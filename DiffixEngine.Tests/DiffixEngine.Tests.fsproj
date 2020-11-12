@@ -8,8 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Parser.Tests.fs" />
+        <Compile Include="QueryEngine.Tests.fs" />
         <Compile Include="Program.fs" />
+        <Content Include="test-db-creation.sql" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\SqlParser\SqlParser.fsproj" />
+      <ProjectReference Include="..\DiffixEngine\DiffixEngine.fsproj" />
       <ProjectReference Include="..\TestHelpers\TestHelpers.fsproj" />
     </ItemGroup>
 

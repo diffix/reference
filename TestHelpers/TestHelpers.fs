@@ -1,4 +1,4 @@
-module SqlParser.Tests.TestHelpers
+module TestHelpers
 
 open Xunit
 open System

@@ -1,10 +1,9 @@
 module Tests
 
-open SqlParser.Tests
+open TestHelpers
 open SqlParser.Parser
 open SqlParser.Query
 open Xunit
-open TestHelpers
 
 [<Fact>]
 let ``Fails on unexpected input`` () =
