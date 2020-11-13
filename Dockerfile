@@ -8,9 +8,13 @@ RUN npm install -g yarn
 # Do the CSS generation separately. Unlikely to change much,
 # and takes an awful lot of time!
 RUN mkdir /assets
-COPY WebFrontend/ /assets
 WORKDIR /assets
+COPY WebFrontend/package.json /assets/
+COPY WebFrontend/yarn.lock /assets/
 RUN yarn install
+
+# And now the rest of the web app
+COPY WebFrontend/ /assets
 RUN make build-css
 
 RUN mkdir /diffix-prototype
