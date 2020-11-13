@@ -29,7 +29,11 @@ let main _ =
                 webHostBuilder
                     .Configure(configureApp)
                     .ConfigureServices(configureServices)
+                    #if DEBUG
                     .UseWebRoot(__SOURCE_DIRECTORY__ + "/wwwroot")
+                    #else
+                    .UseWebRoot("/wwwroot")
+                    #endif 
                     |> ignore)
         .Build()
         .Run()

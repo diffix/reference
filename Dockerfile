@@ -21,4 +21,5 @@ RUN dotnet publish WebFrontend -c Production -r linux-x64 --output build
 FROM mcr.microsoft.com/dotnet/runtime:5.0
 
 COPY --from=builder /diffix-prototype/build/ /release
+COPY --from=builder /diffix-prototype/WebFrontend/wwwroot/ /wwwroot
 CMD /release/WebFrontend
