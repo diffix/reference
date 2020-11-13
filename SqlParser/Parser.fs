@@ -14,7 +14,7 @@ module ParserDefinition =
         |> List.reduce (>>.)
         
     module ShowQueries =
-        let pIdentifiersColumnsInTable = pSkipWordsCI ["columns"; "from"] >>. pAnyWord |>> ShowColumnsFromTable 
+        let pIdentifiersColumnsInTable = pSkipWordsCI ["columns"; "from"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
             
         let pIdentifierTables = stringCIReturn "tables" ShowTables
         
