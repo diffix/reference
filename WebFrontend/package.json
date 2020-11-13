@@ -1,0 +1,11 @@
+{
+  "name": "WebFrontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "parcel-bundler": "^1.12.4",
+    "postcss": "^8.1.7",
+    "tailwindcss": "^1.9.6"
+  }
+}
