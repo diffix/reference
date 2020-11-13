@@ -30,6 +30,7 @@ let queryContainer query =
   form [_method "POST"; _action "/query"] [
     textarea [
       _class "pt-6 w-full block bg-gray-100 font-mono px-6 focus:bg-gray-700 focus:text-gray-100 focus:outline-none"
+      _oninput "this.style.height = '';this.style.height = this.scrollHeight + 3 + 'px'"
       _name "query"
     ] [
       str query
