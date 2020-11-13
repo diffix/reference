@@ -75,7 +75,7 @@ let renderResults: Row list -> XmlNode =
 let errorFragment title description =
   div [_class "bg-red-400 text-white p-4 w-full"] [
     h2 [_class "text-lg font-bold"] [str title]
-    pre [_class "mt-2 p-4 bg-red-500"] [str description]
+    pre [_class "mt-2 p-4 bg-red-500 rounded-b-md"] [str description]
   ]
   
 let queryPage query queryResult =

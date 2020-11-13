@@ -23,6 +23,7 @@ let handleQuery: HttpHandler =
     task {
       let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
       let! userRequest = ctx.BindFormAsync<Query>(usAmerican)
-      let! queryResult = DiffixEngine.QueryEngine.runQuery dbPath userRequest.Query |> Async.StartAsTask
+      let query = userRequest.Query.Trim()
+      let! queryResult = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask
       return! htmlView (Page.queryPage userRequest.Query queryResult) next ctx
     }
