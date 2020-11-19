@@ -5,7 +5,7 @@ module ParserDefinition =
     open SqlParser.Query
     
     let pAnyWord =
-       satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c)
+       satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_')
        |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
     
     let pSkipWordSpacesCI word = skipStringCI word >>. spaces

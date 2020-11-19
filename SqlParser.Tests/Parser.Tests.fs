@@ -19,6 +19,7 @@ let ``Parses words`` () =
     assertOkEqual (parse pAnyWord "hello, world") "hello" // Parses until special token
     assertOkEqual (parse pAnyWord "hello12") "hello12" // Parses digits too
     assertError (parse pAnyWord "12hello") // Rejects things starting with digits
+    assertOkEqual (parse pAnyWord "hello_12") "hello_12" // Allows underscores
 
 [<Fact>]
 let ``Parses columns`` () =
