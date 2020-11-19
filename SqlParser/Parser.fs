@@ -4,7 +4,9 @@ module ParserDefinition =
     open FParsec
     open SqlParser.Query
     
-    let pAnyWord = many1Satisfy isLetter
+    let pAnyWord =
+       satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c)
+       |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
     
     let pSkipWordSpacesCI word = skipStringCI word >>. spaces
     
@@ -14,13 +16,34 @@ module ParserDefinition =
         |> List.reduce (>>.)
         
     module ShowQueries =
-        let pIdentifiersColumnsInTable = pSkipWordsCI ["columns"; "from"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
+        let pIdentifiersColumnsInTable = pSkipWordsCI ["COLUMNS"; "FROM"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
             
-        let pIdentifierTables = stringCIReturn "tables" ShowTables
+        let pIdentifierTables = stringCIReturn "TABLES" ShowTables
         
-        let parse = skipStringCI "show" >>. spaces >>. (pIdentifierTables <|> pIdentifiersColumnsInTable)
+        let parse = skipStringCI "SHOW" >>. spaces >>. (pIdentifierTables <|> pIdentifiersColumnsInTable)
         
-    let pQuery = spaces >>. ShowQueries.parse
+    module SelectQueries =
+       let pColumn =
+           pAnyWord .>> spaces
+           |>> fun columnName -> Column (PlainColumn columnName)
+       
+       let pTable =
+           pAnyWord .>> spaces |>> Table 
+       
+       let pColumns =
+           sepBy1 pColumn (pchar ',' .>> spaces)
+           .>> spaces
+           
+       let parse =
+           pSkipWordSpacesCI "SELECT"
+           >>. pColumns
+           .>> pSkipWordSpacesCI "FROM"
+           .>>. pTable
+           |>> fun (columns, table) -> SelectQuery {Expressions = columns; From = table}
+        
+    let pQuery =
+        spaces
+        >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
         
     let parse = run pQuery 
 

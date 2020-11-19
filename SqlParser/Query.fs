@@ -8,13 +8,13 @@ module Query =
   type ColumnName = string
   type TableName = string
 
-  type Column =
-    | Column of ColumnName 
+  type ColumnType =
+    | PlainColumn of ColumnName 
     | AliasedColumn of ColumnName * string
     
   type Expression =
     | Constant of Constant
-    | Column of Column
+    | Column of ColumnType
     
   type From =
     | Table of TableName

@@ -1,7 +1,6 @@
 module TestHelpers
 
 open Xunit
-open System
 
 let assertOk (result: Result<'a, 'b>) =
   Assert.True (match result with Ok _ -> true | Error _ -> false)
@@ -9,10 +8,10 @@ let assertOk (result: Result<'a, 'b>) =
 let assertError (result: Result<'a, 'b>) =
   Assert.True (match result with Ok _ -> false | Error _ -> true)
   
-let assertOkEqual (result: Result<'a, 'b>) (expected: 'a) =
+let assertOkEqual<'a, 'b> (result: Result<'a, 'b>) (expected: 'a) =
   match result with
-  | Ok value -> Assert.Equal (sprintf "%A" expected, sprintf "%A" value)
-  | Error error -> Assert.Equal (sprintf "%A" expected, sprintf "%A" error)
+  | Ok value -> Assert.Equal (expected, value)
+  | Error error -> failwith (sprintf "Did not expect error: %A" error)
     
 let assertErrorEqual (result: Result<'a, 'b>) (expected: 'b) =
   assertError result
