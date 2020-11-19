@@ -157,15 +157,19 @@ let readQueryResults connection (query: SelectQuery) =
                             | DbUnknownType _ -> ColumnValue.StringValue "Unknown type"
                         ColumnCell (columnName, value)
                 )
-            let reader = command.ExecuteReader()
-            return
-                seq {
-                    while reader.Read() do
-                        let row: ColumnCell list =
-                            columnConverter
-                            |> List.map(fun c -> c reader)
-                        yield row
-                }
+            try
+                let reader = command.ExecuteReader()
+                return
+                    seq {
+                        while reader.Read() do
+                            let row: ColumnCell list =
+                                columnConverter
+                                |> List.map(fun c -> c reader)
+                            yield row
+                    }
+            with
+            | exn ->
+                return! Error (ExecutionError exn.Message)
     }
             
 let executeSelect (connection: SQLiteConnection) query =
