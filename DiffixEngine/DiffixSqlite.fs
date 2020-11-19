@@ -1,13 +1,19 @@
 module DiffixEngine.DiffixSqlite
 
+open SqlParser.Query
 open Types
 open System.Data.SQLite
 open FsToolkit.ErrorHandling
 open Dapper
 
+type DbColumnType =
+    | DbInteger
+    | DbString
+    | DbUnknownType of string
+    
 type DbColumn = {
     Name: string
-    ColumnType: string
+    ColumnType: DbColumnType
 }
 
 type DbTable = {
@@ -18,6 +24,18 @@ type DbTable = {
 let dbConnection path =
     try Ok (new SQLiteConnection(sprintf "Data Source=%s; Version=3; Read Only=true;" path))
     with exn -> Error DbNotFound
+    
+let columnTypeFromString =
+    function
+    | "INTEGER" -> DbInteger
+    | "TEXT" -> DbString
+    | other -> DbUnknownType other
+
+let columnTypeToString =
+    function
+    | DbInteger -> "integer"
+    | DbString -> "string"
+    | DbUnknownType typeName -> typeName + " (not yet supported)"
     
 let dbSchema (connection: SQLiteConnection) =
     asyncResult {
@@ -46,7 +64,7 @@ let dbSchema (connection: SQLiteConnection) =
                        Name = tableName
                        Columns =
                            rows
-                           |> List.map(fun row -> {Name = row.ColumnName; ColumnType = row.ColumnType})
+                           |> List.map(fun row -> {Name = row.ColumnName; ColumnType = columnTypeFromString row.ColumnType})
                    } 
                 )
                 |> List.sortBy(fun table -> table.Name)
@@ -77,8 +95,81 @@ let getColumnsFromTable (connection: SQLiteConnection) tableName =
                     |> List.map(fun column ->
                         [
                             ColumnCell ("name", StringValue column.Name)
-                            ColumnCell ("type", StringValue column.ColumnType)
+                            ColumnCell ("type", StringValue (columnTypeToString column.ColumnType))
                         ]
                     )
             |> ResultTable
+    }
+
+let columnToSql index column =
+    let columnSql = 
+        match column with
+        | Constant (Integer value)  -> string value
+        | Constant (String value)  -> sprintf "'%s'" value
+        | Column (PlainColumn name) -> name
+        | Column (AliasedColumn (columnName, _aliasName)) -> columnName
+    sprintf "%s as col%i" columnSql index
+
+let tableName =
+    function
+    | Table tableName -> tableName
+    
+let generateSqlQuery (query: SelectQuery) =
+    let columns =
+        query.Expressions
+        |> List.mapi columnToSql
+        |> List.reduce(fun a b -> sprintf "%s, %s" a b)
+    let from = tableName query.From
+    sprintf """
+    SELECT
+        %s
+    FROM %s
+    """ columns from
+
+let readQueryResults connection (query: SelectQuery) =
+    asyncResult {
+        let! schema = dbSchema connection
+        let desiredTableName = tableName query.From
+        match schema |> List.tryFind (fun table -> table.Name = desiredTableName) with
+        | None -> return! Error (ExecutionError (sprintf "Unknown table %s" desiredTableName))
+        | Some table ->
+            let typeByColumnName =
+                table.Columns
+                |> List.map(fun column -> column.Name, column.ColumnType)
+                |> Map.ofList
+                
+            use command = new SQLiteCommand(generateSqlQuery query, connection)
+            
+            let columnConverter =
+                query.Expressions
+                |> List.mapi(fun index expression (reader: SQLiteDataReader) ->
+                    match expression with
+                    | Constant (Integer value) ->
+                        ColumnCell (string value, ColumnValue.IntegerValue value)
+                    | Constant (String value) ->
+                        ColumnCell (value, ColumnValue.StringValue value)
+                    | Column (PlainColumn columnName) 
+                    | Column (AliasedColumn (columnName, _)) ->
+                        let value =
+                            match Map.find columnName typeByColumnName with
+                            | DbInteger -> ColumnValue.IntegerValue(reader.GetInt32 index)
+                            | DbString -> ColumnValue.StringValue(reader.GetString index)
+                            | DbUnknownType _ -> ColumnValue.StringValue "Unknown type"
+                        ColumnCell (columnName, value)
+                )
+            let reader = command.ExecuteReader()
+            return
+                seq {
+                    while reader.Read() do
+                        let row: ColumnCell list =
+                            columnConverter
+                            |> List.map(fun c -> c reader)
+                        yield row
+                }
+    }
+            
+let executeSelect (connection: SQLiteConnection) query =
+    asyncResult {
+        let! rowSequence = readQueryResults connection query
+        return ResultTable (Seq.toList rowSequence)
     }

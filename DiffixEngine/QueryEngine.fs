@@ -8,10 +8,14 @@ module QueryEngine =
     let private executeQuery databasePath queryAst =
         asyncResult {
             let! connection = DiffixSqlite.dbConnection databasePath
-            match queryAst with
-            | Query.ShowTables -> return! DiffixSqlite.getTables connection
-            | Query.ShowColumnsFromTable table -> return! DiffixSqlite.getColumnsFromTable connection table
-            | Query.SelectQuery _ -> return (ExecutionError "SELECT queries are not yet supported")
+            do! connection.OpenAsync() |> Async.AwaitTask
+            let! result =
+                match queryAst with
+                | Query.ShowTables -> DiffixSqlite.getTables connection
+                | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
+                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection query
+            do! connection.CloseAsync() |> Async.AwaitTask
+            return result
         }
         
     let parseSql sqlQuery =
