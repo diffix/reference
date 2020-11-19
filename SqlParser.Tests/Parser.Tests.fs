@@ -23,10 +23,21 @@ let ``Parses words`` () =
 
 [<Fact>]
 let ``Parses columns`` () =
-    assertOkEqual (parse SelectQueries.pColumns "hello") [Column (PlainColumn "hello")]
-    assertOkEqual (parse SelectQueries.pColumns "hello, world") [Column (PlainColumn "hello"); Column (PlainColumn "world")]
-    assertOkEqual (parse SelectQueries.pColumns "hello,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
-    assertOkEqual (parse SelectQueries.pColumns "hello ,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.pExpressions "hello") [Column (PlainColumn "hello")]
+    assertOkEqual (parse SelectQueries.pExpressions "hello, world") [Column (PlainColumn "hello"); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.pExpressions "hello,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.pExpressions "hello ,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
+    
+[<Fact>]
+let ``Parses functions`` () =
+    assertOkEqual (parse SelectQueries.pExpressions "hello(world)") [Function ("hello", (Column (PlainColumn "world")))]
+    assertOkEqual (parse SelectQueries.pExpressions "hello ( world )") [Function ("hello", (Column (PlainColumn "world")))]
+    assertOkEqual
+        (parse SelectQueries.pExpressions "hello(world), hello(moon)")
+        [
+          Function ("hello", (Column (PlainColumn "world")))
+          Function ("hello", (Column (PlainColumn "moon")))
+        ]
     
 [<Fact>]
 let ``Parses SELECT by itself`` () =

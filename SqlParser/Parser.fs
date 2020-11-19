@@ -15,6 +15,9 @@ module ParserDefinition =
         |> List.map(pSkipWordSpacesCI)
         |> List.reduce (>>.)
         
+    let pInParenthesis p =
+        pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
+        
     module ShowQueries =
         let pIdentifiersColumnsInTable = pSkipWordsCI ["COLUMNS"; "FROM"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
             
@@ -30,13 +33,17 @@ module ParserDefinition =
        let pTable =
            pAnyWord .>> spaces |>> Table 
        
-       let pColumns =
-           sepBy1 pColumn (pchar ',' .>> spaces)
+       let pFunction =
+           pAnyWord .>> spaces .>>. pInParenthesis pColumn
+           |>> Function
+       
+       let pExpressions =
+           sepBy1 (attempt pFunction <|> pColumn) (pchar ',' .>> spaces)
            .>> spaces
            
        let parse =
            pSkipWordSpacesCI "SELECT"
-           >>. pColumns
+           >>. pExpressions
            .>> pSkipWordSpacesCI "FROM"
            .>>. pTable
            |>> fun (columns, table) -> SelectQuery {Expressions = columns; From = table}

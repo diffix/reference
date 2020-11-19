@@ -15,6 +15,7 @@ module Query =
   type Expression =
     | Constant of Constant
     | Column of ColumnType
+    | Function of (string * Expression)
     
   type From =
     | Table of TableName

@@ -100,14 +100,16 @@ let getColumnsFromTable (connection: SQLiteConnection) tableName =
       |> ResultTable
   }
 
-let columnToSql index column =
-  let columnSql = 
-    match column with
-    | Constant (Integer value)  -> string value
-    | Constant (String value)  -> sprintf "'%s'" value
-    | Column (PlainColumn name) -> name
-    | Column (AliasedColumn (columnName, _aliasName)) -> columnName
-  sprintf "%s as col%i" columnSql index
+let rec expressionToSql =
+  function
+  | Constant (Integer value)  -> string value
+  | Constant (String value)  -> sprintf "'%s'" value
+  | Column (PlainColumn name) -> name
+  | Column (AliasedColumn (columnName, _aliasName)) -> columnName
+  | Function (functionName, subExpression) -> sprintf "%s(%s)" functionName (expressionToSql subExpression)
+  
+let rec columnToSql index column =
+  sprintf "%s as col%i" (expressionToSql column) index
 
 let tableName =
   function
@@ -131,30 +133,28 @@ let readQueryResults connection (query: SelectQuery) =
     let desiredTableName = tableName query.From
     match schema |> List.tryFind (fun table -> table.Name = desiredTableName) with
     | None -> return! Error (ExecutionError (sprintf "Unknown table %s" desiredTableName))
-    | Some table ->
-      let typeByColumnName =
-        table.Columns
-        |> List.map(fun column -> column.Name, column.ColumnType)
-        |> Map.ofList
-            
-      use command = new SQLiteCommand(generateSqlQuery query, connection)
+    | Some _table ->
+      let sqlQuery = generateSqlQuery query
+      printfn "Using query:\n%s" sqlQuery
+      use command = new SQLiteCommand(sqlQuery, connection)
       
       let columnConverter =
         query.Expressions
         |> List.mapi(fun index expression (reader: SQLiteDataReader) ->
-          match expression with
-          | Constant (Integer value) ->
-            ColumnCell (string value, ColumnValue.IntegerValue value)
-          | Constant (String value) ->
-            ColumnCell (value, ColumnValue.StringValue value)
-          | Column (PlainColumn columnName) 
-          | Column (AliasedColumn (columnName, _)) ->
-            let value =
-              match Map.find columnName typeByColumnName with
-              | DbInteger -> ColumnValue.IntegerValue(reader.GetInt32 index)
-              | DbString -> ColumnValue.StringValue(reader.GetString index)
-              | DbUnknownType _ -> ColumnValue.StringValue "Unknown type"
-            ColumnCell (columnName, value)
+          let value =
+            match reader.GetFieldType(index) with
+            | fieldType when fieldType = typeof<System.Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
+            | fieldType when fieldType = typeof<System.Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
+            | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
+            | unknownType -> ColumnValue.StringValue (sprintf "Unknown type: %A" unknownType)
+          let columnName =
+            match expression with
+            | Constant (Integer value) -> string value
+            | Constant (String value) -> value
+            | Column (PlainColumn columnName) 
+            | Column (AliasedColumn (columnName, _)) -> columnName
+            | Function (functionName, _expression) -> functionName
+          ColumnCell (columnName, value)
         )
       try
         let reader = command.ExecuteReader()
