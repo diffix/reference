@@ -32,7 +32,7 @@ let layout content =
             _class "flex flex-col space-y-2 mt-4"] [
             div [_class "flex"] [
               label [_for "password"; _class "w-1/3 text-right pr-4"] [str "Password:"]
-              input [_id "password"; _name "password"; _type "password"; _class "flex-grow px-2 py-1"]
+              input [_id "password"; _name "password"; _type "password"; _class "flex-grow px-2 py-1 rounded-lg"]
             ]
 
             div [_class "flex"] [
