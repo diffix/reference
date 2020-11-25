@@ -58,6 +58,7 @@ let webApp =
     choose [
       POST >=>
         choose [
+          route "/api" >=> QueryHandler.apiHandleQuery dbPath 
           route "/query" >=> QueryHandler.handleQuery dbPath 
           route "/upload-db" >=> validatePassword >=> dbUploadHandler
         ]
