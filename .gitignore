@@ -8,3 +8,4 @@ DiffixPrototype.sln.DotSettings.user
 
 WebFrontend/dist/
 WebFrontend/wwwroot/*.map
+dbs/*
