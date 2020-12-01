@@ -6,8 +6,6 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Http
 open Giraffe
 open WebFrontend
-open FSharp.Control.Tasks.V2
-open System.IO
 
 let uploadPassword =
   match Environment.GetEnvironmentVariable("UPLOAD_PASSWORD") with
