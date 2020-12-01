@@ -87,6 +87,7 @@ type QueryResult =
 type QueryError =
   | ParseError of string
   | DbNotFound
+  | InvalidRequest of string
   | ExecutionError of string
   | UnexpectedError of string
   
@@ -103,6 +104,12 @@ type QueryError =
         "success", Encode.bool false
         "type", Encode.string "Database not found"
         "error_message", Encode.string "Could not find the database"
+      ]
+    | InvalidRequest error ->
+      Encode.object [
+        "success", Encode.bool false
+        "type", Encode.string "Invalid request"
+        "error_message", Encode.string error
       ]
     | ExecutionError error ->
       Encode.object [

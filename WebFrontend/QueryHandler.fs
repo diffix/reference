@@ -15,9 +15,20 @@ type QueryRequest =
   {
     Query: string
     Database: string
-    AidColumn: string option
+    AidColumns: string list
     Seed: int option
   }
+  
+  static member Decoder: Decoder<QueryRequest> =
+    Decode.object (
+      fun get ->
+        {
+          Query = get.Required.Field "query" Decode.string
+          Database = get.Required.Field "database" Decode.string
+          AidColumns = get.Optional.Field "aid_columns" (Decode.list Decode.string) |> Option.defaultValue []
+          Seed = get.Optional.Field "seed" Decode.int
+        }
+    )
 
 let seed =
   match Environment.GetEnvironmentVariable("SEED") with
@@ -37,8 +48,14 @@ let runQuery pathToDbs (request: QueryRequest) =
       |> List.tryFind (fun (name, _) -> name = request.Database)
       |> Option.map snd
       |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
+    let! aidColumnOption = result {
+      match request.AidColumns with
+      | [aidColumn] -> return Some aidColumn
+      | [] -> return None
+      | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
+    }
     let reqParams = {
-      AidColumnOption = request.AidColumn
+      AidColumnOption = aidColumnOption
       Seed = request.Seed |> Option.map int |> Option.defaultValue seed
       LowCountThreshold = 5.
       LowCountThresholdStdDev = 0.5
@@ -50,17 +67,26 @@ let runQuery pathToDbs (request: QueryRequest) =
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
-      let! userRequest = ctx.BindJsonAsync<QueryRequest>()
-      let! result = runQuery pathToDbs userRequest
-      let response =
-        match result with
-        | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
-        | Error error -> Encode.toString 2 (QueryError.Encoder error)
-      return! (
-        text response
-        >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
-        >=> setStatusCode 200
-      ) next ctx
+      let! body = ctx.ReadBodyFromRequestAsync()
+      match Decode.fromString QueryRequest.Decoder body with
+      | Ok userRequest ->
+        let! result = runQuery pathToDbs userRequest
+        let response =
+          match result with
+          | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
+          | Error error -> Encode.toString 2 (QueryError.Encoder error)
+        return! (
+          text response
+          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
+          >=> setStatusCode 200
+        ) next ctx
+      | Error errorMessage ->
+        let error = Encode.toString 2 (QueryError.Encoder (InvalidRequest errorMessage))
+        return! (
+          text error
+          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
+          >=> setStatusCode 400
+        ) next ctx
     }
   
 let handleQuery pathToDbs: HttpHandler =
