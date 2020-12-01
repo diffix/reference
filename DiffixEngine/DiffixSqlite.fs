@@ -36,7 +36,14 @@ let columnTypeToString =
   | DbInteger -> "integer"
   | DbString -> "string"
   | DbUnknownType typeName -> typeName + " (not yet supported)"
-    
+
+[<CLIMutable>]
+type private DbSchemaQueryRow = {
+  TableName: string
+  ColumnName: string
+  ColumnType: string
+}
+
 let dbSchema (connection: SQLiteConnection) =
   asyncResult {
     // Note: somewhat counterintuitively the order in which the columns are selected matter here.
@@ -54,7 +61,7 @@ let dbSchema (connection: SQLiteConnection) =
     ORDER by tableName, columnName
     """
     try
-      let! resultRows = connection.QueryAsync<{| TableName: string; ColumnName: string; ColumnType: string |}>(sql) |> Async.AwaitTask
+      let! resultRows = connection.QueryAsync<DbSchemaQueryRow>(sql) |> Async.AwaitTask
       return
         resultRows
         |> Seq.toList
@@ -69,7 +76,9 @@ let dbSchema (connection: SQLiteConnection) =
         )
         |> List.sortBy(fun table -> table.Name)
     with
-    | exn -> return! (Error (ExecutionError exn.Message))
+    | exn ->
+      printfn "Exception: %A" exn
+      return! (Error (ExecutionError exn.Message))
   }
 
 let getTables (connection: SQLiteConnection) =
