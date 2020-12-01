@@ -1,6 +1,8 @@
 module WebFrontend.QueryHandler
 
 open System.Globalization
+open DiffixEngine.Types
+open Thoth.Json.Net
 open FSharp.Control.Tasks
 open Microsoft.AspNetCore.Http
 open Giraffe
@@ -11,7 +13,9 @@ type QueryRequest =
   {
     Query: string
     Anonymize: bool
-    Database: string 
+    Database: string
+    AidColumn: string option
+    Seed: string option
   }
 
 let availableDbs path =
@@ -19,7 +23,7 @@ let availableDbs path =
   |> Array.map (fun dbPathName -> Path.GetFileName dbPathName, dbPathName)
   |> Array.sortBy fst
   |> Array.toList
-    
+
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
@@ -28,8 +32,13 @@ let apiHandleQuery pathToDbs: HttpHandler =
       | None -> return! RequestErrors.notFound (text <| sprintf "Could not find database %s" userRequest.Database) next ctx
       | Some (_dbName, dbPath) ->
         let query = userRequest.Query.Trim()
-        let! queryResult = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask
-        return! json queryResult next ctx
+        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask
+        let resultAsJson = Encode.toString 2 (QueryResult.Encoder result)
+        return! (
+          text resultAsJson
+          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
+          >=> setStatusCode 200
+        ) next ctx
     }
     
 let handleQuery pathToDbs: HttpHandler =
