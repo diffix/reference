@@ -38,47 +38,6 @@ let validatePassword: HttpHandler =
       | password when password <> uploadPassword -> RequestErrors.FORBIDDEN "Password is incorrect" next ctx
       | _ -> next ctx
     
-let dbUploadHandler =
-  fun (next : HttpFunc) (ctx : HttpContext) ->
-    task {
-      return!
-        (match ctx.Request.HasFormContentType with
-        | false -> RequestErrors.BAD_REQUEST "Bad request" next ctx
-        | true  ->
-          if ctx.Request.Form.Files.Count = 0
-          then text "Please upload at least one database file" next ctx
-          else
-            ctx.Request.Form.Files
-            |> Seq.iter(fun file ->
-              let fileNamePath = Path.Join [| dbPath; file.FileName |]
-              let fileStream = File.Create fileNamePath
-              file.CopyTo fileStream
-              fileStream.Flush()
-              fileStream.Close()
-            )
-            redirectTo false "/" next ctx)
-    }
-    
-let dbUploadHandlerContentBody =
-  fun (next : HttpFunc) (ctx : HttpContext) ->
-    task {
-      match ctx.TryGetRequestHeader "db-name" with
-      | None ->
-        return! RequestErrors.unprocessableEntity
-                  (text "Please specify the db name with an HTTP header called 'db-name'") next ctx
-      | Some dbName ->
-        let fileNamePath = Path.Join [| dbPath; dbName |]
-        let fileStream = File.Create fileNamePath
-        do! ctx.Request.Body.CopyToAsync fileStream
-        fileStream.Flush()
-        fileStream.Close()
-        return! (
-          text "{\"ok\": true}"
-          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
-          >=> setStatusCode 200
-        ) next ctx
-    }
-    
 let webApp =
   warbler (fun _ ->
     choose [
@@ -86,10 +45,12 @@ let webApp =
         choose [
           route "/api" >=> QueryHandler.apiHandleQuery dbPath 
           route "/query" >=> QueryHandler.handleQuery dbPath 
-          route "/upload-db" >=> validatePassword >=> dbUploadHandler
+          route "/upload-db"
+            >=> validatePassword
+            >=> DbUploadHandler.fromFormHandler dbPath
           route "/api/upload-db"
             >=> validatePasswordHeader
-            >=> dbUploadHandlerContentBody
+            >=> DbUploadHandler.fromBodyHandler dbPath
         ]
       route  "/" >=> htmlView (Page.index dbPath)
       route  "/query" >=> htmlView (Page.index dbPath)
