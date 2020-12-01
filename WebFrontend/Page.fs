@@ -133,14 +133,14 @@ let availableDbs path =
   |> Array.sortBy id
   |> Array.toList
   
-let queryPage dbPath selectedDb query queryResult =
+let queryPage dbPath selectedDb query result =
   let renderedResultSection =
-    match queryResult with
-    | QueryResult.ResultTable rows -> renderResults rows
-    | ParseError error -> errorFragment "Parse error" error
-    | DbNotFound -> errorFragment "Error" "Could not locate the database"
-    | ExecutionError error -> errorFragment "Execution error" error
-    | UnexpectedError error -> errorFragment "An unexpected error occurred" error
+    match result with
+    | Ok (QueryResult.ResultTable rows) -> renderResults rows
+    | Error (ParseError error) -> errorFragment "Parse error" error
+    | Error (DbNotFound) -> errorFragment "Error" "Could not locate the database"
+    | Error (ExecutionError error) -> errorFragment "Execution error" error
+    | Error (UnexpectedError error) -> errorFragment "An unexpected error occurred" error
   div [] [
     queryContainer (availableDbs dbPath) (Some selectedDb) query
     renderedResultSection

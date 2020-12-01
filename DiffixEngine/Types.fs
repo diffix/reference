@@ -19,13 +19,40 @@ type ColumnCell =
 type Row = ColumnCell list
   
 type QueryResult =
+  | ResultTable of Row list
+  
+  static member Encoder (queryResult: QueryResult) =
+    match queryResult with
+    | ResultTable rows ->
+      let columnNames =
+        match List.tryHead rows with
+        | Some columnCells ->
+          columnCells
+          |> List.map (fun (ColumnCell (columnName, _)) -> columnName)
+          |> List.map Encode.string
+        | None -> []
+      
+      let values =
+        rows
+        |> List.map(fun row ->
+          List.map(fun (ColumnCell (_name, value)) -> ColumnValue.Encoder value) row
+          |> Encode.list
+        )
+        |> Encode.list
+      
+      Encode.object [
+        "success", Encode.bool true
+        "column_names", Encode.list columnNames
+        "values", values
+      ]
+  
+type QueryError =
   | ParseError of string
   | DbNotFound
   | ExecutionError of string
   | UnexpectedError of string
-  | ResultTable of Row list
   
-  static member Encoder (queryResult: QueryResult) =
+  static member Encoder (queryResult: QueryError) =
     match queryResult with
     | ParseError error ->
       Encode.object [
@@ -50,26 +77,4 @@ type QueryResult =
         "success", Encode.bool false
         "type", Encode.string "Unexpected error"
         "error_message", Encode.string error
-      ]
-    | ResultTable rows ->
-      let columnNames =
-        match List.tryHead rows with
-        | Some columnCells ->
-          columnCells
-          |> List.map (fun (ColumnCell (columnName, _)) -> columnName)
-          |> List.map Encode.string
-        | None -> []
-      
-      let values =
-        rows
-        |> List.map(fun row ->
-          List.map(fun (ColumnCell (_name, value)) -> ColumnValue.Encoder value) row
-          |> Encode.list
-        )
-        |> Encode.list
-      
-      Encode.object [
-        "success", Encode.bool true
-        "column_names", Encode.list columnNames
-        "values", values
       ]

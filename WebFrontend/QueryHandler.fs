@@ -4,6 +4,7 @@ open System.Globalization
 open DiffixEngine.Types
 open Thoth.Json.Net
 open FSharp.Control.Tasks
+open FsToolkit.ErrorHandling
 open Microsoft.AspNetCore.Http
 open Giraffe
 open System.IO
@@ -32,15 +33,18 @@ let apiHandleQuery pathToDbs: HttpHandler =
       | None -> return! RequestErrors.notFound (text <| sprintf "Could not find database %s" userRequest.Database) next ctx
       | Some (_dbName, dbPath) ->
         let query = userRequest.Query.Trim()
-        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask
-        let resultAsJson = Encode.toString 2 (QueryResult.Encoder result)
+        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask 
+        let response =
+          match result with
+          | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
+          | Error error -> Encode.toString 2 (QueryError.Encoder error)
         return! (
-          text resultAsJson
+          text response
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
           >=> setStatusCode 200
         ) next ctx
     }
-    
+  
 let handleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
@@ -50,6 +54,6 @@ let handleQuery pathToDbs: HttpHandler =
       | None -> return! RequestErrors.notFound (text <| sprintf "Could not find database %s" userRequest.Database) next ctx
       | Some (dbName, dbPath) ->
         let query = userRequest.Query.Trim()
-        let! queryResult = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask
-        return! htmlView (Page.queryPage pathToDbs dbName userRequest.Query queryResult) next ctx
+        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask 
+        return! htmlView (Page.queryPage pathToDbs dbName userRequest.Query result) next ctx
     }

@@ -28,8 +28,3 @@ module QueryEngine =
             let! queryAst = parseSql sqlQuery
             return! executeQuery databasePath queryAst
         }
-        |> Async.map(
-            function
-            | Ok result -> result
-            | Error error -> error
-        )
