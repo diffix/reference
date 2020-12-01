@@ -77,7 +77,7 @@ let queryContainer databases (selectedDbOption: string option) query =
         ]
         label [_class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"] [
           input [_type "checkbox"; _name "anonymize"; _checked]
-          str "Anonymize"
+          span [_class "ml-2"] [str "Anonymize"]
         ]
       ]
       div [] [
