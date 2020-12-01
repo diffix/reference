@@ -16,13 +16,13 @@ type QueryRequest =
     Query: string
     Database: string
     AidColumn: string option
-    Seed: string option
+    Seed: int option
   }
 
 let seed =
   match Environment.GetEnvironmentVariable("SEED") with
-  | null -> "smart deterministic seed"
-  | seed -> seed
+  | null -> 0
+  | seed -> int seed
 
 let availableDbs path =
   Directory.GetFiles path
@@ -39,7 +39,9 @@ let runQuery pathToDbs (request: QueryRequest) =
       |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
     let reqParams = {
       AidColumnOption = request.AidColumn
-      Seed = request.Seed |> Option.defaultValue seed
+      Seed = request.Seed |> Option.map int |> Option.defaultValue seed
+      LowCountThreshold = 5.
+      LowCountThresholdStdDev = 0.5
     }
     let query = request.Query.Trim()
     return! DiffixEngine.QueryEngine.runQuery dbPath reqParams query

@@ -1,5 +1,6 @@
 module DiffixEngine.DiffixSqlite
 
+open System
 open SqlParser.Query
 open Types
 open System.Data.SQLite
@@ -86,7 +87,7 @@ let getTables (connection: SQLiteConnection) =
     let! schema = dbSchema connection
     return
       schema
-      |> List.map(fun table -> [NonPersonal {ColumnName = "name"; ColumnValue = StringValue table.Name}])
+      |> List.map(fun table -> NonPersonalRow {Columns = [{ColumnName = "name"; ColumnValue = StringValue table.Name}]})
       |> ResultTable
   }
     
@@ -101,16 +102,16 @@ let getColumnsFromTable (connection: SQLiteConnection) tableName =
         | Some table ->
           table.Columns
           |> List.map(fun column ->
-            [
-              NonPersonal {
+            NonPersonalRow {Columns = [
+              {
                 ColumnName = "name"
                 ColumnValue = StringValue column.Name
               }
-              NonPersonal {
+              {
                 ColumnName = "type"
                 ColumnValue = StringValue (columnTypeToString column.ColumnType)
               }
-            ]
+            ]}
           )
       |> ResultTable
   }
@@ -146,8 +147,8 @@ let generateSqlQuery aidColumnName (query: SelectQuery) =
 let columnFromReader index expression (reader: SQLiteDataReader) =
   let value =
     match reader.GetFieldType(index) with
-    | fieldType when fieldType = typeof<System.Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
-    | fieldType when fieldType = typeof<System.Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
+    | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
+    | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
     | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
     | unknownType -> ColumnValue.StringValue (sprintf "Unknown type: %A" unknownType)
   let columnName =
@@ -157,7 +158,7 @@ let columnFromReader index expression (reader: SQLiteDataReader) =
     | Column (PlainColumn columnName) 
     | Column (AliasedColumn (columnName, _)) -> columnName
     | Function (functionName, _expression) -> functionName
-  (columnName, value)
+  {ColumnName = columnName; ColumnValue = value}
   
 let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
@@ -173,30 +174,56 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       let fakeAidColumnExpression = Column (PlainColumn aidColumnName)
       
       let columnConverter =
-        query.Expressions
-        |> List.mapi(fun index expression reader ->
-          let (_aidColumnName, aidColumnValue) = columnFromReader 0 fakeAidColumnExpression reader
-          // Since we inserted the AID column as the first column, the requested columns are offset by 1
-          let (columnName, columnValue) = columnFromReader (index+1) expression reader
-          Anonymizable {
-            AidValue = aidColumnValue
-            ColumnName = columnName
-            ColumnValue = columnValue
-          }
-        )
+        fakeAidColumnExpression :: query.Expressions
+        |> List.mapi(columnFromReader)
         
       try
         let reader = command.ExecuteReader()
         return
           seq {
             while reader.Read() do
-              let row: ColumnCell list = List.map(fun c -> c reader) columnConverter
+              let (aidColumn :: row): ColumnCell list = List.map(fun c -> c reader) columnConverter
+              let row: AnonymizableRow = {
+                AidValues = Set.ofList [aidColumn.ColumnValue]
+                Columns = row
+              } 
               yield row
           }
       with
       | exn -> return! Error (ExecutionError exn.Message)
   }
-            
+  
+let randomNum (rnd: System.Random) mean stdDev = 
+  let u1 = 1.0-rnd.NextDouble()
+  let u2 = 1.0-rnd.NextDouble()
+  let randStdNormal = Math.Sqrt(-2.0 * log(u1)) * Math.Sin(2.0 * Math.PI * u2)
+  mean + stdDev * randStdNormal; 
+  
+let newRandom (reqParams: RequestParams) =
+  Random(reqParams.Seed)
+  
+let anonymize reqParams (rowSequence: AnonymizableRow seq) =
+  let rnd = newRandom reqParams
+  let rowsToReject = 
+    rowSequence
+    |> Seq.groupBy(fun row -> row.Columns)
+    |> Seq.filter(fun (_columns, instancesOfRow) ->
+      let distinctUsersCount =
+        instancesOfRow
+        |> Seq.map(fun row -> row.AidValues)
+        |> Set.unionMany
+        |> Set.count
+      let lowCountThreshold = randomNum rnd reqParams.LowCountThreshold reqParams.LowCountThresholdStdDev
+      float distinctUsersCount >= lowCountThreshold
+    )
+    |> Seq.map(fst)
+    |> Set.ofSeq
+  rowSequence
+  |> Seq.filter(fun row ->
+    not (Set.contains row.Columns rowsToReject)
+  )
+  |> Seq.map (AnonymizableRow)
+  
 let executeSelect (connection: SQLiteConnection) reqParams query =
   asyncResult {
     match reqParams.AidColumnOption with
@@ -205,5 +232,6 @@ let executeSelect (connection: SQLiteConnection) reqParams query =
       return! Error (ExecutionError "An AID column name is required")
     | Some aidColumn ->
       let! rowSequence = readQueryResults connection aidColumn query
-      return ResultTable (Seq.toList rowSequence)
+      let anonymizedRows = anonymize reqParams rowSequence 
+      return ResultTable (Seq.toList anonymizedRows)
   }

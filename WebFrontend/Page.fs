@@ -97,30 +97,27 @@ let renderResults: Row list -> XmlNode =
       h2 [_class "text-lg font-bold"] [str "No rows returned"]
     ]
   | rows ->
-    let header = List.head rows
+    let columnsFromRow =
+      function
+      | AnonymizableRow row -> row.Columns
+      | NonPersonalRow row -> row.Columns
+      
+    let header = columnsFromRow (List.head rows)
     
     div [_class "w-full bg-white py-3 px-6"] [
       table [_class "w-full"] [
         thead [] [
           tr [_class "text-left border-b-2 border-gr"] [
             for columnCell in header do
-              let columnName =
-                match columnCell with
-                | Anonymizable columnCell -> columnCell.ColumnName
-                | NonPersonal columnCell -> columnCell.ColumnName
-              yield th [] [str columnName]
+              yield th [] [str columnCell.ColumnName]
           ]
         ]
         tbody [] [
-          for row in rows do
+          for row in rows |> List.map columnsFromRow do
             yield
               tr [_class "pt-2 odd:bg-gray-200"] [
                 for columnCell in row do
-                  let columnValue =
-                    match columnCell with
-                    | Anonymizable columnCell -> columnCell.ColumnValue
-                    | NonPersonal columnCell -> columnCell.ColumnValue
-                  yield td [] [valueToStrNode columnValue]
+                  yield td [] [valueToStrNode columnCell.ColumnValue]
               ]
         ]
       ]

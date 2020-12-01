@@ -4,7 +4,9 @@ open Thoth.Json.Net
 
 type RequestParams = {
   AidColumnOption: string option
-  Seed: string
+  Seed: int
+  LowCountThreshold: float
+  LowCountThresholdStdDev: float
 }
 
 type ColumnName = string
@@ -23,17 +25,27 @@ type NonPersonalColumnCell = {
   ColumnValue: ColumnValue
 }
 
-type AnonymizableColumnCell = {
-  AidValue: ColumnValue 
+type ColumnCell = {
   ColumnName: string
   ColumnValue: ColumnValue
 }
+
+type AnonymizableColumnCell = {
+  AidValue: ColumnValue Set
+}
   
-type ColumnCell =
-  | Anonymizable of AnonymizableColumnCell
-  | NonPersonal of NonPersonalColumnCell
-  
-type Row = ColumnCell list
+type AnonymizableRow = {
+  AidValues: ColumnValue Set
+  Columns: ColumnCell list
+}
+
+type NonPersonalRow = {
+  Columns: ColumnCell list
+}
+
+type Row =
+  | AnonymizableRow of AnonymizableRow
+  | NonPersonalRow of NonPersonalRow
   
 type QueryResult =
   | ResultTable of Row list
@@ -41,33 +53,34 @@ type QueryResult =
   static member Encoder (queryResult: QueryResult) =
     match queryResult with
     | ResultTable rows ->
+      let encodeColumnNames columns = 
+        columns
+        |> List.map(fun column -> Encode.string column.ColumnName) 
+        |> Encode.list
+        
       let columnNames =
         match List.tryHead rows with
-        | Some columnCells ->
-          columnCells
-          |> List.map (
-              function
-              | Anonymizable columnCell -> columnCell.ColumnName
-              | NonPersonal columnCell -> columnCell.ColumnName
-          )
-          |> List.map Encode.string
-        | None -> []
+        | Some (AnonymizableRow anonymizableRow) -> encodeColumnNames anonymizableRow.Columns
+        | Some (NonPersonalRow nonPersonalRow) -> encodeColumnNames nonPersonalRow.Columns
+        | None -> Encode.list []
       
+      let encodeColumns columns = 
+        columns
+        |> List.map(fun column -> ColumnValue.Encoder column.ColumnValue) 
+        |> Encode.list
+        
       let values =
         rows
-        |> List.map(fun row ->
-          List.map(
-            function
-            | Anonymizable columnCell -> ColumnValue.Encoder columnCell.ColumnValue
-            | NonPersonal columnCell -> ColumnValue.Encoder columnCell.ColumnValue
-          ) row
-          |> Encode.list
+        |> List.map(
+          function
+          | AnonymizableRow anonymizableRow -> encodeColumns anonymizableRow.Columns
+          | NonPersonalRow nonPersonalRow -> encodeColumns nonPersonalRow.Columns
         )
         |> Encode.list
       
       Encode.object [
         "success", Encode.bool true
-        "column_names", Encode.list columnNames
+        "column_names", columnNames
         "values", values
       ]
   
