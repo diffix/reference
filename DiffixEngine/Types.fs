@@ -2,6 +2,11 @@ module DiffixEngine.Types
 
 open Thoth.Json.Net
 
+type RequestParams = {
+  AidColumnOption: string option
+  Seed: string
+}
+
 type ColumnName = string
 
 type ColumnValue =
@@ -13,8 +18,20 @@ type ColumnValue =
     | IntegerValue intValue -> Encode.int intValue
     | StringValue strValue -> Encode.string strValue
   
+type NonPersonalColumnCell = {
+  ColumnName: string
+  ColumnValue: ColumnValue
+}
+
+type AnonymizableColumnCell = {
+  AidValue: ColumnValue 
+  ColumnName: string
+  ColumnValue: ColumnValue
+}
+  
 type ColumnCell =
-  | ColumnCell of (ColumnName * ColumnValue) 
+  | Anonymizable of AnonymizableColumnCell
+  | NonPersonal of NonPersonalColumnCell
   
 type Row = ColumnCell list
   
@@ -28,14 +45,22 @@ type QueryResult =
         match List.tryHead rows with
         | Some columnCells ->
           columnCells
-          |> List.map (fun (ColumnCell (columnName, _)) -> columnName)
+          |> List.map (
+              function
+              | Anonymizable columnCell -> columnCell.ColumnName
+              | NonPersonal columnCell -> columnCell.ColumnName
+          )
           |> List.map Encode.string
         | None -> []
       
       let values =
         rows
         |> List.map(fun row ->
-          List.map(fun (ColumnCell (_name, value)) -> ColumnValue.Encoder value) row
+          List.map(
+            function
+            | Anonymizable columnCell -> ColumnValue.Encoder columnCell.ColumnValue
+            | NonPersonal columnCell -> ColumnValue.Encoder columnCell.ColumnValue
+          ) row
           |> Encode.list
         )
         |> Encode.list

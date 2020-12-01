@@ -86,7 +86,7 @@ let getTables (connection: SQLiteConnection) =
     let! schema = dbSchema connection
     return
       schema
-      |> List.map(fun table -> [ColumnCell ("name", StringValue table.Name)])
+      |> List.map(fun table -> [NonPersonal {ColumnName = "name"; ColumnValue = StringValue table.Name}])
       |> ResultTable
   }
     
@@ -102,8 +102,14 @@ let getColumnsFromTable (connection: SQLiteConnection) tableName =
           table.Columns
           |> List.map(fun column ->
             [
-              ColumnCell ("name", StringValue column.Name)
-              ColumnCell ("type", StringValue (columnTypeToString column.ColumnType))
+              NonPersonal {
+                ColumnName = "name"
+                ColumnValue = StringValue column.Name
+              }
+              NonPersonal {
+                ColumnName = "type"
+                ColumnValue = StringValue (columnTypeToString column.ColumnType)
+              }
             ]
           )
       |> ResultTable
@@ -124,11 +130,12 @@ let tableName =
   function
   | Table tableName -> tableName
     
-let generateSqlQuery (query: SelectQuery) =
+let generateSqlQuery aidColumnName (query: SelectQuery) =
+  let aidColumn = Column (PlainColumn aidColumnName)
   let columns =
-    query.Expressions
+    aidColumn :: query.Expressions
     |> List.mapi columnToSql
-    |> List.reduce(fun a b -> sprintf "%s, %s" a b)
+    |> List.reduce(sprintf "%s, %s")
   let from = tableName query.From
   sprintf """
   SELECT
@@ -136,51 +143,67 @@ let generateSqlQuery (query: SelectQuery) =
   FROM %s
   """ columns from
 
-let readQueryResults connection (query: SelectQuery) =
+let columnFromReader index expression (reader: SQLiteDataReader) =
+  let value =
+    match reader.GetFieldType(index) with
+    | fieldType when fieldType = typeof<System.Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
+    | fieldType when fieldType = typeof<System.Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
+    | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
+    | unknownType -> ColumnValue.StringValue (sprintf "Unknown type: %A" unknownType)
+  let columnName =
+    match expression with
+    | Constant (Integer value) -> string value
+    | Constant (String value) -> value
+    | Column (PlainColumn columnName) 
+    | Column (AliasedColumn (columnName, _)) -> columnName
+    | Function (functionName, _expression) -> functionName
+  (columnName, value)
+  
+let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
     let! schema = dbSchema connection
     let desiredTableName = tableName query.From
     match schema |> List.tryFind (fun table -> table.Name = desiredTableName) with
     | None -> return! Error (ExecutionError (sprintf "Unknown table %s" desiredTableName))
     | Some _table ->
-      let sqlQuery = generateSqlQuery query
+      let sqlQuery = generateSqlQuery aidColumnName query
       printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
       
+      let fakeAidColumnExpression = Column (PlainColumn aidColumnName)
+      
       let columnConverter =
         query.Expressions
-        |> List.mapi(fun index expression (reader: SQLiteDataReader) ->
-          let value =
-            match reader.GetFieldType(index) with
-            | fieldType when fieldType = typeof<System.Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
-            | fieldType when fieldType = typeof<System.Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-            | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
-            | unknownType -> ColumnValue.StringValue (sprintf "Unknown type: %A" unknownType)
-          let columnName =
-            match expression with
-            | Constant (Integer value) -> string value
-            | Constant (String value) -> value
-            | Column (PlainColumn columnName) 
-            | Column (AliasedColumn (columnName, _)) -> columnName
-            | Function (functionName, _expression) -> functionName
-          ColumnCell (columnName, value)
+        |> List.mapi(fun index expression reader ->
+          let (_aidColumnName, aidColumnValue) = columnFromReader 0 fakeAidColumnExpression reader
+          // Since we inserted the AID column as the first column, the requested columns are offset by 1
+          let (columnName, columnValue) = columnFromReader (index+1) expression reader
+          Anonymizable {
+            AidValue = aidColumnValue
+            ColumnName = columnName
+            ColumnValue = columnValue
+          }
         )
+        
       try
         let reader = command.ExecuteReader()
         return
           seq {
             while reader.Read() do
-              let row: ColumnCell list =
-                columnConverter
-                |> List.map(fun c -> c reader)
+              let row: ColumnCell list = List.map(fun c -> c reader) columnConverter
               yield row
           }
       with
       | exn -> return! Error (ExecutionError exn.Message)
   }
             
-let executeSelect (connection: SQLiteConnection) query =
+let executeSelect (connection: SQLiteConnection) reqParams query =
   asyncResult {
-    let! rowSequence = readQueryResults connection query
-    return ResultTable (Seq.toList rowSequence)
+    match reqParams.AidColumnOption with
+    | None 
+    | Some "" ->
+      return! Error (ExecutionError "An AID column name is required")
+    | Some aidColumn ->
+      let! rowSequence = readQueryResults connection aidColumn query
+      return ResultTable (Seq.toList rowSequence)
   }

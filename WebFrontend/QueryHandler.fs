@@ -1,5 +1,6 @@
 module WebFrontend.QueryHandler
 
+open System
 open System.Globalization
 open DiffixEngine.Types
 open Thoth.Json.Net
@@ -13,11 +14,15 @@ open System.IO
 type QueryRequest =
   {
     Query: string
-    Anonymize: bool
     Database: string
     AidColumn: string option
     Seed: string option
   }
+
+let seed =
+  match Environment.GetEnvironmentVariable("SEED") with
+  | null -> "smart deterministic seed"
+  | seed -> seed
 
 let availableDbs path =
   Directory.GetFiles path
@@ -32,8 +37,12 @@ let runQuery pathToDbs (request: QueryRequest) =
       |> List.tryFind (fun (name, _) -> name = request.Database)
       |> Option.map snd
       |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
+    let reqParams = {
+      AidColumnOption = request.AidColumn
+      Seed = request.Seed |> Option.defaultValue seed
+    }
     let query = request.Query.Trim()
-    return! DiffixEngine.QueryEngine.runQuery dbPath query
+    return! DiffixEngine.QueryEngine.runQuery dbPath reqParams query
   }
   
 let apiHandleQuery pathToDbs: HttpHandler =

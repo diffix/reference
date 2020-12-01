@@ -76,8 +76,7 @@ let queryContainer databases (selectedDbOption: string option) query =
           )
         ]
         label [_class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"] [
-          input [_type "checkbox"; _name "anonymize"; _checked]
-          span [_class "ml-2"] [str "Anonymize"]
+          input [_type "text"; _name "AidColumn"; _class "rounded-md border px-2 py-1"; _placeholder "Name of the AID column"]
         ]
       ]
       div [] [
@@ -104,7 +103,11 @@ let renderResults: Row list -> XmlNode =
       table [_class "w-full"] [
         thead [] [
           tr [_class "text-left border-b-2 border-gr"] [
-            for ColumnCell (columnName, _value) in header do
+            for columnCell in header do
+              let columnName =
+                match columnCell with
+                | Anonymizable columnCell -> columnCell.ColumnName
+                | NonPersonal columnCell -> columnCell.ColumnName
               yield th [] [str columnName]
           ]
         ]
@@ -112,7 +115,11 @@ let renderResults: Row list -> XmlNode =
           for row in rows do
             yield
               tr [_class "pt-2 odd:bg-gray-200"] [
-                for ColumnCell (_, columnValue) in row do
+                for columnCell in row do
+                  let columnValue =
+                    match columnCell with
+                    | Anonymizable columnCell -> columnCell.ColumnValue
+                    | NonPersonal columnCell -> columnCell.ColumnValue
                   yield td [] [valueToStrNode columnValue]
               ]
         ]
