@@ -21,6 +21,12 @@ let dbPath =
   "/data/"
   #endif
   
+let validatePasswordHeader: HttpHandler =
+  fun (next: HttpFunc) (ctx: HttpContext) ->
+    match ctx.TryGetRequestHeader "password" with
+    | Some password when password = uploadPassword -> next ctx
+    | _ -> RequestErrors.FORBIDDEN "The password is missing or wrong" next ctx
+      
 let validatePassword: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
     let passwordValues = ctx.Request.Form.Item "password"
@@ -53,6 +59,26 @@ let dbUploadHandler =
             redirectTo false "/" next ctx)
     }
     
+let dbUploadHandlerContentBody =
+  fun (next : HttpFunc) (ctx : HttpContext) ->
+    task {
+      match ctx.TryGetRequestHeader "db-name" with
+      | None ->
+        return! RequestErrors.unprocessableEntity
+                  (text "Please specify the db name with an HTTP header called 'db-name'") next ctx
+      | Some dbName ->
+        let fileNamePath = Path.Join [| dbPath; dbName |]
+        let fileStream = File.Create fileNamePath
+        do! ctx.Request.Body.CopyToAsync fileStream
+        fileStream.Flush()
+        fileStream.Close()
+        return! (
+          text "{\"ok\": true}"
+          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
+          >=> setStatusCode 200
+        ) next ctx
+    }
+    
 let webApp =
   warbler (fun _ ->
     choose [
@@ -61,6 +87,9 @@ let webApp =
           route "/api" >=> QueryHandler.apiHandleQuery dbPath 
           route "/query" >=> QueryHandler.handleQuery dbPath 
           route "/upload-db" >=> validatePassword >=> dbUploadHandler
+          route "/api/upload-db"
+            >=> validatePasswordHeader
+            >=> dbUploadHandlerContentBody
         ]
       route  "/" >=> htmlView (Page.index dbPath)
       route  "/query" >=> htmlView (Page.index dbPath)
