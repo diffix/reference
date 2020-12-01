@@ -25,24 +25,31 @@ let availableDbs path =
   |> Array.sortBy fst
   |> Array.toList
 
+let runQuery pathToDbs (request: QueryRequest) =
+  asyncResult {
+    let! dbPath =
+      availableDbs pathToDbs
+      |> List.tryFind (fun (name, _) -> name = request.Database)
+      |> Option.map snd
+      |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
+    let query = request.Query.Trim()
+    return! DiffixEngine.QueryEngine.runQuery dbPath query
+  }
+  
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let! userRequest = ctx.BindJsonAsync<QueryRequest>()
-      match List.tryFind (fun (name, _) -> name = userRequest.Database) (availableDbs pathToDbs) with
-      | None -> return! RequestErrors.notFound (text <| sprintf "Could not find database %s" userRequest.Database) next ctx
-      | Some (_dbName, dbPath) ->
-        let query = userRequest.Query.Trim()
-        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask 
-        let response =
-          match result with
-          | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
-          | Error error -> Encode.toString 2 (QueryError.Encoder error)
-        return! (
-          text response
-          >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
-          >=> setStatusCode 200
-        ) next ctx
+      let! result = runQuery pathToDbs userRequest
+      let response =
+        match result with
+        | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
+        | Error error -> Encode.toString 2 (QueryError.Encoder error)
+      return! (
+        text response
+        >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
+        >=> setStatusCode 200
+      ) next ctx
     }
   
 let handleQuery pathToDbs: HttpHandler =
@@ -50,10 +57,6 @@ let handleQuery pathToDbs: HttpHandler =
     task {
       let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
       let! userRequest = ctx.BindFormAsync<QueryRequest>(usAmerican)
-      match List.tryFind (fun (name, _) -> name = userRequest.Database) (availableDbs pathToDbs) with
-      | None -> return! RequestErrors.notFound (text <| sprintf "Could not find database %s" userRequest.Database) next ctx
-      | Some (dbName, dbPath) ->
-        let query = userRequest.Query.Trim()
-        let! result = DiffixEngine.QueryEngine.runQuery dbPath query |> Async.StartAsTask 
-        return! htmlView (Page.queryPage pathToDbs dbName userRequest.Query result) next ctx
+      let! result = runQuery pathToDbs userRequest 
+      return! htmlView (Page.queryPage pathToDbs userRequest.Database userRequest.Query result) next ctx
     }
