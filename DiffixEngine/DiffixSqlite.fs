@@ -183,18 +183,20 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
         return
           seq {
             while reader.Read() do
-              let (aidColumn :: row): ColumnCell list = List.map(fun c -> c reader) columnConverter
-              let row: AnonymizableRow = {
-                AidValues = Set.ofList [aidColumn.ColumnValue]
-                Columns = row
-              } 
-              yield row
+              match columnConverter |> List.map(fun c -> c reader) with
+              | [] -> failwith "Can't happen. List is never empty since we add the AID column expression"
+              | aidColumn :: row ->
+                let row: AnonymizableRow = {
+                  AidValues = Set.ofList [aidColumn.ColumnValue]
+                  Columns = row
+                } 
+                yield row
           }
       with
       | exn -> return! Error (ExecutionError exn.Message)
   }
   
-let randomNum (rnd: System.Random) mean stdDev = 
+let randomNum (rnd: Random) mean stdDev = 
   let u1 = 1.0-rnd.NextDouble()
   let u2 = 1.0-rnd.NextDouble()
   let randStdNormal = Math.Sqrt(-2.0 * log(u1)) * Math.Sin(2.0 * Math.PI * u2)
@@ -233,6 +235,6 @@ let executeSelect (connection: SQLiteConnection) reqParams query =
       return! Error (ExecutionError "An AID column name is required")
     | Some aidColumn ->
       let! rowSequence = readQueryResults connection aidColumn query
-      let anonymizedRows = anonymize reqParams (Seq.toList rowSequence)
-      return ResultTable (Seq.toList anonymizedRows)
+      let anonRows = anonymize reqParams (Seq.toList rowSequence)
+      return ResultTable (Seq.toList anonRows)
   }
