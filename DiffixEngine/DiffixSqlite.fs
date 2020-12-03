@@ -202,27 +202,27 @@ let randomNum (rnd: System.Random) mean stdDev =
 let newRandom (reqParams: RequestParams) =
   Random(reqParams.Seed)
   
-let anonymize reqParams (rowSequence: AnonymizableRow seq) =
+let anonymize reqParams (rows: AnonymizableRow list) =
   let rnd = newRandom reqParams
-  let rowsToReject = 
-    rowSequence
-    |> Seq.groupBy(fun row -> row.Columns)
-    |> Seq.filter(fun (_columns, instancesOfRow) ->
+  let rowsToReject =
+    rows
+    |> List.groupBy(fun row -> row.Columns)
+    |> List.filter(fun (_columns, instancesOfRow) ->
       let distinctUsersCount =
         instancesOfRow
-        |> Seq.map(fun row -> row.AidValues)
+        |> List.map(fun row -> row.AidValues)
         |> Set.unionMany
         |> Set.count
       let lowCountThreshold = randomNum rnd reqParams.LowCountThreshold reqParams.LowCountThresholdStdDev
-      float distinctUsersCount >= lowCountThreshold
+      (float distinctUsersCount) < lowCountThreshold
     )
-    |> Seq.map(fst)
+    |> List.map(fst)
     |> Set.ofSeq
-  rowSequence
-  |> Seq.filter(fun row ->
+  rows
+  |> List.filter(fun row ->
     not (Set.contains row.Columns rowsToReject)
   )
-  |> Seq.map (AnonymizableRow)
+  |> List.map (AnonymizableRow)
   
 let executeSelect (connection: SQLiteConnection) reqParams query =
   asyncResult {
@@ -232,6 +232,6 @@ let executeSelect (connection: SQLiteConnection) reqParams query =
       return! Error (ExecutionError "An AID column name is required")
     | Some aidColumn ->
       let! rowSequence = readQueryResults connection aidColumn query
-      let anonymizedRows = anonymize reqParams rowSequence 
+      let anonymizedRows = anonymize reqParams (Seq.toList rowSequence)
       return ResultTable (Seq.toList anonymizedRows)
   }
