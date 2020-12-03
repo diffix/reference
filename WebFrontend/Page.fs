@@ -49,7 +49,7 @@ let layout content =
         ]
         
         div [_class "mt-8 py-5 text-gray-600"] [
-          str "For the source, checkout "
+          str "For the source code and more info, checkout "
           a [_href "https://github.com/diffix/prototype"; _class "underlined"] [str "Github"]
           str "."
         ]
