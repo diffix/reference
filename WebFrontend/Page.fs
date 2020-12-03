@@ -48,7 +48,7 @@ let layout content =
           ]
         ]
         
-        div [_class "mt-4 mx-auto py-5 text-sm text-gray-600"] [
+        div [_class "mt-4 mx-auto py-5 text-sm text-gray-500"] [
           str "For the source code and more info, checkout "
           a [_href "https://github.com/diffix/prototype"; _class "underline"] [str "Github"]
           str "."
