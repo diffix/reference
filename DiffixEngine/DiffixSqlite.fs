@@ -164,9 +164,10 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
     let! schema = dbSchema connection
     let desiredTableName = tableName query.From
-    match schema |> List.tryFind (fun table -> table.Name = desiredTableName) with
-    | None -> return! Error (ExecutionError (sprintf "Unknown table %s" desiredTableName))
-    | Some _table ->
+    let (tableOption: DbTable option) = schema |> List.tryFind (fun table -> table.Name = desiredTableName)
+    if tableOption.IsNone
+    then return! Error (ExecutionError (sprintf "Unknown table %s" desiredTableName))
+    else
       let sqlQuery = generateSqlQuery aidColumnName query
       printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
