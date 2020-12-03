@@ -3,6 +3,7 @@ module WebFrontend.Page
 open DiffixEngine.Types
 open Giraffe
 open GiraffeViewEngine
+open WebFrontend.Types
 
 let layout content =
   html [_lang "en"] [
@@ -50,14 +51,14 @@ let layout content =
     ]
   ]
 
-let queryContainer databases (selectedDbOption: string option) query =
+let queryContainer databases (queryRequest: QueryRequest) =
   form [_method "POST"; _action "/query"] [
     textarea [
       _class "pt-6 w-full block bg-gray-100 font-mono px-6 focus:bg-gray-700 focus:text-gray-100 focus:outline-none"
       _oninput "this.style.height = '';this.style.height = this.scrollHeight + 'px'"
       _name "query"
     ] [
-      str query
+      str queryRequest.Query
     ]
     div [_class "flex items-center bg-white px-6 py-5"] [
       div [_class "flex-grow"] [
@@ -68,15 +69,21 @@ let queryContainer databases (selectedDbOption: string option) query =
             |> List.map (fun dbName ->
               option [
                 _value dbName
-                match selectedDbOption with
-                | Some selectedDbName when selectedDbName = dbName -> _selected
+                match queryRequest.Database with
+                | selectedDbName when selectedDbName = dbName -> _selected
                 | _ -> ()
               ] [str dbName]
             )
           )
         ]
         label [_class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"] [
-          input [_type "text"; _name "AidColumns[]"; _class "rounded-md border px-2 py-1"; _placeholder "Name of the AID column"]
+          input [
+            _type "text"
+            _name "AidColumns[]"
+            _class "rounded-md border px-2 py-1"
+            _placeholder "Name of the AID column"
+            _value (queryRequest.AidColumns |> List.tryHead |> Option.defaultValue "")
+          ]
         ]
       ]
       div [] [
@@ -137,7 +144,7 @@ let availableDbs path =
   |> Array.sortBy id
   |> Array.toList
   
-let queryPage dbPath selectedDb query result =
+let queryPage dbPath (userRequest: QueryRequest) result =
   let renderedResultSection =
     match result with
     | Ok (QueryResult.ResultTable rows) -> renderResults rows
@@ -145,12 +152,18 @@ let queryPage dbPath selectedDb query result =
     | Error (DbNotFound) -> errorFragment "Error" "Could not locate the database"
     | Error (ExecutionError error) -> errorFragment "Execution error" error
     | Error (UnexpectedError error) -> errorFragment "An unexpected error occurred" error
+    | Error (InvalidRequest error) -> errorFragment "The request is invalid" error
   div [] [
-    queryContainer (availableDbs dbPath) (Some selectedDb) query
+    queryContainer (availableDbs dbPath) userRequest
     renderedResultSection
   ]
   |> layout
     
 let index dbPath =
-  queryContainer (availableDbs dbPath) None "SHOW tables"
+  let dbs = availableDbs dbPath
+  let queryRequest =
+    match dbs with
+    | [] -> QueryRequest.withQuery "SHOW tables" ""
+    | db :: _ -> QueryRequest.withQuery "SHOW tables" db
+  queryContainer (availableDbs dbPath) queryRequest
   |> layout

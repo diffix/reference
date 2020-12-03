@@ -9,26 +9,7 @@ open FsToolkit.ErrorHandling
 open Microsoft.AspNetCore.Http
 open Giraffe
 open System.IO
-
-[<CLIMutable>]
-type QueryRequest =
-  {
-    Query: string
-    Database: string
-    AidColumns: string list
-    Seed: int option
-  }
-  
-  static member Decoder: Decoder<QueryRequest> =
-    Decode.object (
-      fun get ->
-        {
-          Query = get.Required.Field "query" Decode.string
-          Database = get.Required.Field "database" Decode.string
-          AidColumns = get.Optional.Field "aid_columns" (Decode.list Decode.string) |> Option.defaultValue []
-          Seed = get.Optional.Field "seed" Decode.int
-        }
-    )
+open Types
 
 let seed =
   match Environment.GetEnvironmentVariable("SEED") with
@@ -95,5 +76,5 @@ let handleQuery pathToDbs: HttpHandler =
       let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
       let! userRequest = ctx.BindFormAsync<QueryRequest>(usAmerican)
       let! result = runQuery pathToDbs userRequest 
-      return! htmlView (Page.queryPage pathToDbs userRequest.Database userRequest.Query result) next ctx
+      return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
     }
