@@ -85,7 +85,7 @@ let queryContainer databases (queryRequest: QueryRequest) =
         label [_class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"] [
           input [
             _type "text"
-            _name "AidColumns[]"
+            _name "AidColumn"
             _class "rounded-md border px-2 py-1"
             _placeholder "Name of the AID column"
             _value (queryRequest.AidColumns |> List.tryHead |> Option.defaultValue "")

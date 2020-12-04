@@ -6,6 +6,7 @@ open DiffixEngine.Types
 type AnonymizationParameters =
   {
     LowCountFiltering: LowCountSettings option
+    Seed: int
   }
   
   static member Decoder: Decoder<AnonymizationParameters> =
@@ -13,16 +14,15 @@ type AnonymizationParameters =
       fun get ->
         {
           LowCountFiltering = get.Optional.Field "low_count_filter" LowCountSettings.Decoder
+          Seed = get.Optional.Field "seed" Decode.int |> Option.defaultValue 1
         }
     )
 
-[<CLIMutable>]
 type QueryRequest =
   {
     Query: string
     Database: string
     AidColumns: string list
-    Seed: int 
     Anonymization: AnonymizationParameters
   }
   
@@ -33,10 +33,9 @@ type QueryRequest =
           Query = get.Required.Field "query" Decode.string
           Database = get.Required.Field "database" Decode.string
           AidColumns = get.Optional.Field "aid_columns" (Decode.list Decode.string) |> Option.defaultValue []
-          Seed = get.Optional.Field "seed" Decode.int |> Option.defaultValue 1
           Anonymization =
             get.Optional.Field "anonymization_parameters" AnonymizationParameters.Decoder
-            |> Option.defaultValue {LowCountFiltering = Some LowCountSettings.Defaults}
+            |> Option.defaultValue {LowCountFiltering = Some LowCountSettings.Defaults; Seed = 1}
         }
     )
 
@@ -45,9 +44,9 @@ type QueryRequest =
       Query = query
       Database = db
       AidColumns = []
-      Seed = 1
       Anonymization = {
         LowCountFiltering = Some LowCountSettings.Defaults
+        Seed = 1
       }
     }
 

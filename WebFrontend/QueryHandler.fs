@@ -30,25 +30,30 @@ let findDatabase pathToDbs database =
   |> Option.map snd
   |> Result.requireSome DbNotFound 
   
-let deriveRequestParams pathToDbs (requestBody: string) =
+let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
   result {
-    let! userRequest = Decode.fromString QueryRequest.Decoder requestBody |> Result.mapError (InvalidRequest)
     let! aidColumnOption = getAidColumnOption userRequest
     let! dbPath = findDatabase pathToDbs userRequest.Database
     return {
       AidColumnOption = aidColumnOption
-      Seed = userRequest.Seed 
+      Seed = userRequest.Anonymization.Seed 
       LowCountSettings = userRequest.Anonymization.LowCountFiltering
       Query = userRequest.Query.Trim()
       DatabasePath = dbPath
     }
   }
   
+let deriveRequestParamsFromBody pathToDbs (requestBody: string) =
+  result {
+    let! userRequest = Decode.fromString QueryRequest.Decoder requestBody |> Result.mapError (InvalidRequest)
+    return! deriveRequestParams pathToDbs userRequest
+  }
+  
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let! body = ctx.ReadBodyFromRequestAsync()
-      match deriveRequestParams pathToDbs body with
+      match deriveRequestParamsFromBody pathToDbs body with
       | Ok requestParams ->
         let! result = DiffixEngine.QueryEngine.runQuery requestParams
         let response =
@@ -69,11 +74,34 @@ let apiHandleQuery pathToDbs: HttpHandler =
         ) next ctx
     }
   
+[<CLIMutable>]
+type FormQueryRequest = {
+  Query: string
+  Database: string
+  AidColumn: string 
+}
+
 let handleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
-      let! userRequest = ctx.BindFormAsync<QueryRequest>(usAmerican)
-      let! result = runQuery pathToDbs userRequest 
-      return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
+      let! formUserRequest = ctx.BindFormAsync<FormQueryRequest>(usAmerican)
+      let userRequest = {
+        Query = formUserRequest.Query
+        Database = formUserRequest.Database
+        AidColumns =
+          match formUserRequest.AidColumn with
+          | "" -> []
+          | columnName -> [columnName]
+        Anonymization = {
+          LowCountFiltering = Some LowCountSettings.Defaults
+          Seed = 1
+        }
+      }
+      match deriveRequestParams pathToDbs userRequest with
+      | Ok requestParameters ->
+        let! result = DiffixEngine.QueryEngine.runQuery requestParameters |> Async.StartAsTask
+        return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
+      | Error error -> 
+        return! htmlView (Page.queryPage pathToDbs userRequest (Error error)) next ctx
     }
