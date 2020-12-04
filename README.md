@@ -1,50 +1,34 @@
-# open-diffix prototype
+# open-diffix reference implementation
 
-A live version of this prototype can be found at [db-proto.probsteide.com](https://db-proto.probsteide.com).
+A live version of the reference implementation can be found at [db-proto.probsteide.com](https://db-proto.probsteide.com).
 
 - [Purpose](#purpose)
 - [Development process](#development-process)
   - [Design considerations](#design-considerations)
-  - [Features](#features)
   - [Organization](#organization)
   - [Branches](#branches)
 - [API](#api)
 
 ## Purpose
 
-This is a prototype. As such, the code written here is not meant to go into production.
-The prototype is a playground to test and validate anonymization concept. Both in order to test the quality of anonymization,
-and to test our implementation ideas for our anonymization features that hopefully can help guide how a later (more costly) 
-implementation in Postgres could be done.
+This is a reference implementation of open-diffix. 
+As such, this serves as a sandbox in which we can quickly try, and validate, new ideas for anonymization.
+The reference implementation is meant to offer anonymization quality matching that of a final product - however
+not necessarily SQL parity. It is not mean to be productized. As such it will not receive the type of polish
+and usability work a commercial product would. It can safely be used to anonymize data, but there will be rough
+edges.
 
 ## Development process
 
-This is a low ceremony prototype. The concepts we implement will at times be complex. We therefore do not skimp on
-code quality or legibility. We are not however building something that should ever make it into production.
-We do not want bad code, code smells, or dead code. Treat it as a properly engineered code base with the standards
-we are used to from Aircloak. We do not however necessarily require code reviews for all inclusions.
+The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility. 
+Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
-If you are working on a complex concept and want another pair of eyes, then please feel free to request a review.
-If what you are building is fairly straight forward, then please go ahead and merge it yourself without review.
+### Design considerations
 
-## Design considerations
-
-We use SQLite as a dumb backing store for testing. Dumb in the sense that we just read the data out of it and
-otherwise rely mostly on providing the functionality we need in our own codebase. The reason for this is that
-it allows us to pretend to be in the middle of the database engine without having to hack or alter any existing
-database engine codebase.
-
-### Features
-
-We keep the prototype as simple as possible, adding exactly as much functionality as is required to test the concepts 
-we want to validate, not more. For the time being that means supporting queries over single tables (i.e. no JOINs)
-and requiring the AID to be explicitly specified by the entity querying the system.
-
-At present the following queries are supported:
-
-- `SHOW tables`
-- `SHOW columns FROM tableName`
-- `SELECT col1, col2 FROM table`
+We use SQLite as a dumb backing store for data. Dumb in the sense that we just read the data out of it and
+otherwise rely on our own code to perform the query execution. The reason for this is that it allows us to
+perform all the operations we would otherwise do in a database, but without the constraints of having to work
+around the complex and large codebase of a real world database engine.
 
 ### Organization
 
@@ -52,11 +36,11 @@ The codebase is currently organized in a number of projects:
 
 - `DiffixEngine` and `DiffixEngine.Tests`: Contains the meat of this project. It is the anonymization engine.
 - `SqlParser` and `SqlParser.Tests`: Simplistic SQL parser and corresponding tests.
-- `WebFrontend`: API endpoint that is served on [db-proto.probsteide.com](https://db-proto.probsteide.com) and used for testing and validating the anonymization quality
+- `WebFrontend`: API endpoint that is served on [db-proto.probsteide.com](https://db-proto.probsteide.com) and can be used for simple testing with external tools.
 
 ### Branches
 
-To avoid merge conflicts and other nasties we work on feature branches. Once automated tests pass it can either be reviewed
+To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
 
 ## API
@@ -82,7 +66,7 @@ The `/api` endpoint expects the body of the request to be a JSON payload with th
 - The `aid_columns` is an array. It is optional in the payload but required for `SELECT ...` queries. Currently only a single `AID` value is supported
 - The `seed` column is optional and determines the seed used with the PRNG for anonymization
 
-### '/api/upload-db'
+### `/api/upload-db`
 
 Requires two HTTP headers to be set:
 
