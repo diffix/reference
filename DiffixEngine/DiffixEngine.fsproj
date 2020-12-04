@@ -6,6 +6,7 @@
 
     <ItemGroup>
         <Compile Include="Types.fs" />
+        <Compile Include="Anonymizer.fs" />
         <Compile Include="DiffixSqlite.fs" />
         <Compile Include="QueryEngine.fs" />
     </ItemGroup>
