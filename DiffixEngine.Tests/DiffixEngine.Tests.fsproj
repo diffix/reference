@@ -22,7 +22,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\DiffixEngine\DiffixEngine.fsproj" />
-      <ProjectReference Include="..\TestHelpers\TestHelpers.fsproj" />
     </ItemGroup>
 
 </Project>

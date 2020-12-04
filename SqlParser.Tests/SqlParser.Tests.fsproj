@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="TestHelpers.fs" />
         <Compile Include="Parser.Tests.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
@@ -21,7 +22,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\SqlParser\SqlParser.fsproj" />
-      <ProjectReference Include="..\TestHelpers\TestHelpers.fsproj" />
     </ItemGroup>
 
 </Project>
