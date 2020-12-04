@@ -6,11 +6,10 @@ open DiffixEngine
 
 let runQuery query =
   let requestParams = {
-    AidColumnOption = Some "id"
-    Seed = 1
-    LowCountSettings = Some {
-      Threshold = 5.
-      StdDev = 2.
+    AnonymizationParams = {
+      AidColumnOption = Some "id"
+      Seed = 1
+      LowCountSettings = Some LowCountSettings.Defaults
     }
     DatabasePath = __SOURCE_DIRECTORY__ + "/../dbs/test-db.sqlite"
     Query = query
