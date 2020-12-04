@@ -225,7 +225,7 @@ let anonymize reqParams (rows: AnonymizableRow list) =
   |> List.filter(fun row ->
     not (Set.contains row.Columns rowsToReject)
   )
-  |> List.map (AnonymizableRow)
+  |> List.map (fun anonymizedRow -> NonPersonalRow {Columns = anonymizedRow.Columns})
   
 let executeSelect (connection: SQLiteConnection) reqParams query =
   asyncResult {

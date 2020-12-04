@@ -46,3 +46,26 @@ let ``SHOW columns FROM customers`` () =
       |> Ok
     let queryResult = runQuery "SHOW columns FROM customers"
     Assert.Equal (expected, queryResult)
+    
+[<Fact>]
+let ``SELECT product_id FROM line_items`` () =
+    let expected =
+      [
+        1, 10
+        2, 16
+        3, 16
+        4, 16
+        5, 16
+      ]
+      |> List.map(fun (productId, occurrences) ->
+        let row =
+          NonPersonalRow {Columns = [
+            {ColumnName = "product_id"; ColumnValue = IntegerValue productId}
+          ]}
+        List.replicate occurrences row 
+      )
+      |> List.concat
+      |> ResultTable
+      |> Ok
+    let queryResult = runQuery "SELECT product_id FROM line_items"
+    Assert.Equal (expected, queryResult)
