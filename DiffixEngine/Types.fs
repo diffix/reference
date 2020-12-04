@@ -2,11 +2,35 @@ module DiffixEngine.Types
 
 open Thoth.Json.Net
 
+type LowCountSettings =
+  {
+    Threshold: float
+    StdDev: float
+  }
+  
+  static member Defaults =
+    {
+      Threshold = 5.
+      StdDev = 2.
+    }
+    
+  static member Decoder: Decoder<LowCountSettings> =
+    Decode.object (
+      fun get ->
+        {
+          Threshold =
+            get.Optional.Field "threshold" Decode.float
+            |> Option.defaultValue LowCountSettings.Defaults.Threshold
+          StdDev =
+            get.Optional.Field "threshold" Decode.float
+            |> Option.defaultValue LowCountSettings.Defaults.StdDev
+        }
+    )
+
 type RequestParams = {
   AidColumnOption: string option
   Seed: int
-  LowCountThreshold: float
-  LowCountThresholdStdDev: float
+  LowCountSettings: LowCountSettings option
 }
 
 type ColumnName = string

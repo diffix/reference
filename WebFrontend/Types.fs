@@ -1,6 +1,20 @@
 module WebFrontend.Types
 
 open Thoth.Json.Net
+open DiffixEngine.Types
+
+type AnonymizationParameters =
+  {
+    LowCountFiltering: LowCountSettings option
+  }
+  
+  static member Decoder: Decoder<AnonymizationParameters> =
+    Decode.object (
+      fun get ->
+        {
+          LowCountFiltering = get.Optional.Field "low_count_filter" LowCountSettings.Decoder
+        }
+    )
 
 [<CLIMutable>]
 type QueryRequest =
@@ -9,6 +23,7 @@ type QueryRequest =
     Database: string
     AidColumns: string list
     Seed: int option
+    Anonymization: AnonymizationParameters
   }
   
   static member Decoder: Decoder<QueryRequest> =
@@ -19,6 +34,9 @@ type QueryRequest =
           Database = get.Required.Field "database" Decode.string
           AidColumns = get.Optional.Field "aid_columns" (Decode.list Decode.string) |> Option.defaultValue []
           Seed = get.Optional.Field "seed" Decode.int
+          Anonymization =
+            get.Optional.Field "anonymization_parameters" AnonymizationParameters.Decoder
+            |> Option.defaultValue {LowCountFiltering = Some LowCountSettings.Defaults}
         }
     )
 
@@ -28,5 +46,8 @@ type QueryRequest =
       Database = db
       AidColumns = []
       Seed = None
+      Anonymization = {
+        LowCountFiltering = Some LowCountSettings.Defaults
+      }
     }
 
