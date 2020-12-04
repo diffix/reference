@@ -21,7 +21,6 @@ edges.
 ## Development process
 
 The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility. 
-Treat it as a properly engineered codebase with the standards we are used to from Aircloak. 
 Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
 ### Design considerations
