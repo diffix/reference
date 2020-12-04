@@ -57,14 +57,20 @@ The `/api` endpoint expects the body of the request to be a JSON payload with th
 {
   "query": "SELECT ...",
   "database": "test-db.sqlite",
-  "aid_columns": ["aid1"],
-  "seed": 1
+  "anonymization_parameters": {
+    "aid_columns": ["aid1"],
+    "seed": 1,
+    "low_count_filter": {
+      "threshold": 5.0,
+      "std_dev": 2.0
+    }
+  }
 }
 ```
 
+- The `query` field is required and should specify the SQL query to be executed
 - The `database` field is required and is the name of a database that has been previously uploaded and that should be used
-- The `aid_columns` is an array. It is optional in the payload but required for `SELECT ...` queries. Currently only a single `AID` value is supported
-- The `seed` column is optional and determines the seed used with the PRNG for anonymization
+- The `aid_columns` parameter in the `anonymization_parameters` section is the only required anonymization parameter
 
 ### `/api/upload-db`
 

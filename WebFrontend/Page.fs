@@ -88,7 +88,7 @@ let queryContainer databases (queryRequest: QueryRequest) =
             _name "AidColumn"
             _class "rounded-md border px-2 py-1"
             _placeholder "Name of the AID column"
-            _value (queryRequest.AidColumns |> List.tryHead |> Option.defaultValue "")
+            _value (queryRequest.Anonymization.AidColumns |> List.tryHead |> Option.defaultValue "")
           ]
         ]
       ]

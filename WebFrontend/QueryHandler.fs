@@ -18,7 +18,7 @@ let availableDbs path =
 
 let private getAidColumnOption (userRequest: QueryRequest) =
   result {
-    match userRequest.AidColumns with
+    match userRequest.Anonymization.AidColumns with
     | [aidColumn] -> return Some aidColumn
     | [] -> return None
     | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
@@ -91,13 +91,13 @@ let handleQuery pathToDbs: HttpHandler =
       let userRequest = {
         Query = formUserRequest.Query
         Database = formUserRequest.Database
-        AidColumns =
-          match formUserRequest.AidColumn with
-          | "" -> []
-          | columnName -> [columnName]
         Anonymization = {
-          LowCountFiltering = Some LowCountSettings.Defaults
-          Seed = 1
+          AnonymizationParameters.Default
+            with
+              AidColumns =
+                match formUserRequest.AidColumn with
+                | "" -> []
+                | columnName -> [columnName]
         }
       }
       match deriveRequestParams pathToDbs userRequest with
