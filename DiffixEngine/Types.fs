@@ -33,29 +33,39 @@ type LowCountSettings =
       "std_dev", Encode.float settings.StdDev
     ]
 
-type RequestParams =
+type AnonymizationParams =
   {
     AidColumnOption: string option
     Seed: int
     LowCountSettings: LowCountSettings option
+  }
+  
+  static member Encoder (anonymizationParams: AnonymizationParams) =
+    Encode.object [
+      "anonymization_parameters", Encode.object [
+        "aid_columns", Encode.list (
+          anonymizationParams.AidColumnOption
+          |> Option.map (fun aid -> [Encode.string aid])
+          |> Option.defaultValue []
+        )
+        "seed", Encode.int anonymizationParams.Seed
+        "low_count",
+          anonymizationParams.LowCountSettings
+          |> Option.map LowCountSettings.Encoder
+          |> Option.defaultValue (Encode.bool false)
+      ]
+    ]
+
+type RequestParams =
+  {
+    AnonymizationParams: AnonymizationParams
     Query: string
     DatabasePath: string
   }
   
   static member Encoder (requestParams: RequestParams) =
     Encode.object [
-      "anonymization_parameters", Encode.object [
-        "aid_columns", Encode.list (
-          requestParams.AidColumnOption
-          |> Option.map (fun aid -> [Encode.string aid])
-          |> Option.defaultValue []
-        )
-        "seed", Encode.int requestParams.Seed
-        "low_count",
-          requestParams.LowCountSettings
-          |> Option.map LowCountSettings.Encoder
-          |> Option.defaultValue (Encode.bool false)
-      ]
+      "anonymization_parameters", AnonymizationParams.Encoder requestParams.AnonymizationParams
     ]
 
 type ColumnName = string

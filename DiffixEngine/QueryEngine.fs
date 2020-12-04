@@ -13,7 +13,7 @@ module QueryEngine =
                 match queryAst with
                 | Query.ShowTables -> DiffixSqlite.getTables connection
                 | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
-                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams query
+                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
             do! connection.CloseAsync() |> Async.AwaitTask
             return result
         }

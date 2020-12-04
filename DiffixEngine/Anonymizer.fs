@@ -9,11 +9,11 @@ let private randomNum (rnd: Random) mean stdDev =
   let randStdNormal = Math.Sqrt(-2.0 * log(u1)) * Math.Sin(2.0 * Math.PI * u2)
   mean + stdDev * randStdNormal; 
   
-let private newRandom (reqParams: RequestParams) =
-  Random(reqParams.Seed)
+let private newRandom (anonymizationParams: AnonymizationParams) =
+  Random(anonymizationParams.Seed)
   
-let private lowCountFilter (reqParams: RequestParams) rnd (rows: AnonymizableRow list) =
-  match reqParams.LowCountSettings with
+let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows: AnonymizableRow list) =
+  match anonymizationParams.LowCountSettings with
   | None -> rows
   | Some lowCountParams ->
     let rowsToReject =
@@ -35,8 +35,8 @@ let private lowCountFilter (reqParams: RequestParams) rnd (rows: AnonymizableRow
       not (Set.contains row.Columns rowsToReject)
     )
   
-let anonymize reqParams (rows: AnonymizableRow list) =
-  let rnd = newRandom reqParams
+let anonymize (anonymizationParams: AnonymizationParams) (rows: AnonymizableRow list) =
+  let rnd = newRandom anonymizationParams
   rows
-  |> lowCountFilter reqParams rnd
+  |> lowCountFilter anonymizationParams rnd
   |> List.map (fun anonymizedRow -> NonPersonalRow {Columns = anonymizedRow.Columns})

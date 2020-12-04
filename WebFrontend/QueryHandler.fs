@@ -35,9 +35,11 @@ let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
     let! aidColumnOption = getAidColumnOption userRequest
     let! dbPath = findDatabase pathToDbs userRequest.Database
     return {
-      AidColumnOption = aidColumnOption
-      Seed = userRequest.Anonymization.Seed 
-      LowCountSettings = userRequest.Anonymization.LowCountFiltering
+      AnonymizationParams = {
+        AidColumnOption = aidColumnOption
+        Seed = userRequest.Anonymization.Seed 
+        LowCountSettings = userRequest.Anonymization.LowCountFiltering
+      }
       Query = userRequest.Query.Trim()
       DatabasePath = dbPath
     }
