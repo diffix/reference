@@ -60,15 +60,15 @@ let apiHandleQuery pathToDbs: HttpHandler =
         let! result = DiffixEngine.QueryEngine.runQuery requestParams
         let response =
           match result with
-          | Ok result -> Encode.toString 2 (QueryResult.Encoder requestParams result)
-          | Error error -> Encode.toString 2 (QueryError.Encoder error)
+          | Ok result -> Encode.toString 2 (QueryResultJson.Encoder requestParams result)
+          | Error error -> Encode.toString 2 (QueryErrorJson.Encoder error)
         return! (
           text response
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
           >=> setStatusCode 200
         ) next ctx
       | Error queryError ->
-        let error = Encode.toString 2 (QueryError.Encoder queryError)
+        let error = Encode.toString 2 (QueryErrorJson.Encoder queryError)
         return! (
           text error
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
