@@ -45,7 +45,7 @@ type QueryRequest =
       Query = query
       Database = db
       AidColumns = []
-      Seed = None
+      Seed = 1
       Anonymization = {
         LowCountFiltering = Some LowCountSettings.Defaults
       }
