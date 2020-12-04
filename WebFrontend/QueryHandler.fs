@@ -11,11 +11,6 @@ open Giraffe
 open System.IO
 open Types
 
-let seed =
-  match Environment.GetEnvironmentVariable("SEED") with
-  | null -> 0
-  | seed -> int seed
-
 let availableDbs path =
   Directory.GetFiles path
   |> Array.map (fun dbPathName -> Path.GetFileName dbPathName, dbPathName)
@@ -37,9 +32,8 @@ let runQuery pathToDbs (request: QueryRequest) =
     }
     let reqParams = {
       AidColumnOption = aidColumnOption
-      Seed = request.Seed |> Option.map int |> Option.defaultValue seed
-      LowCountThreshold = 5.
-      LowCountThresholdStdDev = 0.5
+      Seed = request.Seed 
+      LowCountSettings = request.Anonymization.LowCountFiltering
     }
     let query = request.Query.Trim()
     return! DiffixEngine.QueryEngine.runQuery dbPath reqParams query

@@ -22,7 +22,7 @@ type QueryRequest =
     Query: string
     Database: string
     AidColumns: string list
-    Seed: int option
+    Seed: int 
     Anonymization: AnonymizationParameters
   }
   
@@ -33,7 +33,7 @@ type QueryRequest =
           Query = get.Required.Field "query" Decode.string
           Database = get.Required.Field "database" Decode.string
           AidColumns = get.Optional.Field "aid_columns" (Decode.list Decode.string) |> Option.defaultValue []
-          Seed = get.Optional.Field "seed" Decode.int
+          Seed = get.Optional.Field "seed" Decode.int |> Option.defaultValue 1
           Anonymization =
             get.Optional.Field "anonymization_parameters" AnonymizationParameters.Decoder
             |> Option.defaultValue {LowCountFiltering = Some LowCountSettings.Defaults}
