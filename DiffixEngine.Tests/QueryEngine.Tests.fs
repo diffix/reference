@@ -5,7 +5,14 @@ open Xunit
 open DiffixEngine
 
 let runQuery query =
-  QueryEngine.runQuery (__SOURCE_DIRECTORY__ + "/../test-db.sqlite") query
+  let requestParams = {
+    AidColumnOption = Some "id"
+    Seed = 1
+    LowCountThreshold = 5.
+    LowCountThresholdStdDev = 2.
+  }
+  let dbPath = __SOURCE_DIRECTORY__ + "/../dbs/test-db.sqlite"
+  QueryEngine.runQuery dbPath requestParams query
   |> Async.RunSynchronously
   
 [<Fact>]
@@ -17,17 +24,25 @@ let ``SHOW TABLES`` () =
         "products"
         "purchases"
       ]
-      |> List.map(fun v -> [ColumnCell ("name", StringValue v)])
+      |> List.map(fun v -> NonPersonalRow {Columns = [{ColumnName = "name"; ColumnValue = StringValue v}]})
       |> ResultTable
+      |> Ok
     Assert.Equal (expected, runQuery "SHOW TABLES")
     
 [<Fact>]
 let ``SHOW columns FROM customers`` () =
     let expected =
       [
-        "id", "INTEGER"
-        "name", "TEXT"
+        "id", "integer"
+        "name", "string"
       ]
-      |> List.map(fun (name, dataType) -> [ColumnCell ("name", StringValue name); ColumnCell ("type", StringValue dataType)])
+      |> List.map(fun (name, dataType) ->
+        NonPersonalRow {Columns = [
+          {ColumnName = "name"; ColumnValue = StringValue name}
+          {ColumnName = "type"; ColumnValue = StringValue dataType}
+        ]}
+      )
       |> ResultTable
-    Assert.Equal (expected, runQuery "SHOW columns FROM customers")
+      |> Ok
+    let queryResult = runQuery "SHOW columns FROM customers"
+    Assert.Equal (expected, queryResult)
