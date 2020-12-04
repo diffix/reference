@@ -8,11 +8,14 @@ let runQuery query =
   let requestParams = {
     AidColumnOption = Some "id"
     Seed = 1
-    LowCountThreshold = 5.
-    LowCountThresholdStdDev = 2.
+    LowCountSettings = Some {
+      Threshold = 5.
+      StdDev = 2.
+    }
+    DatabasePath = __SOURCE_DIRECTORY__ + "/../dbs/test-db.sqlite"
+    Query = query
   }
-  let dbPath = __SOURCE_DIRECTORY__ + "/../dbs/test-db.sqlite"
-  QueryEngine.runQuery dbPath requestParams query
+  QueryEngine.runQuery requestParams 
   |> Async.RunSynchronously
   
 [<Fact>]

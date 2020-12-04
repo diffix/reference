@@ -22,16 +22,41 @@ type LowCountSettings =
             get.Optional.Field "threshold" Decode.float
             |> Option.defaultValue LowCountSettings.Defaults.Threshold
           StdDev =
-            get.Optional.Field "threshold" Decode.float
+            get.Optional.Field "std_dev" Decode.float
             |> Option.defaultValue LowCountSettings.Defaults.StdDev
         }
     )
+    
+  static member Encoder (settings: LowCountSettings) =
+    Encode.object [
+      "threshold", Encode.float settings.Threshold
+      "std_dev", Encode.float settings.StdDev
+    ]
 
-type RequestParams = {
-  AidColumnOption: string option
-  Seed: int
-  LowCountSettings: LowCountSettings option
-}
+type RequestParams =
+  {
+    AidColumnOption: string option
+    Seed: int
+    LowCountSettings: LowCountSettings option
+    Query: string
+    DatabasePath: string
+  }
+  
+  static member Encoder (requestParams: RequestParams) =
+    Encode.object [
+      "anonymization_parameters", Encode.object [
+        "aid_columns", Encode.list (
+          requestParams.AidColumnOption
+          |> Option.map (fun aid -> [Encode.string aid])
+          |> Option.defaultValue []
+        )
+        "seed", Encode.int requestParams.Seed
+        "low_count",
+          requestParams.LowCountSettings
+          |> Option.map LowCountSettings.Encoder
+          |> Option.defaultValue (Encode.bool false)
+      ]
+    ]
 
 type ColumnName = string
 
@@ -74,7 +99,7 @@ type Row =
 type QueryResult =
   | ResultTable of Row list
   
-  static member Encoder (queryResult: QueryResult) =
+  static member Encoder (requestParams: RequestParams) (queryResult: QueryResult) =
     match queryResult with
     | ResultTable rows ->
       let encodeColumnNames columns = 
@@ -106,6 +131,7 @@ type QueryResult =
         "success", Encode.bool true
         "column_names", columnNames
         "values", values
+        "anonymization", RequestParams.Encoder requestParams
       ]
   
 type QueryError =

@@ -1,6 +1,5 @@
 module WebFrontend.QueryHandler
 
-open System
 open System.Globalization
 open DiffixEngine.Types
 open Thoth.Json.Net
@@ -17,46 +16,52 @@ let availableDbs path =
   |> Array.sortBy fst
   |> Array.toList
 
-let runQuery pathToDbs (request: QueryRequest) =
-  asyncResult {
-    let! dbPath =
-      availableDbs pathToDbs
-      |> List.tryFind (fun (name, _) -> name = request.Database)
-      |> Option.map snd
-      |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
-    let! aidColumnOption = result {
-      match request.AidColumns with
-      | [aidColumn] -> return Some aidColumn
-      | [] -> return None
-      | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
-    }
-    let reqParams = {
+let private getAidColumnOption (userRequest: QueryRequest) =
+  result {
+    match userRequest.AidColumns with
+    | [aidColumn] -> return Some aidColumn
+    | [] -> return None
+    | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
+  }
+
+let findDatabase pathToDbs database =
+  availableDbs pathToDbs
+  |> List.tryFind (fun (name, _) -> name = database)
+  |> Option.map snd
+  |> Result.requireSome DbNotFound 
+  
+let deriveRequestParams pathToDbs (requestBody: string) =
+  result {
+    let! userRequest = Decode.fromString QueryRequest.Decoder requestBody |> Result.mapError (InvalidRequest)
+    let! aidColumnOption = getAidColumnOption userRequest
+    let! dbPath = findDatabase pathToDbs userRequest.Database
+    return {
       AidColumnOption = aidColumnOption
-      Seed = request.Seed 
-      LowCountSettings = request.Anonymization.LowCountFiltering
+      Seed = userRequest.Seed 
+      LowCountSettings = userRequest.Anonymization.LowCountFiltering
+      Query = userRequest.Query.Trim()
+      DatabasePath = dbPath
     }
-    let query = request.Query.Trim()
-    return! DiffixEngine.QueryEngine.runQuery dbPath reqParams query
   }
   
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let! body = ctx.ReadBodyFromRequestAsync()
-      match Decode.fromString QueryRequest.Decoder body with
-      | Ok userRequest ->
-        let! result = runQuery pathToDbs userRequest
+      match deriveRequestParams pathToDbs body with
+      | Ok requestParams ->
+        let! result = DiffixEngine.QueryEngine.runQuery requestParams
         let response =
           match result with
-          | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
+          | Ok result -> Encode.toString 2 (QueryResult.Encoder requestParams result)
           | Error error -> Encode.toString 2 (QueryError.Encoder error)
         return! (
           text response
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
           >=> setStatusCode 200
         ) next ctx
-      | Error errorMessage ->
-        let error = Encode.toString 2 (QueryError.Encoder (InvalidRequest errorMessage))
+      | Error queryError ->
+        let error = Encode.toString 2 (QueryError.Encoder queryError)
         return! (
           text error
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
