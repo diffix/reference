@@ -5,15 +5,15 @@ module QueryEngine =
     open SqlParser
     open Types
     
-    let private executeQuery databasePath reqParams queryAst =
+    let private executeQuery reqParams queryAst =
         asyncResult {
-            let! connection = DiffixSqlite.dbConnection databasePath
+            let! connection = DiffixSqlite.dbConnection reqParams.DatabasePath
             do! connection.OpenAsync() |> Async.AwaitTask
             let! result =
                 match queryAst with
                 | Query.ShowTables -> DiffixSqlite.getTables connection
                 | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
-                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams query
+                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
             do! connection.CloseAsync() |> Async.AwaitTask
             return result
         }
@@ -23,8 +23,8 @@ module QueryEngine =
         | Ok ast -> Ok ast
         | Error (Parser.CouldNotParse error) -> Error (ParseError error)
         
-    let runQuery databasePath reqParams sqlQuery =
+    let runQuery reqParams =
         asyncResult {
-            let! queryAst = parseSql sqlQuery
-            return! executeQuery databasePath reqParams queryAst
+            let! queryAst = parseSql reqParams.Query
+            return! executeQuery reqParams queryAst
         }

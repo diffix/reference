@@ -1,6 +1,5 @@
 module WebFrontend.QueryHandler
 
-open System
 open System.Globalization
 open DiffixEngine.Types
 open Thoth.Json.Net
@@ -11,58 +10,65 @@ open Giraffe
 open System.IO
 open Types
 
-let seed =
-  match Environment.GetEnvironmentVariable("SEED") with
-  | null -> 0
-  | seed -> int seed
-
 let availableDbs path =
   Directory.GetFiles path
   |> Array.map (fun dbPathName -> Path.GetFileName dbPathName, dbPathName)
   |> Array.sortBy fst
   |> Array.toList
 
-let runQuery pathToDbs (request: QueryRequest) =
-  asyncResult {
-    let! dbPath =
-      availableDbs pathToDbs
-      |> List.tryFind (fun (name, _) -> name = request.Database)
-      |> Option.map snd
-      |> Result.requireSome (ExecutionError $"database %s{request.Database} not found")
-    let! aidColumnOption = result {
-      match request.AidColumns with
-      | [aidColumn] -> return Some aidColumn
-      | [] -> return None
-      | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
+let private getAidColumnOption (userRequest: QueryRequest) =
+  result {
+    match userRequest.Anonymization.AidColumns with
+    | [aidColumn] -> return Some aidColumn
+    | [] -> return None
+    | _ -> return! Error (InvalidRequest "A maximum of one AID column is supported at present")
+  }
+
+let findDatabase pathToDbs database =
+  availableDbs pathToDbs
+  |> List.tryFind (fun (name, _) -> name = database)
+  |> Option.map snd
+  |> Result.requireSome DbNotFound 
+  
+let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
+  result {
+    let! aidColumnOption = getAidColumnOption userRequest
+    let! dbPath = findDatabase pathToDbs userRequest.Database
+    return {
+      AnonymizationParams = {
+        AidColumnOption = aidColumnOption
+        Seed = userRequest.Anonymization.Seed 
+        LowCountSettings = userRequest.Anonymization.LowCountFiltering
+      }
+      Query = userRequest.Query.Trim()
+      DatabasePath = dbPath
     }
-    let reqParams = {
-      AidColumnOption = aidColumnOption
-      Seed = request.Seed |> Option.map int |> Option.defaultValue seed
-      LowCountThreshold = 5.
-      LowCountThresholdStdDev = 0.5
-    }
-    let query = request.Query.Trim()
-    return! DiffixEngine.QueryEngine.runQuery dbPath reqParams query
+  }
+  
+let deriveRequestParamsFromBody pathToDbs (requestBody: string) =
+  result {
+    let! userRequest = Decode.fromString QueryRequest.Decoder requestBody |> Result.mapError (InvalidRequest)
+    return! deriveRequestParams pathToDbs userRequest
   }
   
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let! body = ctx.ReadBodyFromRequestAsync()
-      match Decode.fromString QueryRequest.Decoder body with
-      | Ok userRequest ->
-        let! result = runQuery pathToDbs userRequest
+      match deriveRequestParamsFromBody pathToDbs body with
+      | Ok requestParams ->
+        let! result = DiffixEngine.QueryEngine.runQuery requestParams
         let response =
           match result with
-          | Ok result -> Encode.toString 2 (QueryResult.Encoder result)
-          | Error error -> Encode.toString 2 (QueryError.Encoder error)
+          | Ok result -> Encode.toString 2 (QueryResultJson.Encoder requestParams result)
+          | Error error -> Encode.toString 2 (QueryErrorJson.Encoder error)
         return! (
           text response
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
           >=> setStatusCode 200
         ) next ctx
-      | Error errorMessage ->
-        let error = Encode.toString 2 (QueryError.Encoder (InvalidRequest errorMessage))
+      | Error queryError ->
+        let error = Encode.toString 2 (QueryErrorJson.Encoder queryError)
         return! (
           text error
           >=> setHttpHeader "Content-Type" "application/json; charset=utf-8"
@@ -70,11 +76,34 @@ let apiHandleQuery pathToDbs: HttpHandler =
         ) next ctx
     }
   
+[<CLIMutable>]
+type FormQueryRequest = {
+  Query: string
+  Database: string
+  AidColumn: string 
+}
+
 let handleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
-      let! userRequest = ctx.BindFormAsync<QueryRequest>(usAmerican)
-      let! result = runQuery pathToDbs userRequest 
-      return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
+      let! formUserRequest = ctx.BindFormAsync<FormQueryRequest>(usAmerican)
+      let userRequest = {
+        Query = formUserRequest.Query
+        Database = formUserRequest.Database
+        Anonymization = {
+          AnonymizationParameters.Default
+            with
+              AidColumns =
+                match formUserRequest.AidColumn with
+                | "" -> []
+                | columnName -> [columnName]
+        }
+      }
+      match deriveRequestParams pathToDbs userRequest with
+      | Ok requestParameters ->
+        let! result = DiffixEngine.QueryEngine.runQuery requestParameters |> Async.StartAsTask
+        return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
+      | Error error -> 
+        return! htmlView (Page.queryPage pathToDbs userRequest (Error error)) next ctx
     }

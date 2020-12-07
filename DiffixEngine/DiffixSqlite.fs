@@ -197,9 +197,9 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
   }
   
   
-let executeSelect (connection: SQLiteConnection) reqParams query =
+let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {
-    match reqParams.AidColumnOption with
+    match anonymizationParams.AidColumnOption with
     | None 
     | Some "" ->
       return! Error (ExecutionError "An AID column name is required")
@@ -207,5 +207,5 @@ let executeSelect (connection: SQLiteConnection) reqParams query =
       let! rawRows =
         readQueryResults connection aidColumn query
         |> AsyncResult.map Seq.toList
-      return ResultTable (Anonymizer.anonymize reqParams rawRows)
+      return ResultTable (Anonymizer.anonymize anonymizationParams rawRows)
   }
