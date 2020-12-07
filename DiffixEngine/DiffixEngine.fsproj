@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netstandard2.1</TargetFramework>
+        <TargetFramework>net5.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
         <Compile Include="Types.fs" />
+        <Compile Include="Anonymizer.fs" />
         <Compile Include="DiffixSqlite.fs" />
         <Compile Include="QueryEngine.fs" />
     </ItemGroup>
