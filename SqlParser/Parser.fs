@@ -30,6 +30,10 @@ module ParserDefinition =
         let parse = skipStringCI "SHOW" >>. spaces >>. (pIdentifierTables <|> pIdentifiersColumnsInTable)
         
     module SelectQueries =
+       let pPlainColumn =
+           pAnyWord
+           |>> PlainColumn
+           
        let pColumn =
            pPlainColumn
            |>> Column 
@@ -40,17 +44,36 @@ module ParserDefinition =
        let pFunction =
            pAnyWord .>>. pInParenthesis pColumn
            |>> Function
+           
+       let pDistinctColumn =
+           pstringCI "distinct" .>> spaces >>. pPlainColumn
+           |>> Distinct
+               
+       let pAggregate =
+           pstringCI "count" .>> spaces >>. pInParenthesis pDistinctColumn
+           |>> AnonymizedCount
+           |>> AggregateFunction
        
        let pExpressions =
            pCommaSeparated (choice [pAggregate; attempt pFunction; pColumn]) 
            .>> spaces
+           
+       let pGroupBy =
+           pSkipWordsCI ["GROUP"; "BY"]
+           .>> spaces 
+           >>. pCommaSeparated pAnyWord
            
        let parse =
            pSkipWordSpacesCI "SELECT"
            >>. pExpressions
            .>> pSkipWordSpacesCI "FROM"
            .>>. pTable
-           |>> fun (columns, table) -> SelectQuery {Expressions = columns; From = table}
+           .>>. opt pGroupBy
+           |>> function
+               | (columns, table), None ->
+                   SelectQuery {Expressions = columns; From = table}
+               | (columns, table), Some groupByColumns ->
+                   AggregateQuery {Expressions = columns; From = table; GroupBy = groupByColumns}
         
     let pSkipSemiColon =
         optional (skipSatisfy ((=) ';')) .>> spaces
