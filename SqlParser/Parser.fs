@@ -4,87 +4,87 @@ module ParserDefinition =
     open FParsec
     open SqlParser.Query
     
-    let pAnyWord =
+    let anyWord =
        satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_')
        .>> spaces
        |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
     
-    let pSkipWordSpacesCI word = skipStringCI word >>. spaces
+    let skipWordSpacesCI word = skipStringCI word >>. spaces
     
-    let pSkipWordsCI words =
+    let skipWordsCI words =
         words
-        |> List.map(pSkipWordSpacesCI)
+        |> List.map(skipWordSpacesCI)
         |> List.reduce (>>.)
         
-    let pInParenthesis p =
+    let inParenthesis p =
         pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
         
-    let pCommaSeparated p =
+    let commaSeparated p =
         sepBy1 p (pchar ',' .>> spaces)
         
     module ShowQueries =
-        let pIdentifiersColumnsInTable = pSkipWordsCI ["COLUMNS"; "FROM"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
+        let identifiersColumnsInTable = skipWordsCI ["COLUMNS"; "FROM"] >>. (anyWord <?> "table name") |>> ShowColumnsFromTable 
             
-        let pIdentifierTables = stringCIReturn "TABLES" ShowTables
+        let identifierTables = stringCIReturn "TABLES" ShowTables
         
-        let parse = skipStringCI "SHOW" >>. spaces >>. (pIdentifierTables <|> pIdentifiersColumnsInTable)
+        let parse = skipStringCI "SHOW" >>. spaces >>. (identifierTables <|> identifiersColumnsInTable)
         
     module SelectQueries =
-       let pPlainColumn =
-           pAnyWord
+       let plainColumn =
+           anyWord
            |>> PlainColumn
            
-       let pColumn =
-           pPlainColumn
+       let column =
+           plainColumn
            |>> Column 
        
-       let pTable =
-           pAnyWord |>> Table 
+       let table =
+           anyWord |>> Table 
        
-       let pFunction =
-           pAnyWord .>>. pInParenthesis pColumn
+       let ``function`` =
+           anyWord .>>. inParenthesis column
            |>> Function
            
-       let pDistinctColumn =
-           pstringCI "distinct" .>> spaces >>. pPlainColumn
+       let distinctColumn =
+           pstringCI "distinct" .>> spaces >>. plainColumn
            |>> Distinct
                
-       let pAggregate =
-           pstringCI "count" .>> spaces >>. pInParenthesis pDistinctColumn
+       let aggregate =
+           pstringCI "count" .>> spaces >>. inParenthesis distinctColumn
            |>> AnonymizedCount
            |>> AggregateFunction
        
-       let pExpressions =
-           pCommaSeparated (choice [pAggregate; attempt pFunction; pColumn]) 
+       let expressions =
+           commaSeparated (choice [aggregate; attempt ``function``; column]) 
            .>> spaces
            
-       let pGroupBy =
-           pSkipWordsCI ["GROUP"; "BY"]
+       let groupBy =
+           skipWordsCI ["GROUP"; "BY"]
            .>> spaces 
-           >>. pCommaSeparated pAnyWord
+           >>. commaSeparated anyWord
            
        let parse =
-           pSkipWordSpacesCI "SELECT"
-           >>. pExpressions
-           .>> pSkipWordSpacesCI "FROM"
-           .>>. pTable
-           .>>. opt pGroupBy
+           skipWordSpacesCI "SELECT"
+           >>. expressions
+           .>> skipWordSpacesCI "FROM"
+           .>>. table
+           .>>. opt groupBy
            |>> function
                | (columns, table), None ->
                    SelectQuery {Expressions = columns; From = table}
                | (columns, table), Some groupByColumns ->
                    AggregateQuery {Expressions = columns; From = table; GroupBy = groupByColumns}
         
-    let pSkipSemiColon =
+    let skipSemiColon =
         optional (skipSatisfy ((=) ';')) .>> spaces
         
-    let pQuery =
+    let query =
         spaces
         >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
-        .>> pSkipSemiColon
+        .>> skipSemiColon
         .>> eof
         
-    let parse = run pQuery 
+    let parse = run query 
 
 module Parser =
     open SqlParser.Query
@@ -93,6 +93,6 @@ module Parser =
         | CouldNotParse of string
         
     let parseSql sqlString: Result<Query, SqlParserError> =
-        match FParsec.CharParsers.run ParserDefinition.pQuery sqlString with
+        match FParsec.CharParsers.run ParserDefinition.query sqlString with
         | FParsec.CharParsers.Success (result, _, _) -> Ok result
         | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error (CouldNotParse errorMessage)

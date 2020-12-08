@@ -14,26 +14,26 @@ let parse p string =
 
 [<Fact>]
 let ``Parses words`` () =
-    assertOkEqual (parse pAnyWord "hello") "hello"
-    assertError (parse pAnyWord ",hello") // Rejects something not starting with a character
-    assertOkEqual (parse pAnyWord "hello, world") "hello" // Parses until special token
-    assertOkEqual (parse pAnyWord "hello12") "hello12" // Parses digits too
-    assertError (parse pAnyWord "12hello") // Rejects things starting with digits
-    assertOkEqual (parse pAnyWord "hello_12") "hello_12" // Allows underscores
+    assertOkEqual (parse anyWord "hello") "hello"
+    assertError (parse anyWord ",hello") // Rejects something not starting with a character
+    assertOkEqual (parse anyWord "hello, world") "hello" // Parses until special token
+    assertOkEqual (parse anyWord "hello12") "hello12" // Parses digits too
+    assertError (parse anyWord "12hello") // Rejects things starting with digits
+    assertOkEqual (parse anyWord "hello_12") "hello_12" // Allows underscores
 
 [<Fact>]
 let ``Parses columns`` () =
-    assertOkEqual (parse SelectQueries.pExpressions "hello") [Column (PlainColumn "hello")]
-    assertOkEqual (parse SelectQueries.pExpressions "hello, world") [Column (PlainColumn "hello"); Column (PlainColumn "world")]
-    assertOkEqual (parse SelectQueries.pExpressions "hello,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
-    assertOkEqual (parse SelectQueries.pExpressions "hello ,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.expressions "hello") [Column (PlainColumn "hello")]
+    assertOkEqual (parse SelectQueries.expressions "hello, world") [Column (PlainColumn "hello"); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.expressions "hello,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
+    assertOkEqual (parse SelectQueries.expressions "hello ,world") [(Column (PlainColumn "hello")); Column (PlainColumn "world")]
     
 [<Fact>]
 let ``Parses functions`` () =
-    assertOkEqual (parse SelectQueries.pExpressions "hello(world)") [Function ("hello", (Column (PlainColumn "world")))]
-    assertOkEqual (parse SelectQueries.pExpressions "hello ( world )") [Function ("hello", (Column (PlainColumn "world")))]
+    assertOkEqual (parse SelectQueries.expressions "hello(world)") [Function ("hello", (Column (PlainColumn "world")))]
+    assertOkEqual (parse SelectQueries.expressions "hello ( world )") [Function ("hello", (Column (PlainColumn "world")))]
     assertOkEqual
-        (parse SelectQueries.pExpressions "hello(world), hello(moon)")
+        (parse SelectQueries.expressions "hello(world), hello(moon)")
         [
           Function ("hello", (Column (PlainColumn "world")))
           Function ("hello", (Column (PlainColumn "moon")))
@@ -42,19 +42,19 @@ let ``Parses functions`` () =
 [<Fact>]
 let ``Parses count(distinct col)`` () =
     let expected = AggregateFunction (AnonymizedCount (Distinct (PlainColumn "col")))
-    assertOkEqual (parse SelectQueries.pExpressions "count(distinct col)") [expected]
-    assertOkEqual (parse SelectQueries.pExpressions "count ( distinct     col )") [expected]
+    assertOkEqual (parse SelectQueries.expressions "count(distinct col)") [expected]
+    assertOkEqual (parse SelectQueries.expressions "count ( distinct     col )") [expected]
     
 [<Fact>]
 let ``Parses optional semicolon`` () =
-    assertOk (parse pSkipSemiColon ";")
-    assertOk (parse pSkipSemiColon "")
+    assertOk (parse skipSemiColon ";")
+    assertOk (parse skipSemiColon "")
     
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
-    assertOkEqual (parse SelectQueries.pGroupBy "GROUP BY a, b, c") ["a"; "b"; "c"]
-    assertOkEqual (parse SelectQueries.pGroupBy "GROUP BY a") ["a"]
-    assertError (parse SelectQueries.pGroupBy "GROUP BY")
+    assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") ["a"; "b"; "c"]
+    assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") ["a"]
+    assertError (parse SelectQueries.groupBy "GROUP BY")
     
 [<Fact>]
 let ``Parses SELECT by itself`` () =
