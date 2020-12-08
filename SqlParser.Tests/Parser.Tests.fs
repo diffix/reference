@@ -40,6 +40,11 @@ let ``Parses functions`` () =
         ]
     
 [<Fact>]
+let ``Parses optional semicolon`` () =
+    assertOk (parse pSkipSemiColon ";")
+    assertOk (parse pSkipSemiColon "")
+    
+[<Fact>]
 let ``Parses SELECT by itself`` () =
     assertOkEqual
         (parse SelectQueries.parse "SELECT col FROM table")
@@ -66,4 +71,7 @@ let ``Not sensitive to whitespace`` () =
 let ``Parse SELECT query with columns and table`` () =
     assertOkEqual
         (parseSql "SELECT col1, col2 FROM table")
+        (SelectQuery {Expressions = [Column (PlainColumn "col1"); Column (PlainColumn "col2")]; From = Table "table"})
+    assertOkEqual
+        (parseSql "SELECT col1, col2 FROM table ;")
         (SelectQuery {Expressions = [Column (PlainColumn "col1"); Column (PlainColumn "col2")]; From = Table "table"})

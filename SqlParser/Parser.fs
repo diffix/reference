@@ -48,9 +48,14 @@ module ParserDefinition =
            .>>. pTable
            |>> fun (columns, table) -> SelectQuery {Expressions = columns; From = table}
         
+    let pSkipSemiColon =
+        optional (skipSatisfy ((=) ';')) .>> spaces
+        
     let pQuery =
         spaces
         >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
+        .>> pSkipSemiColon
+        .>> eof
         
     let parse = run pQuery 
 
