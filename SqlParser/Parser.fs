@@ -30,24 +30,15 @@ module ParserDefinition =
         let parse = skipStringCI "SHOW" >>. spaces >>. (identifierTables <|> identifiersColumnsInTable)
         
     module SelectQueries =
-       let plainColumn =
-           anyWord
-           |>> PlainColumn
+       let plainColumn = anyWord |>> PlainColumn
            
-       let column =
-           plainColumn
-           |>> Column 
+       let column = plainColumn |>> Column 
        
-       let table =
-           anyWord |>> Table 
+       let table = anyWord |>> Table 
        
-       let ``function`` =
-           anyWord .>>. inParenthesis column
-           |>> Function
+       let ``function`` = anyWord .>>. inParenthesis column |>> Function
            
-       let distinctColumn =
-           pstringCI "distinct" .>> spaces >>. plainColumn
-           |>> Distinct
+       let distinctColumn = pstringCI "distinct" .>> spaces >>. plainColumn |>> Distinct
                
        let aggregate =
            pstringCI "count" .>> spaces >>. inParenthesis distinctColumn
@@ -55,8 +46,7 @@ module ParserDefinition =
            |>> AggregateFunction
        
        let expressions =
-           commaSeparated (choice [aggregate; attempt ``function``; column]) 
-           .>> spaces
+           commaSeparated (choice [aggregate; attempt ``function``; column])  .>> spaces
            
        let groupBy =
            skipWordsCI ["GROUP"; "BY"]
@@ -75,14 +65,12 @@ module ParserDefinition =
                | (columns, table), Some groupByColumns ->
                    AggregateQuery {Expressions = columns; From = table; GroupBy = groupByColumns}
         
-    let skipSemiColon =
-        optional (skipSatisfy ((=) ';')) .>> spaces
+    let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
         
     let query =
         spaces
         >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
-        .>> skipSemiColon
-        .>> eof
+        .>> skipSemiColon .>> eof
         
     let parse = run query 
 
