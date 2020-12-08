@@ -38,6 +38,23 @@ let ``Parses functions`` () =
           Function ("hello", (Column (PlainColumn "world")))
           Function ("hello", (Column (PlainColumn "moon")))
         ]
+        
+[<Fact>]
+let ``Parses count(distinct col)`` () =
+    let expected = AggregateFunction (AnonymizedCount (Distinct (PlainColumn "col")))
+    assertOkEqual (parse SelectQueries.pExpressions "count(distinct col)") [expected]
+    assertOkEqual (parse SelectQueries.pExpressions "count ( distinct     col )") [expected]
+    
+[<Fact>]
+let ``Parses optional semicolon`` () =
+    assertOk (parse pSkipSemiColon ";")
+    assertOk (parse pSkipSemiColon "")
+    
+[<Fact>]
+let ``Parses GROUP BY statement`` () =
+    assertOkEqual (parse SelectQueries.pGroupBy "GROUP BY a, b, c") ["a"; "b"; "c"]
+    assertOkEqual (parse SelectQueries.pGroupBy "GROUP BY a") ["a"]
+    assertError (parse SelectQueries.pGroupBy "GROUP BY")
     
 [<Fact>]
 let ``Parses SELECT by itself`` () =
@@ -67,3 +84,23 @@ let ``Parse SELECT query with columns and table`` () =
     assertOkEqual
         (parseSql "SELECT col1, col2 FROM table")
         (SelectQuery {Expressions = [Column (PlainColumn "col1"); Column (PlainColumn "col2")]; From = Table "table"})
+    assertOkEqual
+        (parseSql "SELECT col1, col2 FROM table ;")
+        (SelectQuery {Expressions = [Column (PlainColumn "col1"); Column (PlainColumn "col2")]; From = Table "table"})
+        
+[<Fact>]
+let ``Parse aggregate query`` () =
+    assertOkEqual
+        (parseSql """
+         SELECT col1, count(distinct aid)
+         FROM table
+         GROUP BY col1
+         """)
+        (AggregateQuery {
+            Expressions = [
+                Column (PlainColumn "col1")
+                Distinct (PlainColumn "aid") |> AnonymizedCount |> AggregateFunction
+            ]
+            From = Table "table"
+            GroupBy = ["col1"]
+        })

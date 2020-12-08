@@ -6,6 +6,7 @@ module ParserDefinition =
     
     let pAnyWord =
        satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_')
+       .>> spaces
        |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
     
     let pSkipWordSpacesCI word = skipStringCI word >>. spaces
@@ -18,6 +19,9 @@ module ParserDefinition =
     let pInParenthesis p =
         pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
         
+    let pCommaSeparated p =
+        sepBy1 p (pchar ',' .>> spaces)
+        
     module ShowQueries =
         let pIdentifiersColumnsInTable = pSkipWordsCI ["COLUMNS"; "FROM"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
             
@@ -26,31 +30,59 @@ module ParserDefinition =
         let parse = skipStringCI "SHOW" >>. spaces >>. (pIdentifierTables <|> pIdentifiersColumnsInTable)
         
     module SelectQueries =
+       let pPlainColumn =
+           pAnyWord
+           |>> PlainColumn
+           
        let pColumn =
-           pAnyWord .>> spaces
-           |>> fun columnName -> Column (PlainColumn columnName)
+           pPlainColumn
+           |>> Column 
        
        let pTable =
-           pAnyWord .>> spaces |>> Table 
+           pAnyWord |>> Table 
        
        let pFunction =
-           pAnyWord .>> spaces .>>. pInParenthesis pColumn
+           pAnyWord .>>. pInParenthesis pColumn
            |>> Function
+           
+       let pDistinctColumn =
+           pstringCI "distinct" .>> spaces >>. pPlainColumn
+           |>> Distinct
+               
+       let pAggregate =
+           pstringCI "count" .>> spaces >>. pInParenthesis pDistinctColumn
+           |>> AnonymizedCount
+           |>> AggregateFunction
        
        let pExpressions =
-           sepBy1 (attempt pFunction <|> pColumn) (pchar ',' .>> spaces)
+           pCommaSeparated (choice [pAggregate; attempt pFunction; pColumn]) 
            .>> spaces
+           
+       let pGroupBy =
+           pSkipWordsCI ["GROUP"; "BY"]
+           .>> spaces 
+           >>. pCommaSeparated pAnyWord
            
        let parse =
            pSkipWordSpacesCI "SELECT"
            >>. pExpressions
            .>> pSkipWordSpacesCI "FROM"
            .>>. pTable
-           |>> fun (columns, table) -> SelectQuery {Expressions = columns; From = table}
+           .>>. opt pGroupBy
+           |>> function
+               | (columns, table), None ->
+                   SelectQuery {Expressions = columns; From = table}
+               | (columns, table), Some groupByColumns ->
+                   AggregateQuery {Expressions = columns; From = table; GroupBy = groupByColumns}
+        
+    let pSkipSemiColon =
+        optional (skipSatisfy ((=) ';')) .>> spaces
         
     let pQuery =
         spaces
         >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
+        .>> pSkipSemiColon
+        .>> eof
         
     let parse = run pQuery 
 
