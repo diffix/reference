@@ -5,15 +5,15 @@ module Query =
     | Integer of int
     | String of string
     
-  type ColumnName = string
-  type TableName = string
+  type ColumnName = ColumnName of string
+  type TableName = TableName of string
 
   type ColumnType =
     | PlainColumn of ColumnName 
     | AliasedColumn of ColumnName * string
     
   type AggregateFunctionArgs =
-    | Distinct of ColumnType
+    | Distinct of ColumnName
     
   type AggregateFunction =
     | AnonymizedCount of AggregateFunctionArgs
