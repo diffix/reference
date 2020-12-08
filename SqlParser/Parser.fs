@@ -6,6 +6,7 @@ module ParserDefinition =
     
     let pAnyWord =
        satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_')
+       .>> spaces
        |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
     
     let pSkipWordSpacesCI word = skipStringCI word >>. spaces
@@ -30,14 +31,14 @@ module ParserDefinition =
         
     module SelectQueries =
        let pColumn =
-           pAnyWord .>> spaces
-           |>> fun columnName -> Column (PlainColumn columnName)
+           pPlainColumn
+           |>> Column 
        
        let pTable =
-           pAnyWord .>> spaces |>> Table 
+           pAnyWord |>> Table 
        
        let pFunction =
-           pAnyWord .>> spaces .>>. pInParenthesis pColumn
+           pAnyWord .>>. pInParenthesis pColumn
            |>> Function
        
        let pExpressions =
