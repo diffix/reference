@@ -14,6 +14,9 @@ module QueryEngine =
                 | Query.ShowTables -> DiffixSqlite.getTables connection
                 | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
                 | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
+                | Query.AggregateQuery _query -> asyncResult {
+                    return! Error (InvalidRequest "Aggregate queries aren't supported yet")
+                }
             do! connection.CloseAsync() |> Async.AwaitTask
             return result
         }
