@@ -18,6 +18,9 @@ module ParserDefinition =
     let pInParenthesis p =
         pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
         
+    let pCommaSeparated p =
+        sepBy1 p (pchar ',' .>> spaces)
+        
     module ShowQueries =
         let pIdentifiersColumnsInTable = pSkipWordsCI ["COLUMNS"; "FROM"] >>. (pAnyWord <?> "table name") |>> ShowColumnsFromTable 
             
@@ -38,7 +41,7 @@ module ParserDefinition =
            |>> Function
        
        let pExpressions =
-           sepBy1 (attempt pFunction <|> pColumn) (pchar ',' .>> spaces)
+           pCommaSeparated (choice [pAggregate; attempt pFunction; pColumn]) 
            .>> spaces
            
        let parse =
