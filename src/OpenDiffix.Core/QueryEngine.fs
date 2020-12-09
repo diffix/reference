@@ -1,33 +1,34 @@
 ﻿namespace OpenDiffix.Core
 
 module QueryEngine =
-    open FsToolkit.ErrorHandling
-    open OpenDiffix.Core
-    open Types
+  open FsToolkit.ErrorHandling
+  open OpenDiffix.Core
+  open Types
 
-    let private executeQuery reqParams queryAst =
-        asyncResult {
-            let! connection = DiffixSqlite.dbConnection reqParams.DatabasePath
-            do! connection.OpenAsync() |> Async.AwaitTask
-            let! result =
-                match queryAst with
-                | Query.ShowTables -> DiffixSqlite.getTables connection
-                | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
-                | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
-                | Query.AggregateQuery _query -> asyncResult {
-                    return! Error (InvalidRequest "Aggregate queries aren't supported yet")
-                }
-            do! connection.CloseAsync() |> Async.AwaitTask
-            return result
-        }
+  let private executeQuery reqParams queryAst =
+    asyncResult {
+      let! connection = DiffixSqlite.dbConnection reqParams.DatabasePath
+      do! connection.OpenAsync() |> Async.AwaitTask
 
-    let parseSql sqlQuery =
-        match Parser.parseSql sqlQuery with
-        | Ok ast -> Ok ast
-        | Error (Parser.CouldNotParse error) -> Error (ParseError error)
+      let! result =
+        match queryAst with
+        | Query.ShowTables -> DiffixSqlite.getTables connection
+        | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
+        | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
+        | Query.AggregateQuery _query ->
+            asyncResult { return! Error(InvalidRequest "Aggregate queries aren't supported yet") }
 
-    let runQuery reqParams =
-        asyncResult {
-            let! queryAst = parseSql reqParams.Query
-            return! executeQuery reqParams queryAst
-        }
+      do! connection.CloseAsync() |> Async.AwaitTask
+      return result
+    }
+
+  let parseSql sqlQuery =
+    match Parser.parseSql sqlQuery with
+    | Ok ast -> Ok ast
+    | Error (Parser.CouldNotParse error) -> Error(ParseError error)
+
+  let runQuery reqParams =
+    asyncResult {
+      let! queryAst = parseSql reqParams.Query
+      return! executeQuery reqParams queryAst
+    }
