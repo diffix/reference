@@ -11,7 +11,7 @@ A live version of the reference implementation can be found at [prototype.open-d
 
 ## Purpose
 
-This is a reference implementation of open-diffix. 
+This is a reference implementation of open-diffix.
 As such, this serves as a sandbox in which we can quickly try, and validate, new ideas for anonymization.
 The reference implementation is meant to offer anonymization quality matching that of a final product - however
 not necessarily SQL parity. It is not mean to be productized. As such it will not receive the type of polish
@@ -20,7 +20,7 @@ edges.
 
 ## Development process
 
-The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility. 
+The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility.
 Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
 ### Design considerations
@@ -34,9 +34,8 @@ around the complex and large codebase of a real world database engine.
 
 The codebase is currently organized in a number of projects:
 
-- `DiffixEngine` and `DiffixEngine.Tests`: Contains the meat of this project. It is the anonymization engine.
-- `SqlParser` and `SqlParser.Tests`: Simplistic SQL parser and corresponding tests.
-- `WebFrontend`: API endpoint that is served on [prototype.open-diffix.org](https://prototype.open-diffix.org) and can be used for simple testing with external tools.
+- `OpenDiffix.Core` and `OpenDiffix.Core.Tests`: Contains the meat of this project. It is the query and anonymization engine.
+- `OpenDiffix.Web`: API endpoint that is served on [prototype.open-diffix.org](https://prototype.open-diffix.org) and can be used for simple testing with external tools.
 
 ### Branches
 

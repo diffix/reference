@@ -1,2 +1,2 @@
 start:
-	dotnet watch -p WebFrontend/ run
+	dotnet watch -p src/OpenDiffix.Web/ run

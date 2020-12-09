@@ -1,7 +1,7 @@
 */bin
 */obj
-WebFrontend/.cache
-WebFrontend/node_modules/
+src/OpenDiffix.Web/.cache
+src/OpenDiffix.Web/node_modules/
 Dockerfile
 .dockerignore
 .git
