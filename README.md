@@ -1,6 +1,6 @@
 # open-diffix reference implementation
 
-A live version of the reference implementation can be found at [db-proto.probsteide.com](https://db-proto.probsteide.com).
+A live version of the reference implementation can be found at [prototype.open-diffix.org](https://prototype.open-diffix.org).
 
 - [Purpose](#purpose)
 - [Development process](#development-process)
@@ -36,7 +36,7 @@ The codebase is currently organized in a number of projects:
 
 - `DiffixEngine` and `DiffixEngine.Tests`: Contains the meat of this project. It is the anonymization engine.
 - `SqlParser` and `SqlParser.Tests`: Simplistic SQL parser and corresponding tests.
-- `WebFrontend`: API endpoint that is served on [db-proto.probsteide.com](https://db-proto.probsteide.com) and can be used for simple testing with external tools.
+- `WebFrontend`: API endpoint that is served on [prototype.open-diffix.org](https://prototype.open-diffix.org) and can be used for simple testing with external tools.
 
 ### Branches
 
