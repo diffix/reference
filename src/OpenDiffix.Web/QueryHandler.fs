@@ -94,8 +94,7 @@ type FormQueryRequest =
 let handleQuery pathToDbs: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
     task {
-      let usAmerican =
-        CultureInfo.CreateSpecificCulture("en-US")
+      let usAmerican = CultureInfo.CreateSpecificCulture("en-US")
 
       let! formUserRequest = ctx.BindFormAsync<FormQueryRequest>(usAmerican)
 

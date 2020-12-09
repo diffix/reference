@@ -39,17 +39,21 @@ let validatePassword: HttpHandler =
 
 let webApp =
   warbler (fun _ ->
-    choose [ POST
-             >=> choose [ route "/api" >=> QueryHandler.apiHandleQuery dbPath
-                          route "/query" >=> QueryHandler.handleQuery dbPath
-                          route "/upload-db"
-                          >=> validatePassword
-                          >=> DbUploadHandler.fromFormHandler dbPath
-                          route "/api/upload-db"
-                          >=> validatePasswordHeader
-                          >=> DbUploadHandler.fromBodyHandler dbPath ]
-             route "/" >=> htmlView (Page.index dbPath)
-             route "/query" >=> htmlView (Page.index dbPath) ])
+    choose [
+      POST
+      >=> choose [
+            route "/api" >=> QueryHandler.apiHandleQuery dbPath
+            route "/query" >=> QueryHandler.handleQuery dbPath
+            route "/upload-db"
+            >=> validatePassword
+            >=> DbUploadHandler.fromFormHandler dbPath
+            route "/api/upload-db"
+            >=> validatePasswordHeader
+            >=> DbUploadHandler.fromBodyHandler dbPath
+          ]
+      route "/" >=> htmlView (Page.index dbPath)
+      route "/query" >=> htmlView (Page.index dbPath)
+    ])
 
 let configureApp (app: IApplicationBuilder) = app.UseStaticFiles().UseGiraffe webApp
 

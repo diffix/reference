@@ -62,7 +62,6 @@ let ``SELECT product_id FROM line_items`` () =
     |> ResultTable
     |> Ok
 
-  let queryResult =
-    runQuery "SELECT product_id FROM line_items"
+  let queryResult = runQuery "SELECT product_id FROM line_items"
 
   Assert.Equal(expected, queryResult)

@@ -14,22 +14,25 @@ type LowCountSettingsJson =
           |> Option.defaultValue LowCountSettings.Defaults.StdDev })
 
   static member Encoder(settings: LowCountSettings) =
-    Encode.object [ "threshold", Encode.float settings.Threshold
-                    "std_dev", Encode.float settings.StdDev ]
+    Encode.object [ "threshold", Encode.float settings.Threshold; "std_dev", Encode.float settings.StdDev ]
 
 type AnonymizationParamsJson =
   static member Encoder(anonymizationParams: AnonymizationParams) =
-    Encode.object [ "anonymization_parameters",
-                    Encode.object [ "aid_columns",
-                                    Encode.list
-                                      (anonymizationParams.AidColumnOption
-                                       |> Option.map (fun aid -> [ Encode.string aid ])
-                                       |> Option.defaultValue [])
-                                    "seed", Encode.int anonymizationParams.Seed
-                                    "low_count",
-                                    anonymizationParams.LowCountSettings
-                                    |> Option.map LowCountSettingsJson.Encoder
-                                    |> Option.defaultValue (Encode.bool false) ] ]
+    Encode.object [
+      "anonymization_parameters",
+      Encode.object [
+        "aid_columns",
+        Encode.list
+          (anonymizationParams.AidColumnOption
+           |> Option.map (fun aid -> [ Encode.string aid ])
+           |> Option.defaultValue [])
+        "seed", Encode.int anonymizationParams.Seed
+        "low_count",
+        anonymizationParams.LowCountSettings
+        |> Option.map LowCountSettingsJson.Encoder
+        |> Option.defaultValue (Encode.bool false)
+      ]
+    ]
 
 type RequestParamsJson =
   static member Encoder(requestParams: RequestParams) =
@@ -68,34 +71,46 @@ type QueryResultJson =
                | NonPersonalRow nonPersonalRow -> encodeColumns nonPersonalRow.Columns)
           |> Encode.list
 
-        Encode.object [ "success", Encode.bool true
-                        "column_names", columnNames
-                        "values", values
-                        "anonymization", RequestParamsJson.Encoder requestParams ]
+        Encode.object [
+          "success", Encode.bool true
+          "column_names", columnNames
+          "values", values
+          "anonymization", RequestParamsJson.Encoder requestParams
+        ]
 
 type QueryErrorJson =
   static member Encoder(queryResult: QueryError) =
     match queryResult with
     | ParseError error ->
-        Encode.object [ "success", Encode.bool false
-                        "type", Encode.string "Parse error"
-                        "error_message", Encode.string error ]
+        Encode.object [
+          "success", Encode.bool false
+          "type", Encode.string "Parse error"
+          "error_message", Encode.string error
+        ]
     | DbNotFound ->
-        Encode.object [ "success", Encode.bool false
-                        "type", Encode.string "Database not found"
-                        "error_message", Encode.string "Could not find the database" ]
+        Encode.object [
+          "success", Encode.bool false
+          "type", Encode.string "Database not found"
+          "error_message", Encode.string "Could not find the database"
+        ]
     | InvalidRequest error ->
-        Encode.object [ "success", Encode.bool false
-                        "type", Encode.string "Invalid request"
-                        "error_message", Encode.string error ]
+        Encode.object [
+          "success", Encode.bool false
+          "type", Encode.string "Invalid request"
+          "error_message", Encode.string error
+        ]
     | ExecutionError error ->
-        Encode.object [ "success", Encode.bool false
-                        "type", Encode.string "Execution error"
-                        "error_message", Encode.string error ]
+        Encode.object [
+          "success", Encode.bool false
+          "type", Encode.string "Execution error"
+          "error_message", Encode.string error
+        ]
     | UnexpectedError error ->
-        Encode.object [ "success", Encode.bool false
-                        "type", Encode.string "Unexpected error"
-                        "error_message", Encode.string error ]
+        Encode.object [
+          "success", Encode.bool false
+          "type", Encode.string "Unexpected error"
+          "error_message", Encode.string error
+        ]
 
 type AnonymizationParameters =
   { AidColumns: string list

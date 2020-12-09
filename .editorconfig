@@ -1,5 +1,9 @@
 root = true
 
+[*]
+charset = utf-8
+end_of_line = lf
+
 [Makefile]
 indent_style = tab
 
@@ -14,5 +18,38 @@ max_line_length = 120
 trim_trailing_whitespace = true
 insert_final_newline = true
 end_of_line = lf
+resharper_fsharp_semicolon_at_end_of_line = false
+resharper_fsharp_space_before_parameter = true
+resharper_fsharp_space_before_lowercase_invocation = true
+resharper_fsharp_space_before_uppercase_invocation = false
+resharper_fsharp_space_before_class_constructor = false
+resharper_fsharp_space_before_member = false
+resharper_fsharp_space_before_colon = false
+resharper_fsharp_space_after_comma = true
+resharper_fsharp_space_before_semicolon = false
+resharper_fsharp_space_after_semicolon = true
+resharper_fsharp_indent_on_try_with = false
+resharper_fsharp_space_around_delimiter = true
+resharper_fsharp_max_if_then_else_short_width = 40
 resharper_fsharp_max_infix_operator_expression = 60
+resharper_fsharp_max_newline_infix_operator_expression_number_of_items = 1
+resharper_fsharp_multiline_infix_multiline_formatter = character_width
+resharper_fsharp_max_record_width = 40
+resharper_fsharp_max_record_number_of_items = 1
+resharper_fsharp_record_multiline_formatter = character_width
 resharper_fsharp_max_array_or_list_width = 60
+resharper_fsharp_max_array_or_list_number_of_items = 1
+resharper_fsharp_array_or_list_multiline_formatter = character_width
+resharper_fsharp_max_value_binding_width = 50
+resharper_fsharp_max_function_binding_width = 50
+resharper_fsharp_max_dot_get_expression_width = 50
+resharper_fsharp_multiline_block_brackets_on_same_column = false
+resharper_fsharp_newline_between_type_definition_and_members = false
+resharper_fsharp_keep_if_then_in_same_line = false
+resharper_fsharp_max_elmish_width = 120
+resharper_fsharp_single_argument_web_mode = true
+resharper_fsharp_align_function_signature_to_indentation = false
+resharper_fsharp_alternative_long_member_definitions = false
+resharper_fsharp_disable_elmish_syntax = false
+resharper_fsharp_multi_line_lambda_closing_newline = true
+resharper_fsharp_strict_mode = false

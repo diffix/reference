@@ -44,8 +44,7 @@ module Definitions =
     let table =
       anyWord |>> fun tableName -> Table(TableName tableName)
 
-    let ``function`` =
-      anyWord .>>. inParenthesis column |>> Function
+    let ``function`` = anyWord .>>. inParenthesis column |>> Function
 
     let distinctColumn =
       pstringCI "distinct" .>> spaces >>. columnName |>> Distinct
@@ -77,8 +76,7 @@ module Definitions =
               From = table
               GroupBy = groupByColumns }
 
-  let skipSemiColon =
-    optional (skipSatisfy ((=) ';')) .>> spaces
+  let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
 
   let query =
     spaces

@@ -10,18 +10,14 @@ let layout content =
     head [] [
       meta [ _charset "UTF-8" ]
       title [] [ str "Diffix query prototype" ]
-      link [ _rel "stylesheet"
-             _type "text/css"
-             _href "styles.css" ]
+      link [ _rel "stylesheet"; _type "text/css"; _href "styles.css" ]
     ]
     body [] [
       div [ _class "min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12" ] [
         div [ _class
                 "relative sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800" ] [
           div [ _class "bg-white w-full px-6 py-5 relative" ] [
-            h1 [ _class "font-medium text-4xl" ] [
-              str "Diffix prototype"
-            ]
+            h1 [ _class "font-medium text-4xl" ] [ str "Diffix prototype" ]
             p [ _class "mt-2" ] [
               str "Test db-diffix to your hearts contents. May it produce exceptionally well anonymized results."
             ]
@@ -31,33 +27,26 @@ let layout content =
 
         div [ _class
                 "mt-8 py-5 px-6 bg-gray-200 sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800" ] [
-          h1 [ _class "font-medium text-4xl" ] [
-            str "Upload databases"
-          ]
+          h1 [ _class "font-medium text-4xl" ] [ str "Upload databases" ]
           form [ _action "/upload-db"
                  _method "POST"
                  _enctype "multipart/form-data"
                  _class "flex flex-col space-y-2 mt-4" ] [
             div [ _class "flex" ] [
-              label [ _for "password"; _class "w-1/3 text-right pr-4" ] [
-                str "Password:"
-              ]
-              input [ _id "password"
-                      _name "password"
-                      _type "password"
-                      _class "flex-grow px-2 py-1 rounded-lg" ]
+              label [ _for "password"; _class "w-1/3 text-right pr-4" ] [ str "Password:" ]
+              input [ _id "password"; _name "password"; _type "password"; _class "flex-grow px-2 py-1 rounded-lg" ]
             ]
 
             div [ _class "flex" ] [
-              label [ _for "files"; _class "w-1/3 text-right pr-4" ] [
-                str "Sqlite files:"
+              label [ _for "files"; _class "w-1/3 text-right pr-4" ] [ str "Sqlite files:" ]
+              input [
+                _id "files"
+                _name "files"
+                _type "file"
+                _accept ".db,.sqlite,.sqlite3,application/vnd.sqlite3, application/x-sqlite3"
+                _multiple
+                _class "flex-grow px-2 py-1"
               ]
-              input [ _id "files"
-                      _name "files"
-                      _type "file"
-                      _accept ".db,.sqlite,.sqlite3,application/vnd.sqlite3, application/x-sqlite3"
-                      _multiple
-                      _class "flex-grow px-2 py-1" ]
             ]
 
             div [ _class "flex" ] [
@@ -107,21 +96,19 @@ let queryContainer databases (queryRequest: QueryRequest) =
                   ]))
         ]
         label [ _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400" ] [
-          input [ _type "text"
-                  _name "AidColumn"
-                  _class "rounded-md border px-2 py-1"
-                  _placeholder "Name of the AID column"
-                  _value
-                    (queryRequest.Anonymization.AidColumns
-                     |> List.tryHead
-                     |> Option.defaultValue "") ]
+          input [
+            _type "text"
+            _name "AidColumn"
+            _class "rounded-md border px-2 py-1"
+            _placeholder "Name of the AID column"
+            _value
+              (queryRequest.Anonymization.AidColumns
+               |> List.tryHead
+               |> Option.defaultValue "")
+          ]
         ]
       ]
-      div [] [
-        button [ _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500" ] [
-          str "Run query"
-        ]
-      ]
+      div [] [ button [ _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500" ] [ str "Run query" ] ]
     ]
   ]
 
@@ -166,9 +153,7 @@ let renderResults: Row list -> XmlNode =
 let errorFragment title description =
   div [ _class "bg-red-400 text-white p-4 w-full" ] [
     h2 [ _class "text-lg font-bold" ] [ str title ]
-    pre [ _class "mt-2 p-4 bg-red-500 rounded-b-md" ] [
-      str description
-    ]
+    pre [ _class "mt-2 p-4 bg-red-500 rounded-b-md" ] [ str description ]
   ]
 
 open System.IO
@@ -189,10 +174,7 @@ let queryPage dbPath (userRequest: QueryRequest) result =
     | Error (UnexpectedError error) -> errorFragment "An unexpected error occurred" error
     | Error (InvalidRequest error) -> errorFragment "The request is invalid" error
 
-  div [] [
-    queryContainer (availableDbs dbPath) userRequest
-    renderedResultSection
-  ]
+  div [] [ queryContainer (availableDbs dbPath) userRequest; renderedResultSection ]
   |> layout
 
 let index dbPath =
