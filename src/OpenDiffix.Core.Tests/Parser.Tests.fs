@@ -27,20 +27,11 @@ let ``Parses words`` () =
 let ``Parses columns`` () =
   assertOkEqual (parse SelectQueries.expressions "hello") [ plainColumn "hello" ]
 
-  assertOkEqual
-    (parse SelectQueries.expressions "hello, world")
-    [ plainColumn "hello"
-      plainColumn "world" ]
+  assertOkEqual (parse SelectQueries.expressions "hello, world") [ plainColumn "hello"; plainColumn "world" ]
 
-  assertOkEqual
-    (parse SelectQueries.expressions "hello,world")
-    [ plainColumn "hello"
-      plainColumn "world" ]
+  assertOkEqual (parse SelectQueries.expressions "hello,world") [ plainColumn "hello"; plainColumn "world" ]
 
-  assertOkEqual
-    (parse SelectQueries.expressions "hello ,world")
-    [ plainColumn "hello"
-      plainColumn "world" ]
+  assertOkEqual (parse SelectQueries.expressions "hello ,world") [ plainColumn "hello"; plainColumn "world" ]
 
 [<Fact>]
 let ``Parses functions`` () =
@@ -67,11 +58,7 @@ let ``Parses optional semicolon`` () =
 
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
-  assertOkEqual
-    (parse SelectQueries.groupBy "GROUP BY a, b, c")
-    [ ColumnName "a"
-      ColumnName "b"
-      ColumnName "c" ]
+  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ ColumnName "a"; ColumnName "b"; ColumnName "c" ]
 
   assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ ColumnName "a" ]
   assertError (parse SelectQueries.groupBy "GROUP BY")
@@ -107,17 +94,13 @@ let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table")
     (SelectQuery
-      { Expressions =
-          [ plainColumn "col1"
-            plainColumn "col2" ]
+      { Expressions = [ plainColumn "col1"; plainColumn "col2" ]
         From = Table(TableName "table") })
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
     (SelectQuery
-      { Expressions =
-          [ plainColumn "col1"
-            plainColumn "col2" ]
+      { Expressions = [ plainColumn "col1"; plainColumn "col2" ]
         From = Table(TableName "table") })
 
 [<Fact>]

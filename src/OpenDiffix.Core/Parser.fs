@@ -14,14 +14,10 @@ module Definitions =
   let skipWordSpacesCI word = skipStringCI word >>. spaces
 
   let skipWordsCI words =
-    words
-    |> List.map (skipWordSpacesCI)
-    |> List.reduce (>>.)
+    words |> List.map (skipWordSpacesCI) |> List.reduce (>>.)
 
   let inParenthesis p =
-    pchar '(' >>. spaces >>. p
-    .>> pchar ')'
-    .>> spaces
+    pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
 
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
@@ -46,15 +42,13 @@ module Definitions =
     let column = plainColumn |>> Column
 
     let table =
-      anyWord
-      |>> fun tableName -> Table(TableName tableName)
+      anyWord |>> fun tableName -> Table(TableName tableName)
 
     let ``function`` =
       anyWord .>>. inParenthesis column |>> Function
 
     let distinctColumn =
-      pstringCI "distinct" .>> spaces >>. columnName
-      |>> Distinct
+      pstringCI "distinct" .>> spaces >>. columnName |>> Distinct
 
     let aggregate =
       pstringCI "count" .>> spaces
@@ -63,10 +57,7 @@ module Definitions =
       |>> AggregateFunction
 
     let expressions =
-      commaSeparated
-        (choice [ aggregate
-                  attempt ``function``
-                  column ])
+      commaSeparated (choice [ aggregate; attempt ``function``; column ])
       .>> spaces
 
     let groupBy =

@@ -13,16 +13,12 @@ let runQuery query =
       DatabasePath = __SOURCE_DIRECTORY__ + "/../../dbs/test-db.sqlite"
       Query = query }
 
-  QueryEngine.runQuery requestParams
-  |> Async.RunSynchronously
+  QueryEngine.runQuery requestParams |> Async.RunSynchronously
 
 [<Fact>]
 let ``SHOW TABLES`` () =
   let expected =
-    [ "customers"
-      "line_items"
-      "products"
-      "purchases" ]
+    [ "customers"; "line_items"; "products"; "purchases" ]
     |> List.map (fun v ->
          NonPersonalRow
            { Columns =

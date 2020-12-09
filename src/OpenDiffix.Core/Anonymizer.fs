@@ -8,8 +8,7 @@ let private randomNum (rnd: Random) mean stdDev =
   let u2 = 1.0 - rnd.NextDouble()
 
   let randStdNormal =
-    Math.Sqrt(-2.0 * log (u1))
-    * Math.Sin(2.0 * Math.PI * u2)
+    Math.Sqrt(-2.0 * log (u1)) * Math.Sin(2.0 * Math.PI * u2)
 
   mean + stdDev * randStdNormal
 

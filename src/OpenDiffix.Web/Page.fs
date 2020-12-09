@@ -9,9 +9,7 @@ let layout content =
   html [ _lang "en" ] [
     head [] [
       meta [ _charset "UTF-8" ]
-      title [] [
-        str "Diffix query prototype"
-      ]
+      title [] [ str "Diffix query prototype" ]
       link [ _rel "stylesheet"
              _type "text/css"
              _href "styles.css" ]
@@ -41,8 +39,7 @@ let layout content =
                  _enctype "multipart/form-data"
                  _class "flex flex-col space-y-2 mt-4" ] [
             div [ _class "flex" ] [
-              label [ _for "password"
-                      _class "w-1/3 text-right pr-4" ] [
+              label [ _for "password"; _class "w-1/3 text-right pr-4" ] [
                 str "Password:"
               ]
               input [ _id "password"
@@ -52,8 +49,7 @@ let layout content =
             ]
 
             div [ _class "flex" ] [
-              label [ _for "files"
-                      _class "w-1/3 text-right pr-4" ] [
+              label [ _for "files"; _class "w-1/3 text-right pr-4" ] [
                 str "Sqlite files:"
               ]
               input [ _id "files"
@@ -138,9 +134,7 @@ let renderResults: Row list -> XmlNode =
   function
   | [] ->
       div [ _class "bg-gray-400 text-white p-4 w-full" ] [
-        h2 [ _class "text-lg font-bold" ] [
-          str "No rows returned"
-        ]
+        h2 [ _class "text-lg font-bold" ] [ str "No rows returned" ]
       ]
   | rows ->
       let columnsFromRow =
@@ -163,10 +157,7 @@ let renderResults: Row list -> XmlNode =
               yield
                 tr [ _class "pt-2 odd:bg-gray-200" ] [
                   for columnCell in row do
-                    yield
-                      td [] [
-                        valueToStrNode columnCell.ColumnValue
-                      ]
+                    yield td [] [ valueToStrNode columnCell.ColumnValue ]
                 ]
           ]
         ]
@@ -174,9 +165,7 @@ let renderResults: Row list -> XmlNode =
 
 let errorFragment title description =
   div [ _class "bg-red-400 text-white p-4 w-full" ] [
-    h2 [ _class "text-lg font-bold" ] [
-      str title
-    ]
+    h2 [ _class "text-lg font-bold" ] [ str title ]
     pre [ _class "mt-2 p-4 bg-red-500 rounded-b-md" ] [
       str description
     ]
@@ -214,5 +203,4 @@ let index dbPath =
     | [] -> QueryRequest.withQuery "SHOW tables" ""
     | db :: _ -> QueryRequest.withQuery "SHOW tables" db
 
-  queryContainer (availableDbs dbPath) queryRequest
-  |> layout
+  queryContainer (availableDbs dbPath) queryRequest |> layout

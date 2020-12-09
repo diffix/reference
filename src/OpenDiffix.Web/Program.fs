@@ -40,8 +40,7 @@ let validatePassword: HttpHandler =
 let webApp =
   warbler (fun _ ->
     choose [ POST
-             >=> choose [ route "/api"
-                          >=> QueryHandler.apiHandleQuery dbPath
+             >=> choose [ route "/api" >=> QueryHandler.apiHandleQuery dbPath
                           route "/query" >=> QueryHandler.handleQuery dbPath
                           route "/upload-db"
                           >=> validatePassword

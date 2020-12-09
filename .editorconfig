@@ -1,8 +1,18 @@
 root = true
 
+[Makefile]
+indent_style = tab
+
+[*.{js,json}]
+indent_style = space
+indent_size = 2
+
 [*.{fs,fsx}]
 indent_size = 2
 indent_style = space
+max_line_length = 120
 trim_trailing_whitespace = true
 insert_final_newline = true
 end_of_line = lf
+resharper_fsharp_max_infix_operator_expression = 60
+resharper_fsharp_max_array_or_list_width = 60
