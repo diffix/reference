@@ -23,22 +23,24 @@ module ParserDefinition =
         sepBy1 p (pchar ',' .>> spaces)
         
     module ShowQueries =
-        let identifiersColumnsInTable = skipWordsCI ["COLUMNS"; "FROM"] >>. (anyWord <?> "table name") |>> ShowColumnsFromTable 
+        let identifiersColumnsInTable = skipWordsCI ["COLUMNS"; "FROM"] >>. (anyWord |>> TableName <?> "table name") |>> ShowColumnsFromTable 
             
         let identifierTables = stringCIReturn "TABLES" ShowTables
         
         let parse = skipStringCI "SHOW" >>. spaces >>. (identifierTables <|> identifiersColumnsInTable)
         
     module SelectQueries =
-       let plainColumn = anyWord |>> PlainColumn
+       let columnName = anyWord .>> spaces |>> ColumnName
+       
+       let plainColumn = columnName |>> PlainColumn 
            
        let column = plainColumn |>> Column 
        
-       let table = anyWord |>> Table 
+       let table = anyWord |>> fun tableName -> Table (TableName tableName)
        
        let ``function`` = anyWord .>>. inParenthesis column |>> Function
            
-       let distinctColumn = pstringCI "distinct" .>> spaces >>. plainColumn |>> Distinct
+       let distinctColumn = pstringCI "distinct" .>> spaces >>. columnName |>> Distinct
                
        let aggregate =
            pstringCI "count" .>> spaces >>. inParenthesis distinctColumn
@@ -51,7 +53,7 @@ module ParserDefinition =
        let groupBy =
            skipWordsCI ["GROUP"; "BY"]
            .>> spaces 
-           >>. commaSeparated anyWord
+           >>. commaSeparated columnName
            
        let parse =
            skipWordSpacesCI "SELECT"
