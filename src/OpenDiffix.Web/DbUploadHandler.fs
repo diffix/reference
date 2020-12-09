@@ -1,4 +1,4 @@
-module WebFrontend.DbUploadHandler
+module OpenDiffix.Web.DbUploadHandler
 
 open Microsoft.AspNetCore.Http
 open Giraffe
@@ -25,7 +25,7 @@ let fromFormHandler dbPath =
             )
             redirectTo false "/" next ctx)
     }
-    
+
 let fromBodyHandler dbPath =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {

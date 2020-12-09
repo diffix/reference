@@ -1,10 +1,10 @@
 module ParserTests
 
 open FParsec.CharParsers
-open SqlParser.ParserDefinition
+open OpenDiffix.Core.ParserDefinition
 open TestHelpers
-open SqlParser.Parser
-open SqlParser.Query
+open OpenDiffix.Core.Parser
+open OpenDiffix.Core.Query
 open Xunit
 
 let parse p string =

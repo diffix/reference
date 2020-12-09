@@ -1,7 +1,7 @@
-module WebFrontend.Types
+module OpenDiffix.Web.Types
 
 open Thoth.Json.Net
-open DiffixEngine.Types
+open OpenDiffix.Core.Types
 
 type LowCountSettingsJson =
   static member Decoder: Decoder<LowCountSettings> =
@@ -16,7 +16,7 @@ type LowCountSettingsJson =
             |> Option.defaultValue LowCountSettings.Defaults.StdDev
         }
     )
-    
+
   static member Encoder (settings: LowCountSettings) =
     Encode.object [
       "threshold", Encode.float settings.Threshold
@@ -39,39 +39,39 @@ type AnonymizationParamsJson =
           |> Option.defaultValue (Encode.bool false)
       ]
     ]
-    
+
 type RequestParamsJson =
   static member Encoder (requestParams: RequestParams) =
     Encode.object [
       "anonymization_parameters", AnonymizationParamsJson.Encoder requestParams.AnonymizationParams
     ]
-    
+
 type ColumnValueJson =
   static member Encoder (columnValue: ColumnValue) =
     match columnValue with
     | IntegerValue intValue -> Encode.int intValue
     | StringValue strValue -> Encode.string strValue
-    
+
 type QueryResultJson =
   static member Encoder (requestParams: RequestParams) (queryResult: QueryResult) =
     match queryResult with
     | ResultTable rows ->
-      let encodeColumnNames columns = 
+      let encodeColumnNames columns =
         columns
-        |> List.map(fun column -> Encode.string column.ColumnName) 
+        |> List.map(fun column -> Encode.string column.ColumnName)
         |> Encode.list
-        
+
       let columnNames =
         match List.tryHead rows with
         | Some (AnonymizableRow anonymizableRow) -> encodeColumnNames anonymizableRow.Columns
         | Some (NonPersonalRow nonPersonalRow) -> encodeColumnNames nonPersonalRow.Columns
         | None -> Encode.list []
-      
-      let encodeColumns columns = 
+
+      let encodeColumns columns =
         columns
-        |> List.map(fun column -> ColumnValueJson.Encoder column.ColumnValue) 
+        |> List.map(fun column -> ColumnValueJson.Encoder column.ColumnValue)
         |> Encode.list
-        
+
       let values =
         rows
         |> List.map(
@@ -80,14 +80,14 @@ type QueryResultJson =
           | NonPersonalRow nonPersonalRow -> encodeColumns nonPersonalRow.Columns
         )
         |> Encode.list
-      
+
       Encode.object [
         "success", Encode.bool true
         "column_names", columnNames
         "values", values
         "anonymization", RequestParamsJson.Encoder requestParams
       ]
-  
+
 type QueryErrorJson =
   static member Encoder (queryResult: QueryError) =
     match queryResult with
@@ -121,21 +121,21 @@ type QueryErrorJson =
         "type", Encode.string "Unexpected error"
         "error_message", Encode.string error
       ]
-      
+
 type AnonymizationParameters =
   {
     AidColumns: string list
     LowCountFiltering: LowCountSettings option
     Seed: int
   }
-  
-  static member Default = 
+
+  static member Default =
     {
       AidColumns = []
       LowCountFiltering = Some LowCountSettings.Defaults
       Seed = 1
     }
-    
+
   static member Decoder: Decoder<AnonymizationParameters> =
     Decode.object (
       fun get ->
@@ -156,7 +156,7 @@ type QueryRequest =
     Database: string
     Anonymization: AnonymizationParameters
   }
-  
+
   static member Decoder: Decoder<QueryRequest> =
     Decode.object (
       fun get ->

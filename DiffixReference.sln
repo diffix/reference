@@ -1,10 +1,10 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DiffixEngine", "DiffixEngine\DiffixEngine.fsproj", "{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.Core", "src\OpenDiffix.Core\OpenDiffix.Core.fsproj", "{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DiffixEngine.Tests", "DiffixEngine.Tests\DiffixEngine.Tests.fsproj", "{41735A1A-EB83-4372-A563-3307FACBB5FF}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.Core.Tests", "src\OpenDiffix.Core.Tests\OpenDiffix.Core.Tests.fsproj", "{41735A1A-EB83-4372-A563-3307FACBB5FF}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "WebFrontend", "WebFrontend\WebFrontend.fsproj", "{9BBA8CD6-CB52-450C-BC63-BD3CCC145512}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.Web", "src\OpenDiffix.Web\OpenDiffix.Web.fsproj", "{9BBA8CD6-CB52-450C-BC63-BD3CCC145512}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

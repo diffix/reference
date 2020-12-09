@@ -5,26 +5,26 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Http
 open Giraffe
-open WebFrontend
+open OpenDiffix.Web
 
 let uploadPassword =
   match Environment.GetEnvironmentVariable("UPLOAD_PASSWORD") with
   | null -> "db-diffix"
   | password -> password
-    
+
 let dbPath =
   #if DEBUG
-  __SOURCE_DIRECTORY__ + "/../dbs"
+  __SOURCE_DIRECTORY__ + "/../../dbs"
   #else
   "/data/"
   #endif
-  
+
 let validatePasswordHeader: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
     match ctx.TryGetRequestHeader "password" with
     | Some password when password = uploadPassword -> next ctx
     | _ -> RequestErrors.FORBIDDEN "The password is missing or wrong" next ctx
-      
+
 let validatePassword: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
     let passwordValues = ctx.Request.Form.Item "password"
@@ -35,14 +35,14 @@ let validatePassword: HttpHandler =
       | null -> RequestErrors.FORBIDDEN "Please authenticate with a password" next ctx
       | password when password <> uploadPassword -> RequestErrors.FORBIDDEN "Password is incorrect" next ctx
       | _ -> next ctx
-    
+
 let webApp =
   warbler (fun _ ->
     choose [
       POST >=>
         choose [
-          route "/api" >=> QueryHandler.apiHandleQuery dbPath 
-          route "/query" >=> QueryHandler.handleQuery dbPath 
+          route "/api" >=> QueryHandler.apiHandleQuery dbPath
+          route "/query" >=> QueryHandler.handleQuery dbPath
           route "/upload-db"
             >=> validatePassword
             >=> DbUploadHandler.fromFormHandler dbPath
@@ -75,7 +75,7 @@ let main _ =
           .UseWebRoot(__SOURCE_DIRECTORY__ + "/wwwroot")
           #else
           .UseWebRoot("/wwwroot")
-          #endif 
+          #endif
           |> ignore)
     .Build()
     .Run()

@@ -1,7 +1,7 @@
-module DiffixEngine.DiffixSqlite
+module OpenDiffix.Core.DiffixSqlite
 
 open System
-open SqlParser.Query
+open OpenDiffix.Core.Query
 open Types
 open System.Data.SQLite
 open FsToolkit.ErrorHandling
@@ -11,7 +11,7 @@ type DbColumnType =
   | DbInteger
   | DbString
   | DbUnknownType of string
-    
+
 type DbColumn = {
   Name: string
   ColumnType: DbColumnType
@@ -25,7 +25,7 @@ type DbTable = {
 let dbConnection path =
   try Ok (new SQLiteConnection(sprintf "Data Source=%s; Version=3; Read Only=true;" path))
   with exn -> Error DbNotFound
-    
+
 let columnTypeFromString =
   function
   | "INTEGER" -> DbInteger
@@ -73,7 +73,7 @@ let dbSchema (connection: SQLiteConnection) =
             Columns =
               rows
               |> List.map(fun row -> {Name = row.ColumnName; ColumnType = columnTypeFromString row.ColumnType})
-          } 
+          }
         )
         |> List.sortBy(fun table -> table.Name)
     with
@@ -90,7 +90,7 @@ let getTables (connection: SQLiteConnection) =
       |> List.map(fun table -> NonPersonalRow {Columns = [{ColumnName = "name"; ColumnValue = StringValue table.Name}]})
       |> ResultTable
   }
-    
+
 let getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
   asyncResult {
     let! schema = dbSchema connection
@@ -115,7 +115,7 @@ let getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
           )
       |> ResultTable
   }
-  
+
 let rec expressionToSql =
   function
   | Constant (Integer value)  -> string value
@@ -124,14 +124,14 @@ let rec expressionToSql =
   | Column (AliasedColumn (ColumnName columnName, _aliasName)) -> columnName
   | Function (functionName, subExpression) -> sprintf "%s(%s)" functionName (expressionToSql subExpression)
   | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> sprintf "count(distinct %s)" name
-  
+
 let rec columnToSql index column =
   sprintf "%s as col%i" (expressionToSql column) index
 
 let tableName =
   function
   | Table (TableName tableName) -> tableName
-    
+
 let generateSqlQuery aidColumnName (query: SelectQuery) =
   let aidColumn = Column (PlainColumn aidColumnName)
   let columns =
@@ -161,7 +161,7 @@ let columnFromReader index expression (reader: SQLiteDataReader) =
     | Function (functionName, _expression) -> functionName
     | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> name
   {ColumnName = columnName; ColumnValue = value}
-  
+
 let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
     let! schema = dbSchema connection
@@ -173,13 +173,13 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       let sqlQuery = generateSqlQuery aidColumnName query
       printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
-      
+
       let fakeAidColumnExpression = Column (PlainColumn aidColumnName)
-      
+
       let columnConverter =
         fakeAidColumnExpression :: query.Expressions
         |> List.mapi(columnFromReader)
-        
+
       try
         let reader = command.ExecuteReader()
         return
@@ -191,23 +191,23 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
                 let row: AnonymizableRow = {
                   AidValues = Set.ofList [aidColumn.ColumnValue]
                   Columns = row
-                } 
+                }
                 yield row
           }
       with
       | exn -> return! Error (ExecutionError exn.Message)
   }
-  
-  
+
+
 let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {
     match anonymizationParams.AidColumnOption with
-    | None 
+    | None
     | Some "" ->
       return! Error (ExecutionError "An AID column name is required")
     | Some aidColumn ->
       let! rawRows =
-        readQueryResults connection (SqlParser.Query.ColumnName aidColumn) query
+        readQueryResults connection (OpenDiffix.Core.Query.ColumnName aidColumn) query
         |> AsyncResult.map Seq.toList
       return ResultTable (Anonymizer.anonymize anonymizationParams rawRows)
   }

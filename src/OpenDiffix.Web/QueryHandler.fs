@@ -1,7 +1,7 @@
-module WebFrontend.QueryHandler
+module OpenDiffix.Web.QueryHandler
 
 open System.Globalization
-open DiffixEngine.Types
+open OpenDiffix.Core.Types
 open Thoth.Json.Net
 open FSharp.Control.Tasks
 open FsToolkit.ErrorHandling
@@ -28,8 +28,8 @@ let findDatabase pathToDbs database =
   availableDbs pathToDbs
   |> List.tryFind (fun (name, _) -> name = database)
   |> Option.map snd
-  |> Result.requireSome DbNotFound 
-  
+  |> Result.requireSome DbNotFound
+
 let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
   result {
     let! aidColumnOption = getAidColumnOption userRequest
@@ -37,27 +37,27 @@ let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
     return {
       AnonymizationParams = {
         AidColumnOption = aidColumnOption
-        Seed = userRequest.Anonymization.Seed 
+        Seed = userRequest.Anonymization.Seed
         LowCountSettings = userRequest.Anonymization.LowCountFiltering
       }
       Query = userRequest.Query.Trim()
       DatabasePath = dbPath
     }
   }
-  
+
 let deriveRequestParamsFromBody pathToDbs (requestBody: string) =
   result {
     let! userRequest = Decode.fromString QueryRequest.Decoder requestBody |> Result.mapError (InvalidRequest)
     return! deriveRequestParams pathToDbs userRequest
   }
-  
+
 let apiHandleQuery pathToDbs: HttpHandler =
   fun (next : HttpFunc) (ctx : HttpContext) ->
     task {
       let! body = ctx.ReadBodyFromRequestAsync()
       match deriveRequestParamsFromBody pathToDbs body with
       | Ok requestParams ->
-        let! result = DiffixEngine.QueryEngine.runQuery requestParams
+        let! result = OpenDiffix.Core.QueryEngine.runQuery requestParams
         let response =
           match result with
           | Ok result -> Encode.toString 2 (QueryResultJson.Encoder requestParams result)
@@ -75,12 +75,12 @@ let apiHandleQuery pathToDbs: HttpHandler =
           >=> setStatusCode 400
         ) next ctx
     }
-  
+
 [<CLIMutable>]
 type FormQueryRequest = {
   Query: string
   Database: string
-  AidColumn: string 
+  AidColumn: string
 }
 
 let handleQuery pathToDbs: HttpHandler =
@@ -102,8 +102,8 @@ let handleQuery pathToDbs: HttpHandler =
       }
       match deriveRequestParams pathToDbs userRequest with
       | Ok requestParameters ->
-        let! result = DiffixEngine.QueryEngine.runQuery requestParameters |> Async.StartAsTask
+        let! result = OpenDiffix.Core.QueryEngine.runQuery requestParameters |> Async.StartAsTask
         return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
-      | Error error -> 
+      | Error error ->
         return! htmlView (Page.queryPage pathToDbs userRequest (Error error)) next ctx
     }

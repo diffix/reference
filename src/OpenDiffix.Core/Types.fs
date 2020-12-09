@@ -1,4 +1,4 @@
-module DiffixEngine.Types
+module OpenDiffix.Core.Types
 
 open Thoth.Json.Net
 
@@ -7,7 +7,7 @@ type LowCountSettings =
     Threshold: float
     StdDev: float
   }
-  
+
   static member Defaults =
     {
       Threshold = 5.
@@ -33,7 +33,7 @@ type ColumnName = string
 type ColumnValue =
   | IntegerValue of int
   | StringValue of string
-  
+
 type NonPersonalColumnCell = {
   ColumnName: string
   ColumnValue: ColumnValue
@@ -47,7 +47,7 @@ type ColumnCell = {
 type AnonymizableColumnCell = {
   AidValue: ColumnValue Set
 }
-  
+
 type AnonymizableRow = {
   AidValues: ColumnValue Set
   Columns: ColumnCell list
@@ -60,10 +60,10 @@ type NonPersonalRow = {
 type Row =
   | AnonymizableRow of AnonymizableRow
   | NonPersonalRow of NonPersonalRow
-  
+
 type QueryResult =
   | ResultTable of Row list
-  
+
 type QueryError =
   | ParseError of string
   | DbNotFound

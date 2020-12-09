@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\DiffixEngine\DiffixEngine.fsproj" />
+      <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
     </ItemGroup>
 
 </Project>

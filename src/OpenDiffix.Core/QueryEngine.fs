@@ -1,10 +1,10 @@
-﻿namespace DiffixEngine
+﻿namespace OpenDiffix.Core
 
 module QueryEngine =
     open FsToolkit.ErrorHandling
-    open SqlParser
+    open OpenDiffix.Core
     open Types
-    
+
     let private executeQuery reqParams queryAst =
         asyncResult {
             let! connection = DiffixSqlite.dbConnection reqParams.DatabasePath
@@ -20,12 +20,12 @@ module QueryEngine =
             do! connection.CloseAsync() |> Async.AwaitTask
             return result
         }
-        
+
     let parseSql sqlQuery =
         match Parser.parseSql sqlQuery with
         | Ok ast -> Ok ast
         | Error (Parser.CouldNotParse error) -> Error (ParseError error)
-        
+
     let runQuery reqParams =
         asyncResult {
             let! queryAst = parseSql reqParams.Query

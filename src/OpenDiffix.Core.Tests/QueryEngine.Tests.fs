@@ -1,8 +1,8 @@
 module Tests
 
-open DiffixEngine.Types
+open OpenDiffix.Core.Types
 open Xunit
-open DiffixEngine
+open OpenDiffix.Core
 
 let runQuery query =
   let requestParams = {
@@ -11,12 +11,12 @@ let runQuery query =
       Seed = 1
       LowCountSettings = Some LowCountSettings.Defaults
     }
-    DatabasePath = __SOURCE_DIRECTORY__ + "/../dbs/test-db.sqlite"
+    DatabasePath = __SOURCE_DIRECTORY__ + "/../../dbs/test-db.sqlite"
     Query = query
   }
-  QueryEngine.runQuery requestParams 
+  QueryEngine.runQuery requestParams
   |> Async.RunSynchronously
-  
+
 [<Fact>]
 let ``SHOW TABLES`` () =
     let expected =
@@ -30,7 +30,7 @@ let ``SHOW TABLES`` () =
       |> ResultTable
       |> Ok
     Assert.Equal (expected, runQuery "SHOW TABLES")
-    
+
 [<Fact>]
 let ``SHOW columns FROM customers`` () =
     let expected =
@@ -48,7 +48,7 @@ let ``SHOW columns FROM customers`` () =
       |> Ok
     let queryResult = runQuery "SHOW columns FROM customers"
     Assert.Equal (expected, queryResult)
-    
+
 [<Fact>]
 let ``SELECT product_id FROM line_items`` () =
     let expected =
@@ -64,7 +64,7 @@ let ``SELECT product_id FROM line_items`` () =
           NonPersonalRow {Columns = [
             {ColumnName = "product_id"; ColumnValue = IntegerValue productId}
           ]}
-        List.replicate occurrences row 
+        List.replicate occurrences row
       )
       |> List.concat
       |> ResultTable

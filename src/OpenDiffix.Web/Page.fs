@@ -1,9 +1,9 @@
-module WebFrontend.Page
+module OpenDiffix.Web.Page
 
-open DiffixEngine.Types
+open OpenDiffix.Core.Types
 open Giraffe
 open GiraffeViewEngine
-open WebFrontend.Types
+open OpenDiffix.Web.Types
 
 let layout content =
   html [_lang "en"] [
@@ -23,7 +23,7 @@ let layout content =
           ]
           content
         ]
-        
+
         div [_class "mt-8 py-5 px-6 bg-gray-200 sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800"] [
           h1 [_class "font-medium text-4xl"] [str "Upload databases"]
           form [
@@ -47,7 +47,7 @@ let layout content =
             ]
           ]
         ]
-        
+
         div [_class "mt-4 mx-auto py-5 text-sm text-gray-500"] [
           str "For the source code and more info, visit "
           a [_href "https://github.com/diffix/prototype"; _class "underline"] [str "Github"]
@@ -102,10 +102,10 @@ let valueToStrNode =
   function
   | ColumnValue.IntegerValue v -> str (sprintf "%i" v)
   | ColumnValue.StringValue v -> str v
-  
+
 let renderResults: Row list -> XmlNode =
   function
-  | [] -> 
+  | [] ->
     div [_class "bg-gray-400 text-white p-4 w-full"] [
       h2 [_class "text-lg font-bold"] [str "No rows returned"]
     ]
@@ -114,9 +114,9 @@ let renderResults: Row list -> XmlNode =
       function
       | AnonymizableRow row -> row.Columns
       | NonPersonalRow row -> row.Columns
-      
+
     let header = columnsFromRow (List.head rows)
-    
+
     div [_class "w-full bg-white py-3 px-6"] [
       table [_class "w-full"] [
         thead [] [
@@ -141,7 +141,7 @@ let errorFragment title description =
     h2 [_class "text-lg font-bold"] [str title]
     pre [_class "mt-2 p-4 bg-red-500 rounded-b-md"] [str description]
   ]
-  
+
 open System.IO
 
 let availableDbs path =
@@ -149,7 +149,7 @@ let availableDbs path =
   |> Array.map Path.GetFileName
   |> Array.sortBy id
   |> Array.toList
-  
+
 let queryPage dbPath (userRequest: QueryRequest) result =
   let renderedResultSection =
     match result with
@@ -164,7 +164,7 @@ let queryPage dbPath (userRequest: QueryRequest) result =
     renderedResultSection
   ]
   |> layout
-    
+
 let index dbPath =
   let dbs = availableDbs dbPath
   let queryRequest =

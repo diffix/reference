@@ -1,17 +1,17 @@
-module DiffixEngine.Anonymizer
+module OpenDiffix.Core.Anonymizer
 
-open DiffixEngine.Types
+open OpenDiffix.Core.Types
 open System
 
-let private randomNum (rnd: Random) mean stdDev = 
+let private randomNum (rnd: Random) mean stdDev =
   let u1 = 1.0-rnd.NextDouble()
   let u2 = 1.0-rnd.NextDouble()
   let randStdNormal = Math.Sqrt(-2.0 * log(u1)) * Math.Sin(2.0 * Math.PI * u2)
-  mean + stdDev * randStdNormal; 
-  
+  mean + stdDev * randStdNormal;
+
 let private newRandom (anonymizationParams: AnonymizationParams) =
   Random(anonymizationParams.Seed)
-  
+
 let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows: AnonymizableRow list) =
   match anonymizationParams.LowCountSettings with
   | None -> rows
@@ -34,7 +34,7 @@ let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows:
     |> List.filter(fun row ->
       not (Set.contains row.Columns rowsToReject)
     )
-  
+
 let anonymize (anonymizationParams: AnonymizationParams) (rows: AnonymizableRow list) =
   let rnd = newRandom anonymizationParams
   rows

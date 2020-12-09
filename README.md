@@ -34,8 +34,8 @@ around the complex and large codebase of a real world database engine.
 
 The codebase is currently organized in a number of projects:
 
-- `DiffixEngine` and `DiffixEngine.Tests`: Contains the meat of this project. It is the query and anonymization engine.
-- `WebFrontend`: API endpoint that is served on [db-proto.probsteide.com](https://db-proto.probsteide.com) and can be used for simple testing with external tools.
+- `OpenDiffix.Core` and `OpenDiffix.Core.Tests`: Contains the meat of this project. It is the query and anonymization engine.
+- `OpenDiffix.Web`: API endpoint that is served on [db-proto.probsteide.com](https://db-proto.probsteide.com) and can be used for simple testing with external tools.
 
 ### Branches
 
