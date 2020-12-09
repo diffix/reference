@@ -1,8 +1,9 @@
-﻿namespace OpenDiffix.Core
+﻿module OpenDiffix.Core.Parser
 
-module ParserDefinition =
+open OpenDiffix.Core.ParserTypes
+
+module Definitions =
   open FParsec
-  open OpenDiffix.Core.Query
 
   let anyWord =
     satisfy isLetter
@@ -96,12 +97,9 @@ module ParserDefinition =
 
   let parse = run query
 
-module Parser =
-  open OpenDiffix.Core.Query
+type SqlParserError = CouldNotParse of string
 
-  type SqlParserError = CouldNotParse of string
-
-  let parseSql sqlString: Result<Query, SqlParserError> =
-    match FParsec.CharParsers.run ParserDefinition.query sqlString with
-    | FParsec.CharParsers.Success (result, _, _) -> Ok result
-    | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)
+let parse sql: Result<Query, SqlParserError> =
+  match FParsec.CharParsers.run Definitions.query sql with
+  | FParsec.CharParsers.Success (result, _, _) -> Ok result
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)

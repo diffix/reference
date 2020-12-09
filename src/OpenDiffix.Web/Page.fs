@@ -1,6 +1,6 @@
 module OpenDiffix.Web.Page
 
-open OpenDiffix.Core.Types
+open OpenDiffix.Core.AnonymizerTypes
 open Giraffe
 open GiraffeViewEngine
 open OpenDiffix.Web.Types

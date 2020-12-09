@@ -1,11 +1,11 @@
 module OpenDiffix.Core.DiffixSqlite
 
 open System
-open OpenDiffix.Core.Query
-open Types
 open System.Data.SQLite
-open FsToolkit.ErrorHandling
 open Dapper
+open FsToolkit.ErrorHandling
+open OpenDiffix.Core.ParserTypes
+open OpenDiffix.Core.AnonymizerTypes
 
 type DbColumnType =
   | DbInteger
@@ -217,7 +217,7 @@ let executeSelect (connection: SQLiteConnection) anonymizationParams query =
     | Some "" -> return! Error(ExecutionError "An AID column name is required")
     | Some aidColumn ->
         let! rawRows =
-          readQueryResults connection (OpenDiffix.Core.Query.ColumnName aidColumn) query
+          readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
           |> AsyncResult.map Seq.toList
 
         return ResultTable(Anonymizer.anonymize anonymizationParams rawRows)

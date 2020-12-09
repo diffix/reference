@@ -5,9 +5,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Query.fs" />
+        <Compile Include="ParserTypes.fs" />
         <Compile Include="Parser.fs" />
-        <Compile Include="Types.fs" />
+        <Compile Include="AnonymizerTypes.fs" />
         <Compile Include="Anonymizer.fs" />
         <Compile Include="DiffixSqlite.fs" />
         <Compile Include="QueryEngine.fs" />

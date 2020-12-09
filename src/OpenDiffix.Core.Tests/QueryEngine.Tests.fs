@@ -1,8 +1,8 @@
-module Tests
+module OpenDiffix.Core.QueryEngineTests
 
-open OpenDiffix.Core.Types
 open Xunit
 open OpenDiffix.Core
+open OpenDiffix.Core.AnonymizerTypes
 
 let runQuery query =
   let requestParams =

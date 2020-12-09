@@ -1,6 +1,4 @@
-module OpenDiffix.Core.Types
-
-open Thoth.Json.Net
+namespace OpenDiffix.Core.AnonymizerTypes
 
 type LowCountSettings =
   { Threshold: float

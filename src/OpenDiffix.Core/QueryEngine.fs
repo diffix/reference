@@ -3,7 +3,7 @@
 module QueryEngine =
   open FsToolkit.ErrorHandling
   open OpenDiffix.Core
-  open Types
+  open OpenDiffix.Core.AnonymizerTypes
 
   let private executeQuery reqParams queryAst =
     asyncResult {
@@ -12,10 +12,10 @@ module QueryEngine =
 
       let! result =
         match queryAst with
-        | Query.ShowTables -> DiffixSqlite.getTables connection
-        | Query.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
-        | Query.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
-        | Query.AggregateQuery _query ->
+        | ParserTypes.ShowTables -> DiffixSqlite.getTables connection
+        | ParserTypes.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
+        | ParserTypes.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
+        | ParserTypes.AggregateQuery _query ->
             asyncResult { return! Error(InvalidRequest "Aggregate queries aren't supported yet") }
 
       do! connection.CloseAsync() |> Async.AwaitTask
@@ -23,7 +23,7 @@ module QueryEngine =
     }
 
   let parseSql sqlQuery =
-    match Parser.parseSql sqlQuery with
+    match Parser.parse sqlQuery with
     | Ok ast -> Ok ast
     | Error (Parser.CouldNotParse error) -> Error(ParseError error)
 

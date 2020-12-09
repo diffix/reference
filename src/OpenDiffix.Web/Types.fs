@@ -1,7 +1,7 @@
 module OpenDiffix.Web.Types
 
 open Thoth.Json.Net
-open OpenDiffix.Core.Types
+open OpenDiffix.Core.AnonymizerTypes
 
 type LowCountSettingsJson =
   static member Decoder: Decoder<LowCountSettings> =

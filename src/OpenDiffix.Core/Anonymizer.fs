@@ -1,7 +1,7 @@
 module OpenDiffix.Core.Anonymizer
 
-open OpenDiffix.Core.Types
 open System
+open OpenDiffix.Core.AnonymizerTypes
 
 let private randomNum (rnd: Random) mean stdDev =
   let u1 = 1.0 - rnd.NextDouble()

@@ -1,7 +1,7 @@
 module OpenDiffix.Web.QueryHandler
 
 open System.Globalization
-open OpenDiffix.Core.Types
+open OpenDiffix.Core.AnonymizerTypes
 open Thoth.Json.Net
 open FSharp.Control.Tasks
 open FsToolkit.ErrorHandling

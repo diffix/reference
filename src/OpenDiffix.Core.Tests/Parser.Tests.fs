@@ -1,11 +1,11 @@
-module ParserTests
+module OpenDiffix.Core.ParserTests
 
-open FParsec.CharParsers
-open OpenDiffix.Core.ParserDefinition
-open TestHelpers
-open OpenDiffix.Core.Parser
-open OpenDiffix.Core.Query
 open Xunit
+open TestHelpers
+open FParsec.CharParsers
+open OpenDiffix.Core
+open OpenDiffix.Core.ParserTypes
+open OpenDiffix.Core.Parser.Definitions
 
 let parse p string =
   match run p string with
@@ -85,27 +85,27 @@ let ``Parses SELECT by itself`` () =
         From = Table(TableName "table") })
 
 [<Fact>]
-let ``Fails on unexpected input`` () = assertError (parseSql "Foo")
+let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
 let ``Parses "SHOW tables"`` () =
-  assertOkEqual (parseSql "show tables") ShowTables
+  assertOkEqual (Parser.parse "show tables") ShowTables
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (parseSql "show columns FROM bar") (ShowColumnsFromTable(TableName "bar"))
+  assertOkEqual (Parser.parse "show columns FROM bar") (ShowColumnsFromTable(TableName "bar"))
 
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
   assertOkEqual<Query, _>
-    (parseSql "   show
+    (Parser.parse "   show
                    tables   ")
     ShowTables
 
 [<Fact>]
 let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
-    (parseSql "SELECT col1, col2 FROM table")
+    (Parser.parse "SELECT col1, col2 FROM table")
     (SelectQuery
       { Expressions =
           [ plainColumn "col1"
@@ -113,7 +113,7 @@ let ``Parse SELECT query with columns and table`` () =
         From = Table(TableName "table") })
 
   assertOkEqual
-    (parseSql "SELECT col1, col2 FROM table ;")
+    (Parser.parse "SELECT col1, col2 FROM table ;")
     (SelectQuery
       { Expressions =
           [ plainColumn "col1"
@@ -123,7 +123,7 @@ let ``Parse SELECT query with columns and table`` () =
 [<Fact>]
 let ``Parse aggregate query`` () =
   assertOkEqual
-    (parseSql """
+    (Parser.parse """
          SELECT col1, count(distinct aid)
          FROM table
          GROUP BY col1
