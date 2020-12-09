@@ -5,6 +5,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Expression.fs" />
         <Compile Include="ParserTypes.fs" />
         <Compile Include="Parser.fs" />
         <Compile Include="AnonymizerTypes.fs" />
