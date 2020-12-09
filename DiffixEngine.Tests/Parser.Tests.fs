@@ -1,4 +1,4 @@
-module Tests
+module ParserTests
 
 open FParsec.CharParsers
 open SqlParser.ParserDefinition
@@ -11,8 +11,8 @@ let parse p string =
     match run p string with
     | ParserResult.Success (value, _, _) -> Ok value
     | ParserResult.Failure (error, _, _) -> Error error
-    
-let plainColumn = ColumnName >> PlainColumn >> Column 
+
+let plainColumn = ColumnName >> PlainColumn >> Column
 
 [<Fact>]
 let ``Parses words`` () =
@@ -29,7 +29,7 @@ let ``Parses columns`` () =
     assertOkEqual (parse SelectQueries.expressions "hello, world") [plainColumn "hello"; plainColumn "world"]
     assertOkEqual (parse SelectQueries.expressions "hello,world") [plainColumn "hello"; plainColumn "world"]
     assertOkEqual (parse SelectQueries.expressions "hello ,world") [plainColumn "hello"; plainColumn "world"]
-    
+
 [<Fact>]
 let ``Parses functions`` () =
     assertOkEqual (parse SelectQueries.expressions "hello(world)") [Function ("hello", plainColumn "world")]
@@ -40,24 +40,24 @@ let ``Parses functions`` () =
           Function ("hello", plainColumn "world")
           Function ("hello", plainColumn "moon")
         ]
-        
+
 [<Fact>]
 let ``Parses count(distinct col)`` () =
     let expected = AggregateFunction (AnonymizedCount (Distinct (ColumnName "col")))
     assertOkEqual (parse SelectQueries.expressions "count(distinct col)") [expected]
     assertOkEqual (parse SelectQueries.expressions "count ( distinct     col )") [expected]
-    
+
 [<Fact>]
 let ``Parses optional semicolon`` () =
     assertOk (parse skipSemiColon ";")
     assertOk (parse skipSemiColon "")
-    
+
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
     assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ColumnName "a"; ColumnName "b"; ColumnName "c"]
     assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ColumnName "a"]
     assertError (parse SelectQueries.groupBy "GROUP BY")
-    
+
 [<Fact>]
 let ``Parses SELECT by itself`` () =
     assertOkEqual
@@ -89,7 +89,7 @@ let ``Parse SELECT query with columns and table`` () =
     assertOkEqual
         (parseSql "SELECT col1, col2 FROM table ;")
         (SelectQuery {Expressions = [plainColumn "col1"; plainColumn "col2"]; From = Table (TableName "table")})
-        
+
 [<Fact>]
 let ``Parse aggregate query`` () =
     assertOkEqual

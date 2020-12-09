@@ -1,9 +1,5 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SqlParser", "SqlParser\SqlParser.fsproj", "{0B1BC2F2-52A3-4B65-A71C-AC9385DFCA78}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "SqlParser.Tests", "SqlParser.Tests\SqlParser.Tests.fsproj", "{6A78C898-733B-478E-827D-B982551F105B}"
-EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DiffixEngine", "DiffixEngine\DiffixEngine.fsproj", "{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "DiffixEngine.Tests", "DiffixEngine.Tests\DiffixEngine.Tests.fsproj", "{41735A1A-EB83-4372-A563-3307FACBB5FF}"
@@ -16,14 +12,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{0B1BC2F2-52A3-4B65-A71C-AC9385DFCA78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0B1BC2F2-52A3-4B65-A71C-AC9385DFCA78}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0B1BC2F2-52A3-4B65-A71C-AC9385DFCA78}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0B1BC2F2-52A3-4B65-A71C-AC9385DFCA78}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6A78C898-733B-478E-827D-B982551F105B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6A78C898-733B-478E-827D-B982551F105B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6A78C898-733B-478E-827D-B982551F105B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6A78C898-733B-478E-827D-B982551F105B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5BEB2CD3-83F2-4439-898E-7CC7DB57DE68}.Release|Any CPU.ActiveCfg = Release|Any CPU

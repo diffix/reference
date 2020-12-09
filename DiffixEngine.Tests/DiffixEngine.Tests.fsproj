@@ -8,6 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="TestHelpers.fs" />
+        <Compile Include="Parser.Tests.fs" />
         <Compile Include="QueryEngine.Tests.fs" />
         <Compile Include="Program.fs" />
         <Content Include="test-db-creation.sql" />
