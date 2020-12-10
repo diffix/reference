@@ -1,7 +1,6 @@
 module OpenDiffix.Core.ParserTests
 
 open Xunit
-open TestHelpers
 open FParsec.CharParsers
 open OpenDiffix.Core
 open OpenDiffix.Core.ParserTypes
