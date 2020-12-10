@@ -4,118 +4,160 @@ open System
 open System.Collections.Generic
 
 type Value =
-  | StringValue of string
-  | IntegerValue of int
-  | FloatValue of float
-  | BooleanValue of bool
-  | NullValue
+  | String of string
+  | Integer of int
+  | Float of float
+  | Boolean of bool
+  | Null
 
-type Tuple = Map<string, Value>
+type Row = Value array
+
+type OrderByDirection =
+  | Ascending
+  | Descending
 
 type Expression =
-  | FunctionCall of name: string * args: Expression list
-  | DistinctFunctionCall of name: string * arg: Expression list
-  | ColumnReference of name: string
+  | Function of name: string * args: Expression list * functionType: FunctionType
+  | ColumnReference of index: int
   | Constant of value: Value
+
+and FunctionType =
+  | Scalar
+  | Aggregate of options: AggregateOptions
+
+and AggregateOptions =
+  {
+    Distinct: bool
+    OrderBy: Expression list
+    OrderByDirection: OrderByDirection
+  }
+  static member Default =
+    {
+      Distinct = false
+      OrderBy = []
+      OrderByDirection = Ascending
+    }
 
 type EvaluationContext = EmptyContext
 
-module DefaultFunctions =
-  let private invalidOverload name =
+type ScalarArgs = Value list
+type AggregateArgs = seq<Value list>
+
+module ExpressionUtils =
+  open System.Linq
+
+  let invalidOverload name =
     failwith $"Invalid overload called for function '{name}'."
+
+  let countSeqBy fn (seq: seq<'a>) = seq.Count(fun x -> fn x)
+
+  let mapSingleArg name (args: AggregateArgs) =
+    args
+    |> Seq.map (function
+         | [ arg ] -> arg
+         | _ -> invalidOverload name)
+
+module DefaultFunctions =
+  open ExpressionUtils
 
   let add _ctx args =
     match args with
-    | [ IntegerValue a; IntegerValue b ] -> IntegerValue(a + b)
-    | [ FloatValue a; FloatValue b ] -> FloatValue(a + b)
-    | [ FloatValue a; IntegerValue b ] -> FloatValue(a + float b)
-    | [ IntegerValue a; FloatValue b ] -> FloatValue(float a + b)
+    | [ Integer a; Integer b ] -> Integer(a + b)
+    | [ Float a; Float b ] -> Float(a + b)
+    | [ Float a; Integer b ] -> Float(a + float b)
+    | [ Integer a; Float b ] -> Float(float a + b)
     | _ -> invalidOverload "+"
 
   let sub _ctx args =
     match args with
-    | [ IntegerValue a; IntegerValue b ] -> IntegerValue(a - b)
-    | [ FloatValue a; FloatValue b ] -> FloatValue(a - b)
-    | [ FloatValue a; IntegerValue b ] -> FloatValue(a - float b)
-    | [ IntegerValue a; FloatValue b ] -> FloatValue(float a - b)
+    | [ Integer a; Integer b ] -> Integer(a - b)
+    | [ Float a; Float b ] -> Float(a - b)
+    | [ Float a; Integer b ] -> Float(a - float b)
+    | [ Integer a; Float b ] -> Float(float a - b)
     | _ -> invalidOverload "-"
 
-module DefaultAggregators =
-  open System.Linq
+module DefaultAggregates =
+  open ExpressionUtils
 
-  let sum ctx values =
+  let sum ctx (values: AggregateArgs) =
     if Seq.isEmpty values then
-      NullValue
+      Null
     else
       values
+      |> mapSingleArg "sum"
       |> Seq.reduce (fun a b -> DefaultFunctions.add ctx [ a; b ])
 
-  let count _ctx (values: seq<Value>) =
-    values.Count(fun x ->
-      match x with
-      | NullValue -> false
-      | _ -> true)
-    |> IntegerValue
+  let count _ctx (values: AggregateArgs) =
+    values
+    |> countSeqBy (function
+         | [ Null ] -> false
+         | [ _ ] -> true
+         | _ -> invalidOverload "count")
+    |> Integer
 
 module Expression =
   let functions =
-    Dictionary<string, EvaluationContext -> Value list -> Value>(StringComparer.OrdinalIgnoreCase)
+    Dictionary<string, EvaluationContext -> ScalarArgs -> Value>(StringComparer.OrdinalIgnoreCase)
 
   functions.Add("+", DefaultFunctions.add)
   functions.Add("-", DefaultFunctions.sub)
 
-  let aggregators =
-    Dictionary<string, EvaluationContext -> seq<Value> -> Value>(StringComparer.OrdinalIgnoreCase)
+  let aggregates =
+    Dictionary<string, EvaluationContext -> AggregateArgs -> Value>(StringComparer.OrdinalIgnoreCase)
 
-  aggregators.Add("sum", DefaultAggregators.sum)
-  aggregators.Add("count", DefaultAggregators.count)
+  aggregates.Add("sum", DefaultAggregates.sum)
+  aggregates.Add("count", DefaultAggregates.count)
 
   let invokeFunction ctx name args =
     match functions.TryGetValue name with
     | true, fn -> fn ctx args
-    | _ -> failwith $"Unknown function {name}."
+    | _ -> failwith $"Unknown function '{name}'."
 
-  let invokeAggregator ctx name values =
-    match aggregators.TryGetValue name with
-    | true, fn -> fn ctx values
-    | _ -> failwith $"Unknown aggregator {name}."
+  let invokeAggregate ctx name mappedArgs =
+    match aggregates.TryGetValue name with
+    | true, fn -> fn ctx mappedArgs
+    | _ -> failwith $"Unknown aggregate '{name}'."
 
-  let rec evaluate (ctx: EvaluationContext) (expr: Expression) (tuple: Tuple) =
+  let rec evaluate (ctx: EvaluationContext) (expr: Expression) (row: Row) =
     match expr with
-    | FunctionCall (name, args) -> invokeFunction ctx name (args |> List.map (fun arg -> evaluate ctx arg tuple))
-    | DistinctFunctionCall (name, _) -> failwith $"Invalid usage of distinct aggregator '{name}'."
-    | ColumnReference name -> tuple.[name]
+    | Function (name, args, Scalar) -> invokeFunction ctx name (args |> List.map (fun arg -> evaluate ctx arg row))
+    | Function (name, _, _) -> failwith $"Invalid usage of aggregate '{name}'."
+    | ColumnReference index -> row.[index]
     | Constant value -> value
+
+  let private prepareAggregateArgs ctx args opts rows =
+    let sortedRows =
+      match opts.OrderBy, opts.OrderByDirection with
+      | [], _ -> rows
+      | [ orderByExpr ], Ascending -> rows |> Seq.sortBy (evaluate ctx orderByExpr)
+      | [ orderByExpr ], Descending -> rows |> Seq.sortByDescending (evaluate ctx orderByExpr)
+      | _ -> failwith "Multiple order by expressions are not supported yet."
+
+    let projectedArgs =
+      sortedRows
+      |> Seq.map (fun row -> args |> List.map (fun expr -> evaluate ctx expr row))
+
+    if opts.Distinct then Seq.distinct projectedArgs else projectedArgs
 
   let rec evaluateAggregated (ctx: EvaluationContext)
                              (expr: Expression)
                              (groupings: Map<Expression, Value>)
-                             (tuples: seq<Tuple>)
+                             (rows: seq<Row>)
                              =
     match Map.tryFind expr groupings with
     | Some value -> value
     | None ->
         match expr with
-        // Regular function
-        | FunctionCall (name, args) when functions.ContainsKey(name) ->
+        | Function (name, args, Scalar) ->
             let evaluatedArgs =
               args
-              |> List.map (fun arg -> evaluateAggregated ctx arg groupings tuples)
+              |> List.map (fun arg -> evaluateAggregated ctx arg groupings rows)
 
             invokeFunction ctx name evaluatedArgs
-        // Non-distinct aggregate
-        | FunctionCall (name, [ arg ]) ->
-            let mappedTuples = tuples |> Seq.map (evaluate ctx arg)
-            invokeAggregator ctx name mappedTuples
-        | FunctionCall _ -> failwith "Aggregators accept only one argument."
-        // Distinct aggregate
-        | DistinctFunctionCall (name, [ arg ]) ->
-            let mappedTuples =
-              tuples |> Seq.map (evaluate ctx arg) |> Seq.distinct
-
-            invokeAggregator ctx name mappedTuples
-        | DistinctFunctionCall _ -> failwith "Aggregators accept only one argument."
+        | Function (name, args, Aggregate opts) ->
+            let aggregateArgs = prepareAggregateArgs ctx args opts rows
+            invokeAggregate ctx name aggregateArgs
         | ColumnReference name -> failwith $"Value '{name}' is not found in aggregated context."
         | Constant value -> value
 
-  let makeTuple (data: list<string * Value>): Tuple = Map.ofList data
+  let defaultAggregate = Aggregate AggregateOptions.Default

@@ -9,84 +9,95 @@ let ctx = EmptyContext
 module DefaultFunctionsTests =
   [<Fact>]
   let add () =
-    DefaultFunctions.add ctx [ IntegerValue 5; IntegerValue 3 ]
-    |> should equal (IntegerValue 8)
+    DefaultFunctions.add ctx [ Integer 5; Integer 3 ]
+    |> should equal (Integer 8)
 
-    (fun () ->
-      DefaultFunctions.add ctx [ IntegerValue 5; StringValue "a" ]
-      |> ignore)
+    (fun () -> DefaultFunctions.add ctx [ Integer 5; String "a" ] |> ignore)
     |> shouldFail
 
   [<Fact>]
   let sub () =
-    DefaultFunctions.sub ctx [ IntegerValue 5; IntegerValue 3 ]
-    |> should equal (IntegerValue 2)
+    DefaultFunctions.sub ctx [ Integer 5; Integer 3 ]
+    |> should equal (Integer 2)
 
-    (fun () ->
-      DefaultFunctions.sub ctx [ IntegerValue 5; StringValue "a" ]
-      |> ignore)
+    (fun () -> DefaultFunctions.sub ctx [ Integer 5; String "a" ] |> ignore)
     |> shouldFail
 
 module DefaultAggregatorsTests =
   [<Fact>]
   let sum () =
-    DefaultAggregators.sum ctx [ IntegerValue 5; IntegerValue 3; IntegerValue -2 ]
-    |> should equal (IntegerValue 6)
+    DefaultAggregates.sum ctx [ [ Integer 5 ]; [ Integer 3 ]; [ Integer -2 ] ]
+    |> should equal (Integer 6)
 
-    DefaultAggregators.sum ctx [] |> should equal NullValue
+    DefaultAggregates.sum ctx [] |> should equal Null
 
   [<Fact>]
   let count () =
-    DefaultAggregators.count ctx [ IntegerValue 7; IntegerValue 15; IntegerValue -3 ]
-    |> should equal (IntegerValue 3)
+    DefaultAggregates.count ctx [ [ Integer 7 ]; [ Integer 15 ]; [ Integer -3 ] ]
+    |> should equal (Integer 3)
 
-    DefaultAggregators.count ctx []
-    |> should equal (IntegerValue 0)
+    DefaultAggregates.count ctx [] |> should equal (Integer 0)
 
-    DefaultAggregators.count ctx [ StringValue "str1"; StringValue ""; NullValue ]
-    |> should equal (IntegerValue 2)
+    DefaultAggregates.count ctx [ [ String "str1" ]; [ String "" ]; [ Null ] ]
+    |> should equal (Integer 2)
 
 module ExpressionTests =
-  let row strValue intValue floatValue =
-    Expression.makeTuple [
-      "val_str", StringValue strValue
-      "val_int", IntegerValue intValue
-      "val_float", FloatValue floatValue
+  let makeRow strValue intValue floatValue =
+    [| String strValue; Integer intValue; Float floatValue |]
+
+  let testRow = makeRow "Some text" 7 0.25
+
+  let testRows =
+    [
+      makeRow "row1" 1 1.5
+      makeRow "row1" 2 2.5
+      makeRow "row2" 3 3.5
+      makeRow "row2" 4 4.5
     ]
 
-  let tuple = row "Some text" 7 0.25
+  let distinctAggregate =
+    Aggregate
+      {
+        Distinct = true
+        OrderBy = []
+        OrderByDirection = Ascending
+      }
 
-  let tuples =
-    [ row "row1" 1 1.5
-      row "row2" 2 2.5
-      row "row3" 3 3.5
-      row "row4" 4 4.5 ]
-
-  let eval expr = Expression.evaluate ctx expr tuple
+  let eval expr = Expression.evaluate ctx expr testRow
 
   let evalAggr expr =
-    Expression.evaluateAggregated ctx expr Map.empty tuples
+    Expression.evaluateAggregated ctx expr Map.empty testRows
 
   [<Fact>]
   let evaluate () =
     // select val_int + 3
-    eval (FunctionCall("+", [ ColumnReference "val_int"; Constant(IntegerValue 3) ]))
-    |> should equal (IntegerValue 10)
+    eval (Function("+", [ ColumnReference 1; Constant(Integer 3) ], Scalar))
+    |> should equal (Integer 10)
 
     // select val_str
-    eval (ColumnReference "val_str")
-    |> should equal (StringValue "Some text")
+    eval (ColumnReference 0)
+    |> should equal (String "Some text")
 
   [<Fact>]
   let evaluateAggregated () =
     // select sum(val_float - val_int)
-    evalAggr (FunctionCall("sum", [ FunctionCall("-", [ ColumnReference "val_float"; ColumnReference "val_int" ]) ]))
-    |> should equal (FloatValue 2.0)
+    evalAggr
+      (Function
+        ("sum",
+         [
+           Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar)
+         ],
+         Expression.defaultAggregate))
+    |> should equal (Float 2.0)
 
     // select count(1)
-    evalAggr (FunctionCall("count", [ Constant(IntegerValue 1) ]))
-    |> should equal (IntegerValue 4)
+    evalAggr (Function("count", [ Constant(Integer 1) ], Expression.defaultAggregate))
+    |> should equal (Integer 4)
+
+    // select count(distinct val_str)
+    evalAggr (Function("count", [ ColumnReference 0 ], distinctAggregate))
+    |> should equal (Integer 2)
 
     // select val_str
-    (fun () -> evalAggr (ColumnReference "val_str") |> ignore)
+    (fun () -> evalAggr (ColumnReference 0) |> ignore)
     |> shouldFail
