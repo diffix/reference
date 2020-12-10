@@ -6,12 +6,16 @@ open OpenDiffix.Core.AnonymizerTypes
 
 let runQuery query =
   let requestParams =
-    { AnonymizationParams =
-        { AidColumnOption = Some "id"
+    {
+      AnonymizationParams =
+        {
+          AidColumnOption = Some "id"
           Seed = 1
-          LowCountSettings = Some LowCountSettings.Defaults }
+          LowCountSettings = Some LowCountSettings.Defaults
+        }
       DatabasePath = __SOURCE_DIRECTORY__ + "/../../dbs/test-db.sqlite"
-      Query = query }
+      Query = query
+    }
 
   QueryEngine.runQuery requestParams |> Async.RunSynchronously
 
@@ -21,9 +25,15 @@ let ``SHOW TABLES`` () =
     [ "customers"; "line_items"; "products"; "purchases" ]
     |> List.map (fun v ->
          NonPersonalRow
-           { Columns =
-               [ { ColumnName = "name"
-                   ColumnValue = StringValue v } ] })
+           {
+             Columns =
+               [
+                 {
+                   ColumnName = "name"
+                   ColumnValue = StringValue v
+                 }
+               ]
+           })
     |> ResultTable
     |> Ok
 
@@ -35,11 +45,19 @@ let ``SHOW columns FROM customers`` () =
     [ "id", "integer"; "name", "string" ]
     |> List.map (fun (name, dataType) ->
          NonPersonalRow
-           { Columns =
-               [ { ColumnName = "name"
-                   ColumnValue = StringValue name }
-                 { ColumnName = "type"
-                   ColumnValue = StringValue dataType } ] })
+           {
+             Columns =
+               [
+                 {
+                   ColumnName = "name"
+                   ColumnValue = StringValue name
+                 }
+                 {
+                   ColumnName = "type"
+                   ColumnValue = StringValue dataType
+                 }
+               ]
+           })
     |> ResultTable
     |> Ok
 
@@ -53,9 +71,15 @@ let ``SELECT product_id FROM line_items`` () =
     |> List.map (fun (productId, occurrences) ->
          let row =
            NonPersonalRow
-             { Columns =
-                 [ { ColumnName = "product_id"
-                     ColumnValue = IntegerValue productId } ] }
+             {
+               Columns =
+                 [
+                   {
+                     ColumnName = "product_id"
+                     ColumnValue = IntegerValue productId
+                   }
+                 ]
+             }
 
          List.replicate occurrences row)
     |> List.concat

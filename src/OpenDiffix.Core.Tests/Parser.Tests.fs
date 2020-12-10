@@ -40,8 +40,10 @@ let ``Parses functions`` () =
 
   assertOkEqual
     (parse SelectQueries.expressions "hello(world), hello(moon)")
-    [ Function("hello", plainColumn "world")
-      Function("hello", plainColumn "moon") ]
+    [
+      Function("hello", plainColumn "world")
+      Function("hello", plainColumn "moon")
+    ]
 
 [<Fact>]
 let ``Parses count(distinct col)`` () =
@@ -68,8 +70,10 @@ let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse SelectQueries.parse "SELECT col FROM table")
     (SelectQuery
-      { Expressions = [ plainColumn "col" ]
-        From = Table(TableName "table") })
+      {
+        Expressions = [ plainColumn "col" ]
+        From = Table(TableName "table")
+      })
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
@@ -94,14 +98,18 @@ let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table")
     (SelectQuery
-      { Expressions = [ plainColumn "col1"; plainColumn "col2" ]
-        From = Table(TableName "table") })
+      {
+        Expressions = [ plainColumn "col1"; plainColumn "col2" ]
+        From = Table(TableName "table")
+      })
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
     (SelectQuery
-      { Expressions = [ plainColumn "col1"; plainColumn "col2" ]
-        From = Table(TableName "table") })
+      {
+        Expressions = [ plainColumn "col1"; plainColumn "col2" ]
+        From = Table(TableName "table")
+      })
 
 [<Fact>]
 let ``Parse aggregate query`` () =
@@ -112,10 +120,14 @@ let ``Parse aggregate query`` () =
          GROUP BY col1
          """)
     (AggregateQuery
-      { Expressions =
-          [ plainColumn "col1"
+      {
+        Expressions =
+          [
+            plainColumn "col1"
             Distinct(ColumnName "aid")
             |> AnonymizedCount
-            |> AggregateFunction ]
+            |> AggregateFunction
+          ]
         From = Table(TableName "table")
-        GroupBy = [ ColumnName "col1" ] })
+        GroupBy = [ ColumnName "col1" ]
+      })
