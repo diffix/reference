@@ -118,9 +118,9 @@ module Expression =
     | true, fn -> fn ctx mappedArgs
     | _ -> failwith $"Unknown aggregate '{name}'."
 
-  let rec evaluate (ctx: EvaluationContext) (expr: Expression) (row: Row) =
+  let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
-    | Function (name, args, Scalar) -> invokeFunction ctx name (args |> List.map (fun arg -> evaluate ctx arg row))
+    | Function (name, args, Scalar) -> invokeFunction ctx name (args |> List.map (evaluate ctx row))
     | Function (name, _, _) -> failwith $"Invalid usage of aggregate '{name}'."
     | ColumnReference index -> row.[index]
     | Constant value -> value
@@ -129,20 +129,22 @@ module Expression =
     let sortedRows =
       match opts.OrderBy, opts.OrderByDirection with
       | [], _ -> rows
-      | [ orderByExpr ], Ascending -> rows |> Seq.sortBy (evaluate ctx orderByExpr)
-      | [ orderByExpr ], Descending -> rows |> Seq.sortByDescending (evaluate ctx orderByExpr)
+      | [ orderByExpr ], Ascending -> rows |> Seq.sortBy (fun row -> evaluate ctx row orderByExpr)
+      | [ orderByExpr ], Descending ->
+          rows
+          |> Seq.sortByDescending (fun row -> evaluate ctx row orderByExpr)
       | _ -> failwith "Multiple order by expressions are not supported yet."
 
     let projectedArgs =
       sortedRows
-      |> Seq.map (fun row -> args |> List.map (fun expr -> evaluate ctx expr row))
+      |> Seq.map (fun row -> args |> List.map (evaluate ctx row))
 
     if opts.Distinct then Seq.distinct projectedArgs else projectedArgs
 
   let rec evaluateAggregated (ctx: EvaluationContext)
-                             (expr: Expression)
                              (groupings: Map<Expression, Value>)
                              (rows: seq<Row>)
+                             (expr: Expression)
                              =
     match Map.tryFind expr groupings with
     | Some value -> value
@@ -150,8 +152,7 @@ module Expression =
         match expr with
         | Function (name, args, Scalar) ->
             let evaluatedArgs =
-              args
-              |> List.map (fun arg -> evaluateAggregated ctx arg groupings rows)
+              args |> List.map (evaluateAggregated ctx groupings rows)
 
             invokeFunction ctx name evaluatedArgs
         | Function (name, args, Aggregate opts) ->

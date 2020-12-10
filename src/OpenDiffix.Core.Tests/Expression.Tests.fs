@@ -63,10 +63,10 @@ module ExpressionTests =
         OrderByDirection = Ascending
       }
 
-  let eval expr = Expression.evaluate ctx expr testRow
+  let eval expr = Expression.evaluate ctx testRow expr
 
   let evalAggr expr =
-    Expression.evaluateAggregated ctx expr Map.empty testRows
+    Expression.evaluateAggregated ctx Map.empty testRows expr
 
   [<Fact>]
   let evaluate () =
