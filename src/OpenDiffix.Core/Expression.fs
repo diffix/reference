@@ -1,5 +1,6 @@
 namespace OpenDiffix.Core
 
+open System
 open System.Collections.Generic
 
 type Value =
@@ -7,6 +8,7 @@ type Value =
   | IntegerValue of int
   | FloatValue of float
   | BooleanValue of bool
+  | NullValue
 
 type Tuple = Map<string, Value>
 
@@ -16,28 +18,80 @@ type Expression =
   | TupleElement of name: string
   | Constant of value: Value
 
-module Expression =
-  let functions = Dictionary<string, Value list -> Value>()
-  let aggregators = Dictionary<string, seq<Value> -> Value>()
+type EvaluationContext = EmptyContext
 
-  let invokeFunction name args =
+module DefaultFunctions =
+  let private invalidOverload name =
+    failwith $"Invalid overload called for function '{name}'."
+
+  let add _ctx args =
+    match args with
+    | [ IntegerValue a; IntegerValue b ] -> IntegerValue(a + b)
+    | [ FloatValue a; FloatValue b ] -> FloatValue(a + b)
+    | [ FloatValue a; IntegerValue b ] -> FloatValue(a + float b)
+    | [ IntegerValue a; FloatValue b ] -> FloatValue(float a + b)
+    | _ -> invalidOverload "+"
+
+  let sub _ctx args =
+    match args with
+    | [ IntegerValue a; IntegerValue b ] -> IntegerValue(a - b)
+    | [ FloatValue a; FloatValue b ] -> FloatValue(a - b)
+    | [ FloatValue a; IntegerValue b ] -> FloatValue(a - float b)
+    | [ IntegerValue a; FloatValue b ] -> FloatValue(float a - b)
+    | _ -> invalidOverload "-"
+
+module DefaultAggregators =
+  open System.Linq
+
+  let sum ctx values =
+    if Seq.isEmpty values then
+      NullValue
+    else
+      values
+      |> Seq.reduce (fun a b -> DefaultFunctions.add ctx [ a; b ])
+
+  let count _ctx (values: seq<Value>) =
+    values.Count(fun x ->
+      match x with
+      | NullValue -> false
+      | _ -> true)
+    |> IntegerValue
+
+module Expression =
+  let functions =
+    Dictionary<string, EvaluationContext -> Value list -> Value>(StringComparer.OrdinalIgnoreCase)
+
+  functions.Add("+", DefaultFunctions.add)
+  functions.Add("-", DefaultFunctions.sub)
+
+  let aggregators =
+    Dictionary<string, EvaluationContext -> seq<Value> -> Value>(StringComparer.OrdinalIgnoreCase)
+
+  aggregators.Add("sum", DefaultAggregators.sum)
+  aggregators.Add("count", DefaultAggregators.count)
+
+  let invokeFunction ctx name args =
     match functions.TryGetValue name with
-    | true, fn -> fn args
+    | true, fn -> fn ctx args
     | _ -> failwith $"Unknown function {name}."
 
-  let invokeAggregator name values =
+  let invokeAggregator ctx name values =
     match aggregators.TryGetValue name with
-    | true, fn -> fn values
+    | true, fn -> fn ctx values
     | _ -> failwith $"Unknown aggregator {name}."
 
-  let rec evaluate (expr: Expression) (tuple: Tuple) =
+  let rec evaluate (ctx: EvaluationContext) (expr: Expression) (tuple: Tuple) =
     match expr with
-    | FunctionCall (name, args) -> invokeFunction name (args |> List.map (fun arg -> evaluate arg tuple))
+    | FunctionCall (name, args) -> invokeFunction ctx name (args |> List.map (fun arg -> evaluate ctx arg tuple))
     | DistinctFunctionCall (name, _) -> failwith $"Invalid usage of distinct aggregator '{name}'."
     | TupleElement name -> tuple.[name]
     | Constant value -> value
 
-  let rec evaluateAggregated (expr: Expression) (groupings: Map<Expression, Value>) (tuples: seq<Tuple>) =
+  let rec evaluateAggregated (ctx: EvaluationContext)
+                             (expr: Expression)
+                             (groupings: Map<Expression, Value>)
+                             (tuples: seq<Tuple>)
+                             =
     match Map.tryFind expr groupings with
     | Some value -> value
     | None ->
@@ -46,18 +100,22 @@ module Expression =
         | FunctionCall (name, args) when functions.ContainsKey(name) ->
             let evaluatedArgs =
               args
-              |> List.map (fun arg -> evaluateAggregated arg groupings tuples)
+              |> List.map (fun arg -> evaluateAggregated ctx arg groupings tuples)
 
-            invokeFunction name evaluatedArgs
+            invokeFunction ctx name evaluatedArgs
         // Non-distinct aggregate
         | FunctionCall (name, [ arg ]) ->
-            let mappedTuples = tuples |> Seq.map (evaluate arg)
-            invokeAggregator name mappedTuples
+            let mappedTuples = tuples |> Seq.map (evaluate ctx arg)
+            invokeAggregator ctx name mappedTuples
         | FunctionCall _ -> failwith "Aggregators accept only one argument."
         // Distinct aggregate
         | DistinctFunctionCall (name, [ arg ]) ->
-            let mappedTuples = tuples |> Seq.map (evaluate arg) |> Seq.distinct
-            invokeAggregator name mappedTuples
+            let mappedTuples =
+              tuples |> Seq.map (evaluate ctx arg) |> Seq.distinct
+
+            invokeAggregator ctx name mappedTuples
         | DistinctFunctionCall _ -> failwith "Aggregators accept only one argument."
         | TupleElement name -> failwith $"Value '{name}' is not found in aggregated context."
         | Constant value -> value
+
+  let makeTuple (data: list<string * Value>): Tuple = Map.ofList data
