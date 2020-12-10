@@ -15,7 +15,7 @@ type Tuple = Map<string, Value>
 type Expression =
   | FunctionCall of name: string * args: Expression list
   | DistinctFunctionCall of name: string * arg: Expression list
-  | TupleElement of name: string
+  | ColumnReference of name: string
   | Constant of value: Value
 
 type EvaluationContext = EmptyContext
@@ -84,7 +84,7 @@ module Expression =
     match expr with
     | FunctionCall (name, args) -> invokeFunction ctx name (args |> List.map (fun arg -> evaluate ctx arg tuple))
     | DistinctFunctionCall (name, _) -> failwith $"Invalid usage of distinct aggregator '{name}'."
-    | TupleElement name -> tuple.[name]
+    | ColumnReference name -> tuple.[name]
     | Constant value -> value
 
   let rec evaluateAggregated (ctx: EvaluationContext)
@@ -115,7 +115,7 @@ module Expression =
 
             invokeAggregator ctx name mappedTuples
         | DistinctFunctionCall _ -> failwith "Aggregators accept only one argument."
-        | TupleElement name -> failwith $"Value '{name}' is not found in aggregated context."
+        | ColumnReference name -> failwith $"Value '{name}' is not found in aggregated context."
         | Constant value -> value
 
   let makeTuple (data: list<string * Value>): Tuple = Map.ofList data

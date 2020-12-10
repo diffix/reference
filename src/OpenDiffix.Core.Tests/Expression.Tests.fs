@@ -70,17 +70,17 @@ module ExpressionTests =
   [<Fact>]
   let evaluate () =
     // select val_int + 3
-    eval (FunctionCall("+", [ TupleElement "val_int"; Constant(IntegerValue 3) ]))
+    eval (FunctionCall("+", [ ColumnReference "val_int"; Constant(IntegerValue 3) ]))
     |> should equal (IntegerValue 10)
 
     // select val_str
-    eval (TupleElement "val_str")
+    eval (ColumnReference "val_str")
     |> should equal (StringValue "Some text")
 
   [<Fact>]
   let evaluateAggregated () =
     // select sum(val_float - val_int)
-    evalAggr (FunctionCall("sum", [ FunctionCall("-", [ TupleElement "val_float"; TupleElement "val_int" ]) ]))
+    evalAggr (FunctionCall("sum", [ FunctionCall("-", [ ColumnReference "val_float"; ColumnReference "val_int" ]) ]))
     |> should equal (FloatValue 2.0)
 
     // select count(1)
@@ -88,5 +88,5 @@ module ExpressionTests =
     |> should equal (IntegerValue 4)
 
     // select val_str
-    (fun () -> evalAggr (TupleElement "val_str") |> ignore)
+    (fun () -> evalAggr (ColumnReference "val_str") |> ignore)
     |> shouldFail
