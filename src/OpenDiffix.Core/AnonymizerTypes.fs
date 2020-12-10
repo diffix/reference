@@ -1,20 +1,26 @@
 namespace OpenDiffix.Core.AnonymizerTypes
 
 type LowCountSettings =
-  { Threshold: float
-    StdDev: float }
+  {
+    Threshold: float
+    StdDev: float
+  }
 
   static member Defaults = { Threshold = 5.; StdDev = 2. }
 
 type AnonymizationParams =
-  { AidColumnOption: string option
+  {
+    AidColumnOption: string option
     Seed: int
-    LowCountSettings: LowCountSettings option }
+    LowCountSettings: LowCountSettings option
+  }
 
 type RequestParams =
-  { AnonymizationParams: AnonymizationParams
+  {
+    AnonymizationParams: AnonymizationParams
     Query: string
-    DatabasePath: string }
+    DatabasePath: string
+  }
 
 type ColumnName = string
 
@@ -23,18 +29,24 @@ type ColumnValue =
   | StringValue of string
 
 type NonPersonalColumnCell =
-  { ColumnName: string
-    ColumnValue: ColumnValue }
+  {
+    ColumnName: string
+    ColumnValue: ColumnValue
+  }
 
 type ColumnCell =
-  { ColumnName: string
-    ColumnValue: ColumnValue }
+  {
+    ColumnName: string
+    ColumnValue: ColumnValue
+  }
 
 type AnonymizableColumnCell = { AidValue: ColumnValue Set }
 
 type AnonymizableRow =
-  { AidValues: ColumnValue Set
-    Columns: ColumnCell list }
+  {
+    AidValues: ColumnValue Set
+    Columns: ColumnCell list
+  }
 
 type NonPersonalRow = { Columns: ColumnCell list }
 

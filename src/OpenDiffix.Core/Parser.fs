@@ -72,9 +72,11 @@ module Definitions =
       | (columns, table), None -> SelectQuery { Expressions = columns; From = table }
       | (columns, table), Some groupByColumns ->
           AggregateQuery
-            { Expressions = columns
+            {
+              Expressions = columns
               From = table
-              GroupBy = groupByColumns }
+              GroupBy = groupByColumns
+            }
 
   let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
 

@@ -13,12 +13,16 @@ type DbColumnType =
   | DbUnknownType of string
 
 type DbColumn =
-  { Name: string
-    ColumnType: DbColumnType }
+  {
+    Name: string
+    ColumnType: DbColumnType
+  }
 
 type DbTable =
-  { Name: string
-    Columns: DbColumn list }
+  {
+    Name: string
+    Columns: DbColumn list
+  }
 
 let dbConnection path =
   try
@@ -39,9 +43,11 @@ let columnTypeToString =
 
 [<CLIMutable>]
 type private DbSchemaQueryRow =
-  { TableName: string
+  {
+    TableName: string
     ColumnName: string
-    ColumnType: string }
+    ColumnType: string
+  }
 
 let dbSchema (connection: SQLiteConnection) =
   asyncResult {
@@ -70,12 +76,16 @@ let dbSchema (connection: SQLiteConnection) =
         |> Seq.toList
         |> List.groupBy (fun row -> row.TableName)
         |> List.map (fun (tableName, rows) ->
-             { Name = tableName
+             {
+               Name = tableName
                Columns =
                  rows
                  |> List.map (fun row ->
-                      { Name = row.ColumnName
-                        ColumnType = columnTypeFromString row.ColumnType }) })
+                      {
+                        Name = row.ColumnName
+                        ColumnType = columnTypeFromString row.ColumnType
+                      })
+             })
         |> List.sortBy (fun table -> table.Name)
     with exn ->
       printfn "Exception: %A" exn
@@ -90,9 +100,15 @@ let getTables (connection: SQLiteConnection) =
       schema
       |> List.map (fun table ->
            NonPersonalRow
-             { Columns =
-                 [ { ColumnName = "name"
-                     ColumnValue = StringValue table.Name } ] })
+             {
+               Columns =
+                 [
+                   {
+                     ColumnName = "name"
+                     ColumnValue = StringValue table.Name
+                   }
+                 ]
+             })
       |> ResultTable
   }
 
@@ -109,11 +125,19 @@ let getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
           table.Columns
           |> List.map (fun column ->
                NonPersonalRow
-                 { Columns =
-                     [ { ColumnName = "name"
-                         ColumnValue = StringValue column.Name }
-                       { ColumnName = "type"
-                         ColumnValue = StringValue(columnTypeToString column.ColumnType) } ] })
+                 {
+                   Columns =
+                     [
+                       {
+                         ColumnName = "name"
+                         ColumnValue = StringValue column.Name
+                       }
+                       {
+                         ColumnName = "type"
+                         ColumnValue = StringValue(columnTypeToString column.ColumnType)
+                       }
+                     ]
+                 })
       |> ResultTable
   }
 
@@ -166,8 +190,10 @@ let columnFromReader index expression (reader: SQLiteDataReader) =
     | Function (functionName, _expression) -> functionName
     | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> name
 
-  { ColumnName = columnName
-    ColumnValue = value }
+  {
+    ColumnName = columnName
+    ColumnValue = value
+  }
 
 let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
@@ -201,8 +227,10 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
               | [] -> failwith "Can't happen. List is never empty since we add the AID column expression"
               | aidColumn :: row ->
                   let row: AnonymizableRow =
-                    { AidValues = Set.ofList [ aidColumn.ColumnValue ]
-                      Columns = row }
+                    {
+                      AidValues = Set.ofList [ aidColumn.ColumnValue ]
+                      Columns = row
+                    }
 
                   yield row
           }

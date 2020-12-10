@@ -6,12 +6,14 @@ open OpenDiffix.Core.AnonymizerTypes
 type LowCountSettingsJson =
   static member Decoder: Decoder<LowCountSettings> =
     Decode.object (fun get ->
-      { Threshold =
+      {
+        Threshold =
           get.Optional.Field "threshold" Decode.float
           |> Option.defaultValue LowCountSettings.Defaults.Threshold
         StdDev =
           get.Optional.Field "std_dev" Decode.float
-          |> Option.defaultValue LowCountSettings.Defaults.StdDev })
+          |> Option.defaultValue LowCountSettings.Defaults.StdDev
+      })
 
   static member Encoder(settings: LowCountSettings) =
     Encode.object [ "threshold", Encode.float settings.Threshold; "std_dev", Encode.float settings.StdDev ]
@@ -113,39 +115,51 @@ type QueryErrorJson =
         ]
 
 type AnonymizationParameters =
-  { AidColumns: string list
+  {
+    AidColumns: string list
     LowCountFiltering: LowCountSettings option
-    Seed: int }
+    Seed: int
+  }
 
   static member Default =
-    { AidColumns = []
+    {
+      AidColumns = []
       LowCountFiltering = Some LowCountSettings.Defaults
-      Seed = 1 }
+      Seed = 1
+    }
 
   static member Decoder: Decoder<AnonymizationParameters> =
     Decode.object (fun get ->
-      { AidColumns =
+      {
+        AidColumns =
           get.Optional.Field "aid_columns" (Decode.list Decode.string)
           |> Option.defaultValue AnonymizationParameters.Default.AidColumns
         LowCountFiltering = get.Optional.Field "low_count_filter" LowCountSettingsJson.Decoder
         Seed =
           get.Optional.Field "seed" Decode.int
-          |> Option.defaultValue AnonymizationParameters.Default.Seed })
+          |> Option.defaultValue AnonymizationParameters.Default.Seed
+      })
 
 type QueryRequest =
-  { Query: string
+  {
+    Query: string
     Database: string
-    Anonymization: AnonymizationParameters }
+    Anonymization: AnonymizationParameters
+  }
 
   static member Decoder: Decoder<QueryRequest> =
     Decode.object (fun get ->
-      { Query = get.Required.Field "query" Decode.string
+      {
+        Query = get.Required.Field "query" Decode.string
         Database = get.Required.Field "database" Decode.string
         Anonymization =
           get.Optional.Field "anonymization_parameters" AnonymizationParameters.Decoder
-          |> Option.defaultValue AnonymizationParameters.Default })
+          |> Option.defaultValue AnonymizationParameters.Default
+      })
 
   static member withQuery query db =
-    { Query = query
+    {
+      Query = query
       Database = db
-      Anonymization = AnonymizationParameters.Default }
+      Anonymization = AnonymizationParameters.Default
+    }

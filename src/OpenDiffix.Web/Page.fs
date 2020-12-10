@@ -13,9 +13,13 @@ let layout content =
       link [ _rel "stylesheet"; _type "text/css"; _href "styles.css" ]
     ]
     body [] [
-      div [ _class "min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12" ] [
-        div [ _class
-                "relative sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800" ] [
+      div [
+            _class "min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12"
+          ] [
+        div [
+              _class
+                "relative sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800"
+            ] [
           div [ _class "bg-white w-full px-6 py-5 relative" ] [
             h1 [ _class "font-medium text-4xl" ] [ str "Diffix prototype" ]
             p [ _class "mt-2" ] [
@@ -25,13 +29,17 @@ let layout content =
           content
         ]
 
-        div [ _class
-                "mt-8 py-5 px-6 bg-gray-200 sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800" ] [
+        div [
+              _class
+                "mt-8 py-5 px-6 bg-gray-200 sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800"
+            ] [
           h1 [ _class "font-medium text-4xl" ] [ str "Upload databases" ]
-          form [ _action "/upload-db"
+          form [
+                 _action "/upload-db"
                  _method "POST"
                  _enctype "multipart/form-data"
-                 _class "flex flex-col space-y-2 mt-4" ] [
+                 _class "flex flex-col space-y-2 mt-4"
+               ] [
             div [ _class "flex" ] [
               label [ _for "password"; _class "w-1/3 text-right pr-4" ] [ str "Password:" ]
               input [ _id "password"; _name "password"; _type "password"; _class "flex-grow px-2 py-1 rounded-lg" ]
@@ -51,8 +59,10 @@ let layout content =
 
             div [ _class "flex" ] [
               div [ _class "w-1/3" ] [ str "" ]
-              button [ _class "bg-green-500 text-gray-100 px-2 py-1 rounded-lg hover:bg-green-400 transition-colors"
-                       _type "submit" ] [
+              button [
+                       _class "bg-green-500 text-gray-100 px-2 py-1 rounded-lg hover:bg-green-400 transition-colors"
+                       _type "submit"
+                     ] [
                 str "Upload"
               ]
             ]
@@ -61,8 +71,10 @@ let layout content =
 
         div [ _class "mt-4 mx-auto py-5 text-sm text-gray-500" ] [
           str "For the source code and more info, visit "
-          a [ _href "https://github.com/diffix/prototype"
-              _class "underline" ] [
+          a [
+              _href "https://github.com/diffix/prototype"
+              _class "underline"
+            ] [
             str "Github"
           ]
           str "."
@@ -73,10 +85,12 @@ let layout content =
 
 let queryContainer databases (queryRequest: QueryRequest) =
   form [ _method "POST"; _action "/query" ] [
-    textarea [ _class
+    textarea [
+               _class
                  "pt-6 w-full block bg-gray-100 font-mono px-6 focus:bg-gray-700 focus:text-gray-100 focus:outline-none"
                _oninput "this.style.height = '';this.style.height = this.scrollHeight + 'px'"
-               _name "query" ] [
+               _name "query"
+             ] [
       str queryRequest.Query
     ]
     div [ _class "flex items-center bg-white px-6 py-5" ] [
@@ -84,18 +98,24 @@ let queryContainer databases (queryRequest: QueryRequest) =
         label [] [
           str "Data source"
           select
-            [ _name "database"
-              _class "rounded-md border ml-2 px-2 py-1" ]
+            [
+              _name "database"
+              _class "rounded-md border ml-2 px-2 py-1"
+            ]
             (databases
              |> List.map (fun dbName ->
-                  option [ _value dbName
+                  option [
+                           _value dbName
                            match queryRequest.Database with
                            | selectedDbName when selectedDbName = dbName -> _selected
-                           | _ -> () ] [
+                           | _ -> ()
+                         ] [
                     str dbName
                   ]))
         ]
-        label [ _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400" ] [
+        label [
+                _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"
+              ] [
           input [
             _type "text"
             _name "AidColumn"
@@ -108,7 +128,13 @@ let queryContainer databases (queryRequest: QueryRequest) =
           ]
         ]
       ]
-      div [] [ button [ _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500" ] [ str "Run query" ] ]
+      div [] [
+        button [
+                 _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500"
+               ] [
+          str "Run query"
+        ]
+      ]
     ]
   ]
 

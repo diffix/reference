@@ -36,12 +36,16 @@ let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
     let! dbPath = findDatabase pathToDbs userRequest.Database
 
     return
-      { AnonymizationParams =
-          { AidColumnOption = aidColumnOption
+      {
+        AnonymizationParams =
+          {
+            AidColumnOption = aidColumnOption
             Seed = userRequest.Anonymization.Seed
-            LowCountSettings = userRequest.Anonymization.LowCountFiltering }
+            LowCountSettings = userRequest.Anonymization.LowCountFiltering
+          }
         Query = userRequest.Query.Trim()
-        DatabasePath = dbPath }
+        DatabasePath = dbPath
+      }
   }
 
 let deriveRequestParamsFromBody pathToDbs (requestBody: string) =
@@ -87,9 +91,11 @@ let apiHandleQuery pathToDbs: HttpHandler =
 
 [<CLIMutable>]
 type FormQueryRequest =
-  { Query: string
+  {
+    Query: string
     Database: string
-    AidColumn: string }
+    AidColumn: string
+  }
 
 let handleQuery pathToDbs: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -99,14 +105,17 @@ let handleQuery pathToDbs: HttpHandler =
       let! formUserRequest = ctx.BindFormAsync<FormQueryRequest>(usAmerican)
 
       let userRequest =
-        { Query = formUserRequest.Query
+        {
+          Query = formUserRequest.Query
           Database = formUserRequest.Database
           Anonymization =
             { AnonymizationParameters.Default with
                 AidColumns =
                   match formUserRequest.AidColumn with
                   | "" -> []
-                  | columnName -> [ columnName ] } }
+                  | columnName -> [ columnName ]
+            }
+        }
 
       match deriveRequestParams pathToDbs userRequest with
       | Ok requestParameters ->
