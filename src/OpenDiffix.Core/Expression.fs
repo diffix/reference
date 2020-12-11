@@ -1,8 +1,5 @@
 namespace OpenDiffix.Core
 
-open System
-open System.Collections.Generic
-
 type Value =
   | String of string
   | Integer of int
@@ -60,38 +57,43 @@ module ExpressionUtils =
 
   let filterNulls args = args |> Seq.filter (fun v -> not (v = Null))
 
+  let binaryFunction fn =
+    fun _ctx args ->
+      match args with
+      | [ a; b ] -> fn (a, b)
+      | _ -> failwith "Expected 2 arguments in function."
+
+  let nullableBinaryFunction fn =
+    binaryFunction (function
+      | Null, _ -> Null
+      | _, Null -> Null
+      | a, b -> fn (a, b))
+
 module DefaultFunctions =
   open ExpressionUtils
 
-  let add _ctx args =
-    match args with
-    | [ Null; _ ] -> Null
-    | [ _; Null ] -> Null
-    | [ Integer a; Integer b ] -> Integer(a + b)
-    | [ Float a; Float b ] -> Float(a + b)
-    | [ Float a; Integer b ] -> Float(a + float b)
-    | [ Integer a; Float b ] -> Float(float a + b)
-    | _ -> invalidOverload "+"
+  let add =
+    nullableBinaryFunction (function
+      | Integer a, Integer b -> Integer(a + b)
+      | Float a, Float b -> Float(a + b)
+      | Float a, Integer b -> Float(a + float b)
+      | Integer a, Float b -> Float(float a + b)
+      | _ -> invalidOverload "+")
 
-  let sub _ctx args =
-    match args with
-    | [ Null; _ ] -> Null
-    | [ _; Null ] -> Null
-    | [ Integer a; Integer b ] -> Integer(a - b)
-    | [ Float a; Float b ] -> Float(a - b)
-    | [ Float a; Integer b ] -> Float(a - float b)
-    | [ Integer a; Float b ] -> Float(float a - b)
-    | _ -> invalidOverload "-"
+  let sub =
+    nullableBinaryFunction (function
+      | Integer a, Integer b -> Integer(a - b)
+      | Float a, Float b -> Float(a - b)
+      | Float a, Integer b -> Float(a - float b)
+      | Integer a, Float b -> Float(float a - b)
+      | _ -> invalidOverload "-")
 
-  let equals _ctx args =
-    match args with
-    | [ Null; _ ] -> Null
-    | [ _; Null ] -> Null
-    | [ a; b ] when a = b -> Boolean true
-    | [ Integer a; Float b ] -> Boolean(float a = b)
-    | [ Float a; Integer b ] -> Boolean(a = float b)
-    | [ _; _ ] -> Boolean false
-    | _ -> invalidOverload "="
+  let equals =
+    nullableBinaryFunction (function
+      | a, b when a = b -> Boolean true
+      | Integer a, Float b -> Boolean(float a = b)
+      | Float a, Integer b -> Boolean(a = float b)
+      | _ -> Boolean false)
 
   let not _ctx args =
     match args with
