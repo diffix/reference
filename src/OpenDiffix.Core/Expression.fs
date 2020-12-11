@@ -121,28 +121,25 @@ module DefaultAggregates =
 
 module Expression =
   let functions =
-    Dictionary<string, EvaluationContext -> ScalarArgs -> Value>(StringComparer.OrdinalIgnoreCase)
-
-  functions.Add("+", DefaultFunctions.add)
-  functions.Add("-", DefaultFunctions.sub)
-  functions.Add("=", DefaultFunctions.equals)
-  functions.Add("not", DefaultFunctions.not)
+    Map.ofList [
+      "+", DefaultFunctions.add
+      "-", DefaultFunctions.sub
+      "=", DefaultFunctions.equals
+      "not", DefaultFunctions.not
+    ]
 
   let aggregates =
-    Dictionary<string, EvaluationContext -> AggregateArgs -> Value>(StringComparer.OrdinalIgnoreCase)
-
-  aggregates.Add("sum", DefaultAggregates.sum)
-  aggregates.Add("count", DefaultAggregates.count)
+    Map.ofList [ "sum", DefaultAggregates.sum; "count", DefaultAggregates.count ]
 
   let invokeFunction ctx name args =
-    match functions.TryGetValue name with
-    | true, fn -> fn ctx args
-    | _ -> failwith $"Unknown function '{name}'."
+    match Map.tryFind name functions with
+    | Some fn -> fn ctx args
+    | None -> failwith $"Unknown function '{name}'."
 
   let invokeAggregate ctx name mappedArgs =
-    match aggregates.TryGetValue name with
-    | true, fn -> fn ctx mappedArgs
-    | _ -> failwith $"Unknown aggregate '{name}'."
+    match Map.tryFind name aggregates with
+    | Some fn -> fn ctx mappedArgs
+    | None -> failwith $"Unknown aggregate '{name}'."
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
