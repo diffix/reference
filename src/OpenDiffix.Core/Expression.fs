@@ -58,11 +58,15 @@ module ExpressionUtils =
          | [ arg ] -> arg
          | _ -> invalidOverload name)
 
+  let filterNulls args = args |> Seq.filter (fun v -> not (v = Null))
+
 module DefaultFunctions =
   open ExpressionUtils
 
   let add _ctx args =
     match args with
+    | [ Null; _ ] -> Null
+    | [ _; Null ] -> Null
     | [ Integer a; Integer b ] -> Integer(a + b)
     | [ Float a; Float b ] -> Float(a + b)
     | [ Float a; Integer b ] -> Float(a + float b)
@@ -71,21 +75,40 @@ module DefaultFunctions =
 
   let sub _ctx args =
     match args with
+    | [ Null; _ ] -> Null
+    | [ _; Null ] -> Null
     | [ Integer a; Integer b ] -> Integer(a - b)
     | [ Float a; Float b ] -> Float(a - b)
     | [ Float a; Integer b ] -> Float(a - float b)
     | [ Integer a; Float b ] -> Float(float a - b)
     | _ -> invalidOverload "-"
 
+  let equals _ctx args =
+    match args with
+    | [ Null; _ ] -> Null
+    | [ _; Null ] -> Null
+    | [ a; b ] when a = b -> Boolean true
+    | [ Integer a; Float b ] -> Boolean(float a = b)
+    | [ Float a; Integer b ] -> Boolean(a = float b)
+    | [ _; _ ] -> Boolean false
+    | _ -> invalidOverload "="
+
+  let not _ctx args =
+    match args with
+    | [ Boolean b ] -> Boolean(not b)
+    | [ Null ] -> Null
+    | _ -> invalidOverload "not"
+
 module DefaultAggregates =
   open ExpressionUtils
 
   let sum ctx (values: AggregateArgs) =
+    let values = values |> mapSingleArg "sum" |> filterNulls
+
     if Seq.isEmpty values then
       Null
     else
       values
-      |> mapSingleArg "sum"
       |> Seq.reduce (fun a b -> DefaultFunctions.add ctx [ a; b ])
 
   let count _ctx (values: AggregateArgs) =
@@ -102,6 +125,8 @@ module Expression =
 
   functions.Add("+", DefaultFunctions.add)
   functions.Add("-", DefaultFunctions.sub)
+  functions.Add("=", DefaultFunctions.equals)
+  functions.Add("not", DefaultFunctions.not)
 
   let aggregates =
     Dictionary<string, EvaluationContext -> AggregateArgs -> Value>(StringComparer.OrdinalIgnoreCase)

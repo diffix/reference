@@ -7,21 +7,80 @@ open OpenDiffix.Core
 let ctx = EmptyContext
 
 module DefaultFunctionsTests =
+  let runs fn expectations =
+    expectations
+    |> List.iter (fun (a, b, result) -> fn ctx [ a; b ] |> should equal result)
+
+  let runs1 fn expectations =
+    expectations
+    |> List.iter (fun (a, result) -> fn ctx [ a ] |> should equal result)
+
+  let fails fn cases =
+    cases
+    |> List.iter (fun args -> (fun () -> fn ctx args |> ignore) |> shouldFail)
+
   [<Fact>]
   let add () =
-    DefaultFunctions.add ctx [ Integer 5; Integer 3 ]
-    |> should equal (Integer 8)
+    runs
+      DefaultFunctions.add
+      [
+        Integer 5, Integer 3, Integer 8
+        Float 2.5, Integer 3, Float 5.5
+        Integer 4, Float 2.5, Float 6.5
+        Integer 3, Null, Null
+        Null, Integer 3, Null
+      ]
 
-    (fun () -> DefaultFunctions.add ctx [ Integer 5; String "a" ] |> ignore)
-    |> shouldFail
+    fails
+      DefaultFunctions.add
+      [
+        [ Integer 5; String "a" ]
+        [ Boolean true; Integer 1 ]
+        [ String "a"; Float 2.5 ]
+      ]
 
   [<Fact>]
   let sub () =
-    DefaultFunctions.sub ctx [ Integer 5; Integer 3 ]
-    |> should equal (Integer 2)
+    runs
+      DefaultFunctions.sub
+      [
+        Integer 5, Integer 3, Integer 2
+        Float 2.5, Integer 3, Float -0.5
+        Integer 3, Float 2.5, Float 0.5
+        Integer 3, Null, Null
+        Null, Integer 3, Null
+      ]
 
-    (fun () -> DefaultFunctions.sub ctx [ Integer 5; String "a" ] |> ignore)
-    |> shouldFail
+    fails
+      DefaultFunctions.sub
+      [
+        [ Integer 5; String "a" ]
+        [ Boolean true; Integer 1 ]
+        [ String "a"; Float 2.5 ]
+      ]
+
+  [<Fact>]
+  let equals () =
+    runs
+      DefaultFunctions.equals
+      [
+        Integer 3, Integer 3, Boolean true
+        Float 3., Integer 3, Boolean true
+        Null, Null, Null
+        Null, Integer 3, Null
+        Integer 3, Null, Null
+        String "a", String "a", Boolean true
+      ]
+
+  [<Fact>]
+  let not () =
+    runs1
+      DefaultFunctions.not
+      [
+        Boolean true, Boolean false
+        Boolean false, Boolean true
+        Null, Null
+      ]
 
 module DefaultAggregatorsTests =
   [<Fact>]
