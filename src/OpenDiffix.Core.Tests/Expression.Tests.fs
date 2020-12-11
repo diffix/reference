@@ -90,6 +90,10 @@ module ExpressionTests =
          Expression.defaultAggregate))
     |> should equal (Float 2.0)
 
+    // select count(*)
+    evalAggr (Function("count", [ Constant(Unit) ], Expression.defaultAggregate))
+    |> should equal (Integer 4)
+
     // select count(1)
     evalAggr (Function("count", [ Constant(Integer 1) ], Expression.defaultAggregate))
     |> should equal (Integer 4)

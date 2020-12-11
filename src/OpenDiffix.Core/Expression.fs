@@ -8,6 +8,7 @@ type Value =
   | Integer of int
   | Float of float
   | Boolean of bool
+  | Unit
   | Null
 
 type Row = Value array
