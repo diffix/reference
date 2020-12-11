@@ -114,14 +114,6 @@ module ExpressionTests =
       makeRow "row2" 4 4.5
     ]
 
-  let distinctAggregate =
-    Aggregate
-      {
-        Distinct = true
-        OrderBy = []
-        OrderByDirection = Ascending
-      }
-
   let eval expr = Expression.evaluate ctx testRow expr
 
   let evalAggr expr =
@@ -158,7 +150,7 @@ module ExpressionTests =
     |> should equal (Integer 4)
 
     // select count(distinct val_str)
-    evalAggr (Function("count", [ ColumnReference 0 ], distinctAggregate))
+    evalAggr (Function("count", [ ColumnReference 0 ], Expression.distinctAggregate))
     |> should equal (Integer 2)
 
     // select val_str

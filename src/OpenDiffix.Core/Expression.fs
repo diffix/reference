@@ -188,3 +188,9 @@ module Expression =
         | Constant value -> value
 
   let defaultAggregate = Aggregate AggregateOptions.Default
+
+  let distinctAggregate =
+    Aggregate
+      { AggregateOptions.Default with
+          Distinct = true
+      }
