@@ -159,7 +159,7 @@ module Expression =
         | Function (name, args, Aggregate opts) ->
             let aggregateArgs = prepareAggregateArgs ctx args opts rows
             invokeAggregate ctx name aggregateArgs
-        | ColumnReference name -> failwith $"Value '{name}' is not found in aggregated context."
+        | ColumnReference _ -> failwith $"Incorrect column reference in aggregated context."
         | Constant value -> value
 
   let defaultAggregate = Aggregate AggregateOptions.Default
