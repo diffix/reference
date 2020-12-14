@@ -130,7 +130,7 @@ let generate conn table rowsCount =
   printfn "Creating table %A with %i rows and columns %A" table.Name rowsCount columns
 
   use command =
-    new SQLiteCommand($"CREATE TABLE {table.Name} ({columns})", conn)
+    new SQLiteCommand($"CREATE TABLE %s{table.Name} (%s{columns})", conn)
 
   command.ExecuteNonQuery() |> ignore
 
@@ -151,7 +151,7 @@ let generate conn table rowsCount =
       |> String.concat ", "
 
     use command =
-      new SQLiteCommand($"INSERT INTO {table.Name} ({columns}) VALUES ({row})", conn)
+      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{row})", conn)
 
     command.ExecuteNonQuery() |> ignore
 
