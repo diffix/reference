@@ -22,50 +22,41 @@ let fieldToString field =
   | Integer value -> string value
   | Real value -> string value
 
-type IGenerator =
-  abstract Create: unit -> Field
-
 type Column =
   {
     Name: string
     Type: Type
-    Generator: IGenerator
+    Generator: seq<Field>
   }
 
 type Table = { Name: string; Columns: Column list }
 
-type SequentialGenerator(?max: uint) =
-  let mutable current = 0u
-  let max = defaultArg max UInt32.MaxValue
-
-  member this.Next() =
-    current <- (current + 1u) % max
-    current
-
-  interface IGenerator with
-    member this.Create() =
-      let value = this.Next()
-      Field.Integer(int64 value)
-
-type ListGenerator(values: Field list) =
-  let values = values
-  let sequence = SequentialGenerator(uint values.Length)
-
-  interface IGenerator with
-    member this.Create() =
-      let index = sequence.Next()
-      List.item (int index) values
-
 let g_rng = System.Random(123) // Fixed seed because we want constant values
 
-type RandomGenerator(min, max) =
-  let min = min
-  let max = max
+let sequentialGenerator max =
+  seq {
+    while true do
+      for i in 1 .. Int32.MaxValue -> Field.Integer(int64 i)
+  }
 
-  interface IGenerator with
-    member this.Create() =
-      let value = g_rng.Next(min, max)
-      Field.Integer(int64 value)
+let listGenerator values =
+  seq {
+    while true do
+      for value in values -> value
+  }
+
+let randomGenerator min max =
+  seq {
+    while true do
+      yield Field.Integer(int64 (g_rng.Next(min, max)))
+  }
+
+let statefulGenerator (generator: seq<Field>) =
+  let enumerator = generator.GetEnumerator()
+
+  fun () ->
+    enumerator.MoveNext() |> ignore
+    enumerator.Current
 
 let cities =
   [ "Berlin"; "Rome"; "Paris"; "Madrid"; "London" ]
@@ -105,27 +96,27 @@ let customers =
         {
           Name = "id"
           Type = Type.Integer
-          Generator = SequentialGenerator()
+          Generator = sequentialGenerator ()
         }
         {
           Name = "first_name"
           Type = Type.Text
-          Generator = ListGenerator(first_names)
+          Generator = listGenerator first_names
         }
         {
           Name = "last_name"
           Type = Type.Text
-          Generator = ListGenerator(last_names)
+          Generator = listGenerator last_names
         }
         {
           Name = "age"
           Type = Type.Integer
-          Generator = RandomGenerator(18, 80)
+          Generator = randomGenerator 18 80
         }
         {
           Name = "city"
           Type = Type.Text
-          Generator = ListGenerator(cities)
+          Generator = listGenerator cities
         }
       ]
   }
@@ -148,10 +139,14 @@ let generate conn table rowsCount =
     |> List.map (fun column -> column.Name)
     |> String.concat ", "
 
+  let generators =
+    table.Columns
+    |> List.map (fun column -> statefulGenerator column.Generator)
+
   for _i = 1 to rowsCount do
     let row =
-      table.Columns
-      |> List.map (fun column -> column.Generator.Create())
+      generators
+      |> List.map (fun generator -> generator ())
       |> List.map fieldToString
       |> String.concat ", "
 
