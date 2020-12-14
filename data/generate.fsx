@@ -31,7 +31,7 @@ type Column =
 
 type Table = { Name: string; Columns: Column list }
 
-let g_rng = System.Random(123) // Fixed seed because we want constant values
+let gRNG = System.Random(123) // Fixed seed because we want constant values
 
 let sequentialGenerator () =
   seq {
@@ -48,7 +48,7 @@ let listGenerator values =
 let randomGenerator min max =
   seq {
     while true do
-      yield Field.Integer(int64 (g_rng.Next(min, max)))
+      yield Field.Integer(int64 (gRNG.Next(min, max)))
   }
 
 let statefulGenerator (generator: seq<Field>) =
