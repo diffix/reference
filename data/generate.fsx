@@ -56,14 +56,15 @@ type ListGenerator(values: Field list) =
       let index = sequence.Next()
       List.item (int index) values
 
+let g_rng = System.Random(123) // Fixed seed because we want constant values
+
 type RandomGenerator(min, max) =
   let min = min
   let max = max
-  let rng = System.Random(123) // Fixed seed because we want constant values
 
   interface IGenerator with
     member this.Create() =
-      let value = rng.Next(min, max)
+      let value = g_rng.Next(min, max)
       Field.Integer(int64 value)
 
 let cities =
