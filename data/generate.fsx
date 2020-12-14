@@ -59,12 +59,24 @@ let statefulGenerator (generator: seq<Field>) =
     enumerator.Current
 
 let cities =
-  [ "Berlin"; "Rome"; "Paris"; "Madrid"; "London" ]
+  [
+    "Berlin"
+    "Berlin"
+    "Berlin"
+    "Rome"
+    "Rome"
+    "Paris"
+    "Madrid"
+    "London"
+  ]
   |> List.map Field.Text
 
 let first_names =
   [
     "James"
+    "James"
+    "James"
+    "Mary"
     "Mary"
     "Robert"
     "Jennifer"
@@ -79,11 +91,17 @@ let first_names =
 let last_names =
   [
     "Smith"
+    "Smith"
+    "Smith"
+    "Jones"
     "Jones"
     "Williams"
     "Brown"
     "Wilson"
     "Taylor"
+    "Thomas"
+    "Thomas"
+    "Thomas"
     "Thomas"
   ]
   |> List.map Field.Text
@@ -165,7 +183,7 @@ let conn = new SQLiteConnection("Data Source=" + file_path)
 
 conn.Open()
 
-generate conn customers 100
+generate conn customers 200
 
 conn.Close()
 
