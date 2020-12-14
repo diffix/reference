@@ -1,5 +1,4 @@
-#I "../src/OpenDiffix.Core.Tests/bin/Debug/net5.0"
-#r "System.Data.SQLite.dll"
+#r "nuget: System.Data.SQLite.Core, Version=1.0.113.6"
 
 open System
 open System.IO
