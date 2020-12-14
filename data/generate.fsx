@@ -33,7 +33,7 @@ type Table = { Name: string; Columns: Column list }
 
 let g_rng = System.Random(123) // Fixed seed because we want constant values
 
-let sequentialGenerator max =
+let sequentialGenerator () =
   seq {
     while true do
       for i in 1 .. Int32.MaxValue -> Field.Integer(int64 i)
