@@ -5,9 +5,9 @@ open System.IO
 open System.Data.SQLite
 
 type Type =
-  | Text = 0
-  | Integer = 1
-  | Real = 2
+  | Text
+  | Integer
+  | Real
 
 type Field =
   | Null
