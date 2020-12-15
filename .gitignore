@@ -9,3 +9,6 @@ DiffixReference.sln.DotSettings.user
 src/OpenDiffix.Web/dist/
 src/OpenDiffix.Web/wwwroot/*.map
 dbs/*
+
+.fake
+.ionide
