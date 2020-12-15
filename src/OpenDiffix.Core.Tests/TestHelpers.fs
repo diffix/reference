@@ -1,4 +1,5 @@
-module TestHelpers
+[<AutoOpen>]
+module OpenDiffix.Core.TestHelpers
 
 open Xunit
 
