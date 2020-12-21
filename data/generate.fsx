@@ -73,7 +73,7 @@ let cities =
   ]
   |> List.map Field.Text
 
-let first_names =
+let firstNames =
   [
     "James"
     "James"
@@ -90,7 +90,7 @@ let first_names =
   ]
   |> List.map Field.Text
 
-let last_names =
+let lastNames =
   [
     "Smith"
     "Smith"
@@ -127,8 +127,8 @@ let customers =
     Generators =
       [
         sequentialGenerator ()
-        listGenerator first_names
-        listGenerator last_names
+        listGenerator firstNames
+        listGenerator lastNames
         randomGenerator 18 80
         listGenerator cities
       ]
