@@ -167,6 +167,76 @@ let customers =
       ]
   }
 
+let products =
+  {
+    Name = "products"
+    Columns =
+      [
+        { Name = "id"; Type = Type.Integer }
+        { Name = "name"; Type = Type.Text }
+        { Name = "price"; Type = Type.Real }
+      ]
+
+    GeneratedRowsCount = 0
+    Generators = []
+
+    StaticRows =
+      [
+        [ Integer(-1L); Text("Drugs"); Real(30.7) ]
+        [ Integer(0L); Null; Null ]
+        [ Integer(1L); Text("Water"); Real(1.3) ]
+        [ Integer(2L); Text("Pasta"); Real(7.5) ]
+        [ Integer(3L); Text("Chicken"); Real(12.81) ]
+        [ Integer(4L); Text("Wine"); Real(9.25) ]
+        [ Integer(5L); Text("Cheese"); Real(4.93) ]
+        [ Integer(6L); Text("Milk"); Real(3.74) ]
+        [ Integer(8L); Text("Coffee"); Real(6.14) ]
+        [ Integer(9L); Text("Bread"); Real(1.4) ]
+        [ Integer(10L); Text("Banana"); Real(4.78) ]
+      ]
+  }
+
+let purchaseAmounts =
+  [
+    0.25
+    0.25
+    0.5
+    0.5
+    0.5
+    0.75
+    1.0
+    1.0
+    1.0
+    1.0
+    1.5
+    2.0
+    2.0
+    2.5
+    4.0
+  ]
+  |> List.map Field.Real
+
+let purchases =
+  {
+    Name = "purchases"
+    Columns =
+      [
+        { Name = "cid"; Type = Type.Integer }
+        { Name = "pid"; Type = Type.Integer }
+        { Name = "amount"; Type = Type.Real }
+      ]
+
+    GeneratedRowsCount = 500
+    Generators =
+      [
+        randomGenerator 1 customers.GeneratedRowsCount
+        randomGenerator 1 (products.StaticRows.Length - 2)
+        listGenerator purchaseAmounts
+      ]
+
+    StaticRows = []
+  }
+
 let generate conn table =
   let columns =
     table.Columns
@@ -214,6 +284,8 @@ let conn = new SQLiteConnection("Data Source=" + file_path)
 conn.Open()
 
 generate conn customers
+generate conn products
+generate conn purchases
 
 conn.Close()
 
