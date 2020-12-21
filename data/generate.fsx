@@ -22,18 +22,15 @@ let fieldToString field =
   | Integer value -> string value
   | Real value -> string value
 
-type Column =
-  {
-    Name: string
-    Type: Type
-    Generator: seq<Field>
-  }
+type Column = { Name: string; Type: Type }
 
 type Table =
   {
     Name: string
     Columns: Column list
-    Outliers: Field list list
+    GeneratedRowsCount: int
+    Generators: seq<Field> list
+    StaticRows: Field list list
   }
 
 let gRNG = System.Random(123) // Fixed seed because we want constant values
@@ -116,34 +113,27 @@ let customers =
     Name = "customers"
     Columns =
       [
-        {
-          Name = "id"
-          Type = Type.Integer
-          Generator = sequentialGenerator ()
-        }
+        { Name = "id"; Type = Type.Integer }
         {
           Name = "first_name"
           Type = Type.Text
-          Generator = listGenerator first_names
         }
-        {
-          Name = "last_name"
-          Type = Type.Text
-          Generator = listGenerator last_names
-        }
-        {
-          Name = "age"
-          Type = Type.Integer
-          Generator = randomGenerator 18 80
-        }
-        {
-          Name = "city"
-          Type = Type.Text
-          Generator = listGenerator cities
-        }
+        { Name = "last_name"; Type = Type.Text }
+        { Name = "age"; Type = Type.Integer }
+        { Name = "city"; Type = Type.Text }
       ]
 
-    Outliers =
+    GeneratedRowsCount = 200
+    Generators =
+      [
+        sequentialGenerator ()
+        listGenerator first_names
+        listGenerator last_names
+        randomGenerator 18 80
+        listGenerator cities
+      ]
+
+    StaticRows =
       [
         [ Integer(0L); Null; Null; Null; Null ]
         [
@@ -177,13 +167,13 @@ let customers =
       ]
   }
 
-let generate conn table rowsCount =
+let generate conn table =
   let columns =
     table.Columns
     |> List.map (fun column -> $"{column.Name} {column.Type}")
     |> String.concat ", "
 
-  printfn "Creating table %A with %i rows and columns %A" table.Name rowsCount columns
+  printfn "Creating table %A with columns %A" table.Name columns
 
   use command =
     new SQLiteCommand($"CREATE TABLE %s{table.Name} (%s{columns})", conn)
@@ -195,18 +185,16 @@ let generate conn table rowsCount =
     |> List.map (fun column -> column.Name)
     |> String.concat ", "
 
-  let generators =
-    List.map (fun column -> statefulGenerator column.Generator) table.Columns
+  let generators = List.map statefulGenerator table.Generators
 
-  let genericSeq =
-    seq {
-      while true do
-        yield List.map (fun generator -> generator ()) generators
-    }
+  let rowGenerator =
+    fun _ -> List.map (fun generator -> generator ()) generators
 
-  let rowsSeq = Seq.append table.Outliers genericSeq
+  let genericRows = Seq.init table.GeneratedRowsCount rowGenerator
 
-  for row in Seq.take rowsCount rowsSeq do
+  let rows = Seq.append table.StaticRows genericRows
+
+  for row in rows do
     let values =
       row |> List.map fieldToString |> String.concat ", "
 
@@ -225,7 +213,7 @@ let conn = new SQLiteConnection("Data Source=" + file_path)
 
 conn.Open()
 
-generate conn customers 200
+generate conn customers
 
 conn.Close()
 
