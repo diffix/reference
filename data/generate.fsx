@@ -29,7 +29,12 @@ type Column =
     Generator: seq<Field>
   }
 
-type Table = { Name: string; Columns: Column list }
+type Table =
+  {
+    Name: string
+    Columns: Column list
+    Outliers: Field list list
+  }
 
 let gRNG = System.Random(123) // Fixed seed because we want constant values
 
@@ -137,6 +142,39 @@ let customers =
           Generator = listGenerator cities
         }
       ]
+
+    Outliers =
+      [
+        [ Integer(0L); Null; Null; Null; Null ]
+        [
+          Integer(-1L)
+          Text("1")
+          Text("outlier")
+          Integer(17L)
+          Text("Oslo")
+        ]
+        [
+          Integer(-2L)
+          Text("2")
+          Text("outlier")
+          Integer(90L)
+          Text("Paris")
+        ]
+        [
+          Integer(-3L)
+          Text("3")
+          Text("outlier")
+          Null
+          Text("Berlin")
+        ]
+        [
+          Integer(-4L)
+          Text("4")
+          Text("outlier")
+          Integer(10L)
+          Text("Berlin")
+        ]
+      ]
   }
 
 let generate conn table rowsCount =
@@ -158,18 +196,22 @@ let generate conn table rowsCount =
     |> String.concat ", "
 
   let generators =
-    table.Columns
-    |> List.map (fun column -> statefulGenerator column.Generator)
+    List.map (fun column -> statefulGenerator column.Generator) table.Columns
 
-  for _i = 1 to rowsCount do
-    let row =
-      generators
-      |> List.map (fun generator -> generator ())
-      |> List.map fieldToString
-      |> String.concat ", "
+  let genericSeq =
+    seq {
+      while true do
+        yield List.map (fun generator -> generator ()) generators
+    }
+
+  let rowsSeq = Seq.append table.Outliers genericSeq
+
+  for row in Seq.take rowsCount rowsSeq do
+    let values =
+      row |> List.map fieldToString |> String.concat ", "
 
     use command =
-      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{row})", conn)
+      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{values})", conn)
 
     command.ExecuteNonQuery() |> ignore
 
