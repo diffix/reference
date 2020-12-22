@@ -234,7 +234,18 @@ let purchases =
         listGenerator purchaseAmounts
       ]
 
-    StaticRows = []
+    StaticRows =
+      [
+        [ Null; Null; Null ]
+        [ Integer(0L); Integer(0L); Real(0.0) ]
+        [ Integer(-1L); Integer(-1L); Real(1.0) ]
+        [ Integer(-2L); Integer(-1L); Real(5.0) ]
+        [ Integer(-3L); Integer(-1L); Real(3.5) ]
+        [ Integer(-3L); Integer(-1L); Real(4.5) ]
+        [ Integer(-4L); Integer(1L); Real(20.0) ]
+        [ Integer(1L); Integer(1L); Real(7.0) ]
+        [ Integer(2L); Integer(1L); Real(0.1) ]
+      ]
   }
 
 let generate conn table =
