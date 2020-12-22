@@ -61,16 +61,7 @@ let statefulGenerator (generator: seq<Field>) =
     enumerator.Current
 
 let cities =
-  [
-    "Berlin"
-    "Berlin"
-    "Berlin"
-    "Rome"
-    "Rome"
-    "Paris"
-    "Madrid"
-    "London"
-  ]
+  [ "Berlin"; "Berlin"; "Berlin"; "Rome"; "Rome"; "Paris"; "Madrid"; "London" ]
   |> List.map Field.Text
 
 let firstNames =
@@ -114,10 +105,7 @@ let customers =
     Columns =
       [
         { Name = "id"; Type = Type.Integer }
-        {
-          Name = "first_name"
-          Type = Type.Text
-        }
+        { Name = "first_name"; Type = Type.Text }
         { Name = "last_name"; Type = Type.Text }
         { Name = "age"; Type = Type.Integer }
         { Name = "city"; Type = Type.Text }
@@ -136,34 +124,10 @@ let customers =
     StaticRows =
       [
         [ Integer 0L; Null; Null; Null; Null ]
-        [
-          Integer -1L
-          Text "1"
-          Text "outlier"
-          Integer 17L
-          Text "Oslo"
-        ]
-        [
-          Integer -2L
-          Text "2"
-          Text "outlier"
-          Integer 90L
-          Text "Paris"
-        ]
-        [
-          Integer -3L
-          Text "3"
-          Text "outlier"
-          Null
-          Text "Berlin"
-        ]
-        [
-          Integer -4L
-          Text "4"
-          Text "outlier"
-          Integer 10L
-          Text "Berlin"
-        ]
+        [ Integer -1L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo" ]
+        [ Integer -2L; Text "2"; Text "outlier"; Integer 90L; Text "Paris" ]
+        [ Integer -3L; Text "3"; Text "outlier"; Null; Text "Berlin" ]
+        [ Integer -4L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin" ]
       ]
   }
 
@@ -197,23 +161,7 @@ let products =
   }
 
 let purchaseAmounts =
-  [
-    0.25
-    0.25
-    0.5
-    0.5
-    0.5
-    0.75
-    1.0
-    1.0
-    1.0
-    1.0
-    1.5
-    2.0
-    2.0
-    2.5
-    4.0
-  ]
+  [ 0.25; 0.25; 0.5; 0.5; 0.5; 0.75; 1.0; 1.0; 1.0; 1.0; 1.5; 2.0; 2.0; 2.5; 4.0 ]
   |> List.map Field.Real
 
 let purchases =
@@ -256,31 +204,24 @@ let generate conn table =
 
   printfn "Creating table %A with columns %A" table.Name columns
 
-  use command =
-    new SQLiteCommand($"CREATE TABLE %s{table.Name} (%s{columns})", conn)
+  use command = new SQLiteCommand($"CREATE TABLE %s{table.Name} (%s{columns})", conn)
 
   command.ExecuteNonQuery() |> ignore
 
-  let columns =
-    table.Columns
-    |> List.map (fun column -> column.Name)
-    |> String.concat ", "
+  let columns = table.Columns |> List.map (fun column -> column.Name) |> String.concat ", "
 
   let generators = List.map statefulGenerator table.Generators
 
-  let rowGenerator =
-    fun _ -> List.map (fun generator -> generator ()) generators
+  let rowGenerator = fun _ -> List.map (fun generator -> generator ()) generators
 
   let genericRows = Seq.init table.GeneratedRowsCount rowGenerator
 
   let rows = Seq.append table.StaticRows genericRows
 
   for row in rows do
-    let values =
-      row |> List.map fieldToString |> String.concat ", "
+    let values = row |> List.map fieldToString |> String.concat ", "
 
-    use command =
-      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{values})", conn)
+    use command = new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{values})", conn)
 
     command.ExecuteNonQuery() |> ignore
 
