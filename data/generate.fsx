@@ -135,34 +135,34 @@ let customers =
 
     StaticRows =
       [
-        [ Integer(0L); Null; Null; Null; Null ]
+        [ Integer 0L; Null; Null; Null; Null ]
         [
-          Integer(-1L)
-          Text("1")
-          Text("outlier")
-          Integer(17L)
-          Text("Oslo")
+          Integer -1L
+          Text "1"
+          Text "outlier"
+          Integer 17L
+          Text "Oslo"
         ]
         [
-          Integer(-2L)
-          Text("2")
-          Text("outlier")
-          Integer(90L)
-          Text("Paris")
+          Integer -2L
+          Text "2"
+          Text "outlier"
+          Integer 90L
+          Text "Paris"
         ]
         [
-          Integer(-3L)
-          Text("3")
-          Text("outlier")
+          Integer -3L
+          Text "3"
+          Text "outlier"
           Null
-          Text("Berlin")
+          Text "Berlin"
         ]
         [
-          Integer(-4L)
-          Text("4")
-          Text("outlier")
-          Integer(10L)
-          Text("Berlin")
+          Integer -4L
+          Text "4"
+          Text "outlier"
+          Integer 10L
+          Text "Berlin"
         ]
       ]
   }
@@ -182,17 +182,17 @@ let products =
 
     StaticRows =
       [
-        [ Integer(-1L); Text("Drugs"); Real(30.7) ]
-        [ Integer(0L); Null; Null ]
-        [ Integer(1L); Text("Water"); Real(1.3) ]
-        [ Integer(2L); Text("Pasta"); Real(7.5) ]
-        [ Integer(3L); Text("Chicken"); Real(12.81) ]
-        [ Integer(4L); Text("Wine"); Real(9.25) ]
-        [ Integer(5L); Text("Cheese"); Real(4.93) ]
-        [ Integer(6L); Text("Milk"); Real(3.74) ]
-        [ Integer(8L); Text("Coffee"); Real(6.14) ]
-        [ Integer(9L); Text("Bread"); Real(1.4) ]
-        [ Integer(10L); Text("Banana"); Real(4.78) ]
+        [ Integer -1L; Text "Drugs"; Real 30.7 ]
+        [ Integer 0L; Null; Null ]
+        [ Integer 1L; Text "Water"; Real 1.3 ]
+        [ Integer 2L; Text "Pasta"; Real 7.5 ]
+        [ Integer 3L; Text "Chicken"; Real 12.81 ]
+        [ Integer 4L; Text "Wine"; Real 9.25 ]
+        [ Integer 5L; Text "Cheese"; Real 4.93 ]
+        [ Integer 6L; Text "Milk"; Real 3.74 ]
+        [ Integer 8L; Text "Coffee"; Real 6.14 ]
+        [ Integer 9L; Text "Bread"; Real 1.4 ]
+        [ Integer 10L; Text "Banana"; Real 4.78 ]
       ]
   }
 
@@ -237,14 +237,14 @@ let purchases =
     StaticRows =
       [
         [ Null; Null; Null ]
-        [ Integer(0L); Integer(0L); Real(0.0) ]
-        [ Integer(-1L); Integer(-1L); Real(1.0) ]
-        [ Integer(-2L); Integer(-1L); Real(5.0) ]
-        [ Integer(-3L); Integer(-1L); Real(3.5) ]
-        [ Integer(-3L); Integer(-1L); Real(4.5) ]
-        [ Integer(-4L); Integer(1L); Real(20.0) ]
-        [ Integer(1L); Integer(1L); Real(7.0) ]
-        [ Integer(2L); Integer(1L); Real(0.1) ]
+        [ Integer 0L; Integer 0L; Real 0.0 ]
+        [ Integer -1L; Integer -1L; Real 1.0 ]
+        [ Integer -2L; Integer -1L; Real 5.0 ]
+        [ Integer -3L; Integer -1L; Real 3.5 ]
+        [ Integer -3L; Integer -1L; Real 4.5 ]
+        [ Integer -4L; Integer 1L; Real 20.0 ]
+        [ Integer 1L; Integer 1L; Real 7.0 ]
+        [ Integer 2L; Integer 1L; Real 0.1 ]
       ]
   }
 
