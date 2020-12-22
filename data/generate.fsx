@@ -22,14 +22,16 @@ let fieldToString field =
   | Integer value -> string value
   | Real value -> string value
 
-type Column =
+type Column = { Name: string; Type: Type }
+
+type Table =
   {
     Name: string
-    Type: Type
-    Generator: seq<Field>
+    Columns: Column list
+    GeneratedRowsCount: int
+    Generators: seq<Field> list
+    StaticRows: Field list list
   }
-
-type Table = { Name: string; Columns: Column list }
 
 let gRNG = System.Random(123) // Fixed seed because we want constant values
 
@@ -71,7 +73,7 @@ let cities =
   ]
   |> List.map Field.Text
 
-let first_names =
+let firstNames =
   [
     "James"
     "James"
@@ -88,7 +90,7 @@ let first_names =
   ]
   |> List.map Field.Text
 
-let last_names =
+let lastNames =
   [
     "Smith"
     "Smith"
@@ -111,41 +113,148 @@ let customers =
     Name = "customers"
     Columns =
       [
-        {
-          Name = "id"
-          Type = Type.Integer
-          Generator = sequentialGenerator ()
-        }
+        { Name = "id"; Type = Type.Integer }
         {
           Name = "first_name"
           Type = Type.Text
-          Generator = listGenerator first_names
         }
-        {
-          Name = "last_name"
-          Type = Type.Text
-          Generator = listGenerator last_names
-        }
-        {
-          Name = "age"
-          Type = Type.Integer
-          Generator = randomGenerator 18 80
-        }
-        {
-          Name = "city"
-          Type = Type.Text
-          Generator = listGenerator cities
-        }
+        { Name = "last_name"; Type = Type.Text }
+        { Name = "age"; Type = Type.Integer }
+        { Name = "city"; Type = Type.Text }
+      ]
+
+    GeneratedRowsCount = 200
+    Generators =
+      [
+        sequentialGenerator ()
+        listGenerator firstNames
+        listGenerator lastNames
+        randomGenerator 18 80
+        listGenerator cities
+      ]
+
+    StaticRows =
+      [
+        [ Integer 0L; Null; Null; Null; Null ]
+        [
+          Integer -1L
+          Text "1"
+          Text "outlier"
+          Integer 17L
+          Text "Oslo"
+        ]
+        [
+          Integer -2L
+          Text "2"
+          Text "outlier"
+          Integer 90L
+          Text "Paris"
+        ]
+        [
+          Integer -3L
+          Text "3"
+          Text "outlier"
+          Null
+          Text "Berlin"
+        ]
+        [
+          Integer -4L
+          Text "4"
+          Text "outlier"
+          Integer 10L
+          Text "Berlin"
+        ]
       ]
   }
 
-let generate conn table rowsCount =
+let products =
+  {
+    Name = "products"
+    Columns =
+      [
+        { Name = "id"; Type = Type.Integer }
+        { Name = "name"; Type = Type.Text }
+        { Name = "price"; Type = Type.Real }
+      ]
+
+    GeneratedRowsCount = 0
+    Generators = []
+
+    StaticRows =
+      [
+        [ Integer -1L; Text "Drugs"; Real 30.7 ]
+        [ Integer 0L; Null; Null ]
+        [ Integer 1L; Text "Water"; Real 1.3 ]
+        [ Integer 2L; Text "Pasta"; Real 7.5 ]
+        [ Integer 3L; Text "Chicken"; Real 12.81 ]
+        [ Integer 4L; Text "Wine"; Real 9.25 ]
+        [ Integer 5L; Text "Cheese"; Real 4.93 ]
+        [ Integer 6L; Text "Milk"; Real 3.74 ]
+        [ Integer 8L; Text "Coffee"; Real 6.14 ]
+        [ Integer 9L; Text "Bread"; Real 1.4 ]
+        [ Integer 10L; Text "Banana"; Real 4.78 ]
+      ]
+  }
+
+let purchaseAmounts =
+  [
+    0.25
+    0.25
+    0.5
+    0.5
+    0.5
+    0.75
+    1.0
+    1.0
+    1.0
+    1.0
+    1.5
+    2.0
+    2.0
+    2.5
+    4.0
+  ]
+  |> List.map Field.Real
+
+let purchases =
+  {
+    Name = "purchases"
+    Columns =
+      [
+        { Name = "cid"; Type = Type.Integer }
+        { Name = "pid"; Type = Type.Integer }
+        { Name = "amount"; Type = Type.Real }
+      ]
+
+    GeneratedRowsCount = 500
+    Generators =
+      [
+        randomGenerator 1 customers.GeneratedRowsCount
+        randomGenerator 1 (products.StaticRows.Length - 2)
+        listGenerator purchaseAmounts
+      ]
+
+    StaticRows =
+      [
+        [ Null; Null; Null ]
+        [ Integer 0L; Integer 0L; Real 0.0 ]
+        [ Integer -1L; Integer -1L; Real 1.0 ]
+        [ Integer -2L; Integer -1L; Real 5.0 ]
+        [ Integer -3L; Integer -1L; Real 3.5 ]
+        [ Integer -3L; Integer -1L; Real 4.5 ]
+        [ Integer -4L; Integer 1L; Real 20.0 ]
+        [ Integer 1L; Integer 1L; Real 7.0 ]
+        [ Integer 2L; Integer 1L; Real 0.1 ]
+      ]
+  }
+
+let generate conn table =
   let columns =
     table.Columns
     |> List.map (fun column -> $"{column.Name} {column.Type}")
     |> String.concat ", "
 
-  printfn "Creating table %A with %i rows and columns %A" table.Name rowsCount columns
+  printfn "Creating table %A with columns %A" table.Name columns
 
   use command =
     new SQLiteCommand($"CREATE TABLE %s{table.Name} (%s{columns})", conn)
@@ -157,19 +266,21 @@ let generate conn table rowsCount =
     |> List.map (fun column -> column.Name)
     |> String.concat ", "
 
-  let generators =
-    table.Columns
-    |> List.map (fun column -> statefulGenerator column.Generator)
+  let generators = List.map statefulGenerator table.Generators
 
-  for _i = 1 to rowsCount do
-    let row =
-      generators
-      |> List.map (fun generator -> generator ())
-      |> List.map fieldToString
-      |> String.concat ", "
+  let rowGenerator =
+    fun _ -> List.map (fun generator -> generator ()) generators
+
+  let genericRows = Seq.init table.GeneratedRowsCount rowGenerator
+
+  let rows = Seq.append table.StaticRows genericRows
+
+  for row in rows do
+    let values =
+      row |> List.map fieldToString |> String.concat ", "
 
     use command =
-      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{row})", conn)
+      new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{values})", conn)
 
     command.ExecuteNonQuery() |> ignore
 
@@ -183,7 +294,9 @@ let conn = new SQLiteConnection("Data Source=" + file_path)
 
 conn.Open()
 
-generate conn customers 200
+generate conn customers
+generate conn products
+generate conn purchases
 
 conn.Close()
 
