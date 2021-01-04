@@ -1,12 +1,12 @@
 namespace OpenDiffix.Core
 
 type Value =
-  | String of string
+  | Null
+  | Boolean of bool
   | Integer of int
   | Float of float
-  | Boolean of bool
+  | String of string
   | Unit
-  | Null
 
 type Row = Value array
 
@@ -154,11 +154,12 @@ module Expression =
     let sortedRows =
       match opts.OrderBy, opts.OrderByDirection with
       | [], _ -> rows
-      | [ orderByExpr ], Ascending -> rows |> Seq.sortBy (fun row -> evaluate ctx row orderByExpr)
-      | [ orderByExpr ], Descending ->
+      | exprs, Ascending ->
           rows
-          |> Seq.sortByDescending (fun row -> evaluate ctx row orderByExpr)
-      | _ -> failwith "Multiple order by expressions are not supported yet."
+          |> Seq.sortBy (fun row -> exprs |> List.map (evaluate ctx row))
+      | exprs, Descending ->
+          rows
+          |> Seq.sortByDescending (fun row -> exprs |> List.map (evaluate ctx row))
 
     let projectedArgs =
       sortedRows
