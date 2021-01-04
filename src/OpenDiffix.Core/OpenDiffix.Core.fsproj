@@ -8,6 +8,8 @@
         <Compile Include="Expression.fs" />
         <Compile Include="ParserTypes.fs" />
         <Compile Include="Parser.fs" />
+        <Compile Include="AnalyzerTypes.fs" />
+        <Compile Include="Analyzer.fs" />
         <Compile Include="AnonymizerTypes.fs" />
         <Compile Include="Anonymizer.fs" />
         <Compile Include="DiffixSqlite.fs" />
