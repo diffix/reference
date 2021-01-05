@@ -23,8 +23,8 @@ let dbConnection path =
 
 let columnTypeFromString =
   function
-  | "INTEGER" -> DbInteger
-  | "TEXT" -> DbString
+  | "integer" -> DbInteger
+  | "text" -> DbString
   | other -> DbUnknownType other
 
 let columnTypeToString =
@@ -65,7 +65,12 @@ let dbSchema (connection: SQLiteConnection) =
             Name = tableName
             Columns =
               rows
-              |> List.map (fun row -> { Name = row.ColumnName; ColumnType = columnTypeFromString row.ColumnType })
+              |> List.map (fun row ->
+                {
+                  Name = row.ColumnName
+                  ColumnType = columnTypeFromString (row.ColumnType.ToLower())
+                }
+              )
           }
         )
         |> List.sortBy (fun table -> table.Name)
