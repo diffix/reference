@@ -23,14 +23,9 @@ type Expression =
 
 type From = Table of TableName
 
-type SelectQuery =
-  { Expressions: Expression list
-    From: From }
+type SelectQuery = { Expressions: Expression list; From: From }
 
-type AggregateQuery =
-  { Expressions: Expression list
-    From: From
-    GroupBy: ColumnName list }
+type AggregateQuery = { Expressions: Expression list; From: From; GroupBy: ColumnName list }
 
 type Query =
   // Exploration queries

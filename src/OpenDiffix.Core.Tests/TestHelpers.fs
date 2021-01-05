@@ -4,16 +4,18 @@ module OpenDiffix.Core.TestHelpers
 open Xunit
 
 let assertOk (result: Result<'a, 'b>) =
-  Assert.True
-    (match result with
-     | Ok _ -> true
-     | Error _ -> false)
+  Assert.True(
+    match result with
+    | Ok _ -> true
+    | Error _ -> false
+  )
 
 let assertError (result: Result<'a, 'b>) =
-  Assert.True
-    (match result with
-     | Ok _ -> false
-     | Error _ -> true)
+  Assert.True(
+    match result with
+    | Ok _ -> false
+    | Error _ -> true
+  )
 
 let assertOkEqual<'a, 'b> (result: Result<'a, 'b>) (expected: 'a) =
   match result with
@@ -23,7 +25,8 @@ let assertOkEqual<'a, 'b> (result: Result<'a, 'b>) (expected: 'a) =
 let assertErrorEqual (result: Result<'a, 'b>) (expected: 'b) =
   assertError result
 
-  Assert.True
-    (match result with
-     | Error value when value = expected -> true
-     | _ -> false)
+  Assert.True(
+    match result with
+    | Error value when value = expected -> true
+    | _ -> false
+  )

@@ -23,17 +23,7 @@ let runQuery query =
 let ``SHOW TABLES`` () =
   let expected =
     [ "customers"; "line_items"; "products"; "purchases" ]
-    |> List.map (fun v ->
-         NonPersonalRow
-           {
-             Columns =
-               [
-                 {
-                   ColumnName = "name"
-                   ColumnValue = StringValue v
-                 }
-               ]
-           })
+    |> List.map (fun v -> NonPersonalRow { Columns = [ { ColumnName = "name"; ColumnValue = StringValue v } ] })
     |> ResultTable
     |> Ok
 
@@ -44,20 +34,15 @@ let ``SHOW columns FROM customers`` () =
   let expected =
     [ "id", "integer"; "name", "string" ]
     |> List.map (fun (name, dataType) ->
-         NonPersonalRow
-           {
-             Columns =
-               [
-                 {
-                   ColumnName = "name"
-                   ColumnValue = StringValue name
-                 }
-                 {
-                   ColumnName = "type"
-                   ColumnValue = StringValue dataType
-                 }
-               ]
-           })
+      NonPersonalRow
+        {
+          Columns =
+            [
+              { ColumnName = "name"; ColumnValue = StringValue name }
+              { ColumnName = "type"; ColumnValue = StringValue dataType }
+            ]
+        }
+    )
     |> ResultTable
     |> Ok
 
@@ -69,19 +54,14 @@ let ``SELECT product_id FROM line_items`` () =
   let expected =
     [ 1, 10; 2, 16; 3, 16; 4, 16; 5, 16 ]
     |> List.map (fun (productId, occurrences) ->
-         let row =
-           NonPersonalRow
-             {
-               Columns =
-                 [
-                   {
-                     ColumnName = "product_id"
-                     ColumnValue = IntegerValue productId
-                   }
-                 ]
-             }
+      let row =
+        NonPersonalRow
+          {
+            Columns = [ { ColumnName = "product_id"; ColumnValue = IntegerValue productId } ]
+          }
 
-         List.replicate occurrences row)
+      List.replicate occurrences row
+    )
     |> List.concat
     |> ResultTable
     |> Ok

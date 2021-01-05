@@ -15,9 +15,7 @@ module DefaultFunctionsTests =
     expectations
     |> List.iter (fun (a, result) -> fn ctx [ a ] |> should equal result)
 
-  let fails fn cases =
-    cases
-    |> List.iter (fun args -> (fun () -> fn ctx args |> ignore) |> shouldFail)
+  let fails fn cases = cases |> List.iter (fun args -> (fun () -> fn ctx args |> ignore) |> shouldFail)
 
   [<Fact>]
   let add () =
@@ -31,13 +29,7 @@ module DefaultFunctionsTests =
         Null, Integer 3, Null
       ]
 
-    fails
-      DefaultFunctions.add
-      [
-        [ Integer 5; String "a" ]
-        [ Boolean true; Integer 1 ]
-        [ String "a"; Float 2.5 ]
-      ]
+    fails DefaultFunctions.add [ [ Integer 5; String "a" ]; [ Boolean true; Integer 1 ]; [ String "a"; Float 2.5 ] ]
 
   [<Fact>]
   let sub () =
@@ -51,13 +43,7 @@ module DefaultFunctionsTests =
         Null, Integer 3, Null
       ]
 
-    fails
-      DefaultFunctions.sub
-      [
-        [ Integer 5; String "a" ]
-        [ Boolean true; Integer 1 ]
-        [ String "a"; Float 2.5 ]
-      ]
+    fails DefaultFunctions.sub [ [ Integer 5; String "a" ]; [ Boolean true; Integer 1 ]; [ String "a"; Float 2.5 ] ]
 
   [<Fact>]
   let equals () =
@@ -73,14 +59,7 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
-  let not () =
-    runs1
-      DefaultFunctions.not
-      [
-        Boolean true, Boolean false
-        Boolean false, Boolean true
-        Null, Null
-      ]
+  let not () = runs1 DefaultFunctions.not [ Boolean true, Boolean false; Boolean false, Boolean true; Null, Null ]
 
 module DefaultAggregatorsTests =
   [<Fact>]
@@ -101,23 +80,15 @@ module DefaultAggregatorsTests =
     |> should equal (Integer 2)
 
 module ExpressionTests =
-  let makeRow strValue intValue floatValue =
-    [| String strValue; Integer intValue; Float floatValue |]
+  let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Float floatValue |]
 
   let testRow = makeRow "Some text" 7 0.25
 
-  let testRows =
-    [
-      makeRow "row1" 1 1.5
-      makeRow "row1" 2 2.5
-      makeRow "row2" 3 3.5
-      makeRow "row2" 4 4.5
-    ]
+  let testRows = [ makeRow "row1" 1 1.5; makeRow "row1" 2 2.5; makeRow "row2" 3 3.5; makeRow "row2" 4 4.5 ]
 
   let eval expr = Expression.evaluate ctx testRow expr
 
-  let evalAggr expr =
-    Expression.evaluateAggregated ctx Map.empty testRows expr
+  let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
 
   [<Fact>]
   let evaluate () =
@@ -126,19 +97,14 @@ module ExpressionTests =
     |> should equal (Integer 10)
 
     // select val_str
-    eval (ColumnReference 0)
-    |> should equal (String "Some text")
+    eval (ColumnReference 0) |> should equal (String "Some text")
 
   [<Fact>]
   let evaluateAggregated () =
     // select sum(val_float - val_int)
-    evalAggr
-      (Function
-        ("sum",
-         [
-           Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar)
-         ],
-         Expression.defaultAggregate))
+    evalAggr (
+      Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate)
+    )
     |> should equal (Float 2.0)
 
     // select count(*)
@@ -154,5 +120,4 @@ module ExpressionTests =
     |> should equal (Integer 2)
 
     // select val_str
-    (fun () -> evalAggr (ColumnReference 0) |> ignore)
-    |> shouldFail
+    (fun () -> evalAggr (ColumnReference 0) |> ignore) |> shouldFail

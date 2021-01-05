@@ -13,7 +13,8 @@ type LowCountSettingsJson =
         StdDev =
           get.Optional.Field "std_dev" Decode.float
           |> Option.defaultValue LowCountSettings.Defaults.StdDev
-      })
+      }
+    )
 
   static member Encoder(settings: LowCountSettings) =
     Encode.object [ "threshold", Encode.float settings.Threshold; "std_dev", Encode.float settings.StdDev ]
@@ -24,10 +25,11 @@ type AnonymizationParamsJson =
       "anonymization_parameters",
       Encode.object [
         "aid_columns",
-        Encode.list
-          (anonymizationParams.AidColumnOption
-           |> Option.map (fun aid -> [ Encode.string aid ])
-           |> Option.defaultValue [])
+        Encode.list (
+          anonymizationParams.AidColumnOption
+          |> Option.map (fun aid -> [ Encode.string aid ])
+          |> Option.defaultValue []
+        )
         "seed", Encode.int anonymizationParams.Seed
         "low_count",
         anonymizationParams.LowCountSettings
@@ -68,7 +70,8 @@ type QueryResultJson =
 
         let values =
           rows
-          |> List.map (function
+          |> List.map
+               (function
                | AnonymizableRow anonymizableRow -> encodeColumns anonymizableRow.Columns
                | NonPersonalRow nonPersonalRow -> encodeColumns nonPersonalRow.Columns)
           |> Encode.list
@@ -138,7 +141,8 @@ type AnonymizationParameters =
         Seed =
           get.Optional.Field "seed" Decode.int
           |> Option.defaultValue AnonymizationParameters.Default.Seed
-      })
+      }
+    )
 
 type QueryRequest =
   {
@@ -155,7 +159,8 @@ type QueryRequest =
         Anonymization =
           get.Optional.Field "anonymization_parameters" AnonymizationParameters.Decoder
           |> Option.defaultValue AnonymizationParameters.Default
-      })
+      }
+    )
 
   static member withQuery query db =
     {
