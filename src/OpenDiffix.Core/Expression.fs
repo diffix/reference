@@ -8,6 +8,12 @@ type Value =
   | String of string
   | Unit
 
+type ExpressionType =
+  | StringType
+  | IntegerType
+  | FloatType
+  | BooleanType
+
 type Row = Value array
 
 type OrderByDirection =
