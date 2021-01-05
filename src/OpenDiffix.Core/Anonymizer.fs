@@ -17,24 +17,20 @@ let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows:
   match anonymizationParams.LowCountSettings with
   | None -> rows
   | Some lowCountParams ->
-      let rowsToReject =
-        rows
-        |> List.groupBy (fun row -> row.Columns)
-        |> List.filter (fun (_columns, instancesOfRow) ->
-          let distinctUsersCount =
-            instancesOfRow
-            |> List.map (fun row -> row.AidValues)
-            |> Set.unionMany
-            |> Set.count
+      rows
+      |> List.groupBy (fun row -> row.Columns)
+      |> List.filter (fun (_columns, instancesOfRow) ->
+        let distinctUsersCount =
+          instancesOfRow
+          |> List.map (fun row -> row.AidValues)
+          |> Set.unionMany
+          |> Set.count
 
-          let lowCountThreshold = randomNum rnd lowCountParams.Threshold lowCountParams.StdDev
+        let lowCountThreshold = randomNum rnd lowCountParams.Threshold lowCountParams.StdDev
 
-          (float distinctUsersCount) < lowCountThreshold
-        )
-        |> List.map (fst)
-        |> Set.ofSeq
-
-      rows |> List.filter (fun row -> not (Set.contains row.Columns rowsToReject))
+        (float distinctUsersCount) >= lowCountThreshold
+      )
+      |> List.collect (fun (columns, instancesOfRow) -> instancesOfRow)
 
 let anonymize (anonymizationParams: AnonymizationParams) (rows: AnonymizableRow list) =
   let rnd = newRandom anonymizationParams

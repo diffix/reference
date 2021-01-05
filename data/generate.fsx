@@ -227,11 +227,11 @@ let generate conn table =
 
 // Main Body
 
-let file_path = Path.Combine(__SOURCE_DIRECTORY__, "data.sqlite")
+let filePath = Path.Combine(__SOURCE_DIRECTORY__, "data.sqlite")
 
-File.Delete(file_path)
+File.Delete(filePath)
 
-let conn = new SQLiteConnection("Data Source=" + file_path)
+let conn = new SQLiteConnection("Data Source=" + filePath)
 
 conn.Open()
 

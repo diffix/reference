@@ -13,7 +13,7 @@ let runQuery query =
           Seed = 1
           LowCountSettings = Some LowCountSettings.Defaults
         }
-      DatabasePath = __SOURCE_DIRECTORY__ + "/../../dbs/test-db.sqlite"
+      DatabasePath = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
       Query = query
     }
 
@@ -22,7 +22,7 @@ let runQuery query =
 [<Fact>]
 let ``SHOW TABLES`` () =
   let expected =
-    [ "customers"; "line_items"; "products"; "purchases" ]
+    [ "customers"; "products"; "purchases" ]
     |> List.map (fun v -> NonPersonalRow { Columns = [ { ColumnName = "name"; ColumnValue = StringValue v } ] })
     |> ResultTable
     |> Ok
@@ -32,7 +32,14 @@ let ``SHOW TABLES`` () =
 [<Fact>]
 let ``SHOW columns FROM customers`` () =
   let expected =
-    [ "id", "integer"; "name", "string" ]
+    [
+      "id", "integer"
+      "first_name", "string"
+      "last_name", "string"
+      "age", "integer"
+      "city", "string"
+    ]
+    |> List.sortBy (fun (name, _type) -> name)
     |> List.map (fun (name, dataType) ->
       NonPersonalRow
         {
@@ -50,22 +57,20 @@ let ``SHOW columns FROM customers`` () =
   Assert.Equal(expected, queryResult)
 
 [<Fact>]
-let ``SELECT product_id FROM line_items`` () =
+let ``SELECT city FROM customers`` () =
   let expected =
-    [ 1, 10; 2, 16; 3, 16; 4, 16; 5, 16 ]
-    |> List.map (fun (productId, occurrences) ->
-      let row =
-        NonPersonalRow
-          {
-            Columns = [ { ColumnName = "product_id"; ColumnValue = IntegerValue productId } ]
-          }
+    [ "Berlin", 77; "London", 25; "Madrid", 25; "Paris", 26; "Rome", 50 ]
+    |> List.collect (fun (city, occurrences) ->
+      let row = NonPersonalRow { Columns = [ { ColumnName = "city"; ColumnValue = StringValue city } ] }
 
       List.replicate occurrences row
     )
-    |> List.concat
     |> ResultTable
     |> Ok
 
-  let queryResult = runQuery "SELECT product_id FROM line_items"
+  let queryResult =
+    match runQuery "SELECT city FROM customers" with
+    | Ok (ResultTable rows) -> rows |> List.sort |> ResultTable |> Ok
+    | other -> other
 
   Assert.Equal(expected, queryResult)

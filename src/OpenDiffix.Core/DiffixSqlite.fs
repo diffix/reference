@@ -23,8 +23,8 @@ let dbConnection path =
 
 let columnTypeFromString =
   function
-  | "INTEGER" -> DbInteger
-  | "TEXT" -> DbString
+  | "integer" -> DbInteger
+  | "text" -> DbString
   | other -> DbUnknownType other
 
 let columnTypeToString =
@@ -65,7 +65,12 @@ let dbSchema (connection: SQLiteConnection) =
             Name = tableName
             Columns =
               rows
-              |> List.map (fun row -> { Name = row.ColumnName; ColumnType = columnTypeFromString row.ColumnType })
+              |> List.map (fun row ->
+                {
+                  Name = row.ColumnName
+                  ColumnType = columnTypeFromString (row.ColumnType.ToLower())
+                }
+              )
           }
         )
         |> List.sortBy (fun table -> table.Name)
@@ -152,7 +157,8 @@ let columnFromReader index expression (reader: SQLiteDataReader) =
     match reader.GetFieldType(index) with
     | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
     | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-    | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
+    | fieldType when fieldType = typeof<System.String> ->
+        ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
     | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
 
   let columnName =
