@@ -157,7 +157,8 @@ let columnFromReader index expression (reader: SQLiteDataReader) =
     match reader.GetFieldType(index) with
     | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
     | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-    | fieldType when fieldType = typeof<System.String> -> ColumnValue.StringValue(reader.GetString index)
+    | fieldType when fieldType = typeof<System.String> ->
+        ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
     | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
 
   let columnName =
