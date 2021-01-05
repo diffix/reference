@@ -6,8 +6,7 @@ type JoinType =
   | InnerJoin
   | LeftJoin
   | RightJoin
-  | OuterJoin
-  | CrossJoin
+  | FullJoin
 
 type SelectExpression =
   {
@@ -16,27 +15,32 @@ type SelectExpression =
     Alias: string
   }
 
+type GroupingSet = int list
+
 type Query =
+  | Union of distinct: bool * Query * Query
+  | SelectQuery of SelectQuery
+
+and SelectQuery =
   {
     Select: SelectExpression list
-    Where: Expression option
-    From: QueryFrom
-    GroupBy: Expression list option
-    Having: Expression option
+    Where: Expression
+    From: SelectFrom
+    GroupBy: Expression list
+    GroupingSets: GroupingSet list
+    Having: Expression
     OrderBy: Expression list
-    Offset: uint64
-    Limit: uint64 option
   }
 
-and QueryFrom =
+and SelectFrom =
   | Subquery of query: Query * alias: string
   | Join of Join
-  | Table of string
+  | Table of name: string * alias: string option
 
 and Join =
   {
     Type: JoinType
     Condition: Expression
-    Left: QueryFrom
-    Right: QueryFrom
+    Left: SelectFrom
+    Right: SelectFrom
   }
