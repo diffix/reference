@@ -39,15 +39,11 @@ let ``Parses functions`` () =
 
   assertOkEqual
     (parse SelectQueries.expressions "hello(world), hello(moon)")
-    [
-      Function("hello", plainColumn "world")
-      Function("hello", plainColumn "moon")
-    ]
+    [ Function("hello", plainColumn "world"); Function("hello", plainColumn "moon") ]
 
 [<Fact>]
 let ``Parses count(distinct col)`` () =
-  let expected =
-    AggregateFunction(AnonymizedCount(Distinct(ColumnName "col")))
+  let expected = AggregateFunction(AnonymizedCount(Distinct(ColumnName "col")))
 
   assertOkEqual (parse SelectQueries.expressions "count(distinct col)") [ expected ]
   assertOkEqual (parse SelectQueries.expressions "count ( distinct     col )") [ expected ]
@@ -68,18 +64,13 @@ let ``Parses GROUP BY statement`` () =
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse SelectQueries.parse "SELECT col FROM table")
-    (SelectQuery
-      {
-        Expressions = [ plainColumn "col" ]
-        From = Table(TableName "table")
-      })
+    (SelectQuery { Expressions = [ plainColumn "col" ]; From = Table(TableName "table") })
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
-let ``Parses "SHOW tables"`` () =
-  assertOkEqual (Parser.parse "show tables") ShowTables
+let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") ShowTables
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
@@ -88,7 +79,8 @@ let ``Parses "SHOW columns FROM bar"`` () =
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
   assertOkEqual<Query, _>
-    (Parser.parse "   show
+    (Parser.parse
+      "   show
                    tables   ")
     ShowTables
 
@@ -113,20 +105,15 @@ let ``Parse SELECT query with columns and table`` () =
 [<Fact>]
 let ``Parse aggregate query`` () =
   assertOkEqual
-    (Parser.parse """
+    (Parser.parse
+      """
          SELECT col1, count(distinct aid)
          FROM table
          GROUP BY col1
          """)
     (AggregateQuery
       {
-        Expressions =
-          [
-            plainColumn "col1"
-            Distinct(ColumnName "aid")
-            |> AnonymizedCount
-            |> AggregateFunction
-          ]
+        Expressions = [ plainColumn "col1"; Distinct(ColumnName "aid") |> AnonymizedCount |> AggregateFunction ]
         From = Table(TableName "table")
         GroupBy = [ ColumnName "col1" ]
       })

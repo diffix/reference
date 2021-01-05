@@ -78,8 +78,7 @@ let apiHandleQuery pathToDbs: HttpHandler =
               next
               ctx
       | Error queryError ->
-          let error =
-            Encode.toString 2 (QueryErrorJson.Encoder queryError)
+          let error = Encode.toString 2 (QueryErrorJson.Encoder queryError)
 
           return!
             (text error
@@ -90,12 +89,7 @@ let apiHandleQuery pathToDbs: HttpHandler =
     }
 
 [<CLIMutable>]
-type FormQueryRequest =
-  {
-    Query: string
-    Database: string
-    AidColumn: string
-  }
+type FormQueryRequest = { Query: string; Database: string; AidColumn: string }
 
 let handleQuery pathToDbs: HttpHandler =
   fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -119,9 +113,7 @@ let handleQuery pathToDbs: HttpHandler =
 
       match deriveRequestParams pathToDbs userRequest with
       | Ok requestParameters ->
-          let! result =
-            OpenDiffix.Core.QueryEngine.runQuery requestParameters
-            |> Async.StartAsTask
+          let! result = OpenDiffix.Core.QueryEngine.runQuery requestParameters |> Async.StartAsTask
 
           return! htmlView (Page.queryPage pathToDbs userRequest result) next ctx
       | Error error -> return! htmlView (Page.queryPage pathToDbs userRequest (Error error)) next ctx

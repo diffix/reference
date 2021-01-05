@@ -17,11 +17,12 @@ let fromFormHandler dbPath =
              else
                ctx.Request.Form.Files
                |> Seq.iter (fun file ->
-                    let fileNamePath = Path.Join [| dbPath; file.FileName |]
-                    let fileStream = File.Create fileNamePath
-                    file.CopyTo fileStream
-                    fileStream.Flush()
-                    fileStream.Close())
+                 let fileNamePath = Path.Join [| dbPath; file.FileName |]
+                 let fileStream = File.Create fileNamePath
+                 file.CopyTo fileStream
+                 fileStream.Flush()
+                 fileStream.Close()
+               )
 
                redirectTo false "/" next ctx)
     }

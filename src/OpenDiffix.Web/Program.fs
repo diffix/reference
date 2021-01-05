@@ -53,7 +53,8 @@ let webApp =
           ]
       route "/" >=> htmlView (Page.index dbPath)
       route "/query" >=> htmlView (Page.index dbPath)
-    ])
+    ]
+  )
 
 let configureApp (app: IApplicationBuilder) = app.UseStaticFiles().UseGiraffe webApp
 

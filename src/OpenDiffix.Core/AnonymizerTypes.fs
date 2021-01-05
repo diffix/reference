@@ -28,25 +28,13 @@ type ColumnValue =
   | IntegerValue of int
   | StringValue of string
 
-type NonPersonalColumnCell =
-  {
-    ColumnName: string
-    ColumnValue: ColumnValue
-  }
+type NonPersonalColumnCell = { ColumnName: string; ColumnValue: ColumnValue }
 
-type ColumnCell =
-  {
-    ColumnName: string
-    ColumnValue: ColumnValue
-  }
+type ColumnCell = { ColumnName: string; ColumnValue: ColumnValue }
 
 type AnonymizableColumnCell = { AidValue: ColumnValue Set }
 
-type AnonymizableRow =
-  {
-    AidValues: ColumnValue Set
-    Columns: ColumnCell list
-  }
+type AnonymizableRow = { AidValues: ColumnValue Set; Columns: ColumnCell list }
 
 type NonPersonalRow = { Columns: ColumnCell list }
 

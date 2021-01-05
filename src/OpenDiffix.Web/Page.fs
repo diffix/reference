@@ -13,9 +13,7 @@ let layout content =
       link [ _rel "stylesheet"; _type "text/css"; _href "styles.css" ]
     ]
     body [] [
-      div [
-            _class "min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12"
-          ] [
+      div [ _class "min-h-screen bg-gray-100 flex flex-col justify-center sm:py-12" ] [
         div [
               _class
                 "relative sm:max-w-3xl w-full sm:mx-auto shadow-lg rounded-xl border-gray-200 border overflow-hidden text-gray-800"
@@ -71,12 +69,7 @@ let layout content =
 
         div [ _class "mt-4 mx-auto py-5 text-sm text-gray-500" ] [
           str "For the source code and more info, visit "
-          a [
-              _href "https://github.com/diffix/prototype"
-              _class "underline"
-            ] [
-            str "Github"
-          ]
+          a [ _href "https://github.com/diffix/prototype"; _class "underline" ] [ str "Github" ]
           str "."
         ]
       ]
@@ -98,43 +91,30 @@ let queryContainer databases (queryRequest: QueryRequest) =
         label [] [
           str "Data source"
           select
-            [
-              _name "database"
-              _class "rounded-md border ml-2 px-2 py-1"
-            ]
+            [ _name "database"; _class "rounded-md border ml-2 px-2 py-1" ]
             (databases
              |> List.map (fun dbName ->
-                  option [
-                           _value dbName
-                           match queryRequest.Database with
-                           | selectedDbName when selectedDbName = dbName -> _selected
-                           | _ -> ()
-                         ] [
-                    str dbName
-                  ]))
+               option [
+                        _value dbName
+                        match queryRequest.Database with
+                        | selectedDbName when selectedDbName = dbName -> _selected
+                        | _ -> ()
+                      ] [
+                 str dbName
+               ]
+             ))
         ]
-        label [
-                _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400"
-              ] [
+        label [ _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400" ] [
           input [
             _type "text"
             _name "AidColumn"
             _class "rounded-md border px-2 py-1"
             _placeholder "Name of the AID column"
-            _value
-              (queryRequest.Anonymization.AidColumns
-               |> List.tryHead
-               |> Option.defaultValue "")
+            _value (queryRequest.Anonymization.AidColumns |> List.tryHead |> Option.defaultValue "")
           ]
         ]
       ]
-      div [] [
-        button [
-                 _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500"
-               ] [
-          str "Run query"
-        ]
-      ]
+      div [] [ button [ _class "bg-green-400 px-3 py-2 rounded-lg text-white hover:bg-green-500" ] [ str "Run query" ] ]
     ]
   ]
 
