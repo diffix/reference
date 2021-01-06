@@ -1,13 +1,5 @@
 namespace OpenDiffix.Core
 
-type Value =
-  | Null
-  | Boolean of bool
-  | Integer of int
-  | Float of float
-  | String of string
-  | Unit
-
 type ExpressionType =
   | StringType
   | IntegerType
@@ -15,10 +7,6 @@ type ExpressionType =
   | BooleanType
 
 type Row = Value array
-
-type OrderByDirection =
-  | Ascending
-  | Descending
 
 type Expression =
   | Function of name: string * args: Expression list * functionType: FunctionType
@@ -29,13 +17,14 @@ and FunctionType =
   | Scalar
   | Aggregate of options: AggregateOptions
 
+and OrderByExpression = Expression * OrderByDirection * OrderByNullsBehavior
+
 and AggregateOptions =
   {
     Distinct: bool
-    OrderBy: Expression list
-    OrderByDirection: OrderByDirection
+    OrderBy: OrderByExpression list
   }
-  static member Default = { Distinct = false; OrderBy = []; OrderByDirection = Ascending }
+  static member Default = { Distinct = false; OrderBy = [] }
 
 type EvaluationContext = EmptyContext
 
@@ -150,14 +139,27 @@ module Expression =
     | ColumnReference index -> row.[index]
     | Constant value -> value
 
-  let private prepareAggregateArgs ctx args opts rows =
-    let sortedRows =
-      match opts.OrderBy, opts.OrderByDirection with
-      | [], _ -> rows
-      | exprs, Ascending -> rows |> Seq.sortBy (fun row -> exprs |> List.map (evaluate ctx row))
-      | exprs, Descending -> rows |> Seq.sortByDescending (fun row -> exprs |> List.map (evaluate ctx row))
+  open System.Linq
 
-    let projectedArgs = sortedRows |> Seq.map (fun row -> args |> List.map (evaluate ctx row))
+  let rec private thenSort ctx orderings (rows: IOrderedEnumerable<Row>) =
+    match orderings with
+    | [] -> rows
+    | (expr, direction, nulls) :: tail ->
+        let sorted = rows.ThenBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
+        thenSort ctx tail sorted
+
+  let sortRows ctx orderings (rows: seq<Row>) =
+    match orderings with
+    | [] -> rows
+    | (expr, direction, nulls) :: tail ->
+        let firstSort = rows.OrderBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
+        thenSort ctx tail firstSort :> seq<Row>
+
+  let private prepareAggregateArgs ctx args opts rows =
+    let projectedArgs =
+      rows
+      |> sortRows ctx opts.OrderBy
+      |> Seq.map (fun row -> args |> List.map (evaluate ctx row))
 
     if opts.Distinct then Seq.distinct projectedArgs else projectedArgs
 
@@ -172,7 +174,6 @@ module Expression =
         match expr with
         | Function (name, args, Scalar) ->
             let evaluatedArgs = args |> List.map (evaluateAggregated ctx groupings rows)
-
             invokeFunction ctx name evaluatedArgs
         | Function (name, args, Aggregate opts) ->
             let aggregateArgs = prepareAggregateArgs ctx args opts rows
