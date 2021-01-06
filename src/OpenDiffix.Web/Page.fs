@@ -123,34 +123,27 @@ let valueToStrNode =
   | ColumnValue.IntegerValue v -> str (sprintf "%i" v)
   | ColumnValue.StringValue v -> str v
 
-let renderResults: Row list -> XmlNode =
+let renderResults: QueryResult -> XmlNode =
   function
-  | [] ->
+  | { Rows = [] } ->
       div [ _class "bg-gray-400 text-white p-4 w-full" ] [
         h2 [ _class "text-lg font-bold" ] [ str "No rows returned" ]
       ]
-  | rows ->
-      let columnsFromRow =
-        function
-        | AnonymizableRow row -> row.Columns
-        | NonPersonalRow row -> row.Columns
-
-      let header = columnsFromRow (List.head rows)
-
+  | { Columns = columns; Rows = rows } ->
       div [ _class "w-full bg-white py-3 px-6" ] [
         table [ _class "w-full" ] [
           thead [] [
             tr [ _class "text-left border-b-2 border-gr" ] [
-              for columnCell in header do
-                yield th [] [ str columnCell.ColumnName ]
+              for column in columns do
+                yield th [] [ str column ]
             ]
           ]
           tbody [] [
-            for row in rows |> List.map columnsFromRow do
+            for row in rows do
               yield
                 tr [ _class "pt-2 odd:bg-gray-200" ] [
-                  for columnCell in row do
-                    yield td [] [ valueToStrNode columnCell.ColumnValue ]
+                  for value in row do
+                    yield td [] [ valueToStrNode value ]
                 ]
           ]
         ]
@@ -173,7 +166,7 @@ let availableDbs path =
 let queryPage dbPath (userRequest: QueryRequest) result =
   let renderedResultSection =
     match result with
-    | Ok (QueryResult.ResultTable rows) -> renderResults rows
+    | Ok (result: QueryResult) -> renderResults result
     | Error (ParseError error) -> errorFragment "Parse error" error
     | Error (DbNotFound) -> errorFragment "Error" "Could not locate the database"
     | Error (ExecutionError error) -> errorFragment "Execution error" error
@@ -188,7 +181,7 @@ let index dbPath =
 
   let queryRequest =
     match dbs with
-    | [] -> QueryRequest.withQuery "SHOW tables" ""
-    | db :: _ -> QueryRequest.withQuery "SHOW tables" db
+    | [] -> QueryRequest.WithQuery "SHOW tables" ""
+    | db :: _ -> QueryRequest.WithQuery "SHOW tables" db
 
   queryContainer (availableDbs dbPath) queryRequest |> layout

@@ -23,26 +23,18 @@ type RequestParams =
   }
 
 type ColumnName = string
+type Columns = ColumnName list
 
 type ColumnValue =
   | IntegerValue of int
   | StringValue of string
 
-type NonPersonalColumnCell = { ColumnName: string; ColumnValue: ColumnValue }
+type NonPersonalRow = ColumnValue list
+type NonPersonalRows = NonPersonalRow list
+type PersonalRow = { AidValues: ColumnValue Set; RowValues: NonPersonalRow }
+type PersonalRows = PersonalRow list
 
-type ColumnCell = { ColumnName: string; ColumnValue: ColumnValue }
-
-type AnonymizableColumnCell = { AidValue: ColumnValue Set }
-
-type AnonymizableRow = { AidValues: ColumnValue Set; Columns: ColumnCell list }
-
-type NonPersonalRow = { Columns: ColumnCell list }
-
-type Row =
-  | AnonymizableRow of AnonymizableRow
-  | NonPersonalRow of NonPersonalRow
-
-type QueryResult = ResultTable of Row list
+type QueryResult = { Columns: Columns; Rows: NonPersonalRows }
 
 type QueryError =
   | ParseError of string

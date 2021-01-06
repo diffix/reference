@@ -36,15 +36,14 @@ module ExpressionUtils =
 
   let invalidOverload name = failwith $"Invalid overload called for function '{name}'."
 
-  let countSeqBy fn (seq: seq<'a>) = seq.Count(fun x -> fn x)
-
   let mapSingleArg name (args: AggregateArgs) =
     args
-    |> Seq.map (function
+    |> Seq.map
+         (function
          | [ arg ] -> arg
          | _ -> invalidOverload name)
 
-  let filterNulls args = args |> Seq.filter (fun v -> not (v = Null))
+  let filterNulls args = args |> Seq.filter (fun v -> v <> Null)
 
   let binaryFunction fn =
     fun _ctx args ->
@@ -53,7 +52,8 @@ module ExpressionUtils =
       | _ -> failwith "Expected 2 arguments in function."
 
   let nullableBinaryFunction fn =
-    binaryFunction (function
+    binaryFunction
+      (function
       | Null, _ -> Null
       | _, Null -> Null
       | a, b -> fn (a, b))
@@ -62,7 +62,8 @@ module DefaultFunctions =
   open ExpressionUtils
 
   let add =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | Integer a, Integer b -> Integer(a + b)
       | Float a, Float b -> Float(a + b)
       | Float a, Integer b -> Float(a + float b)
@@ -70,7 +71,8 @@ module DefaultFunctions =
       | _ -> invalidOverload "+")
 
   let sub =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | Integer a, Integer b -> Integer(a - b)
       | Float a, Float b -> Float(a - b)
       | Float a, Integer b -> Float(a - float b)
@@ -78,7 +80,8 @@ module DefaultFunctions =
       | _ -> invalidOverload "-")
 
   let equals =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | a, b when a = b -> Boolean true
       | Integer a, Float b -> Boolean(float a = b)
       | Float a, Integer b -> Boolean(a = float b)
@@ -100,9 +103,10 @@ module DefaultAggregates =
 
   let count _ctx (values: AggregateArgs) =
     values
-    |> countSeqBy (function
-         | [ Null ] -> false
-         | [ _ ] -> true
+    |> Seq.sumBy
+         (function
+         | [ Null ] -> 0
+         | [ _ ] -> 1
          | _ -> invalidOverload "count")
     |> Integer
 
