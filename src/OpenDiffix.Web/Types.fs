@@ -152,7 +152,7 @@ type QueryRequest =
       }
     )
 
-  static member withQuery query db =
+  static member WithQuery query db =
     {
       Query = query
       Database = db

@@ -47,8 +47,6 @@ module ExpressionUtils =
 
   let invalidOverload name = failwith $"Invalid overload called for function '{name}'."
 
-  let countSeqBy fn (seq: seq<'a>) = seq.Count(fun x -> fn x)
-
   let mapSingleArg name (args: AggregateArgs) =
     args
     |> Seq.map
@@ -56,7 +54,7 @@ module ExpressionUtils =
          | [ arg ] -> arg
          | _ -> invalidOverload name)
 
-  let filterNulls args = args |> Seq.filter (fun v -> not (v = Null))
+  let filterNulls args = args |> Seq.filter (fun v -> v <> Null)
 
   let binaryFunction fn =
     fun _ctx args ->
@@ -116,11 +114,12 @@ module DefaultAggregates =
 
   let count _ctx (values: AggregateArgs) =
     values
-    |> countSeqBy
+    |> Seq.filter
          (function
          | [ Null ] -> false
          | [ _ ] -> true
          | _ -> invalidOverload "count")
+    |> Seq.length
     |> Integer
 
 module Expression =

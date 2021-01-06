@@ -181,7 +181,7 @@ let index dbPath =
 
   let queryRequest =
     match dbs with
-    | [] -> QueryRequest.withQuery "SHOW tables" ""
-    | db :: _ -> QueryRequest.withQuery "SHOW tables" db
+    | [] -> QueryRequest.WithQuery "SHOW tables" ""
+    | db :: _ -> QueryRequest.WithQuery "SHOW tables" db
 
   queryContainer (availableDbs dbPath) queryRequest |> layout
