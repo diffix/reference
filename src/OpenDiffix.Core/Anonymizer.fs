@@ -13,13 +13,13 @@ let private randomNum (rnd: Random) mean stdDev =
 
 let private newRandom (anonymizationParams: AnonymizationParams) = Random(anonymizationParams.Seed)
 
-let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows: AnonymizableRow list) =
+let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows: PersonalRows) =
   match anonymizationParams.LowCountSettings with
   | None -> rows
   | Some lowCountParams ->
       rows
-      |> List.groupBy (fun row -> row.Columns)
-      |> List.filter (fun (_columns, instancesOfRow) ->
+      |> List.groupBy (fun row -> row.RowValues)
+      |> List.filter (fun (_values, instancesOfRow) ->
         let distinctUsersCount =
           instancesOfRow
           |> List.map (fun row -> row.AidValues)
@@ -30,11 +30,11 @@ let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows:
 
         (float distinctUsersCount) >= lowCountThreshold
       )
-      |> List.collect (fun (columns, instancesOfRow) -> instancesOfRow)
+      |> List.collect (fun (_values, instancesOfRow) -> instancesOfRow)
 
-let anonymize (anonymizationParams: AnonymizationParams) (rows: AnonymizableRow list) =
+let anonymize (anonymizationParams: AnonymizationParams) (rows: PersonalRows) =
   let rnd = newRandom anonymizationParams
 
   rows
   |> lowCountFilter anonymizationParams rnd
-  |> List.map (fun anonymizedRow -> NonPersonalRow { Columns = anonymizedRow.Columns })
+  |> List.map (fun anonymizedRow -> anonymizedRow.RowValues)

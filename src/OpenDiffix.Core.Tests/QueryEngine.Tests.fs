@@ -21,17 +21,17 @@ let runQuery query =
 
 [<Fact>]
 let ``SHOW TABLES`` () =
-  let expected =
+  let rows =
     [ "customers"; "products"; "purchases" ]
-    |> List.map (fun v -> NonPersonalRow { Columns = [ { ColumnName = "name"; ColumnValue = StringValue v } ] })
-    |> ResultTable
-    |> Ok
+    |> List.map (fun v -> [ StringValue v ])
+
+  let expected = { Columns = [ "name" ]; Rows = rows } |> Ok
 
   Assert.Equal(expected, runQuery "SHOW TABLES")
 
 [<Fact>]
 let ``SHOW columns FROM customers`` () =
-  let expected =
+  let rows =
     [
       "id", "integer"
       "first_name", "string"
@@ -40,37 +40,26 @@ let ``SHOW columns FROM customers`` () =
       "city", "string"
     ]
     |> List.sortBy (fun (name, _type) -> name)
-    |> List.map (fun (name, dataType) ->
-      NonPersonalRow
-        {
-          Columns =
-            [
-              { ColumnName = "name"; ColumnValue = StringValue name }
-              { ColumnName = "type"; ColumnValue = StringValue dataType }
-            ]
-        }
-    )
-    |> ResultTable
-    |> Ok
+    |> List.map (fun (name, dataType) -> [ StringValue name; StringValue dataType ])
+
+  let expected = { Columns = [ "name"; "type" ]; Rows = rows } |> Ok
 
   let queryResult = runQuery "SHOW columns FROM customers"
   Assert.Equal(expected, queryResult)
 
 [<Fact>]
 let ``SELECT city FROM customers`` () =
-  let expected =
+  let rows =
     [ "Berlin", 77; "London", 25; "Madrid", 25; "Paris", 26; "Rome", 50 ]
-    |> List.collect (fun (city, occurrences) ->
-      let row = NonPersonalRow { Columns = [ { ColumnName = "city"; ColumnValue = StringValue city } ] }
+    |> List.collect (fun (city, occurrences) -> List.replicate occurrences [ StringValue city ])
 
-      List.replicate occurrences row
-    )
-    |> ResultTable
-    |> Ok
+  let expected = { Columns = [ "city" ]; Rows = rows } |> Ok
 
   let queryResult =
     match runQuery "SELECT city FROM customers" with
-    | Ok (ResultTable rows) -> rows |> List.sort |> ResultTable |> Ok
+    | Ok result ->
+        let sortedRows = result.Rows |> List.sort
+        { result with Rows = sortedRows } |> Ok
     | other -> other
 
   Assert.Equal(expected, queryResult)

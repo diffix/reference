@@ -83,39 +83,30 @@ let getTables (connection: SQLiteConnection) =
   asyncResult {
     let! schema = dbSchema connection
 
-    return
-      schema
-      |> List.map (fun table ->
-        NonPersonalRow { Columns = [ { ColumnName = "name"; ColumnValue = StringValue table.Name } ] }
-      )
-      |> ResultTable
+    let rows = schema |> List.map (fun table -> [ StringValue table.Name ])
+
+    let columns = [ "name" ]
+
+    return { Columns = columns; Rows = rows }
   }
 
 let getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
   asyncResult {
     let! schema = dbSchema connection
+    let columns = [ "name"; "type" ]
 
-    return
+    let rows =
       schema
       |> List.tryFind (fun table -> table.Name = tableName)
       |> function
       | None -> []
       | Some table ->
           table.Columns
-          |> List.map (fun column ->
-            NonPersonalRow
-              {
-                Columns =
-                  [
-                    { ColumnName = "name"; ColumnValue = StringValue column.Name }
-                    {
-                      ColumnName = "type"
-                      ColumnValue = StringValue(columnTypeToString column.ColumnType)
-                    }
-                  ]
-              }
+          |> List.map (fun column -> //
+            [ StringValue column.Name; StringValue(columnTypeToString column.ColumnType) ]
           )
-      |> ResultTable
+
+    return { Columns = columns; Rows = rows }
   }
 
 let rec expressionToSql =
@@ -152,25 +143,23 @@ let generateSqlQuery aidColumnName (query: SelectQuery) =
     columns
     from
 
-let columnFromReader index expression (reader: SQLiteDataReader) =
-  let value =
-    match reader.GetFieldType(index) with
-    | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
-    | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-    | fieldType when fieldType = typeof<System.String> ->
-        ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
-    | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
+let columnName =
+  function
+  | Constant (Integer value) -> string value
+  | Constant (String value) -> value
+  | Column (PlainColumn (ColumnName columnName))
+  | Column (AliasedColumn (ColumnName columnName, _)) -> columnName
+  | Function (functionName, _expression) -> functionName
+  | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> name
 
-  let columnName =
-    match expression with
-    | Constant (Integer value) -> string value
-    | Constant (String value) -> value
-    | Column (PlainColumn (ColumnName columnName))
-    | Column (AliasedColumn (ColumnName columnName, _)) -> columnName
-    | Function (functionName, _expression) -> functionName
-    | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> name
+let readValue index (reader: SQLiteDataReader) =
+  match reader.GetFieldType(index) with
+  | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
+  | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
+  | fieldType when fieldType = typeof<System.String> ->
+      ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
+  | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
 
-  { ColumnName = columnName; ColumnValue = value }
 
 let readQueryResults connection aidColumnName (query: SelectQuery) =
   asyncResult {
@@ -186,22 +175,17 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
 
-      let fakeAidColumnExpression = Column(PlainColumn aidColumnName)
-
-      let columnConverter = fakeAidColumnExpression :: query.Expressions |> List.mapi (columnFromReader)
-
       try
         let reader = command.ExecuteReader()
 
         return
           seq {
             while reader.Read() do
-              match columnConverter |> List.map (fun c -> c reader) with
-              | [] -> failwith "Can't happen. List is never empty since we add the AID column expression"
-              | aidColumn :: row ->
-                  let row: AnonymizableRow = { AidValues = Set.ofList [ aidColumn.ColumnValue ]; Columns = row }
+              let aidValue = readValue 0 reader
+              let rowValues = [ 1 .. reader.FieldCount - 1 ] |> List.map (fun index -> readValue index reader)
 
-                  yield row
+              let row = { AidValues = Set.ofList [ aidValue ]; RowValues = rowValues }
+              yield row
           }
       with exn -> return! Error(ExecutionError exn.Message)
   }
@@ -217,5 +201,8 @@ let executeSelect (connection: SQLiteConnection) anonymizationParams query =
           readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
           |> AsyncResult.map Seq.toList
 
-        return ResultTable(Anonymizer.anonymize anonymizationParams rawRows)
+        let rows = Anonymizer.anonymize anonymizationParams rawRows
+        let columns = query.Expressions |> List.map columnName
+
+        return { Columns = columns; Rows = rows }
   }
