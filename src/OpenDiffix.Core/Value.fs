@@ -34,7 +34,5 @@ module Value =
           | Null, Null -> 0
           | Null, _ -> nullsValue
           | _, Null -> -nullsValue
-          | Float x, Integer y -> directionCoefficient * Operators.compare x (float y)
-          | Integer x, Float y -> directionCoefficient * Operators.compare (float x) y
           | x, y -> directionCoefficient * Operators.compare x y
     }
