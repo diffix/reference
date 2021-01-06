@@ -29,7 +29,7 @@ and SelectQuery =
     GroupBy: Expression list
     GroupingSets: GroupingSet list
     Having: Expression
-    OrderBy: Expression list
+    OrderBy: OrderByExpression list
   }
 
 and SelectFrom =
