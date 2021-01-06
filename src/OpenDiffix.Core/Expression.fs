@@ -103,12 +103,11 @@ module DefaultAggregates =
 
   let count _ctx (values: AggregateArgs) =
     values
-    |> Seq.filter
+    |> Seq.sumBy
          (function
-         | [ Null ] -> false
-         | [ _ ] -> true
+         | [ Null ] -> 0
+         | [ _ ] -> 1
          | _ -> invalidOverload "count")
-    |> Seq.length
     |> Integer
 
 module Expression =
