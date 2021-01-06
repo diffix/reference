@@ -51,29 +51,19 @@ type ColumnValueJson =
 type QueryResultJson =
   static member Encoder (requestParams: RequestParams) (queryResult: QueryResult) =
     match queryResult with
-    | ResultTable rows ->
-        let encodeColumnNames columns =
-          columns
-          |> List.map (fun column -> Encode.string column.ColumnName)
-          |> Encode.list
-
-        let columnNames =
-          match List.tryHead rows with
-          | Some (AnonymizableRow anonymizableRow) -> encodeColumnNames anonymizableRow.Columns
-          | Some (NonPersonalRow nonPersonalRow) -> encodeColumnNames nonPersonalRow.Columns
-          | None -> Encode.list []
-
-        let encodeColumns columns =
-          columns
-          |> List.map (fun column -> ColumnValueJson.Encoder column.ColumnValue)
-          |> Encode.list
+    | { Rows = rows; Columns = columns } ->
+        let columnNames = columns |> List.map Encode.string |> Encode.list
 
         let values =
           rows
-          |> List.map
-               (function
-               | AnonymizableRow anonymizableRow -> encodeColumns anonymizableRow.Columns
-               | NonPersonalRow nonPersonalRow -> encodeColumns nonPersonalRow.Columns)
+          |> List.map (fun row ->
+            row
+            |> List.map
+                 (function
+                 | StringValue value -> Encode.string value
+                 | IntegerValue value -> Encode.int value)
+            |> Encode.list
+          )
           |> Encode.list
 
         Encode.object [
