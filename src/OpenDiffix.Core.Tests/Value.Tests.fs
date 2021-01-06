@@ -23,12 +23,6 @@ module ComparerTests =
     |> should equal [ Integer 12; Integer 9; Integer 5; Integer 3; Integer -4 ]
 
   [<Fact>]
-  let ``Compares floats and integers`` () =
-    [ Integer 4; Float 3.5; Integer 3; Float 3.0; Integer 2 ]
-    |> sort Ascending NullsFirst
-    |> should equal [ Integer 2; Integer 3; Float 3.0; Float 3.5; Integer 4 ]
-
-  [<Fact>]
   let ``Nulls first in ascending order`` () =
     [ Integer 10; Null; Integer 1; Null; Integer 5 ]
     |> sort Ascending NullsFirst
