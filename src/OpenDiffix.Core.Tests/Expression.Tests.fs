@@ -101,52 +101,85 @@ module DefaultAggregatorsTests =
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
-module ExpressionTests =
-  let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Float floatValue |]
+let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Float floatValue |]
 
-  let testRow = makeRow "Some text" 7 0.25
+let testRow = makeRow "Some text" 7 0.25
 
-  let testRows =
-    makeRows
-      (String, Integer, Float)
-      [ //
-        "row1", 1, 1.5
-        "row1", 2, 2.5
-        "row2", 3, 3.5
-        "row2", 4, 4.5
-      ]
+let testRows =
+  makeRows
+    (String, Integer, Float)
+    [ //
+      "row1", 1, 1.5
+      "row1", 2, 2.5
+      "row2", 3, 3.5
+      "row2", 4, 4.5
+    ]
 
-  let eval expr = Expression.evaluate ctx testRow expr
+let eval expr = Expression.evaluate ctx testRow expr
 
-  let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
+let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
 
-  [<Fact>]
-  let evaluate () =
-    // select val_int + 3
-    eval (Function("+", [ ColumnReference 1; Constant(Integer 3) ], Scalar))
-    |> should equal (Integer 10)
+[<Fact>]
+let evaluate () =
+  // select val_int + 3
+  eval (Function("+", [ ColumnReference 1; Constant(Integer 3) ], Scalar))
+  |> should equal (Integer 10)
 
-    // select val_str
-    eval (ColumnReference 0) |> should equal (String "Some text")
+  // select val_str
+  eval (ColumnReference 0) |> should equal (String "Some text")
 
-  [<Fact>]
-  let evaluateAggregated () =
-    // select sum(val_float - val_int)
-    evalAggr
-      (Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate))
-    |> should equal (Float 2.0)
+[<Fact>]
+let evaluateAggregated () =
+  // select sum(val_float - val_int)
+  evalAggr
+    (Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate))
+  |> should equal (Float 2.0)
 
-    // select count(*)
-    evalAggr (Function("count", [ Constant(Unit) ], Expression.defaultAggregate))
-    |> should equal (Integer 4)
+  // select count(*)
+  evalAggr (Function("count", [ Constant(Unit) ], Expression.defaultAggregate))
+  |> should equal (Integer 4)
 
-    // select count(1)
-    evalAggr (Function("count", [ Constant(Integer 1) ], Expression.defaultAggregate))
-    |> should equal (Integer 4)
+  // select count(1)
+  evalAggr (Function("count", [ Constant(Integer 1) ], Expression.defaultAggregate))
+  |> should equal (Integer 4)
 
-    // select count(distinct val_str)
-    evalAggr (Function("count", [ ColumnReference 0 ], Expression.distinctAggregate))
-    |> should equal (Integer 2)
+  // select count(distinct val_str)
+  evalAggr (Function("count", [ ColumnReference 0 ], Expression.distinctAggregate))
+  |> should equal (Integer 2)
 
-    // select val_str
-    (fun () -> evalAggr (ColumnReference 0) |> ignore) |> shouldFail
+  // select val_str
+  (fun () -> evalAggr (ColumnReference 0) |> ignore) |> shouldFail
+
+[<Fact>]
+let sortRows () =
+  [
+    [| String "b"; Integer 1 |]
+    [| String "b"; Integer 2 |]
+    [| String "b"; Null |]
+    [| String "a"; Integer 1 |]
+    [| String "a"; Integer 2 |]
+    [| String "a"; Null |]
+    [| Null; Integer 1 |]
+    [| Null; Integer 2 |]
+    [| Null; Null |]
+  ]
+  |> Expression.sortRows
+       ctx
+       [ //
+         ColumnReference 0, Ascending, NullsLast
+         ColumnReference 1, Descending, NullsFirst
+       ]
+  |> List.ofSeq
+  |> should
+       equal
+       [
+         [| String "a"; Null |]
+         [| String "a"; Integer 2 |]
+         [| String "a"; Integer 1 |]
+         [| String "b"; Null |]
+         [| String "b"; Integer 2 |]
+         [| String "b"; Integer 1 |]
+         [| Null; Null |]
+         [| Null; Integer 2 |]
+         [| Null; Integer 1 |]
+       ]
