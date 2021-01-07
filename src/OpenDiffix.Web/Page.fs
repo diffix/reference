@@ -105,11 +105,12 @@ let queryContainer databases (queryRequest: QueryRequest) =
              ))
         ]
         label [ _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400" ] [
+          str "AID "
           input [
             _type "text"
             _name "AidColumn"
-            _class "rounded-md border px-2 py-1"
-            _placeholder "Name of the AID column"
+            _class "rounded-md border px-2 py-1 w-1/3"
+            _placeholder "table_name.column_name"
             _value (queryRequest.Anonymization.AidColumns |> List.tryHead |> Option.defaultValue "")
           ]
         ]
@@ -159,6 +160,7 @@ open System.IO
 
 let availableDbs path =
   Directory.GetFiles path
+  |> Array.filter (fun fileName -> fileName.EndsWith ".sqlite")
   |> Array.map Path.GetFileName
   |> Array.sortBy id
   |> Array.toList

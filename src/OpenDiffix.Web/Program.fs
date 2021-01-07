@@ -14,7 +14,7 @@ let uploadPassword =
 
 let dbPath =
 #if DEBUG
-  __SOURCE_DIRECTORY__ + "/../../dbs"
+  __SOURCE_DIRECTORY__ + "/../../data"
 #else
   "/data/"
 #endif

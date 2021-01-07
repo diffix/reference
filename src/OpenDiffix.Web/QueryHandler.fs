@@ -12,15 +12,19 @@ open Types
 
 let availableDbs path =
   Directory.GetFiles path
+  |> Array.filter (fun fileName -> fileName.EndsWith ".sqlite")
   |> Array.map (fun dbPathName -> Path.GetFileName dbPathName, dbPathName)
   |> Array.sortBy fst
   |> Array.toList
 
-let private getAidColumnOption (userRequest: QueryRequest) =
+let private getTableSettings (userRequest: QueryRequest) =
   result {
     match userRequest.Anonymization.AidColumns with
-    | [ aidColumn ] -> return Some aidColumn
-    | [] -> return None
+    | [ aidColumn ] ->
+        match aidColumn.Split '.' with
+        | [| tableName; columnName |] -> return Map [ tableName, { AidColumns = [ columnName ] } ]
+        | _ -> return! Error(InvalidRequest "AID doesn't have the format `table_name.column_name`")
+    | [] -> return Map []
     | _ -> return! Error(InvalidRequest "A maximum of one AID column is supported at present")
   }
 
@@ -32,14 +36,14 @@ let findDatabase pathToDbs database =
 
 let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
   result {
-    let! aidColumnOption = getAidColumnOption userRequest
+    let! tableSettings = getTableSettings userRequest
     let! dbPath = findDatabase pathToDbs userRequest.Database
 
     return
       {
         AnonymizationParams =
           {
-            AidColumnOption = aidColumnOption
+            TableSettings = tableSettings
             Seed = userRequest.Anonymization.Seed
             LowCountSettings = userRequest.Anonymization.LowCountFiltering
           }
