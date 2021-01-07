@@ -68,7 +68,7 @@ let apiHandleQuery pathToDbs: HttpHandler =
 
           let response =
             match result with
-            | Ok result -> Encode.toString 2 (QueryResultJson.Encoder requestParams result)
+            | Ok result -> Encode.toString 2 (QueryResultJson.Encoder result)
             | Error error -> Encode.toString 2 (QueryErrorJson.Encoder error)
 
           return!

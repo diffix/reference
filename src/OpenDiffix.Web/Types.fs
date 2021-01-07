@@ -16,32 +16,6 @@ type LowCountSettingsJson =
       }
     )
 
-  static member Encoder(settings: LowCountSettings) =
-    Encode.object [ "threshold", Encode.float settings.Threshold; "std_dev", Encode.float settings.StdDev ]
-
-type AnonymizationParamsJson =
-  static member Encoder(anonymizationParams: AnonymizationParams) =
-    Encode.object [
-      "anonymization_parameters",
-      Encode.object [
-        "aid_columns",
-        Encode.list (
-          anonymizationParams.AidColumnOption
-          |> Option.map (fun aid -> [ Encode.string aid ])
-          |> Option.defaultValue []
-        )
-        "seed", Encode.int anonymizationParams.Seed
-        "low_count",
-        anonymizationParams.LowCountSettings
-        |> Option.map LowCountSettingsJson.Encoder
-        |> Option.defaultValue (Encode.bool false)
-      ]
-    ]
-
-type RequestParamsJson =
-  static member Encoder(requestParams: RequestParams) =
-    Encode.object [ "anonymization_parameters", AnonymizationParamsJson.Encoder requestParams.AnonymizationParams ]
-
 type ColumnValueJson =
   static member Encoder(columnValue: ColumnValue) =
     match columnValue with
@@ -49,7 +23,7 @@ type ColumnValueJson =
     | StringValue strValue -> Encode.string strValue
 
 type QueryResultJson =
-  static member Encoder (requestParams: RequestParams) (queryResult: QueryResult) =
+  static member Encoder(queryResult: QueryResult) =
     match queryResult with
     | { Rows = rows; Columns = columns } ->
         let columnNames = columns |> List.map Encode.string |> Encode.list
@@ -66,12 +40,7 @@ type QueryResultJson =
           )
           |> Encode.list
 
-        Encode.object [
-          "success", Encode.bool true
-          "column_names", columnNames
-          "values", values
-          "anonymization", RequestParamsJson.Encoder requestParams
-        ]
+        Encode.object [ "success", Encode.bool true; "column_names", columnNames; "values", values ]
 
 type QueryErrorJson =
   static member Encoder(queryResult: QueryError) =
