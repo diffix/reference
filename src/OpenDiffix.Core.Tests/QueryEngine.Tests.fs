@@ -9,7 +9,11 @@ let runQuery query =
     {
       AnonymizationParams =
         {
-          AidColumnOption = Some "id"
+          TableSettings =
+            Map [
+              "customers", { AidColumns = [ "id" ] } //
+              "purchases", { AidColumns = [ "cid" ] } //
+            ]
           Seed = 1
           LowCountSettings = Some LowCountSettings.Defaults
         }

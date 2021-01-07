@@ -8,9 +8,11 @@ type LowCountSettings =
 
   static member Defaults = { Threshold = 5.; StdDev = 2. }
 
+type TableSettings = { AidColumns: string list }
+
 type AnonymizationParams =
   {
-    AidColumnOption: string option
+    TableSettings: Map<string, TableSettings>
     Seed: int
     LowCountSettings: LowCountSettings option
   }

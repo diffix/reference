@@ -190,13 +190,16 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       with exn -> return! Error(ExecutionError exn.Message)
   }
 
+let extractAidColumns anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =
+  match anonymizationParams.TableSettings.TryFind(tableName) with
+  | None -> []
+  | Some tableSettings -> tableSettings.AidColumns
 
 let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {
-    match anonymizationParams.AidColumnOption with
-    | None
-    | Some "" -> return! Error(ExecutionError "An AID column name is required")
-    | Some aidColumn ->
+    match extractAidColumns anonymizationParams query with
+    | [] -> return! Error(ExecutionError "An AID column name is required")
+    | [ aidColumn ] ->
         let! rawRows =
           readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
           |> AsyncResult.map Seq.toList
@@ -205,4 +208,5 @@ let executeSelect (connection: SQLiteConnection) anonymizationParams query =
         let columns = query.Expressions |> List.map columnName
 
         return { Columns = columns; Rows = rows }
+    | _ -> return! Error(ExecutionError "Multiple AID column names aren't supported yet")
   }
