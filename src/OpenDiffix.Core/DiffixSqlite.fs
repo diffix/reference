@@ -153,12 +153,14 @@ let columnName =
   | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> "count"
 
 let readValue index (reader: SQLiteDataReader) =
-  match reader.GetFieldType(index) with
-  | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
-  | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-  | fieldType when fieldType = typeof<System.String> ->
-      ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
-  | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
+  if reader.IsDBNull index then
+    NullValue
+  else
+    match reader.GetFieldType(index) with
+    | fieldType when fieldType = typeof<Int32> -> IntegerValue(reader.GetInt32 index)
+    | fieldType when fieldType = typeof<Int64> -> IntegerValue(int (reader.GetInt64 index))
+    | fieldType when fieldType = typeof<String> -> StringValue(reader.GetString index)
+    | unknownType -> StringValue(sprintf "Unknown type: %A" unknownType)
 
 
 let readQueryResults connection aidColumnName (query: SelectQuery) =

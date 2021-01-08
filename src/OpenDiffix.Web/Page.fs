@@ -119,10 +119,11 @@ let queryContainer databases (queryRequest: QueryRequest) =
     ]
   ]
 
-let valueToStrNode =
+let valueToString =
   function
-  | ColumnValue.IntegerValue v -> str (sprintf "%i" v)
-  | ColumnValue.StringValue v -> str v
+  | IntegerValue v -> sprintf "%i" v
+  | StringValue v -> v
+  | NullValue -> "NULL"
 
 let renderResults: QueryResult -> XmlNode =
   function
@@ -144,7 +145,7 @@ let renderResults: QueryResult -> XmlNode =
               yield
                 tr [ _class "pt-2 odd:bg-gray-200" ] [
                   for value in row do
-                    yield td [] [ valueToStrNode value ]
+                    yield td [] [ value |> valueToString |> str ]
                 ]
           ]
         ]

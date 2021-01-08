@@ -30,6 +30,7 @@ type Columns = ColumnName list
 type ColumnValue =
   | IntegerValue of int
   | StringValue of string
+  | NullValue
 
 type NonPersonalRow = ColumnValue list
 type NonPersonalRows = NonPersonalRow list

@@ -21,6 +21,7 @@ type ColumnValueJson =
     match columnValue with
     | IntegerValue intValue -> Encode.int intValue
     | StringValue strValue -> Encode.string strValue
+    | NullValue -> Encode.nil
 
 type QueryResultJson =
   static member Encoder(queryResult: QueryResult) =
@@ -30,14 +31,7 @@ type QueryResultJson =
 
         let values =
           rows
-          |> List.map (fun row ->
-            row
-            |> List.map
-                 (function
-                 | StringValue value -> Encode.string value
-                 | IntegerValue value -> Encode.int value)
-            |> Encode.list
-          )
+          |> List.map (fun row -> row |> List.map ColumnValueJson.Encoder |> Encode.list)
           |> Encode.list
 
         Encode.object [ "success", Encode.bool true; "column_names", columnNames; "values", values ]
