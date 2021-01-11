@@ -9,7 +9,11 @@ let runQuery query =
     {
       AnonymizationParams =
         {
-          AidColumnOption = Some "id"
+          TableSettings =
+            Map [
+              "customers", { AidColumns = [ "id" ] } //
+              "purchases", { AidColumns = [ "cid" ] } //
+            ]
           Seed = 1
           LowCountSettings = Some LowCountSettings.Defaults
         }
@@ -57,6 +61,23 @@ let ``SELECT city FROM customers`` () =
 
   let queryResult =
     match runQuery "SELECT city FROM customers" with
+    | Ok result ->
+        let sortedRows = result.Rows |> List.sort
+        { result with Rows = sortedRows } |> Ok
+    | other -> other
+
+  Assert.Equal(expected, queryResult)
+
+[<Fact>]
+let ``SELECT pid FROM purchases`` () =
+  let rows =
+    [ 1, 67; 2, 58; 3, 64; 4, 63; 5, 70; 6, 59; 7, 58; 8, 64 ]
+    |> List.collect (fun (pid, occurrences) -> List.replicate occurrences [ IntegerValue pid ])
+
+  let expected = { Columns = [ "pid" ]; Rows = rows } |> Ok
+
+  let queryResult =
+    match runQuery "SELECT pid FROM purchases" with
     | Ok result ->
         let sortedRows = result.Rows |> List.sort
         { result with Rows = sortedRows } |> Ok

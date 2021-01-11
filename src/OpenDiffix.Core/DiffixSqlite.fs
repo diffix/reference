@@ -153,12 +153,14 @@ let columnName =
   | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> "count"
 
 let readValue index (reader: SQLiteDataReader) =
-  match reader.GetFieldType(index) with
-  | fieldType when fieldType = typeof<Int32> -> ColumnValue.IntegerValue(reader.GetInt32 index)
-  | fieldType when fieldType = typeof<Int64> -> ColumnValue.IntegerValue(int (reader.GetInt64 index))
-  | fieldType when fieldType = typeof<System.String> ->
-      ColumnValue.StringValue((if reader.IsDBNull index then null else reader.GetString index))
-  | unknownType -> ColumnValue.StringValue(sprintf "Unknown type: %A" unknownType)
+  if reader.IsDBNull index then
+    NullValue
+  else
+    match reader.GetFieldType(index) with
+    | fieldType when fieldType = typeof<Int32> -> IntegerValue(reader.GetInt32 index)
+    | fieldType when fieldType = typeof<Int64> -> IntegerValue(int (reader.GetInt64 index))
+    | fieldType when fieldType = typeof<String> -> StringValue(reader.GetString index)
+    | unknownType -> StringValue(sprintf "Unknown type: %A" unknownType)
 
 
 let readQueryResults connection aidColumnName (query: SelectQuery) =
@@ -190,19 +192,23 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       with exn -> return! Error(ExecutionError exn.Message)
   }
 
+let extractAidColumn anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =
+  match anonymizationParams.TableSettings.TryFind(tableName) with
+  | None
+  | Some { AidColumns = [] } -> Error(ExecutionError "An AID column name is required")
+  | Some { AidColumns = [ column ] } -> Ok column
+  | Some _ -> Error(ExecutionError "Multiple AID column names aren't supported yet")
 
 let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {
-    match anonymizationParams.AidColumnOption with
-    | None
-    | Some "" -> return! Error(ExecutionError "An AID column name is required")
-    | Some aidColumn ->
-        let! rawRows =
-          readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
-          |> AsyncResult.map Seq.toList
+    let! aidColumn = extractAidColumn anonymizationParams query
 
-        let rows = Anonymizer.anonymize anonymizationParams rawRows
-        let columns = query.Expressions |> List.map columnName
+    let! rawRows =
+      readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
+      |> AsyncResult.map Seq.toList
 
-        return { Columns = columns; Rows = rows }
+    let rows = Anonymizer.anonymize anonymizationParams rawRows
+    let columns = query.Expressions |> List.map columnName
+
+    return { Columns = columns; Rows = rows }
   }
