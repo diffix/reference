@@ -150,7 +150,7 @@ let columnName =
   | Column (PlainColumn (ColumnName columnName))
   | Column (AliasedColumn (ColumnName columnName, _)) -> columnName
   | Function (functionName, _expression) -> functionName
-  | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> "count"
+  | AggregateFunction (AnonymizedCount (Distinct (ColumnName _name))) -> "count"
 
 let readValue index (reader: SQLiteDataReader) =
   match reader.GetFieldType(index) with
