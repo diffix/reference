@@ -192,23 +192,23 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       with exn -> return! Error(ExecutionError exn.Message)
   }
 
-let extractAidColumns anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =
+let extractAidColumn anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =
   match anonymizationParams.TableSettings.TryFind(tableName) with
-  | None -> []
-  | Some tableSettings -> tableSettings.AidColumns
+  | None
+  | Some { AidColumns = [] } -> Error(ExecutionError "An AID column name is required")
+  | Some { AidColumns = [ column ] } -> Ok column
+  | Some _ -> Error(ExecutionError "Multiple AID column names aren't supported yet")
 
 let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {
-    match extractAidColumns anonymizationParams query with
-    | [] -> return! Error(ExecutionError "An AID column name is required")
-    | [ aidColumn ] ->
-        let! rawRows =
-          readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
-          |> AsyncResult.map Seq.toList
+    let! aidColumn = extractAidColumn anonymizationParams query
 
-        let rows = Anonymizer.anonymize anonymizationParams rawRows
-        let columns = query.Expressions |> List.map columnName
+    let! rawRows =
+      readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
+      |> AsyncResult.map Seq.toList
 
-        return { Columns = columns; Rows = rows }
-    | _ -> return! Error(ExecutionError "Multiple AID column names aren't supported yet")
+    let rows = Anonymizer.anonymize anonymizationParams rawRows
+    let columns = query.Expressions |> List.map columnName
+
+    return { Columns = columns; Rows = rows }
   }
