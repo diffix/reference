@@ -39,7 +39,7 @@ let ``SHOW columns FROM customers`` () =
       "age", "integer"
       "city", "string"
     ]
-    |> List.sortBy (fun (name, _type) -> name)
+    |> List.sortBy fst
     |> List.map (fun (name, dataType) -> [ StringValue name; StringValue dataType ])
 
   let expected = { Columns = [ "name"; "type" ]; Rows = rows } |> Ok
