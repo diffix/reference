@@ -79,7 +79,7 @@ let dbSchema (connection: SQLiteConnection) =
       return! (Error(ExecutionError exn.Message))
   }
 
-let getTables (connection: SQLiteConnection) =
+let private getTables (connection: SQLiteConnection) =
   asyncResult {
     let! schema = dbSchema connection
 
@@ -90,7 +90,7 @@ let getTables (connection: SQLiteConnection) =
     return { Columns = columns; Rows = rows }
   }
 
-let getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
+let private getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
   asyncResult {
     let! schema = dbSchema connection
     let columns = [ "name"; "type" ]
@@ -190,6 +190,10 @@ let readQueryResults connection aidColumnName (query: SelectQuery) =
       with exn -> return! Error(ExecutionError exn.Message)
   }
 
+let executeShow (connection: SQLiteConnection) =
+  function
+  | ShowQuery.Tables -> getTables connection
+  | ShowQuery.Columns tableName -> getColumnsFromTable connection tableName
 
 let executeSelect (connection: SQLiteConnection) anonymizationParams query =
   asyncResult {

@@ -21,9 +21,9 @@ module Definitions =
   module ShowQueries =
     let identifiersColumnsInTable =
       skipWordsCI [ "COLUMNS"; "FROM" ] >>. (anyWord |>> TableName <?> "table name")
-      |>> ShowColumnsFromTable
+      |>> fun tableName -> Show (ShowQuery.Columns tableName)
 
-    let identifierTables = stringCIReturn "TABLES" ShowTables
+    let identifierTables = stringCIReturn "TABLES" (Show ShowQuery.Tables)
 
     let parse =
       skipStringCI "SHOW"

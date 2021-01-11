@@ -27,10 +27,13 @@ type SelectQuery = { Expressions: Expression list; From: From }
 
 type AggregateQuery = { Expressions: Expression list; From: From; GroupBy: ColumnName list }
 
+[<RequireQualifiedAccess>]
+type ShowQuery =
+  | Tables
+  | Columns of TableName
+
 type Query =
-  // Exploration queries
-  | ShowTables
-  | ShowColumnsFromTable of TableName
+  | Show of ShowQuery
   // Data extraction
   | SelectQuery of SelectQuery
   | AggregateQuery of AggregateQuery

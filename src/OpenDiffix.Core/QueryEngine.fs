@@ -12,8 +12,7 @@ module QueryEngine =
 
       let! result =
         match queryAst with
-        | ParserTypes.ShowTables -> DiffixSqlite.getTables connection
-        | ParserTypes.ShowColumnsFromTable table -> DiffixSqlite.getColumnsFromTable connection table
+        | ParserTypes.Show query -> DiffixSqlite.executeShow connection query
         | ParserTypes.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
         | ParserTypes.AggregateQuery _query ->
             asyncResult { return! Error(InvalidRequest "Aggregate queries aren't supported yet") }

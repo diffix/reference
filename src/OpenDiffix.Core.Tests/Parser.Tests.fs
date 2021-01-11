@@ -70,11 +70,11 @@ let ``Parses SELECT by itself`` () =
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
-let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") ShowTables
+let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (Show ShowQuery.Tables)
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (Parser.parse "show columns FROM bar") (ShowColumnsFromTable(TableName "bar"))
+  assertOkEqual (Parser.parse "show columns FROM bar") (Show (ShowQuery.Columns(TableName "bar")))
 
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
@@ -82,7 +82,7 @@ let ``Not sensitive to whitespace`` () =
     (Parser.parse
       "   show
                    tables   ")
-    ShowTables
+    (Show ShowQuery.Tables)
 
 [<Fact>]
 let ``Parse SELECT query with columns and table`` () =
