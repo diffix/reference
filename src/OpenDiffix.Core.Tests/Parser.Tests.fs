@@ -11,7 +11,8 @@ let parse p string =
   | ParserResult.Success (value, _, _) -> Ok value
   | ParserResult.Failure (error, _, _) -> Error error
 
-let plainColumn = ColumnName >> PlainColumn >> Column
+let distinct = Term "distinct"
+let star = Operator Star
 
 [<Fact>]
 let ``Parses words`` () =
@@ -23,30 +24,54 @@ let ``Parses words`` () =
   assertOkEqual (parse anyWord "hello_12") "hello_12" // Allows underscores
 
 [<Fact>]
+let ``Parses terms`` () =
+  assertOkEqual (parse SelectQueries.term "+") (Expression.Operator Operator.Plus)
+  assertOkEqual (parse SelectQueries.term "-") (Expression.Operator Operator.Minus)
+  assertOkEqual (parse SelectQueries.term "*") (Expression.Operator Operator.Star)
+  assertOkEqual (parse SelectQueries.term "/") (Expression.Operator Operator.Slash)
+  assertOkEqual (parse SelectQueries.term "^") (Expression.Operator Operator.Hat)
+  assertOkEqual (parse SelectQueries.term "not") (Expression.Operator Operator.Not)
+  assertOkEqual (parse SelectQueries.term "false") (Expression.Constant (Boolean false))
+  assertOkEqual (parse SelectQueries.term "true") (Expression.Constant (Boolean true))
+  assertOkEqual (parse SelectQueries.term "1") (Expression.Constant (Integer 1))
+  assertOkEqual (parse SelectQueries.term "hello") (Expression.Term "hello")
+
+[<Fact>]
 let ``Parses columns`` () =
-  assertOkEqual (parse SelectQueries.expressions "hello") [ plainColumn "hello" ]
-
-  assertOkEqual (parse SelectQueries.expressions "hello, world") [ plainColumn "hello"; plainColumn "world" ]
-
-  assertOkEqual (parse SelectQueries.expressions "hello,world") [ plainColumn "hello"; plainColumn "world" ]
-
-  assertOkEqual (parse SelectQueries.expressions "hello ,world") [ plainColumn "hello"; plainColumn "world" ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello") [ Term "hello" ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello, world") [ Term "hello"; Term "world" ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello,world") [ Term "hello"; Term "world" ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello ,world") [ Term "hello"; Term "world" ]
 
 [<Fact>]
 let ``Parses functions`` () =
-  assertOkEqual (parse SelectQueries.expressions "hello(world)") [ Function("hello", plainColumn "world") ]
-  assertOkEqual (parse SelectQueries.expressions "hello ( world )") [ Function("hello", plainColumn "world") ]
-
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello(world)") [ Function("hello", [Term "world"]) ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "hello ( world )") [ Function("hello", [Term "world"]) ]
   assertOkEqual
-    (parse SelectQueries.expressions "hello(world), hello(moon)")
-    [ Function("hello", plainColumn "world"); Function("hello", plainColumn "moon") ]
+    (parse SelectQueries.commaSepExpressions "hello(world), hello(moon)")
+    [ Function("hello", [Term "world"]); Function("hello", [Term "moon"]) ]
+
+[<Fact>]
+let ``Parses function args`` () =
+  assertOkEqual (parse SelectQueries.spaceSepUnaliasedExpressions "* distinct foo")
+    [star; distinct; Term "foo"]
+
+[<Fact>]
+let ``Parses count(*)`` () =
+  let expected = Function("count", [star])
+  assertOkEqual (parse SelectQueries.commaSepExpressions "count(*)") [ expected ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "count( *     )") [ expected ]
 
 [<Fact>]
 let ``Parses count(distinct col)`` () =
-  let expected = AggregateFunction(AnonymizedCount(Distinct(ColumnName "col")))
+  let expected = Function("count", [distinct; Term "col"])
+  assertOkEqual (parse SelectQueries.commaSepExpressions "count(distinct col)") [ expected ]
+  assertOkEqual (parse SelectQueries.commaSepExpressions "count ( distinct     col )") [ expected ]
 
-  assertOkEqual (parse SelectQueries.expressions "count(distinct col)") [ expected ]
-  assertOkEqual (parse SelectQueries.expressions "count ( distinct     col )") [ expected ]
+[<Fact>]
+let ``Parses complex functions`` () =
+  let expected = Function("length", [Function("sum", [Term "rain"; (Operator Plus); Term "sun"])])
+  assertOkEqual (parse SelectQueries.commaSepExpressions "length(sum(rain + sun))") [ expected ]
 
 [<Fact>]
 let ``Parses optional semicolon`` () =
@@ -55,16 +80,15 @@ let ``Parses optional semicolon`` () =
 
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
-  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ ColumnName "a"; ColumnName "b"; ColumnName "c" ]
-
-  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ ColumnName "a" ]
+  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ Term "a"; Term "b"; Term "c" ]
+  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ Term "a" ]
   assertError (parse SelectQueries.groupBy "GROUP BY")
 
 [<Fact>]
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse SelectQueries.parse "SELECT col FROM table")
-    (SelectQuery { Expressions = [ plainColumn "col" ]; From = Table(TableName "table") })
+    (SelectQuery { Expressions = [ Term "col" ]; From = Table "table"; GroupBy = []})
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
@@ -74,7 +98,7 @@ let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (Sh
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (Parser.parse "show columns FROM bar") (Show (ShowQuery.Columns(TableName "bar")))
+  assertOkEqual (Parser.parse "show columns FROM bar") (Show (ShowQuery.Columns("bar")))
 
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
@@ -90,16 +114,18 @@ let ``Parse SELECT query with columns and table`` () =
     (Parser.parse "SELECT col1, col2 FROM table")
     (SelectQuery
       {
-        Expressions = [ plainColumn "col1"; plainColumn "col2" ]
-        From = Table(TableName "table")
+        Expressions = [ Term "col1"; Term "col2" ]
+        From = Table "table"
+        GroupBy = []
       })
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
     (SelectQuery
       {
-        Expressions = [ plainColumn "col1"; plainColumn "col2" ]
-        From = Table(TableName "table")
+        Expressions = [ Term "col1"; Term "col2" ]
+        From = Table "table"
+        GroupBy = []
       })
 
 [<Fact>]
@@ -111,9 +137,9 @@ let ``Parse aggregate query`` () =
          FROM table
          GROUP BY col1
          """)
-    (AggregateQuery
+    (SelectQuery
       {
-        Expressions = [ plainColumn "col1"; Distinct(ColumnName "aid") |> AnonymizedCount |> AggregateFunction ]
-        From = Table(TableName "table")
-        GroupBy = [ ColumnName "col1" ]
+        Expressions = [ Term "col1"; Function("count", [distinct; Term "aid"]) ]
+        From = Table "table"
+        GroupBy = [ Term "col1" ]
       })

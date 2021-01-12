@@ -3,37 +3,36 @@ namespace OpenDiffix.Core.ParserTypes
 type Constant =
   | Integer of int
   | String of string
+  | Boolean of bool
 
-type ColumnName = ColumnName of string
-type TableName = TableName of string
-
-type ColumnType =
-  | PlainColumn of ColumnName
-  | AliasedColumn of ColumnName * string
-
-type AggregateFunctionArgs = Distinct of ColumnName
-
-type AggregateFunction = AnonymizedCount of AggregateFunctionArgs
+type Operator =
+  | Not   // not
+  | Plus  // +
+  | Minus // -
+  | Star  // *
+  | Slash // /
+  | Hat   // ^
 
 type Expression =
+  | Operator of Operator
   | Constant of Constant
-  | Column of ColumnType
-  | Function of (string * Expression)
-  | AggregateFunction of AggregateFunction
+  | Term of termName: string
+  | AliasedTerm of term: Expression * aliasName: string
+  | Function of functionName: string * Expression list
 
-type From = Table of TableName
+type From = Table of tableName: string
 
-type SelectQuery = { Expressions: Expression list; From: From }
-
-type AggregateQuery = { Expressions: Expression list; From: From; GroupBy: ColumnName list }
+type SelectQuery = {
+  Expressions: Expression list
+  From: From
+  GroupBy: Expression list
+}
 
 [<RequireQualifiedAccess>]
 type ShowQuery =
   | Tables
-  | Columns of TableName
+  | Columns of tableName: string
 
 type Query =
   | Show of ShowQuery
-  // Data extraction
   | SelectQuery of SelectQuery
-  | AggregateQuery of AggregateQuery

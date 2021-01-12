@@ -10,17 +10,21 @@ module Definitions =
     .>> spaces
     |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
 
+  let stringConstant = manySatisfy (fun c -> c <> '"')
+
   let skipWordSpacesCI word = skipStringCI word >>. spaces
 
   let skipWordsCI words = words |> List.map (skipWordSpacesCI) |> List.reduce (>>.)
 
   let inParenthesis p = pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
 
+  let inQuotes p = pchar '"' >>. spaces >>. p .>> pchar '"' .>> spaces
+
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   module ShowQueries =
     let identifiersColumnsInTable =
-      skipWordsCI [ "COLUMNS"; "FROM" ] >>. (anyWord |>> TableName <?> "table name")
+      skipWordsCI [ "COLUMNS"; "FROM" ] >>. (anyWord <?> "table name")
       |>> fun tableName -> Show (ShowQuery.Columns tableName)
 
     let identifierTables = stringCIReturn "TABLES" (Show ShowQuery.Tables)
@@ -31,35 +35,64 @@ module Definitions =
       >>. (identifierTables <|> identifiersColumnsInTable)
 
   module SelectQueries =
-    let columnName = anyWord .>> spaces |>> ColumnName
+    let charTo c v = satisfy (fun pc -> pc = c) |>> fun _ -> v
+    let parseNot = skipWordSpacesCI "not" |>> fun _ -> Not
+    let parsePlus = charTo '+' Plus
+    let parseMinus = charTo '-' Minus
+    let parseStar = charTo '*' Star
+    let parseSlash = charTo '/' Slash
+    let parseHat = charTo '^' Hat
 
-    let plainColumn = columnName |>> PlainColumn
+    let operator = choice [parseNot; parsePlus; parseMinus; parseStar; parseSlash; parseHat] |>> Expression.Operator
 
-    let column = plainColumn |>> Column
+    let constants =
+      choice [
+        attempt (pint32 .>> spaces |>> Constant.Integer)
+        attempt (inQuotes stringConstant |>> Constant.String)
+        choice [
+          pstringCI "true" |>> fun _ -> Boolean true
+          pstringCI "false" |>> fun _ -> Boolean false
+        ]
+      ]
+      |>> Constant
 
-    let table = anyWord |>> fun tableName -> Table(TableName tableName)
+    let term = choice [attempt constants; attempt operator; anyWord |>> Term] .>> spaces
 
-    let ``function`` = anyWord .>>. inParenthesis column |>> Function
+    let table = anyWord |>> Table
 
-    let distinctColumn = pstringCI "distinct" .>> spaces >>. columnName |>> Distinct
+    // Parsers are values, and as such cannot be made recursive.
+    // Instead we have to use a forward reference that allows ut so
+    // use the parser before it is defined.
+    let expression, expressionRef = createParserForwardedToRef()
+    let unaliasedExpression, unaliasedExpressionRef = createParserForwardedToRef()
 
-    let aggregate =
-      pstringCI "count" .>> spaces >>. inParenthesis distinctColumn
-      |>> AnonymizedCount
-      |>> AggregateFunction
+    // Note that since the expression parser itself consumes trailing spaces
+    // we do not use a sepBy1 or equivalent parser combinator here.
+    let spaceSepUnaliasedExpressions = many1 unaliasedExpression
 
-    let expressions = commaSeparated (choice [ aggregate; attempt ``function``; column ]) .>> spaces
+    let ``function`` = anyWord .>>. inParenthesis spaceSepUnaliasedExpressions |>> Function
 
-    let groupBy = skipWordsCI [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated columnName
+    do unaliasedExpressionRef := choice [ attempt ``function``; term ]
+
+    let alias =
+      skipWordSpacesCI "as" >>. anyWord
+
+    do expressionRef := unaliasedExpression .>>. opt alias
+                        |>> (function
+                            | expression, None -> expression
+                            | expression, Some alias -> AliasedTerm (expression, alias))
+
+    let commaSepExpressions = commaSeparated expression .>> spaces
+
+    let groupBy = skipWordsCI [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expression
 
     let parse =
-      skipWordSpacesCI "SELECT" >>. expressions .>> skipWordSpacesCI "FROM"
+      skipWordSpacesCI "SELECT" >>. commaSepExpressions .>> skipWordSpacesCI "FROM"
       .>>. table
       .>>. opt groupBy
       |>> function
-      | (columns, table), None -> SelectQuery { Expressions = columns; From = table }
-      | (columns, table), Some groupByColumns ->
-          AggregateQuery { Expressions = columns; From = table; GroupBy = groupByColumns }
+      | (columns, table), groupByColumnsOption ->
+        SelectQuery { Expressions = columns; From = table; GroupBy = groupByColumnsOption |> Option.defaultValue [] }
 
   let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
 

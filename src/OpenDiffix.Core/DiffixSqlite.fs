@@ -90,7 +90,7 @@ let private getTables (connection: SQLiteConnection) =
     return { Columns = columns; Rows = rows }
   }
 
-let private getColumnsFromTable (connection: SQLiteConnection) (TableName tableName) =
+let private getColumnsFromTable (connection: SQLiteConnection) tableName =
   asyncResult {
     let! schema = dbSchema connection
     let columns = [ "name"; "type" ]
@@ -113,19 +113,21 @@ let rec expressionToSql =
   function
   | Constant (Integer value) -> string value
   | Constant (String value) -> sprintf "'%s'" value
-  | Column (PlainColumn (ColumnName name)) -> name
-  | Column (AliasedColumn (ColumnName columnName, _aliasName)) -> columnName
-  | Function (functionName, subExpression) -> sprintf "%s(%s)" functionName (expressionToSql subExpression)
-  | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> sprintf "count(distinct %s)" name
+  | Term name -> name
+  | AliasedTerm (term, _aliasName) -> expressionToSql term
+  | Function (functionName, subExpressions) ->
+    let functionArgs =
+      subExpressions
+      |> List.map expressionToSql
+      |> List.reduceBack (sprintf "%s %s")
+    sprintf "%s(%s)" functionName  functionArgs
 
 let rec columnToSql index column = sprintf "%s as col%i" (expressionToSql column) index
 
-let tableName =
-  function
-  | Table (TableName tableName) -> tableName
+let tableName (Table name) = name
 
 let generateSqlQuery aidColumnName (query: SelectQuery) =
-  let aidColumn = Column(PlainColumn aidColumnName)
+  let aidColumn = Term aidColumnName
 
   let columns =
     aidColumn :: query.Expressions
@@ -143,14 +145,13 @@ let generateSqlQuery aidColumnName (query: SelectQuery) =
     columns
     from
 
-let columnName =
+let rec columnName =
   function
   | Constant (Integer value) -> string value
   | Constant (String value) -> value
-  | Column (PlainColumn (ColumnName columnName))
-  | Column (AliasedColumn (ColumnName columnName, _)) -> columnName
+  | Term termName -> termName
+  | AliasedTerm (term, _) -> columnName term
   | Function (functionName, _expression) -> functionName
-  | AggregateFunction (AnonymizedCount (Distinct (ColumnName _name))) -> "count"
 
 let readValue index (reader: SQLiteDataReader) =
   match reader.GetFieldType(index) with
@@ -202,7 +203,7 @@ let executeSelect (connection: SQLiteConnection) anonymizationParams query =
     | Some "" -> return! Error(ExecutionError "An AID column name is required")
     | Some aidColumn ->
         let! rawRows =
-          readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
+          readQueryResults connection aidColumn query
           |> AsyncResult.map Seq.toList
 
         let rows = Anonymizer.anonymize anonymizationParams rawRows
