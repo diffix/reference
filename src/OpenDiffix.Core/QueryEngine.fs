@@ -22,21 +22,15 @@ module QueryEngine =
 
   let private getColumnsFromTable (connection: DbConnection) (TableName tableName) =
     asyncResult {
-      let! tables = Table.getAll connection
+      let! table = Table.getI connection tableName
 
-      return!
-        tables
-        |> List.tryFind (fun table -> table.Name = tableName)
-        |> function
-        | None -> Error "Execution error: Table not found"
-        | Some table ->
-            let rows =
-              table.Columns
-              |> List.map (fun column -> //
-                [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ]
-              )
+      let rows =
+        table.Columns
+        |> List.map (fun column -> //
+          [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ]
+        )
 
-            Ok { Columns = [ "name"; "type" ]; Rows = rows }
+      return { Columns = [ "name"; "type" ]; Rows = rows }
     }
 
 
@@ -81,31 +75,26 @@ module QueryEngine =
 
   let private readQueryResults (connection: DbConnection) aidColumnName (query: SelectQuery) =
     asyncResult {
-      let! tables = Table.getAll connection
-      let desiredTableName = tableName query.From
+      let tableName = tableName query.From
+      let! table = Table.getI connection tableName
 
-      let table = tables |> List.tryFind (fun table -> table.Name = desiredTableName)
+      let sqlQuery = generateSqlQuery aidColumnName query
+      printfn "Using query:\n%s" sqlQuery
+      use command = new SQLiteCommand(sqlQuery, connection)
 
-      if table.IsNone then
-        return! Error("Execution error: Unknown table " + desiredTableName)
-      else
-        let sqlQuery = generateSqlQuery aidColumnName query
-        printfn "Using query:\n%s" sqlQuery
-        use command = new SQLiteCommand(sqlQuery, connection)
+      try
+        let reader = command.ExecuteReader()
 
-        try
-          let reader = command.ExecuteReader()
+        return
+          seq {
+            while reader.Read() do
+              let aidValue = readValue 0 reader
+              let rowValues = [ 1 .. reader.FieldCount - 1 ] |> List.map (fun index -> readValue index reader)
 
-          return
-            seq {
-              while reader.Read() do
-                let aidValue = readValue 0 reader
-                let rowValues = [ 1 .. reader.FieldCount - 1 ] |> List.map (fun index -> readValue index reader)
-
-                let row = { AidValues = Set.ofList [ aidValue ]; RowValues = rowValues }
-                yield row
-            }
-        with ex -> return! Error("Execution error: " + ex.Message)
+              let row = { AidValues = Set.ofList [ aidValue ]; RowValues = rowValues }
+              yield row
+          }
+      with ex -> return! Error("Execution error: " + ex.Message)
     }
 
   let private extractAidColumn anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =

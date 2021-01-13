@@ -50,7 +50,7 @@ let ``SHOW columns FROM customers`` () =
 
   let expected = { Columns = [ "name"; "type" ]; Rows = rows }
 
-  let queryResult = runQuery "SHOW columns FROM customers"
+  let queryResult = runQuery "SHOW columns FROM Customers"
 
   assertOkEqual queryResult expected
 

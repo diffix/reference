@@ -13,6 +13,7 @@ type Table = { Name: string; Columns: Column list }
 
 module Table =
   open FsToolkit.ErrorHandling
+  open OpenDiffix.Core.Utils
 
   let private columnTypeFromString =
     function
@@ -41,4 +42,16 @@ module Table =
 
           { Name = table.Name; Columns = columns }
         )
+    }
+
+  let getI connection tableName =
+    asyncResult {
+      let! tables = getAll connection
+
+      return!
+        tables
+        |> List.tryFind (fun table -> equalsI table.Name tableName)
+        |> function
+        | None -> Error "Execution error: Table not found"
+        | Some table -> Ok table
     }
