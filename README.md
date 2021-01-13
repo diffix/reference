@@ -60,7 +60,7 @@ The `/api` endpoint expects the body of the request to be a JSON payload with th
   "query": "SELECT ...",
   "database": "test-db.sqlite",
   "anonymization_parameters": {
-    "aid_columns": ["aid1"],
+    "aid_columns": ["table_name.aid_column"],
     "seed": 1,
     "low_count_filter": {
       "threshold": 5.0,

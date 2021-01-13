@@ -105,11 +105,12 @@ let queryContainer databases (queryRequest: QueryRequest) =
              ))
         ]
         label [ _class "ml-4 border-dotted border-l-2 pl-4 border-gray-400" ] [
+          str "AID "
           input [
             _type "text"
             _name "AidColumn"
-            _class "rounded-md border px-2 py-1"
-            _placeholder "Name of the AID column"
+            _class "rounded-md border px-2 py-1 w-1/3"
+            _placeholder "table_name.column_name"
             _value (queryRequest.Anonymization.AidColumns |> List.tryHead |> Option.defaultValue "")
           ]
         ]
@@ -118,10 +119,11 @@ let queryContainer databases (queryRequest: QueryRequest) =
     ]
   ]
 
-let valueToStrNode =
+let valueToString =
   function
-  | ColumnValue.IntegerValue v -> str (sprintf "%i" v)
-  | ColumnValue.StringValue v -> str v
+  | IntegerValue v -> sprintf "%i" v
+  | StringValue v -> v
+  | NullValue -> "NULL"
 
 let renderResults: QueryResult -> XmlNode =
   function
@@ -143,7 +145,7 @@ let renderResults: QueryResult -> XmlNode =
               yield
                 tr [ _class "pt-2 odd:bg-gray-200" ] [
                   for value in row do
-                    yield td [] [ valueToStrNode value ]
+                    yield td [] [ value |> valueToString |> str ]
                 ]
           ]
         ]
@@ -159,6 +161,7 @@ open System.IO
 
 let availableDbs path =
   Directory.GetFiles path
+  |> Array.filter (fun fileName -> fileName.EndsWith ".sqlite")
   |> Array.map Path.GetFileName
   |> Array.sortBy id
   |> Array.toList

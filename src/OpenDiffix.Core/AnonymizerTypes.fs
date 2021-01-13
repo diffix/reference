@@ -8,9 +8,11 @@ type LowCountSettings =
 
   static member Defaults = { Threshold = 5.; StdDev = 2. }
 
+type TableSettings = { AidColumns: string list }
+
 type AnonymizationParams =
   {
-    AidColumnOption: string option
+    TableSettings: Map<string, TableSettings>
     Seed: int
     LowCountSettings: LowCountSettings option
   }
@@ -28,6 +30,7 @@ type Columns = ColumnName list
 type ColumnValue =
   | IntegerValue of int
   | StringValue of string
+  | NullValue
 
 type NonPersonalRow = ColumnValue list
 type NonPersonalRows = NonPersonalRow list
