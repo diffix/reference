@@ -106,6 +106,7 @@ module DefaultAggregates =
     |> Seq.sumBy
          (function
          | [ Null ] -> 0
+         | []
          | [ _ ] -> 1
          | _ -> invalidOverload "count")
     |> Integer
