@@ -10,15 +10,17 @@ module Definitions =
     .>> spaces
     |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
 
-  let stringConstant = manySatisfy (fun c -> c <> '"')
+  let stringConstant = manySatisfy (fun c -> c <> '\'')
 
   let skipWordSpacesCI word = skipStringCI word >>. spaces
 
   let skipWordsCI words = words |> List.map (skipWordSpacesCI) |> List.reduce (>>.)
 
-  let inParenthesis p = pchar '(' >>. spaces >>. p .>> pchar ')' .>> spaces
+  let between c1 c2 p = pchar c1 >>. spaces >>. p .>> pchar c2 .>> spaces
 
-  let inQuotes p = pchar '"' >>. spaces >>. p .>> pchar '"' .>> spaces
+  let inParenthesis p = between '(' ')' p
+
+  let inSingleQuotes p = between '\'' '\'' p
 
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
@@ -36,19 +38,32 @@ module Definitions =
 
   module SelectQueries =
     let charTo c v = satisfy (fun pc -> pc = c) |>> fun _ -> v
-    let parseNot = skipWordSpacesCI "not" |>> fun _ -> Not
+    let wordTo w v = skipWordSpacesCI w |>> fun _ -> v
+
     let parsePlus = charTo '+' Plus
     let parseMinus = charTo '-' Minus
     let parseStar = charTo '*' Star
     let parseSlash = charTo '/' Slash
     let parseHat = charTo '^' Hat
+    let parseEqual = charTo '=' Operator.Equal
+    let parseNotEqual = wordTo "<>" Operator.NotEqual
+    let parseNot = wordTo "not" Operator.Not
+    let parseLT = charTo '<' Operator.LT
+    let parseGT = charTo '>' Operator.GT
+    let parseAnd = wordTo "and" Operator.And
+    let parseOr = wordTo "or" Operator.Or
 
-    let operator = choice [parseNot; parsePlus; parseMinus; parseStar; parseSlash; parseHat] |>> Expression.Operator
+    let operator =
+      choice [
+        parseNot; parsePlus; parseMinus; parseStar; parseSlash; parseHat
+        parseEqual; parseNotEqual; parseLT; parseGT; parseAnd; parseOr
+      ]
+      |>> Expression.Operator
 
     let constants =
       choice [
         attempt (pint32 .>> spaces |>> Constant.Integer)
-        attempt (inQuotes stringConstant |>> Constant.String)
+        attempt (inSingleQuotes stringConstant |>> Constant.String)
         choice [
           pstringCI "true" |>> fun _ -> Boolean true
           pstringCI "false" |>> fun _ -> Boolean false
@@ -84,15 +99,52 @@ module Definitions =
 
     let commaSepExpressions = commaSeparated expression .>> spaces
 
+    let parseBetween =
+      unaliasedExpression .>> skipWordSpacesCI "between"
+      .>>. unaliasedExpression .>> skipWordSpacesCI "and" .>>.unaliasedExpression
+      |>> fun ((a, b), c) -> Condition.Between (a, b, c)
+
+    let p1BetweenP2ToT p1 p2 t = p2 .>> spaces .>> p1 .>> spaces .>>. p2 .>> spaces |>> t
+
+    let whereClauseCondition, whereClauseConditionRef = createParserForwardedToRef()
+
+    do whereClauseConditionRef := choice [
+        attempt (p1BetweenP2ToT parseEqual unaliasedExpression Condition.Equal)
+        attempt (p1BetweenP2ToT parseNotEqual unaliasedExpression Condition.NotEqual)
+        attempt (p1BetweenP2ToT parseGT unaliasedExpression Condition.GT)
+        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
+        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
+        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
+        attempt (skipWordSpacesCI "not" >>. unaliasedExpression |>> Condition.Not)
+        attempt parseBetween
+        unaliasedExpression |>> Condition.IsTrue
+      ]
+
+    let whereClauseDisjunction =
+      sepBy1 whereClauseCondition (skipWordSpacesCI "or")
+      |>> List.reduce (fun a b -> Condition.Or (a, b))
+
+    let whereClauseConjunction =
+      sepBy1 whereClauseDisjunction (skipWordSpacesCI "and")
+      |>> List.reduce (fun a b -> Condition.And (a, b))
+
+    let whereClause = skipWordSpacesCI "WHERE" .>> spaces >>. whereClauseConjunction
+
     let groupBy = skipWordsCI [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expression
 
     let parse =
       skipWordSpacesCI "SELECT" >>. commaSepExpressions .>> skipWordSpacesCI "FROM"
       .>>. table
+      .>>. opt whereClause
       .>>. opt groupBy
       |>> function
-      | (columns, table), groupByColumnsOption ->
-        SelectQuery { Expressions = columns; From = table; GroupBy = groupByColumnsOption |> Option.defaultValue [] }
+      | ((columns, table), whereClauseConditionOption), groupByColumnsOption ->
+        SelectQuery {
+          Expressions = columns
+          From = table
+          Where = whereClauseConditionOption
+          GroupBy = groupByColumnsOption |> Option.defaultValue []
+        }
 
   let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
 

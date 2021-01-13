@@ -13,6 +13,8 @@ let parse p string =
 
 let distinct = Term "distinct"
 let star = Operator Star
+let integer i = Constant (Integer i)
+let string s = Constant (String s)
 
 [<Fact>]
 let ``Parses words`` () =
@@ -31,6 +33,12 @@ let ``Parses terms`` () =
   assertOkEqual (parse SelectQueries.term "/") (Expression.Operator Operator.Slash)
   assertOkEqual (parse SelectQueries.term "^") (Expression.Operator Operator.Hat)
   assertOkEqual (parse SelectQueries.term "not") (Expression.Operator Operator.Not)
+  assertOkEqual (parse SelectQueries.term "and") (Expression.Operator Operator.And)
+  assertOkEqual (parse SelectQueries.term "or") (Expression.Operator Operator.Or)
+  assertOkEqual (parse SelectQueries.term ">") (Expression.Operator Operator.GT)
+  assertOkEqual (parse SelectQueries.term "<") (Expression.Operator Operator.LT)
+  assertOkEqual (parse SelectQueries.term "=") (Expression.Operator Operator.Equal)
+  assertOkEqual (parse SelectQueries.term "<>") (Expression.Operator Operator.NotEqual)
   assertOkEqual (parse SelectQueries.term "false") (Expression.Constant (Boolean false))
   assertOkEqual (parse SelectQueries.term "true") (Expression.Constant (Boolean true))
   assertOkEqual (parse SelectQueries.term "1") (Expression.Constant (Integer 1))
@@ -79,6 +87,16 @@ let ``Parses optional semicolon`` () =
   assertOk (parse skipSemiColon "")
 
 [<Fact>]
+let ``Parses WHERE clause conditions`` () =
+  assertOkEqual (parse SelectQueries.whereClauseCondition "a = 1") (Condition.Equal (Term "a", integer 1))
+  assertOkEqual (parse SelectQueries.whereClauseCondition "a = '1'") (Condition.Equal (Term "a", string "1"))
+
+[<Fact>]
+let ``Parses WHERE clause construct`` () =
+  assertOkEqual (parse SelectQueries.whereClause "WHERE a = 1 and b <> 'hello'")
+    (Condition.And (Condition.Equal (Term "a", integer 1), Condition.NotEqual (Term "b", string "hello")))
+
+[<Fact>]
 let ``Parses GROUP BY statement`` () =
   assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ Term "a"; Term "b"; Term "c" ]
   assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ Term "a" ]
@@ -88,7 +106,7 @@ let ``Parses GROUP BY statement`` () =
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse SelectQueries.parse "SELECT col FROM table")
-    (SelectQuery { Expressions = [ Term "col" ]; From = Table "table"; GroupBy = []})
+    (SelectQuery { Expressions = [ Term "col" ]; From = Table "table"; Where = None; GroupBy = []})
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
@@ -116,6 +134,7 @@ let ``Parse SELECT query with columns and table`` () =
       {
         Expressions = [ Term "col1"; Term "col2" ]
         From = Table "table"
+        Where = None
         GroupBy = []
       })
 
@@ -125,6 +144,7 @@ let ``Parse SELECT query with columns and table`` () =
       {
         Expressions = [ Term "col1"; Term "col2" ]
         From = Table "table"
+        Where = None
         GroupBy = []
       })
 
@@ -141,5 +161,35 @@ let ``Parse aggregate query`` () =
       {
         Expressions = [ Term "col1"; Function("count", [distinct; Term "aid"]) ]
         From = Table "table"
+        Where = None
+        GroupBy = [ Term "col1" ]
+      })
+
+[<Fact>]
+let ``Parse aggregate query with where clause`` () =
+  assertOkEqual
+    (Parser.parse
+      """
+         SELECT col1, count(distinct aid)
+         FROM table
+         WHERE col1 = 1 AND col2 = 2 or col2 = 3 AND aid between 1 and 5
+         GROUP BY col1
+         """)
+    (SelectQuery
+      {
+        Expressions = [ Term "col1"; Function("count", [distinct; Term "aid"]) ]
+        From = Table "table"
+        Where =
+          Some
+            (Condition.And (
+              Condition.And (
+                Condition.Equal (Term "col1", integer 1),
+                (Condition.Or (
+                  Condition.Equal (Term "col2", integer 2),
+                  Condition.Equal (Term "col2", integer 3)
+                ))
+              ),
+              Condition.Between (Term "aid", integer 1, integer 5)
+            ))
         GroupBy = [ Term "col1" ]
       })

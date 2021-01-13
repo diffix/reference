@@ -109,11 +109,28 @@ let private getColumnsFromTable (connection: SQLiteConnection) tableName =
     return { Columns = columns; Rows = rows }
   }
 
+let operatorToSql =
+  function
+  | Not -> "not"
+  | Plus -> "+"
+  | Minus -> "-"
+  | Star -> "*"
+  | Slash -> "/"
+  | Hat -> "^"
+  | Equal -> "="
+  | NotEqual -> "<>"
+  | LT -> "<"
+  | GT -> ">"
+  | And -> "and"
+  | Or -> "or"
+
 let rec expressionToSql =
   function
   | Constant (Integer value) -> string value
   | Constant (String value) -> sprintf "'%s'" value
+  | Constant (Boolean value) -> sprintf "'%b'" value
   | Term name -> name
+  | Operator op -> operatorToSql op
   | AliasedTerm (term, _aliasName) -> expressionToSql term
   | Function (functionName, subExpressions) ->
     let functionArgs =
@@ -149,6 +166,8 @@ let rec columnName =
   function
   | Constant (Integer value) -> string value
   | Constant (String value) -> value
+  | Constant (Boolean value) -> $"%b{value}"
+  | Operator _ -> "operator"
   | Term termName -> termName
   | AliasedTerm (term, _) -> columnName term
   | Function (functionName, _expression) -> functionName
