@@ -33,7 +33,6 @@ module QueryEngine =
       return { Columns = [ "name"; "type" ]; Rows = rows }
     }
 
-
   let rec private expressionToSql =
     function
     | Constant (Integer value) -> string value
