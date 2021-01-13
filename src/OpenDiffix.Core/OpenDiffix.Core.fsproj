@@ -5,6 +5,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="SQLite.fs" />
+        <Compile Include="Table.fs" />
         <Compile Include="Value.fs" />
         <Compile Include="Expression.fs" />
         <Compile Include="ParserTypes.fs" />
@@ -13,7 +15,6 @@
         <Compile Include="Analyzer.fs" />
         <Compile Include="AnonymizerTypes.fs" />
         <Compile Include="Anonymizer.fs" />
-        <Compile Include="DiffixSqlite.fs" />
         <Compile Include="QueryEngine.fs" />
     </ItemGroup>
 
