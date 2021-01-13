@@ -25,7 +25,7 @@ module QueryEngine =
   let parseSql sqlQuery =
     match Parser.parse sqlQuery with
     | Ok ast -> Ok ast
-    | Error (Parser.CouldNotParse error) -> Error(ParseError error)
+    | Error (Parser.CouldNotParse error) -> Error("Parse error: " + error)
 
   let runQuery reqParams =
     asyncResult {

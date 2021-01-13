@@ -39,9 +39,4 @@ type PersonalRows = PersonalRow list
 
 type QueryResult = { Columns: Columns; Rows: NonPersonalRows }
 
-type QueryError =
-  | ParseError of string
-  | DbNotFound
-  | InvalidRequest of string
-  | ExecutionError of string
-  | UnexpectedError of string
+type QueryError = string
