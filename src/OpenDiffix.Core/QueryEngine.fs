@@ -24,18 +24,19 @@ module QueryEngine =
     asyncResult {
       let! tables = Table.getAll connection
 
-      let rows =
+      return!
         tables
         |> List.tryFind (fun table -> table.Name = tableName)
         |> function
-        | None -> []
+        | None -> Error "Execution error: Table not found"
         | Some table ->
-            table.Columns
-            |> List.map (fun column -> //
-              [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ]
-            )
+            let rows =
+              table.Columns
+              |> List.map (fun column -> //
+                [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ]
+              )
 
-      return { Columns = [ "name"; "type" ]; Rows = rows }
+            Ok { Columns = [ "name"; "type" ]; Rows = rows }
     }
 
 
