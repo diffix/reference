@@ -1,29 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
-    </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <Compile Include="SQLite.fs" />
-        <Compile Include="Table.fs" />
-        <Compile Include="Value.fs" />
-        <Compile Include="Expression.fs" />
-        <Compile Include="ParserTypes.fs" />
-        <Compile Include="Parser.fs" />
-        <Compile Include="AnalyzerTypes.fs" />
-        <Compile Include="Analyzer.fs" />
-        <Compile Include="AnonymizerTypes.fs" />
-        <Compile Include="Anonymizer.fs" />
-        <Compile Include="QueryEngine.fs" />
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Include="SQLite.fs" />
+    <Compile Include="Table.fs" />
+    <Compile Include="Value.fs" />
+    <Compile Include="Expression.fs" />
+    <Compile Include="ParserTypes.fs" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="AnalyzerTypes.fs" />
+    <Compile Include="Analyzer.fs" />
+    <Compile Include="AnonymizerTypes.fs" />
+    <Compile Include="Anonymizer.fs" />
+    <Compile Include="QueryEngine.fs" />
+  </ItemGroup>
 
-    <ItemGroup>
-      <PackageReference Include="Dapper" Version="2.0.35" />
-      <PackageReference Include="FsToolkit.ErrorHandling" Version="1.4.3" />
-      <PackageReference Include="System.Data.SQLite.Core" Version="1.0.113.6" />
-      <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />
-      <PackageReference Include="FParsec" Version="1.1.1" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.0.35" />
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="1.4.3" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.113.6" />
+    <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />
+    <PackageReference Include="FParsec" Version="1.1.1" />
+  </ItemGroup>
 
 </Project>
