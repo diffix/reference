@@ -37,38 +37,8 @@ type QueryResultJson =
         Encode.object [ "success", Encode.bool true; "column_names", columnNames; "values", values ]
 
 type QueryErrorJson =
-  static member Encoder(queryResult: QueryError) =
-    match queryResult with
-    | ParseError error ->
-        Encode.object [
-          "success", Encode.bool false
-          "type", Encode.string "Parse error"
-          "error_message", Encode.string error
-        ]
-    | DbNotFound ->
-        Encode.object [
-          "success", Encode.bool false
-          "type", Encode.string "Database not found"
-          "error_message", Encode.string "Could not find the database"
-        ]
-    | InvalidRequest error ->
-        Encode.object [
-          "success", Encode.bool false
-          "type", Encode.string "Invalid request"
-          "error_message", Encode.string error
-        ]
-    | ExecutionError error ->
-        Encode.object [
-          "success", Encode.bool false
-          "type", Encode.string "Execution error"
-          "error_message", Encode.string error
-        ]
-    | UnexpectedError error ->
-        Encode.object [
-          "success", Encode.bool false
-          "type", Encode.string "Unexpected error"
-          "error_message", Encode.string error
-        ]
+  static member Encoder(error: QueryError) =
+    Encode.object [ "success", Encode.bool false; "error_message", Encode.string error ]
 
 type AnonymizationParameters =
   {

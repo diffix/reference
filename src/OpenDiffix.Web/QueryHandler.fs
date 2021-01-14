@@ -23,16 +23,16 @@ let private getTableSettings (userRequest: QueryRequest) =
     | [ aidColumn ] ->
         match aidColumn.Split '.' with
         | [| tableName; columnName |] -> return Map [ tableName, { AidColumns = [ columnName ] } ]
-        | _ -> return! Error(InvalidRequest "AID doesn't have the format `table_name.column_name`")
+        | _ -> return! Error "Invalid request: AID doesn't have the format `table_name.column_name`"
     | [] -> return Map []
-    | _ -> return! Error(InvalidRequest "A maximum of one AID column is supported at present")
+    | _ -> return! Error "Invalid request: A maximum of one AID column is supported at present"
   }
 
 let findDatabase pathToDbs database =
   availableDbs pathToDbs
   |> List.tryFind (fun (name, _) -> name = database)
   |> Option.map snd
-  |> Result.requireSome DbNotFound
+  |> Result.requireSome "Database not found"
 
 let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
   result {
@@ -54,9 +54,7 @@ let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
 
 let deriveRequestParamsFromBody pathToDbs (requestBody: string) =
   result {
-    let! userRequest =
-      Decode.fromString QueryRequest.Decoder requestBody
-      |> Result.mapError (InvalidRequest)
+    let! userRequest = Decode.fromString QueryRequest.Decoder requestBody
 
     return! deriveRequestParams pathToDbs userRequest
   }

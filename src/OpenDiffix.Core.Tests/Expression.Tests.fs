@@ -131,12 +131,13 @@ let evaluate () =
 [<Fact>]
 let evaluateAggregated () =
   // select sum(val_float - val_int)
-  evalAggr
-    (Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate))
+  evalAggr (
+    Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate)
+  )
   |> should equal (Float 2.0)
 
   // select count(*)
-  evalAggr (Function("count", [ Constant(Unit) ], Expression.defaultAggregate))
+  evalAggr (Function("count", [], Expression.defaultAggregate))
   |> should equal (Integer 4)
 
   // select count(1)

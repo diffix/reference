@@ -151,10 +151,10 @@ let renderResults: QueryResult -> XmlNode =
         ]
       ]
 
-let errorFragment title description =
+let errorFragment message =
   div [ _class "bg-red-400 text-white p-4 w-full" ] [
-    h2 [ _class "text-lg font-bold" ] [ str title ]
-    pre [ _class "mt-2 p-4 bg-red-500 rounded-b-md" ] [ str description ]
+    h2 [ _class "text-lg font-bold" ] [ str "Something went wrong" ]
+    pre [ _class "mt-2 p-4 bg-red-500 rounded-b-md" ] [ str message ]
   ]
 
 open System.IO
@@ -170,11 +170,7 @@ let queryPage dbPath (userRequest: QueryRequest) result =
   let renderedResultSection =
     match result with
     | Ok (result: QueryResult) -> renderResults result
-    | Error (ParseError error) -> errorFragment "Parse error" error
-    | Error (DbNotFound) -> errorFragment "Error" "Could not locate the database"
-    | Error (ExecutionError error) -> errorFragment "Execution error" error
-    | Error (UnexpectedError error) -> errorFragment "An unexpected error occurred" error
-    | Error (InvalidRequest error) -> errorFragment "The request is invalid" error
+    | Error message -> errorFragment message
 
   div [] [ queryContainer (availableDbs dbPath) userRequest; renderedResultSection ]
   |> layout
