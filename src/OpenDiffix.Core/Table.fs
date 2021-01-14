@@ -51,7 +51,5 @@ module Table =
       return!
         tables
         |> List.tryFind (fun table -> equalsI table.Name tableName)
-        |> function
-        | None -> Error "Execution error: Table not found"
-        | Some table -> Ok table
+        |> Result.requireSome "Execution error: Table not found"
     }
