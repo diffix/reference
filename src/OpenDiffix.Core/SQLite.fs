@@ -6,8 +6,6 @@ open Dapper
 open FsToolkit.ErrorHandling
 
 type DbConnection = SQLiteConnection
-type DbColumn = { Name: string; Type: string }
-type DbTable = { Name: string; Columns: DbColumn list }
 
 let dbConnection path =
   try
@@ -42,12 +40,12 @@ let dbSchema (connection: SQLiteConnection) =
         |> Seq.toList
         |> List.groupBy (fun row -> row.TableName)
         |> List.map (fun (tableName, rows) ->
-          {
+          {|
             Name = tableName
             Columns =
               rows
-              |> List.map (fun row -> { Name = row.ColumnName; Type = row.ColumnType.ToLower() })
-          }
+              |> List.map (fun row -> {| Name = row.ColumnName; Type = row.ColumnType.ToLower() |})
+          |}
         )
         |> List.sortBy (fun table -> table.Name)
     with ex ->
