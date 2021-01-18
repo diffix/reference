@@ -3,34 +3,49 @@ namespace OpenDiffix.Core.ParserTypes
 type Constant =
   | Integer of int
   | String of string
+  | Boolean of bool
 
-type ColumnName = ColumnName of string
-type TableName = TableName of string
+type From = Table of tableName: string
 
-type ColumnType =
-  | PlainColumn of ColumnName
-  | AliasedColumn of ColumnName * string
+[<RequireQualifiedAccess>]
+type ShowQuery =
+  | Tables
+  | Columns of tableName: string
 
-type AggregateFunctionArgs = Distinct of ColumnName
+type SelectQuery = {
+  SelectDistinct: bool
+  Expressions: Expression list
+  From: Expression
+  Where: Expression option
+  GroupBy: Expression list
+}
 
-type AggregateFunction = AnonymizedCount of AggregateFunctionArgs
-
-type Expression =
-  | Constant of Constant
-  | Column of ColumnType
-  | Function of (string * Expression)
-  | AggregateFunction of AggregateFunction
-
-type From = Table of TableName
-
-type SelectQuery = { Expressions: Expression list; From: From }
-
-type AggregateQuery = { Expressions: Expression list; From: From; GroupBy: ColumnName list }
-
-type Query =
-  // Exploration queries
-  | ShowTables
-  | ShowColumnsFromTable of TableName
-  // Data extraction
+and Expression =
+  | Star
+  | Null
+  | Integer of int32
+  | Float of float
+  | String of string
+  | Boolean of bool
+  | Distinct of expression: Expression
+  | And of left: Expression * right: Expression
+  | Or of left: Expression * right: Expression
+  | Not of expr: Expression
+  | Lt of left: Expression * right: Expression
+  | LtE of left: Expression * right: Expression
+  | Gt of left: Expression * right: Expression
+  | GtE of left: Expression * right: Expression
+  | Equal of left: Expression * right: Expression
+  | As of left: Expression * right: Expression
+  | Identifier of identifierName: string
+  | Function of functionName: string * Expression list
+  | ShowQuery of ShowQuery
   | SelectQuery of SelectQuery
-  | AggregateQuery of AggregateQuery
+  // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
+  // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then
+  // the operator parser rejects the definition since it clashes with the regular AND operator parser.
+  // If instead it is defined as the infix operator BETWEEN requiring later validation that the
+  // right hand expression was a conjunction, then I couldn't get the precedence to work correctly.
+  // Regular AND binds loosely, whereas AND as the second term in BETWEEN binds very tightly.
+  // I couldn't get the parse tree to be anything but nonsensical using this approach.
+

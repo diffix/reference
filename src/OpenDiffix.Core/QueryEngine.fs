@@ -20,7 +20,7 @@ module QueryEngine =
         }
     }
 
-  let private getColumnsFromTable (connection: DbConnection) (TableName tableName) =
+  let private getColumnsFromTable (connection: DbConnection) tableName =
     asyncResult {
       let! table = Table.getI connection tableName
 
@@ -35,31 +35,72 @@ module QueryEngine =
 
   let rec private expressionToSql =
     function
-    | Constant (Integer value) -> string value
-    | Constant (String value) -> sprintf "'%s'" value
-    | Column (PlainColumn (ColumnName name)) -> name
-    | Column (AliasedColumn (ColumnName columnName, _aliasName)) -> columnName
-    | Function (functionName, subExpression) -> sprintf "%s(%s)" functionName (expressionToSql subExpression)
-    | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> sprintf "count(distinct %s)" name
+    | Star -> "*"
+    | Null -> "null"
+    | Integer value -> $"%i{value}"
+    | Float value -> $"%f{value}"
+    | String value -> value
+    | Boolean value -> $"%b{value}"
+    | Distinct expression -> $"DISTINCT %s{expressionToSql expression}"
+    | Not expression -> $"NOT %s{expressionToSql expression}"
+    | And (left, right) -> $"%s{expressionToSql left} AND %s{expressionToSql right}"
+    | Or (left, right) -> $"%s{expressionToSql left} OR %s{expressionToSql right}"
+    | Lt (left, right) -> $"%s{expressionToSql left} < %s{expressionToSql right}"
+    | LtE (left, right) -> $"%s{expressionToSql left} <= %s{expressionToSql right}"
+    | Gt (left, right) -> $"%s{expressionToSql left} > %s{expressionToSql right}"
+    | GtE (left, right) -> $"%s{expressionToSql left} >= %s{expressionToSql right}"
+    | Equal (left, right) -> $"%s{expressionToSql left} = %s{expressionToSql right}"
+    | As (expr, alias) -> $"%s{expressionToSql expr} AS %s{expressionToSql alias}"
+    | Identifier name -> name
+    | Function (functionName, subExpressions) ->
+      let functionArgs =
+        subExpressions
+        |> List.map expressionToSql
+        |> List.reduceBack (sprintf "%s %s")
+      sprintf "%s(%s)" functionName  functionArgs
+    | ShowQuery _ -> failwith "SHOW-queries are not supported"
+    | SelectQuery queryExpr ->
+      let distinct = if queryExpr.SelectDistinct then "DISTINCT" else ""
+      let columnExpr =
+        queryExpr.Expressions
+        |> List.map expressionToSql
+        |> List.reduceBack (sprintf "%s, %s")
+      let where =
+        queryExpr.Where
+        |> Option.map (fun expr -> $"FROM %s{expressionToSql expr}")
+        |> Option.defaultValue ""
+      let groupBy =
+        queryExpr.GroupBy
+        |> List.map expressionToSql
+        |> function
+          | [] -> ""
+          | groupings ->
+            let groupByTerms = groupings |> List.reduceBack (sprintf "%s, %s")
+            $"GROUP BY %s{groupByTerms}"
+      $"
+      SELECT %s{distinct} %s{columnExpr}
+      FROM %s{expressionToSql queryExpr.From}
+      %s{where}
+      %s{groupBy}
+      "
+
+  let getIdentifier =
+    function
+    | Identifier identifier -> Ok identifier
+    | _ -> Error "Expected an identifier, got something else"
 
   let rec columnToSql index column = sprintf "%s as col%i" (expressionToSql column) index
 
-  let private tableName =
-    function
-    | Table (TableName tableName) -> tableName
-
-  let private generateSqlQuery aidColumnName (query: SelectQuery) =
-    let aidColumn = Column(PlainColumn aidColumnName)
-
+  let private generateSqlQuery tableName aidColumnName (query: SelectQuery) =
     let columns =
-      aidColumn :: query.Expressions
+      (Identifier aidColumnName) :: query.Expressions
       |> List.mapi columnToSql
       |> List.reduce (sprintf "%s, %s")
 
     $"""
     SELECT
       {columns}
-    FROM {tableName query.From}
+    FROM %s{tableName}
     """
 
   let private readValue index (reader: SQLiteDataReader) =
@@ -74,10 +115,10 @@ module QueryEngine =
 
   let private readQueryResults (connection: DbConnection) aidColumnName (query: SelectQuery) =
     asyncResult {
-      let tableName = tableName query.From
+      let! tableName = getIdentifier query.From
       let! table = Table.getI connection tableName
 
-      let sqlQuery = generateSqlQuery aidColumnName query
+      let sqlQuery = generateSqlQuery table.Name aidColumnName query
       printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
 
@@ -96,28 +137,50 @@ module QueryEngine =
       with ex -> return! Error("Execution error: " + ex.Message)
     }
 
-  let private extractAidColumn anonymizationParams ({ From = Table (TableName tableName) }: SelectQuery) =
-    match anonymizationParams.TableSettings.TryFind(tableName) with
-    | None
-    | Some { AidColumns = [] } -> Error "Execution error: An AID column name is required"
-    | Some { AidColumns = [ column ] } -> Ok column
-    | Some _ -> Error "Execution error: Multiple AID column names aren't supported yet"
+  let private extractAidColumn anonymizationParams ({ From = from }: SelectQuery) =
+    result {
+      let! tableName = getIdentifier from
+      match anonymizationParams.TableSettings.TryFind(tableName) with
+      | None
+      | Some { AidColumns = [] } -> return! (Error "Execution error: An AID column name is required")
+      | Some { AidColumns = [ column ] } -> return column
+      | Some _ -> return! (Error "Execution error: Multiple AID column names aren't supported yet")
+    }
 
-  let private columnName =
+  let rec private columnName =
     function
-    | Constant (Integer value) -> string value
-    | Constant (String value) -> value
-    | Column (PlainColumn (ColumnName columnName))
-    | Column (AliasedColumn (ColumnName columnName, _)) -> columnName
+    | Star -> "*"
+    | Null -> "null"
+    | Distinct expr -> columnName expr
+    | Integer value -> $"%i{value}"
+    | Float value -> $"%f{value}"
+    | String value -> value
+    | Boolean value -> $"%b{value}"
+    | And _ -> "and"
+    | Or _ -> "or"
+    | Not expr -> columnName expr
+    | Lt _ -> "<"
+    | LtE _ -> "<="
+    | Gt _ -> ">"
+    | GtE _ -> ">="
+    | Equal _ -> "="
+    | Identifier expr -> expr
+    | As (_term, name) -> columnName name
     | Function (functionName, _expression) -> functionName
-    | AggregateFunction (AnonymizedCount (Distinct (ColumnName name))) -> "count"
+    | ShowQuery _
+    | SelectQuery _ -> failwith "Not a valid term for selection"
+
+  let executeShow (connection: SQLiteConnection) =
+    function
+    | ShowQuery.Tables -> getTables connection
+    | ShowQuery.Columns tableName -> getColumnsFromTable connection tableName
 
   let private executeSelect (connection: DbConnection) anonymizationParams query =
     asyncResult {
       let! aidColumn = extractAidColumn anonymizationParams query
 
       let! rawRows =
-        readQueryResults connection (OpenDiffix.Core.ParserTypes.ColumnName aidColumn) query
+        readQueryResults connection aidColumn query
         |> AsyncResult.map Seq.toList
 
       let rows = Anonymizer.anonymize anonymizationParams rawRows
@@ -133,11 +196,9 @@ module QueryEngine =
 
       let! result =
         match queryAst with
-        | ParserTypes.ShowTables -> getTables connection
-        | ParserTypes.ShowColumnsFromTable table -> getColumnsFromTable connection table
-        | ParserTypes.SelectQuery query -> executeSelect connection reqParams.AnonymizationParams query
-        | ParserTypes.AggregateQuery _query ->
-            asyncResult { return! Error "Request error: Aggregate queries aren't supported yet" }
+        | ShowQuery query -> executeShow connection query
+        | SelectQuery query -> executeSelect connection reqParams.AnonymizationParams query
+        | _ -> AsyncResult.returnError "Expecting an SQL query to run"
 
       do! connection.CloseAsync() |> Async.AwaitTask
       return result

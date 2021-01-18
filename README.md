@@ -23,6 +23,9 @@ edges.
 The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility.
 Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
+The tests rely on the presence of a test database existing. 
+For more information on how to create it, please read the [data/README](data/README.md).
+
 ### Design considerations
 
 We use SQLite as a dumb backing store for data. Dumb in the sense that we just read the data out of it and

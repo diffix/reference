@@ -32,8 +32,6 @@ type ScalarArgs = Value list
 type AggregateArgs = seq<Value list>
 
 module ExpressionUtils =
-  open System.Linq
-
   let invalidOverload name = failwith $"Invalid overload called for function '{name}'."
 
   let mapSingleArg name (args: AggregateArgs) =

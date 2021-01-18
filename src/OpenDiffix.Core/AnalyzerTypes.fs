@@ -33,7 +33,7 @@ and SelectQuery =
   }
 
 and SelectFrom =
-  | Subquery of query: Query * alias: string
+  | SubQuery of query: Query * alias: string
   | Join of Join
   | Table of name: string * alias: string option
 
