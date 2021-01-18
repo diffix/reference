@@ -6,7 +6,6 @@ type Value =
   | Integer of int
   | Float of float
   | String of string
-  | Unit
 
 type OrderByDirection =
   | Ascending
