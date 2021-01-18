@@ -1,163 +1,161 @@
 ﻿module OpenDiffix.Core.Parser
 
+open OpenDiffix.Core
 open OpenDiffix.Core.ParserTypes
 
 module Definitions =
   open FParsec
 
-  let anyWord =
-    satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_')
-    .>> spaces
-    |>> fun (char, remainingColumnName) -> char.ToString() + remainingColumnName
+  let opp = OperatorPrecedenceParser<Expression, unit, unit>()
 
-  let stringConstant = manySatisfy (fun c -> c <> '\'')
+  let expr = opp.ExpressionParser
 
-  let skipWordSpacesCI word = skipStringCI word >>. spaces
+  let simpleIdentifier =
+    let isIdentifierFirstChar token = isLetter token
+    let isIdentifierChar token = isLetter token || isDigit token || token = '.' || token = '_'
+    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> spaces
 
-  let skipWordsCI words = words |> List.map (skipWordSpacesCI) |> List.reduce (>>.)
+  let identifier = simpleIdentifier |>> Expression.Identifier
+
+  let word word = pstringCI word >>. spaces
+
+  let words words = words |> List.map (word) |> List.reduce (>>.)
 
   let between c1 c2 p = pchar c1 >>. spaces >>. p .>> pchar c2 .>> spaces
 
   let inParenthesis p = between '(' ')' p
 
-  let inSingleQuotes p = between '\'' '\'' p
-
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
-  module ShowQueries =
-    let identifiersColumnsInTable =
-      skipWordsCI [ "COLUMNS"; "FROM" ] >>. (anyWord <?> "table name")
-      |>> fun tableName -> Show (ShowQuery.Columns tableName)
+  let star = word "*" |>> fun _ -> Expression.Star
+  // This custom numbers parser is needed as both pint32 and pfloat are eager
+  // to the point of not being possible to combine. pint32 would parse 1.2 as 1,
+  // and pfloat would parse 1 as 1.0.
+  let number =
+    pint32 .>>.
+    opt (pchar '.' >>. many (pchar '0') .>>. pint32)
+    .>> spaces
+    |>> fun (wholeValue, decimalPartOption) ->
+      match decimalPartOption with
+      | None -> Expression.Integer wholeValue
+      | Some (leadingZeros, decimalValue) ->
+        let divisor = List.length leadingZeros + 1
+        let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
+        Expression.Float (float wholeValue + decimalPart)
+  let boolean = (word "true" |>> fun _ -> Expression.Boolean true) <|> (word "false" |>> fun _ -> Expression.Boolean false)
+  let stringLiteral = skipChar '\'' >>. manySatisfy (fun c -> c <> '\'') .>> skipChar '\'' |>> Expression.String
 
-    let identifierTables = stringCIReturn "TABLES" (Show ShowQuery.Tables)
+  let spaceSepUnaliasedExpressions = many1 expr
 
-    let parse =
-      skipStringCI "SHOW"
-      >>. spaces
-      >>. (identifierTables <|> identifiersColumnsInTable)
+  let functionExpression = simpleIdentifier .>>. inParenthesis expr .>> spaces |>> fun (funName, expr) -> Function (funName, [expr])
 
-  module SelectQueries =
-    let charTo c v = satisfy (fun pc -> pc = c) |>> fun _ -> v
-    let wordTo w v = skipWordSpacesCI w |>> fun _ -> v
+  let commaSepExpressions = commaSeparated expr .>> spaces
 
-    let parsePlus = charTo '+' Plus
-    let parseMinus = charTo '-' Minus
-    let parseStar = charTo '*' Star
-    let parseSlash = charTo '/' Slash
-    let parseHat = charTo '^' Hat
-    let parseEqual = charTo '=' Operator.Equal
-    let parseNotEqual = wordTo "<>" Operator.NotEqual
-    let parseNot = wordTo "not" Operator.Not
-    let parseLT = charTo '<' Operator.LT
-    let parseGT = charTo '>' Operator.GT
-    let parseAnd = wordTo "and" Operator.And
-    let parseOr = wordTo "or" Operator.Or
+  let whereClause = word "WHERE" >>. expr
 
-    let operator =
-      choice [
-        parseNot; parsePlus; parseMinus; parseStar; parseSlash; parseHat
-        parseEqual; parseNotEqual; parseLT; parseGT; parseAnd; parseOr
-      ]
-      |>> Expression.Operator
+  let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 
-    let constants =
-      choice [
-        attempt (pint32 .>> spaces |>> Constant.Integer)
-        attempt (inSingleQuotes stringConstant |>> Constant.String)
-        choice [
-          pstringCI "true" |>> fun _ -> Boolean true
-          pstringCI "false" |>> fun _ -> Boolean false
-        ]
-      ]
-      |>> Constant
+  let distinct = opt (word "distinct") |>> Option.isSome
 
-    let term = choice [attempt constants; attempt operator; anyWord |>> Term] .>> spaces
+  let from = word "FROM" >>. identifier
 
-    let table = anyWord |>> Table
-
-    // Parsers are values, and as such cannot be made recursive.
-    // Instead we have to use a forward reference that allows ut so
-    // use the parser before it is defined.
-    let expression, expressionRef = createParserForwardedToRef()
-    let unaliasedExpression, unaliasedExpressionRef = createParserForwardedToRef()
-
-    // Note that since the expression parser itself consumes trailing spaces
-    // we do not use a sepBy1 or equivalent parser combinator here.
-    let spaceSepUnaliasedExpressions = many1 unaliasedExpression
-
-    let ``function`` = anyWord .>>. inParenthesis spaceSepUnaliasedExpressions |>> Function
-
-    do unaliasedExpressionRef := choice [ attempt ``function``; term ]
-
-    let alias =
-      skipWordSpacesCI "as" >>. anyWord
-
-    do expressionRef := unaliasedExpression .>>. opt alias
-                        |>> (function
-                            | expression, None -> expression
-                            | expression, Some alias -> AliasedTerm (expression, alias))
-
-    let commaSepExpressions = commaSeparated expression .>> spaces
-
-    let parseBetween =
-      unaliasedExpression .>> skipWordSpacesCI "between"
-      .>>. unaliasedExpression .>> skipWordSpacesCI "and" .>>.unaliasedExpression
-      |>> fun ((a, b), c) -> Condition.Between (a, b, c)
-
-    let p1BetweenP2ToT p1 p2 t = p2 .>> spaces .>> p1 .>> spaces .>>. p2 .>> spaces |>> t
-
-    let whereClauseCondition, whereClauseConditionRef = createParserForwardedToRef()
-
-    do whereClauseConditionRef := choice [
-        attempt (p1BetweenP2ToT parseEqual unaliasedExpression Condition.Equal)
-        attempt (p1BetweenP2ToT parseNotEqual unaliasedExpression Condition.NotEqual)
-        attempt (p1BetweenP2ToT parseGT unaliasedExpression Condition.GT)
-        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
-        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
-        attempt (p1BetweenP2ToT parseLT unaliasedExpression Condition.LT)
-        attempt (skipWordSpacesCI "not" >>. unaliasedExpression |>> Condition.Not)
-        attempt parseBetween
-        unaliasedExpression |>> Condition.IsTrue
-      ]
-
-    let whereClauseDisjunction =
-      sepBy1 whereClauseCondition (skipWordSpacesCI "or")
-      |>> List.reduce (fun a b -> Condition.Or (a, b))
-
-    let whereClauseConjunction =
-      sepBy1 whereClauseDisjunction (skipWordSpacesCI "and")
-      |>> List.reduce (fun a b -> Condition.And (a, b))
-
-    let whereClause = skipWordSpacesCI "WHERE" .>> spaces >>. whereClauseConjunction
-
-    let groupBy = skipWordsCI [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expression
-
-    let parse =
-      skipWordSpacesCI "SELECT" >>. commaSepExpressions .>> skipWordSpacesCI "FROM"
-      .>>. table
-      .>>. opt whereClause
-      .>>. opt groupBy
-      |>> function
-      | ((columns, table), whereClauseConditionOption), groupByColumnsOption ->
-        SelectQuery {
+  let parseSelectQuery =
+    word "SELECT" >>= fun _ ->
+    distinct >>= fun distinct ->
+    commaSepExpressions >>= fun columns ->
+    from >>= fun table ->
+    opt whereClause >>= fun whereClause ->
+    opt groupBy >>= fun groupBy ->
+      let query =
+        {
+          SelectDistinct = distinct
           Expressions = columns
           From = table
-          Where = whereClauseConditionOption
-          GroupBy = groupByColumnsOption |> Option.defaultValue []
+          Where = whereClause
+          GroupBy = groupBy |> Option.defaultValue []
         }
+      preturn (Expression.SelectQuery query)
 
-  let skipSemiColon = optional (skipSatisfy ((=) ';')) .>> spaces
+  let identifiersColumnsInTable =
+    words [ "COLUMNS"; "FROM" ] >>. (simpleIdentifier <?> "table name")
+    |>> ShowQuery.Columns
 
-  let query =
-    spaces >>. (attempt ShowQueries.parse <|> SelectQueries.parse)
-    .>> skipSemiColon
-    .>> eof
+  let identifierTables = word "TABLES" |>> fun _ -> ShowQuery.Tables
 
-  let parse = run query
+  let parseShowQuery =
+    word "SHOW"
+    >>. (identifierTables <|> identifiersColumnsInTable)
+    |>> Expression.ShowQuery
+
+  // This is sort of silly... but the operator precedence parser is case sensitive. This means
+  // if we add a parser for AND, then it will fail if you write a query as And... Therefore
+  // this function brute forces all cases of a word...
+  let allCasingPermutations (s: string) =
+    let rec createPermutations acc next =
+      match acc, next with
+      | [], c :: cs -> createPermutations [$"%c{System.Char.ToLower(c)}"; $"%c{System.Char.ToUpper(c)}"] cs
+      | acc, c :: cs ->
+        let newLower = acc |> List.map(fun opVariant -> $"%s{opVariant}%c{System.Char.ToLower(c)}")
+        let newUpper = acc |> List.map(fun opVariant -> $"%s{opVariant}%c{System.Char.ToUpper(c)}")
+        createPermutations (newLower @ newUpper) cs
+      | acc, [] -> acc
+    s.ToCharArray()
+    |> Array.toList
+    |> createPermutations []
+    // To avoid duplicates of such things as upper and lowercase "+"
+    |> Set.ofList
+    |> Set.toList
+
+  let addOperator opType opName parseNext precedence associativity f =
+    allCasingPermutations opName
+    |> List.iter(fun opVariant -> opp.AddOperator(opType(opVariant, parseNext, precedence, associativity, f)))
+
+  let addInfixOperator = addOperator InfixOperator
+  let addPrefixOperator = addOperator PrefixOperator
+  let addPostfixOperator = addOperator PostfixOperator
+
+  addPrefixOperator "distinct" spaces 1 false Expression.Distinct
+  addInfixOperator "as" spaces 1 Associativity.Left (fun left right -> Expression.As(left, right))
+  addInfixOperator "and" spaces 1 Associativity.Left (fun left right -> Expression.And(left, right))
+  addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left (fun left right -> Expression.Or(left, right))
+  addInfixOperator "=" spaces 3 Associativity.Left (fun left right -> Expression.Equal(left, right))
+  addInfixOperator "<>" spaces 3 Associativity.Left (fun left right -> Expression.Not(Expression.Equal(left, right)))
+  addInfixOperator ">" spaces 3 Associativity.Left (fun left right -> Expression.Gt(left, right))
+  addInfixOperator "<" spaces 3 Associativity.Left (fun left right -> Expression.Lt(left, right))
+  addInfixOperator "<=" spaces 3 Associativity.Left (fun left right -> Expression.LtE(left, right))
+  addInfixOperator ">=" spaces 3 Associativity.Left (fun left right -> Expression.GtE(left, right))
+  addInfixOperator "+" spaces 4 Associativity.Left (fun left right -> Expression.Function("+", [left; right]))
+  addInfixOperator "-" spaces 4 Associativity.Left (fun left right -> Expression.Function("-", [left; right]))
+  addInfixOperator "*" spaces 5 Associativity.Left (fun left right -> Expression.Function("*", [left; right]))
+  addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [left; right]))
+  addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [left; right]))
+  addPrefixOperator "not" spaces 7 false Expression.Not
+  addPostfixOperator "is null" spaces 8 false (fun expr -> Expression.Equal(expr, Expression.Null))
+  addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.Equal(expr, Expression.Null)))
+  addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [left; right]))
+
+  opp.TermParser <- choice [
+    (attempt parseShowQuery)
+    (attempt parseSelectQuery)
+    (attempt functionExpression)
+    inParenthesis expr
+    star
+    number
+    boolean
+    stringLiteral
+    identifier
+  ]
+
+  let fullParser =
+    spaces >>. expr .>> (opt (pchar ';')) .>> spaces .>> eof
 
 type SqlParserError = CouldNotParse of string
 
-let parse sql: Result<Query, SqlParserError> =
-  match FParsec.CharParsers.run Definitions.query sql with
-  | FParsec.CharParsers.Success (result, _, _) -> Ok result
+let parse sql: Result<Expression, SqlParserError> =
+  match FParsec.CharParsers.run Definitions.fullParser sql with
+  | FParsec.CharParsers.Success (result, _, _) ->
+    match result with
+    | SelectQuery _
+    | ShowQuery _ -> Ok result
+    | _ -> Error(CouldNotParse "Expecting a SELECT or SHOW query")
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)

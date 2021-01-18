@@ -5,53 +5,47 @@ type Constant =
   | String of string
   | Boolean of bool
 
-type Operator =
-  | Not      // not
-  | Plus     // +
-  | Minus    // -
-  | Star     // *
-  | Slash    // /
-  | Hat      // ^
-  | Equal    // =
-  | NotEqual // <>
-  | LT       // <
-  | GT       // >
-  | And      // and
-  | Or       // or
-
-type Expression =
-  | Operator of Operator
-  | Constant of Constant
-  | Term of termName: string
-  | AliasedTerm of term: Expression * aliasName: string
-  | Function of functionName: string * Expression list
-
 type From = Table of tableName: string
-
-[<RequireQualifiedAccess>]
-type Condition =
-  | Not of Expression
-  | IsTrue of Expression
-  | Equal of Expression * Expression
-  | NotEqual of Expression * Expression
-  | GT of Expression * Expression
-  | LT of Expression * Expression
-  | Between of Expression * Expression * Expression
-  | And of Condition * Condition
-  | Or of Condition * Condition
-
-type SelectQuery = {
-  Expressions: Expression list
-  From: From
-  Where: Condition option
-  GroupBy: Expression list
-}
 
 [<RequireQualifiedAccess>]
 type ShowQuery =
   | Tables
   | Columns of tableName: string
 
-type Query =
-  | Show of ShowQuery
+type SelectQuery = {
+  SelectDistinct: bool
+  Expressions: Expression list
+  From: Expression
+  Where: Expression option
+  GroupBy: Expression list
+}
+
+and Expression =
+  | Star
+  | Null
+  | Integer of int32
+  | Float of float
+  | String of string
+  | Boolean of bool
+  | Distinct of expression: Expression
+  | And of left: Expression * right: Expression
+  | Or of left: Expression * right: Expression
+  | Not of expr: Expression
+  | Lt of left: Expression * right: Expression
+  | LtE of left: Expression * right: Expression
+  | Gt of left: Expression * right: Expression
+  | GtE of left: Expression * right: Expression
+  | Equal of left: Expression * right: Expression
+  | As of left: Expression * right: Expression
+  | Identifier of identifierName: string
+  | Function of functionName: string * Expression list
+  | ShowQuery of ShowQuery
   | SelectQuery of SelectQuery
+  // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
+  // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then
+  // the operator parser rejects the definition since it clashes with the regular AND operator parser.
+  // If instead it is defined as the infix operator BETWEEN requiring later validation that the
+  // right hand expression was a conjunction, then I couldn't get the precedence to work correctly.
+  // Regular AND binds loosely, whereas AND as the second term in BETWEEN binds very tightly.
+  // I couldn't get the parse tree to be anything but nonsensical using this approach.
+

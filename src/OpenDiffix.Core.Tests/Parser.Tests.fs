@@ -1,130 +1,169 @@
 module OpenDiffix.Core.ParserTests
 
+open OpenDiffix.Core.ParserTypes
 open Xunit
 open FParsec.CharParsers
 open OpenDiffix.Core
-open OpenDiffix.Core.ParserTypes
 open OpenDiffix.Core.Parser.Definitions
+// Import is needed for type checking although your editor might claim it's not in use
+open OpenDiffix.Core.ParserTypes
 
 let parse p string =
   match run p string with
   | ParserResult.Success (value, _, _) -> Ok value
   | ParserResult.Failure (error, _, _) -> Error error
 
-let distinct = Term "distinct"
-let star = Operator Star
-let integer i = Constant (Integer i)
-let string s = Constant (String s)
+[<Fact>]
+let ``Parses simple identifiers`` () =
+  assertOkEqual (parse commaSepExpressions "hello") [Identifier "hello"]
+  assertOkEqual (parse commaSepExpressions "hello, world") [Identifier "hello"; Identifier "world"]
+  assertOkEqual (parse commaSepExpressions "hello12") [Identifier "hello12"]
+  assertOkEqual (parse commaSepExpressions "hello_12") [Identifier "hello_12"] // Allows underscores
+  assertOkEqual (parse commaSepExpressions "hello.bar12") [Identifier "hello.bar12"] // Allows punctuated names
 
 [<Fact>]
-let ``Parses words`` () =
-  assertOkEqual (parse anyWord "hello") "hello"
-  assertError (parse anyWord ",hello") // Rejects something not starting with a character
-  assertOkEqual (parse anyWord "hello, world") "hello" // Parses until special token
-  assertOkEqual (parse anyWord "hello12") "hello12" // Parses digits too
-  assertError (parse anyWord "12hello") // Rejects things starting with digits
-  assertOkEqual (parse anyWord "hello_12") "hello_12" // Allows underscores
+let ``Parses expressions`` () =
+  [
+    "1", Integer 1
+    "1.1", Float 1.1
+    "1.01", Float 1.01
+    "1.001", Float 1.001
+    "'hello'", String "hello"
+    "true", Boolean true
+    "false", Boolean false
+  ]
+  |> List.iter(fun (value, expected) -> assertOkEqual (parse expr value) expected)
 
-[<Fact>]
-let ``Parses terms`` () =
-  assertOkEqual (parse SelectQueries.term "+") (Expression.Operator Operator.Plus)
-  assertOkEqual (parse SelectQueries.term "-") (Expression.Operator Operator.Minus)
-  assertOkEqual (parse SelectQueries.term "*") (Expression.Operator Operator.Star)
-  assertOkEqual (parse SelectQueries.term "/") (Expression.Operator Operator.Slash)
-  assertOkEqual (parse SelectQueries.term "^") (Expression.Operator Operator.Hat)
-  assertOkEqual (parse SelectQueries.term "not") (Expression.Operator Operator.Not)
-  assertOkEqual (parse SelectQueries.term "and") (Expression.Operator Operator.And)
-  assertOkEqual (parse SelectQueries.term "or") (Expression.Operator Operator.Or)
-  assertOkEqual (parse SelectQueries.term ">") (Expression.Operator Operator.GT)
-  assertOkEqual (parse SelectQueries.term "<") (Expression.Operator Operator.LT)
-  assertOkEqual (parse SelectQueries.term "=") (Expression.Operator Operator.Equal)
-  assertOkEqual (parse SelectQueries.term "<>") (Expression.Operator Operator.NotEqual)
-  assertOkEqual (parse SelectQueries.term "false") (Expression.Constant (Boolean false))
-  assertOkEqual (parse SelectQueries.term "true") (Expression.Constant (Boolean true))
-  assertOkEqual (parse SelectQueries.term "1") (Expression.Constant (Integer 1))
-  assertOkEqual (parse SelectQueries.term "hello") (Expression.Term "hello")
+  [
+    "+"
+    "-"
+    "*"
+    "/"
+    "^"
+    "%"
+  ]
+  |> List.iter(fun op ->
+    assertOkEqual (parse expr $"1 %s{op} 1") (Expression.Function (op, [Integer 1; Integer 1]))
+  )
+
+  [
+    "and", And
+    "or", Or
+    "<", Lt
+    "<=", LtE
+    ">", Gt
+    ">=", GtE
+    "=", Equal
+    "<>", Not << Equal
+  ]
+  |> List.iter(fun (op, expected) ->
+    assertOkEqual (parse expr $"1 %s{op} 1") (expected (Integer 1, Integer 1))
+  )
+
+  assertOkEqual (parse expr "not 1") (Expression.Not (Integer 1))
+  assertOkEqual (parse expr "value is null") (Equal (Identifier "value", Null))
+  assertOkEqual (parse expr "value is not null") (Not (Equal (Identifier "value", Null)))
+  assertOkEqual (parse expr "value as alias") (As (Identifier "value", Identifier "alias"))
+
 
 [<Fact>]
 let ``Parses columns`` () =
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello") [ Term "hello" ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello, world") [ Term "hello"; Term "world" ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello,world") [ Term "hello"; Term "world" ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello ,world") [ Term "hello"; Term "world" ]
+  assertOkEqual (parse commaSepExpressions "hello") [ Identifier "hello" ]
+  assertOkEqual (parse commaSepExpressions "hello, world") [ Identifier "hello"; Identifier "world" ]
+  assertOkEqual (parse commaSepExpressions "hello,world") [ Identifier "hello"; Identifier "world" ]
+  assertOkEqual (parse commaSepExpressions "hello ,world") [ Identifier "hello"; Identifier "world" ]
 
 [<Fact>]
 let ``Parses functions`` () =
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello(world)") [ Function("hello", [Term "world"]) ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "hello ( world )") [ Function("hello", [Term "world"]) ]
+  assertOkEqual (parse commaSepExpressions "hello(world)") [ Function("hello", [Identifier "world"]) ]
+  assertOkEqual (parse commaSepExpressions "hello ( world )") [ Function("hello", [Identifier "world"]) ]
   assertOkEqual
-    (parse SelectQueries.commaSepExpressions "hello(world), hello(moon)")
-    [ Function("hello", [Term "world"]); Function("hello", [Term "moon"]) ]
+    (parse commaSepExpressions "hello(world), hello(moon)")
+    [ Function("hello", [Identifier "world"]); Function("hello", [Identifier "moon"]) ]
 
 [<Fact>]
-let ``Parses function args`` () =
-  assertOkEqual (parse SelectQueries.spaceSepUnaliasedExpressions "* distinct foo")
-    [star; distinct; Term "foo"]
+let ``Precedence is as expected`` () =
+  assertOkEqual (parse expr "1 + 2 * 3^2 < 1 AND a or not b IS NULL") (
+    And(
+      Lt(
+        Function("+", [
+          Integer 1
+          Function("*", [
+            Integer 2
+            Function("^", [Integer 3; Integer 2])
+          ])
+        ]),
+        Integer 1
+      ),
+      Or(
+        Identifier "a",
+        Not(
+          Equal(
+            Identifier "b",
+            Null
+          )
+        )
+      )
+    )
+  )
 
 [<Fact>]
 let ``Parses count(*)`` () =
-  let expected = Function("count", [star])
-  assertOkEqual (parse SelectQueries.commaSepExpressions "count(*)") [ expected ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "count( *     )") [ expected ]
+  let expected = Function("count", [Star])
+  assertOkEqual (parse commaSepExpressions "count(*)") [ expected ]
+  assertOkEqual (parse commaSepExpressions "count( *     )") [ expected ]
 
 [<Fact>]
 let ``Parses count(distinct col)`` () =
-  let expected = Function("count", [distinct; Term "col"])
-  assertOkEqual (parse SelectQueries.commaSepExpressions "count(distinct col)") [ expected ]
-  assertOkEqual (parse SelectQueries.commaSepExpressions "count ( distinct     col )") [ expected ]
+  let expected = Function("count", [Distinct (Identifier "col")])
+  assertOkEqual (parse commaSepExpressions "count(distinct col)") [ expected ]
+  assertOkEqual (parse commaSepExpressions "count ( distinct     col )") [ expected ]
 
 [<Fact>]
 let ``Parses complex functions`` () =
-  let expected = Function("length", [Function("sum", [Term "rain"; (Operator Plus); Term "sun"])])
-  assertOkEqual (parse SelectQueries.commaSepExpressions "length(sum(rain + sun))") [ expected ]
-
-[<Fact>]
-let ``Parses optional semicolon`` () =
-  assertOk (parse skipSemiColon ";")
-  assertOk (parse skipSemiColon "")
+  let expected = Function("length", [Function("sum", [Function("+", [Identifier "rain"; Identifier "sun"])])])
+  assertOkEqual (parse expr "length(sum(rain + sun))") expected
 
 [<Fact>]
 let ``Parses WHERE clause conditions`` () =
-  assertOkEqual (parse SelectQueries.whereClauseCondition "a = 1") (Condition.Equal (Term "a", integer 1))
-  assertOkEqual (parse SelectQueries.whereClauseCondition "a = '1'") (Condition.Equal (Term "a", string "1"))
-
-[<Fact>]
-let ``Parses WHERE clause construct`` () =
-  assertOkEqual (parse SelectQueries.whereClause "WHERE a = 1 and b <> 'hello'")
-    (Condition.And (Condition.Equal (Term "a", integer 1), Condition.NotEqual (Term "b", string "hello")))
+  assertOkEqual (parse whereClause "WHERE a = 1") (Equal (Identifier "a", Integer 1))
+  assertOkEqual (parse whereClause "WHERE a = '1'") (Equal (Identifier "a", String "1"))
 
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
-  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a, b, c") [ Term "a"; Term "b"; Term "c" ]
-  assertOkEqual (parse SelectQueries.groupBy "GROUP BY a") [ Term "a" ]
-  assertError (parse SelectQueries.groupBy "GROUP BY")
+  assertOkEqual (parse groupBy "GROUP BY a, b, c") [ Identifier "a"; Identifier "b"; Identifier "c" ]
+  assertOkEqual (parse groupBy "GROUP BY a") [ Identifier "a" ]
+  assertError (parse groupBy "GROUP BY")
 
 [<Fact>]
 let ``Parses SELECT by itself`` () =
   assertOkEqual
-    (parse SelectQueries.parse "SELECT col FROM table")
-    (SelectQuery { Expressions = [ Term "col" ]; From = Table "table"; Where = None; GroupBy = []})
+    (parse parseSelectQuery "SELECT col FROM table")
+    (SelectQuery { SelectDistinct = false; Expressions = [ Identifier "col" ]; From = Identifier "table"; Where = None; GroupBy = []})
+
+[<Fact>]
+let ``Parses SELECT DISTINCT`` () =
+  assertOkEqual
+    (parse parseSelectQuery "SELECT DISTINCT col FROM table")
+    (SelectQuery { SelectDistinct = true; Expressions = [ Identifier "col" ]; From = Identifier "table"; Where = None; GroupBy = []})
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
-let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (Show ShowQuery.Tables)
+let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (ShowQuery ShowQuery.Tables)
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (Parser.parse "show columns FROM bar") (Show (ShowQuery.Columns("bar")))
+  assertOkEqual (Parser.parse "show columns FROM bar") (ShowQuery (ShowQuery.Columns("bar")))
 
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
-  assertOkEqual<Query, _>
+  assertOkEqual<Expression, _>
     (Parser.parse
       "   show
                    tables   ")
-    (Show ShowQuery.Tables)
+    (ShowQuery ShowQuery.Tables)
 
 [<Fact>]
 let ``Parse SELECT query with columns and table`` () =
@@ -132,8 +171,9 @@ let ``Parse SELECT query with columns and table`` () =
     (Parser.parse "SELECT col1, col2 FROM table")
     (SelectQuery
       {
-        Expressions = [ Term "col1"; Term "col2" ]
-        From = Table "table"
+        SelectDistinct = false
+        Expressions = [ Identifier "col1"; Identifier "col2" ]
+        From = Identifier "table"
         Where = None
         GroupBy = []
       })
@@ -142,8 +182,9 @@ let ``Parse SELECT query with columns and table`` () =
     (Parser.parse "SELECT col1, col2 FROM table ;")
     (SelectQuery
       {
-        Expressions = [ Term "col1"; Term "col2" ]
-        From = Table "table"
+        SelectDistinct = false
+        Expressions = [ Identifier "col1"; Identifier "col2" ]
+        From = Identifier "table"
         Where = None
         GroupBy = []
       })
@@ -159,10 +200,11 @@ let ``Parse aggregate query`` () =
          """)
     (SelectQuery
       {
-        Expressions = [ Term "col1"; Function("count", [distinct; Term "aid"]) ]
-        From = Table "table"
+        SelectDistinct = false
+        Expressions = [ Identifier "col1"; Function("count", [Distinct(Identifier "aid")]) ]
+        From = Identifier "table"
         Where = None
-        GroupBy = [ Term "col1" ]
+        GroupBy = [ Identifier "col1" ]
       })
 
 [<Fact>]
@@ -172,24 +214,22 @@ let ``Parse aggregate query with where clause`` () =
       """
          SELECT col1, count(distinct aid)
          FROM table
-         WHERE col1 = 1 AND col2 = 2 or col2 = 3 AND aid between 1 and 5
+         WHERE col1 = 1 AND col2 = 2 or col2 = 3
          GROUP BY col1
          """)
     (SelectQuery
       {
-        Expressions = [ Term "col1"; Function("count", [distinct; Term "aid"]) ]
-        From = Table "table"
+        SelectDistinct = false
+        Expressions = [ Identifier "col1"; Function("count", [Distinct(Identifier "aid")]) ]
+        From = Identifier "table"
         Where =
           Some
-            (Condition.And (
-              Condition.And (
-                Condition.Equal (Term "col1", integer 1),
-                (Condition.Or (
-                  Condition.Equal (Term "col2", integer 2),
-                  Condition.Equal (Term "col2", integer 3)
-                ))
-              ),
-              Condition.Between (Term "aid", integer 1, integer 5)
+            (And (
+              Equal (Identifier "col1", Integer 1),
+              (Or (
+                Equal (Identifier "col2", Integer 2),
+                Equal (Identifier "col2", Integer 3)
+              ))
             ))
-        GroupBy = [ Term "col1" ]
+        GroupBy = [ Identifier "col1" ]
       })

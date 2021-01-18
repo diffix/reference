@@ -12,8 +12,9 @@ module QueryEngine =
 
       let! result =
         match queryAst with
-        | ParserTypes.Show query -> DiffixSqlite.executeShow connection query
+        | ParserTypes.ShowQuery query -> DiffixSqlite.executeShow connection query
         | ParserTypes.SelectQuery query -> DiffixSqlite.executeSelect connection reqParams.AnonymizationParams query
+        | _ -> AsyncResult.returnError (ExecutionError "Expecting an SQL query to run")
 
       do! connection.CloseAsync() |> Async.AwaitTask
       return result
