@@ -8,7 +8,7 @@ type Constant =
 type From = Table of tableName: string
 
 [<RequireQualifiedAccess>]
-type ShowQuery =
+type ShowQueryKinds =
   | Tables
   | Columns of tableName: string
 
@@ -39,7 +39,7 @@ and Expression =
   | As of left: Expression * right: Expression
   | Identifier of identifierName: string
   | Function of functionName: string * Expression list
-  | ShowQuery of ShowQuery
+  | ShowQuery of ShowQueryKinds
   | SelectQuery of SelectQuery
   // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
   // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then

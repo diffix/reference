@@ -151,11 +151,11 @@ let ``Parses SELECT DISTINCT`` () =
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
-let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (ShowQuery ShowQuery.Tables)
+let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (ShowQuery ShowQueryKinds.Tables)
 
 [<Fact>]
 let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (Parser.parse "show columns FROM bar") (ShowQuery (ShowQuery.Columns("bar")))
+  assertOkEqual (Parser.parse "show columns FROM bar") (ShowQuery (ShowQueryKinds.Columns("bar")))
 
 [<Fact>]
 let ``Not sensitive to whitespace`` () =
@@ -163,7 +163,7 @@ let ``Not sensitive to whitespace`` () =
     (Parser.parse
       "   show
                    tables   ")
-    (ShowQuery ShowQuery.Tables)
+    (ShowQuery ShowQueryKinds.Tables)
 
 [<Fact>]
 let ``Parse SELECT query with columns and table`` () =

@@ -78,9 +78,9 @@ module Definitions =
 
   let identifiersColumnsInTable =
     words [ "COLUMNS"; "FROM" ] >>. (simpleIdentifier <?> "table name")
-    |>> ShowQuery.Columns
+    |>> ShowQueryKinds.Columns
 
-  let identifierTables = word "TABLES" |>> fun _ -> ShowQuery.Tables
+  let identifierTables = word "TABLES" |>> fun _ -> ShowQueryKinds.Tables
 
   let parseShowQuery =
     word "SHOW"

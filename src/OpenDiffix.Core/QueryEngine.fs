@@ -172,8 +172,8 @@ module QueryEngine =
 
   let executeShow (connection: SQLiteConnection) =
     function
-    | ShowQuery.Tables -> getTables connection
-    | ShowQuery.Columns tableName -> getColumnsFromTable connection tableName
+    | ShowQueryKinds.Tables -> getTables connection
+    | ShowQueryKinds.Columns tableName -> getColumnsFromTable connection tableName
 
   let private executeSelect (connection: DbConnection) anonymizationParams query =
     asyncResult {
