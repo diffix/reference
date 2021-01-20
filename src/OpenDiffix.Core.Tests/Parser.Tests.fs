@@ -190,6 +190,25 @@ let ``Parse SELECT query with columns and table`` () =
       })
 
 [<Fact>]
+let ``Multiline select`` () =
+  assertOkEqual
+    (Parser.parse
+      """
+         SELECT
+           col1
+         FROM
+           table
+         """)
+    (SelectQuery
+      {
+        SelectDistinct = false
+        Expressions = [ Identifier "col1" ]
+        From = Identifier "table"
+        Where = None
+        GroupBy = []
+      })
+
+[<Fact>]
 let ``Parse aggregate query`` () =
   assertOkEqual
     (Parser.parse
@@ -212,7 +231,7 @@ let ``Parse aggregate query with where clause`` () =
   assertOkEqual
     (Parser.parse
       """
-         SELECT col1, count(distinct aid)
+         SELECT col1 as colAlias, count(distinct aid)
          FROM table
          WHERE col1 = 1 AND col2 = 2 or col2 = 3
          GROUP BY col1
@@ -220,7 +239,7 @@ let ``Parse aggregate query with where clause`` () =
     (SelectQuery
       {
         SelectDistinct = false
-        Expressions = [ Identifier "col1"; Function("count", [Distinct(Identifier "aid")]) ]
+        Expressions = [ As (Identifier "col1", Identifier "colAlias"); Function("count", [Distinct(Identifier "aid")]) ]
         From = Identifier "table"
         Where =
           Some
