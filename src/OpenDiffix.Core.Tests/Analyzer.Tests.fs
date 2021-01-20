@@ -22,12 +22,12 @@ module AnalyzeShow =
 
   [<Fact>]
   let ``SHOW TABLES`` () =
-    testParsedQuery "SHOW TABLES" showQueries Analyzer.transformShowQuery (ShowQuery ShowQueryKinds.Tables)
+    testParsedQuery "SHOW TABLES" showQueries Analyzer.transformShowQuery (ShowQuery ShowQueryKind.Tables)
 
   [<Fact>]
   let ``SHOW columns FROM table`` () =
     testParsedQuery "SHOW columns FROM table" showQueries Analyzer.transformShowQuery
-      (ShowQuery (ShowQueryKinds.ColumnsInTable "table"))
+      (ShowQuery (ShowQueryKind.ColumnsInTable "table"))
 
 module AnalyzeSelect =
   let selectQueries =
@@ -50,7 +50,7 @@ module AnalyzeSelect =
   let ``Selecting columns from a table`` () =
     testParsedQuery "SELECT str_col, bool_col FROM table" selectQueries (Analyzer.transformSelectQueryWithTable testTable) (
       SelectQuery {
-        Select = [
+        Columns = [
           {
             Type = ExpressionType.StringType
             Expression = ColumnReference (0, ExpressionType.StringType)
@@ -63,7 +63,7 @@ module AnalyzeSelect =
           }
         ]
         Where = None
-        From = Table ("table", None)
+        From = Table (testTable, "")
         GroupBy = []
         GroupingSets = []
         Having = None
@@ -85,7 +85,7 @@ module AnalyzeSelect =
     "
     testParsedQuery query selectQueries (Analyzer.transformSelectQueryWithTable testTable) (
       SelectQuery {
-        Select = [
+        Columns = [
           {
             Type = ExpressionType.IntegerType
             Expression = ColumnReference (1, ExpressionType.IntegerType)
@@ -114,7 +114,7 @@ module AnalyzeSelect =
               FunctionExpr (Function.Lt, [ColumnReference (1, ExpressionType.IntegerType); Constant (Value.Integer 10)], FunctionType.Scalar)
             ], FunctionType.Scalar)
           )
-        From = Table ("table", None)
+        From = Table (testTable, "")
         GroupBy = [
           ColumnReference (1, ExpressionType.IntegerType)
           FunctionExpr (Function.Plus, [

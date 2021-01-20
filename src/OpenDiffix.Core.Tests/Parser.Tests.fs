@@ -1,11 +1,9 @@
 module OpenDiffix.Core.ParserTests
 
-open OpenDiffix.Core.ParserTypes
 open Xunit
 open FParsec.CharParsers
 open OpenDiffix.Core
 open OpenDiffix.Core.Parser.Definitions
-// Import is needed for type checking although your editor might claim it's not in use
 open OpenDiffix.Core.ParserTypes
 
 let parse p string =

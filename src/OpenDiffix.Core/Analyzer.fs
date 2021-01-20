@@ -5,9 +5,9 @@ open OpenDiffix.Core
 
 let transformShowQuery showQuery: Result<AnalyzerTypes.Query, string> =
   match showQuery with
-  | OpenDiffix.Core.ParserTypes.ShowQueryKinds.Tables -> AnalyzerTypes.ShowQueryKinds.Tables
-  | ParserTypes.ShowQueryKinds.Columns tableName -> AnalyzerTypes.ShowQueryKinds.ColumnsInTable tableName
-  |> AnalyzerTypes.Query.ShowQuery
+  | OpenDiffix.Core.ParserTypes.ShowQueryKinds.Tables -> AnalyzerTypes.ShowQueryKind.Tables
+  | ParserTypes.ShowQueryKinds.Columns tableName -> AnalyzerTypes.ShowQueryKind.ColumnsInTable tableName
+  |> AnalyzerTypes.ShowQuery
   |> Ok
 
 let columnToExpressionType =
@@ -133,9 +133,9 @@ let transformSelectQueryWithTable table (selectQuery: ParserTypes.SelectQuery) =
       |> List.map (mapExpression table)
       |> List.sequenceResultM
     return AnalyzerTypes.SelectQuery {
-      Select = selectedExpressions
+      Columns = selectedExpressions
       Where = whereClauseOption
-      From = AnalyzerTypes.SelectFrom.Table (table.Name, None)
+      From = AnalyzerTypes.SelectFrom.Table (table, "")
       GroupBy = groupBy
       GroupingSets = []
       Having = havingClauseOption
