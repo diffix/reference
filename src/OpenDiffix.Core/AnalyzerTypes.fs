@@ -17,9 +17,15 @@ type SelectExpression =
 
 type GroupingSet = int list
 
+[<RequireQualifiedAccess>]
+type ShowQuery =
+  | Tables
+  | ColumnsInTable of tableName: string
+
 type Query =
   | Union of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
+  | ShowQuery of ShowQuery
 
 and SelectQuery =
   {
