@@ -1,6 +1,7 @@
 namespace OpenDiffix.Core
 
 type ExpressionType =
+  | NullType
   | StringType
   | IntegerType
   | FloatType
