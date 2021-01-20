@@ -36,14 +36,14 @@ module Table =
       return
         schema
         |> List.map (fun table ->
-          let columns =
-            table.Columns
-            |> List.sortBy(fun column -> column.Name)
-            |> List.zip [0.. (List.length(table.Columns) - 1)]
-            |> List.map (fun (index, column) -> { Name = column.Name; Type = columnTypeFromString (column.Type); Index = index })
+             let columns =
+               table.Columns
+               |> List.sortBy (fun column -> column.Name)
+               |> List.zip [ 0 .. (List.length (table.Columns) - 1) ]
+               |> List.map (fun (index, column) ->
+                    { Name = column.Name; Type = columnTypeFromString (column.Type); Index = index })
 
-          { Name = table.Name; Columns = columns }
-        )
+             { Name = table.Name; Columns = columns })
     }
 
   let getI connection tableName =
@@ -56,9 +56,7 @@ module Table =
         |> Result.requireSome "Execution error: Table not found"
     }
 
-  let tryFindColumn table columnName =
-    table.Columns
-    |> List.tryFind(fun column -> equalsI column.Name columnName)
+  let tryFindColumn table columnName = table.Columns |> List.tryFind (fun column -> equalsI column.Name columnName)
 
   let getColumn table columnName =
     tryFindColumn table columnName
