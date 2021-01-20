@@ -10,6 +10,7 @@ type JoinType =
 
 type SelectExpression =
   {
+    //
     Type: ExpressionType
     Expression: Expression
     Alias: string
@@ -17,13 +18,14 @@ type SelectExpression =
 
 type GroupingSet = int list
 
+[<RequireQualifiedAccess>]
 type Query =
   | Union of distinct: bool * Query * Query
-  | SelectQuery of SelectQuery
+  | Select of SelectQuery
 
 and SelectQuery =
   {
-    Select: SelectExpression list
+    Columns: SelectExpression list
     Where: Expression
     From: SelectFrom
     GroupBy: Expression list
@@ -33,12 +35,13 @@ and SelectQuery =
   }
 
 and SelectFrom =
-  | SubQuery of query: Query * alias: string
+  | Query of query: Query * alias: string
   | Join of Join
-  | Table of name: string * alias: string option
+  | Table of table: Table * alias: string
 
 and Join =
   {
+    //
     Type: JoinType
     Condition: Expression
     Left: SelectFrom
