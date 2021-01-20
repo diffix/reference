@@ -1,5 +1,7 @@
 namespace OpenDiffix.Core
 
+open FsToolkit.ErrorHandling
+
 type ExpressionType =
   | NullType
   | StringType
@@ -9,10 +11,85 @@ type ExpressionType =
 
 type Row = Value array
 
-type Expression =
-  | Function of name: string * args: Expression list * functionType: FunctionType
-  | ColumnReference of index: int
+type Function =
+  | Plus
+  | Minus
+  | Equality
+  | Not
+  | And
+  | Or
+  | Lt
+  | LtE
+  | Gt
+  | GtE
+  | Count
+  | Sum
+
+  static member FromString =
+    function
+    | "+" -> Ok Plus
+    | "-" -> Ok Minus
+    | "=" -> Ok Equality
+    | "count" -> Ok Count
+    | "sum" -> Ok Sum
+    | other -> Error $"Unknown function %A{other}"
+
+  static member TypeInfo =
+    function
+    | Plus
+    | Minus
+    | Equality
+    | Not
+    | And
+    | Or
+    | Lt
+    | LtE
+    | Gt
+    | GtE -> Scalar
+    | Count
+    | Sum -> Aggregate AggregateOptions.Default
+
+  static member ReturnType fn (args: Expression list) =
+    match fn with
+    | Plus
+    | Minus ->
+      args
+      |> List.tryFind(fun arg ->
+        match (Expression.GetType arg) with
+        | Ok FloatType -> true
+        | _ -> false
+      )
+      |> Option.map(fun _ -> FloatType)
+      |> Option.defaultValue IntegerType
+      |> Ok
+    | Not
+    | And
+    | Equality
+    | Or
+    | Lt
+    | LtE
+    | Gt
+    | GtE -> Ok BooleanType
+    | Count -> Ok IntegerType
+    | Sum ->
+      List.tryHead args
+      |> Result.requireSome "Sum requires an argument"
+      |> Result.bind Expression.GetType
+
+and Expression =
+  | FunctionExpr of fn: Function * args: Expression list * functionType: FunctionType
+  | ColumnReference of index: int * exprType: ExpressionType
   | Constant of value: Value
+
+  static member GetType =
+    function
+    | FunctionExpr (fn, args, _fnType) -> Function.ReturnType fn args
+    | ColumnReference (_, exprType) -> Ok exprType
+    | Constant (String _) -> Ok StringType
+    | Constant (Integer _) -> Ok IntegerType
+    | Constant (Boolean _) -> Ok BooleanType
+    | Constant (Float _) -> Ok FloatType
+    | Constant Null -> Ok NullType
 
 and FunctionType =
   | Scalar
@@ -92,6 +169,15 @@ module DefaultFunctions =
     | [ Null ] -> Null
     | _ -> invalidOverload "not"
 
+  let binaryBooleanCheck check _ctx =
+    function
+    | [_a; _b] as values ->
+      values
+      |> List.map Value.IsTruthy
+      |> List.reduce check
+      |> Value.Boolean
+    | _ -> failwith "Expected two arguments for binary condition"
+
 module DefaultAggregates =
   open ExpressionUtils
 
@@ -111,31 +197,32 @@ module DefaultAggregates =
     |> Integer
 
 module Expression =
-  let functions =
-    Map.ofList [
-      "+", DefaultFunctions.add
-      "-", DefaultFunctions.sub
-      "=", DefaultFunctions.equals
-      "not", DefaultFunctions.not
-    ]
+  let invokeFunction ctx fn args =
+    match fn with
+    | Plus -> DefaultFunctions.add ctx args
+    | Minus -> DefaultFunctions.sub ctx args
+    | Equality -> DefaultFunctions.equals ctx args
+    | Not -> DefaultFunctions.not ctx args
+    | And -> DefaultFunctions.binaryBooleanCheck (&&) ctx args
+    | Or -> DefaultFunctions.binaryBooleanCheck (||) ctx args
+    | Lt -> DefaultFunctions.binaryBooleanCheck (<) ctx args
+    | LtE -> DefaultFunctions.binaryBooleanCheck (<=) ctx args
+    | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
+    | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
+    | Count | Sum -> failwith "Aggregate functions are invoked using invokeAggregate"
 
-  let aggregates = Map.ofList [ "sum", DefaultAggregates.sum; "count", DefaultAggregates.count ]
-
-  let invokeFunction ctx name args =
-    match Map.tryFind name functions with
-    | Some fn -> fn ctx args
-    | None -> failwith $"Unknown function '{name}'."
-
-  let invokeAggregate ctx name mappedArgs =
-    match Map.tryFind name aggregates with
-    | Some fn -> fn ctx mappedArgs
-    | None -> failwith $"Unknown aggregate '{name}'."
+  let invokeAggregate ctx fn mappedArgs =
+    match fn with
+    | Count -> DefaultAggregates.count ctx mappedArgs
+    | Sum -> DefaultAggregates.sum ctx mappedArgs
+    | Plus | Minus | Equality | Not | And | Or | Lt | LtE | Gt | GtE ->
+      failwith "Aggregate functions are invoked using invokeAggregate"
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
-    | Function (name, args, Scalar) -> invokeFunction ctx name (args |> List.map (evaluate ctx row))
-    | Function (name, _, _) -> failwith $"Invalid usage of aggregate '{name}'."
-    | ColumnReference index -> row.[index]
+    | FunctionExpr (fn, args, Scalar) -> invokeFunction ctx fn (args |> List.map (evaluate ctx row))
+    | FunctionExpr (name, _, _) -> failwith $"Invalid usage of aggregate '{name}'."
+    | ColumnReference (index, _) -> row.[index]
     | Constant value -> value
 
   open System.Linq
@@ -171,10 +258,10 @@ module Expression =
     | Some value -> value
     | None ->
         match expr with
-        | Function (name, args, Scalar) ->
+        | FunctionExpr (name, args, Scalar) ->
             let evaluatedArgs = args |> List.map (evaluateAggregated ctx groupings rows)
             invokeFunction ctx name evaluatedArgs
-        | Function (name, args, Aggregate opts) ->
+        | FunctionExpr (name, args, Aggregate opts) ->
             let aggregateArgs = prepareAggregateArgs ctx args opts rows
             invokeAggregate ctx name aggregateArgs
         | ColumnReference _ -> failwith $"Incorrect column reference in aggregated context."
