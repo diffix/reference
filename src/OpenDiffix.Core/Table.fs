@@ -7,7 +7,7 @@ type ColumnType =
   | StringType
   | UnknownType of string
 
-type Column = { Name: string; Type: ColumnType }
+type Column = { Name: string; Type: ColumnType; Index: int }
 
 type Table = { Name: string; Columns: Column list }
 
@@ -38,7 +38,9 @@ module Table =
         |> List.map (fun table ->
           let columns =
             table.Columns
-            |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString (column.Type) })
+            |> List.sortBy(fun column -> column.Name)
+            |> List.zip [0.. (List.length(table.Columns) - 1)]
+            |> List.map (fun (index, column) -> { Name = column.Name; Type = columnTypeFromString (column.Type); Index = index })
 
           { Name = table.Name; Columns = columns }
         )
