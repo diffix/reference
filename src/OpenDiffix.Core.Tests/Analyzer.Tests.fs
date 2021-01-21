@@ -46,7 +46,7 @@ module AnalyzeSelect =
               }
             ]
           Where = Boolean true |> Constant
-          From = Table(testTable, "")
+          From = Table testTable
           GroupBy = []
           GroupingSets = [ [] ]
           Having = Boolean true |> Constant
@@ -111,7 +111,7 @@ module AnalyzeSelect =
                     FunctionType.Scalar)
                ],
                FunctionType.Scalar)
-          From = Table(testTable, "")
+          From = Table testTable
           GroupBy =
             [
               ColumnReference(1, ExpressionType.IntegerType)

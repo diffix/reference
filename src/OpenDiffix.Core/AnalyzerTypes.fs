@@ -34,9 +34,9 @@ and SelectQuery =
   }
 
 and SelectFrom =
-  | Query of query: Query * alias: string
+  | Query of query: Query
   | Join of Join
-  | Table of table: Table * alias: string
+  | Table of table: Table
 
 and Join =
   {
