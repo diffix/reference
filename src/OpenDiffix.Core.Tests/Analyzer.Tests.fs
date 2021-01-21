@@ -18,10 +18,10 @@ module AnalyzeSelect =
       Name = "table"
       Columns =
         [
-          { Name = "str_col"; Type = ColumnType.StringType }
-          { Name = "int_col"; Type = ColumnType.IntegerType }
-          { Name = "float_col"; Type = ColumnType.FloatType }
-          { Name = "bool_col"; Type = ColumnType.BooleanType }
+          { Name = "str_col"; Type = StringType }
+          { Name = "int_col"; Type = IntegerType }
+          { Name = "float_col"; Type = FloatType }
+          { Name = "bool_col"; Type = BooleanType }
         ]
     }
 
@@ -34,16 +34,8 @@ module AnalyzeSelect =
         {
           Columns =
             [
-              {
-                Type = ExpressionType.StringType
-                Expression = ColumnReference(0, ExpressionType.StringType)
-                Alias = ""
-              }
-              {
-                Type = ExpressionType.BooleanType
-                Expression = ColumnReference(3, ExpressionType.BooleanType)
-                Alias = ""
-              }
+              { Expression = ColumnReference(0, StringType); Alias = "" }
+              { Expression = ColumnReference(3, BooleanType); Alias = "" }
             ]
           Where = Boolean true |> Constant
           From = Table testTable
@@ -73,46 +65,32 @@ module AnalyzeSelect =
         {
           Columns =
             [
+              { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
               {
-                Type = ExpressionType.IntegerType
-                Expression = ColumnReference(1, ExpressionType.IntegerType)
-                Alias = "colAlias"
-              }
-              {
-                Type = ExpressionType.FloatType
                 Expression =
-                  FunctionExpr
-                    (ScalarFunction Plus,
-                     [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ])
+                  FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
                 Alias = ""
               }
               {
-                Type = ExpressionType.IntegerType
                 Expression =
-                  FunctionExpr
-                    (AggregateFunction(Count, AggregateOptions.Default),
-                     [ ColumnReference(1, ExpressionType.IntegerType) ])
+                  FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
                 Alias = ""
               }
             ]
           Where =
-            FunctionExpr
-              (ScalarFunction And,
-               [
-                 FunctionExpr
-                   (ScalarFunction Gt, [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ])
-                 FunctionExpr
-                   (ScalarFunction Lt, [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ])
-               ])
+            FunctionExpr(
+              ScalarFunction And,
+              [
+                FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0) ])
+                FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10) ])
+              ]
+            )
           From = Table testTable
           GroupBy =
             [
-              ColumnReference(1, ExpressionType.IntegerType)
-              FunctionExpr
-                (ScalarFunction Plus,
-                 [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ])
-              FunctionExpr
-                (AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, ExpressionType.IntegerType) ])
+              ColumnReference(1, IntegerType)
+              FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
+              FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
             ]
           GroupingSets = [ [ 0; 1; 2 ] ]
           Having = Boolean true |> Constant

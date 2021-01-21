@@ -135,9 +135,9 @@ let testRows =
       "row2", 4, 4.5
     ]
 
-let colRef0 = ColumnReference(0, ExpressionType.StringType)
-let colRef1 = ColumnReference(1, ExpressionType.IntegerType)
-let colRef2 = ColumnReference(2, ExpressionType.FloatType)
+let colRef0 = ColumnReference(0, StringType)
+let colRef1 = ColumnReference(1, IntegerType)
+let colRef2 = ColumnReference(2, FloatType)
 
 let eval expr = Expression.evaluate ctx testRow expr
 
@@ -156,9 +156,12 @@ let evaluate () =
 [<Fact>]
 let evaluateAggregated () =
   // select sum(val_float - val_int)
-  evalAggr
-    (FunctionExpr
-      (AggregateFunction(Sum, AggregateOptions.Default), [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]))
+  evalAggr (
+    FunctionExpr(
+      AggregateFunction(Sum, AggregateOptions.Default),
+      [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
+    )
+  )
   |> should equal (Float 2.0)
 
   // select count(*)
@@ -192,8 +195,8 @@ let sortRows () =
   |> Expression.sortRows
        ctx
        [ //
-         ColumnReference(0, ExpressionType.StringType), Ascending, NullsLast
-         ColumnReference(1, ExpressionType.IntegerType), Descending, NullsFirst
+         ColumnReference(0, StringType), Ascending, NullsLast
+         ColumnReference(1, IntegerType), Descending, NullsFirst
        ]
   |> List.ofSeq
   |> should
