@@ -11,6 +11,10 @@ module DefaultFunctionsTests =
     expectations
     |> List.iter (fun (a, b, result) -> fn ctx [ a; b ] |> should equal result)
 
+  let runsWithArg fn arg expectations =
+    expectations
+    |> List.iter (fun (a, result) -> fn ctx arg [ a ] |> should equal result)
+
   let runs1 fn expectations =
     expectations
     |> List.iter (fun (a, result) -> fn ctx [ a ] |> should equal result)
@@ -80,6 +84,22 @@ module DefaultFunctionsTests =
         Null, Null
       ]
 
+  [<Fact>]
+  let binaryChecks () =
+    runs
+      (DefaultFunctions.binaryBooleanCheck (&&))
+      [ //
+        Boolean true, Boolean true, Boolean true
+        Boolean true, Boolean false, Boolean false
+        Boolean false, Boolean false, Boolean false
+        Integer 0, Boolean true, Boolean false
+        Float 0., Boolean true, Boolean false
+        String "", Boolean true, Boolean false
+        String "bar", Boolean true, Boolean false
+        String "true", Boolean true, Boolean true
+        Null, Boolean true, Boolean false
+      ]
+
 module DefaultAggregatorsTests =
   [<Fact>]
   let sum () =
@@ -115,41 +135,46 @@ let testRows =
       "row2", 4, 4.5
     ]
 
+let colRef0 = ColumnReference(0, ExpressionType.StringType)
+let colRef1 = ColumnReference(1, ExpressionType.IntegerType)
+let colRef2 = ColumnReference(2, ExpressionType.FloatType)
+
 let eval expr = Expression.evaluate ctx testRow expr
 
 let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
 
+
 [<Fact>]
 let evaluate () =
   // select val_int + 3
-  eval (Function("+", [ ColumnReference 1; Constant(Integer 3) ], Scalar))
+  eval (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3) ]))
   |> should equal (Integer 10)
 
   // select val_str
-  eval (ColumnReference 0) |> should equal (String "Some text")
+  eval colRef0 |> should equal (String "Some text")
 
 [<Fact>]
 let evaluateAggregated () =
   // select sum(val_float - val_int)
-  evalAggr (
-    Function("sum", [ Function("-", [ ColumnReference 2; ColumnReference 1 ], Scalar) ], Expression.defaultAggregate)
-  )
+  evalAggr
+    (FunctionExpr
+      (AggregateFunction(Sum, AggregateOptions.Default), [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]))
   |> should equal (Float 2.0)
 
   // select count(*)
-  evalAggr (Function("count", [], Expression.defaultAggregate))
+  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), []))
   |> should equal (Integer 4)
 
   // select count(1)
-  evalAggr (Function("count", [ Constant(Integer 1) ], Expression.defaultAggregate))
+  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ Constant(Integer 1) ]))
   |> should equal (Integer 4)
 
   // select count(distinct val_str)
-  evalAggr (Function("count", [ ColumnReference 0 ], Expression.distinctAggregate))
+  evalAggr (FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }), [ colRef0 ]))
   |> should equal (Integer 2)
 
   // select val_str
-  (fun () -> evalAggr (ColumnReference 0) |> ignore) |> shouldFail
+  (fun () -> evalAggr colRef0 |> ignore) |> shouldFail
 
 [<Fact>]
 let sortRows () =
@@ -167,8 +192,8 @@ let sortRows () =
   |> Expression.sortRows
        ctx
        [ //
-         ColumnReference 0, Ascending, NullsLast
-         ColumnReference 1, Descending, NullsFirst
+         ColumnReference(0, ExpressionType.StringType), Ascending, NullsLast
+         ColumnReference(1, ExpressionType.IntegerType), Descending, NullsFirst
        ]
   |> List.ofSeq
   |> should

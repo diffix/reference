@@ -7,18 +7,14 @@ type Constant =
 
 type From = Table of tableName: string
 
-[<RequireQualifiedAccess>]
-type ShowQuery =
-  | Tables
-  | Columns of tableName: string
-
-type SelectQuery = {
-  SelectDistinct: bool
-  Expressions: Expression list
-  From: Expression
-  Where: Expression option
-  GroupBy: Expression list
-}
+type SelectQuery =
+  {
+    SelectDistinct: bool
+    Expressions: Expression list
+    From: Expression
+    Where: Expression option
+    GroupBy: Expression list
+  }
 
 and Expression =
   | Star
@@ -39,13 +35,11 @@ and Expression =
   | As of left: Expression * right: Expression
   | Identifier of identifierName: string
   | Function of functionName: string * Expression list
-  | ShowQuery of ShowQuery
   | SelectQuery of SelectQuery
-  // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
-  // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then
-  // the operator parser rejects the definition since it clashes with the regular AND operator parser.
-  // If instead it is defined as the infix operator BETWEEN requiring later validation that the
-  // right hand expression was a conjunction, then I couldn't get the precedence to work correctly.
-  // Regular AND binds loosely, whereas AND as the second term in BETWEEN binds very tightly.
-  // I couldn't get the parse tree to be anything but nonsensical using this approach.
-
+// Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
+// If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then
+// the operator parser rejects the definition since it clashes with the regular AND operator parser.
+// If instead it is defined as the infix operator BETWEEN requiring later validation that the
+// right hand expression was a conjunction, then I couldn't get the precedence to work correctly.
+// Regular AND binds loosely, whereas AND as the second term in BETWEEN binds very tightly.
+// I couldn't get the parse tree to be anything but nonsensical using this approach.

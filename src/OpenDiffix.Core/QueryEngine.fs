@@ -27,8 +27,7 @@ module QueryEngine =
       let rows =
         table.Columns
         |> List.map (fun column -> //
-          [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ]
-        )
+             [ StringValue column.Name; StringValue(Table.columnTypeToString column.Type) ])
 
       return { Columns = [ "name"; "type" ]; Rows = rows }
     }
@@ -53,31 +52,31 @@ module QueryEngine =
     | As (expr, alias) -> $"%s{expressionToSql expr} AS %s{expressionToSql alias}"
     | Identifier name -> name
     | Function (functionName, subExpressions) ->
-      let functionArgs =
-        subExpressions
-        |> List.map expressionToSql
-        |> List.reduceBack (sprintf "%s %s")
-      sprintf "%s(%s)" functionName  functionArgs
-    | ShowQuery _ -> failwith "SHOW-queries are not supported"
+        let functionArgs = subExpressions |> List.map expressionToSql |> List.reduceBack (sprintf "%s %s")
+        sprintf "%s(%s)" functionName functionArgs
     | SelectQuery queryExpr ->
-      let distinct = if queryExpr.SelectDistinct then "DISTINCT" else ""
-      let columnExpr =
-        queryExpr.Expressions
-        |> List.map expressionToSql
-        |> List.reduceBack (sprintf "%s, %s")
-      let where =
-        queryExpr.Where
-        |> Option.map (fun expr -> $"FROM %s{expressionToSql expr}")
-        |> Option.defaultValue ""
-      let groupBy =
-        queryExpr.GroupBy
-        |> List.map expressionToSql
-        |> function
+        let distinct = if queryExpr.SelectDistinct then "DISTINCT" else ""
+
+        let columnExpr =
+          queryExpr.Expressions
+          |> List.map expressionToSql
+          |> List.reduceBack (sprintf "%s, %s")
+
+        let where =
+          queryExpr.Where
+          |> Option.map (fun expr -> $"FROM %s{expressionToSql expr}")
+          |> Option.defaultValue ""
+
+        let groupBy =
+          queryExpr.GroupBy
+          |> List.map expressionToSql
+          |> function
           | [] -> ""
           | groupings ->
-            let groupByTerms = groupings |> List.reduceBack (sprintf "%s, %s")
-            $"GROUP BY %s{groupByTerms}"
-      $"
+              let groupByTerms = groupings |> List.reduceBack (sprintf "%s, %s")
+              $"GROUP BY %s{groupByTerms}"
+
+        $"
       SELECT %s{distinct} %s{columnExpr}
       FROM %s{expressionToSql queryExpr.From}
       %s{where}
@@ -140,6 +139,7 @@ module QueryEngine =
   let private extractAidColumn anonymizationParams ({ From = from }: SelectQuery) =
     result {
       let! tableName = getIdentifier from
+
       match anonymizationParams.TableSettings.TryFind(tableName) with
       | None
       | Some { AidColumns = [] } -> return! (Error "Execution error: An AID column name is required")
@@ -167,41 +167,18 @@ module QueryEngine =
     | Identifier expr -> expr
     | As (_term, name) -> columnName name
     | Function (functionName, _expression) -> functionName
-    | ShowQuery _
     | SelectQuery _ -> failwith "Not a valid term for selection"
 
-  let executeShow (connection: SQLiteConnection) =
-    function
-    | ShowQuery.Tables -> getTables connection
-    | ShowQuery.Columns tableName -> getColumnsFromTable connection tableName
-
-  let private executeSelect (connection: DbConnection) anonymizationParams query =
+  let private executeQuery (connection: DbConnection) anonymizationParams query =
     asyncResult {
       let! aidColumn = extractAidColumn anonymizationParams query
 
-      let! rawRows =
-        readQueryResults connection aidColumn query
-        |> AsyncResult.map Seq.toList
+      let! rawRows = readQueryResults connection aidColumn query |> AsyncResult.map Seq.toList
 
       let rows = Anonymizer.anonymize anonymizationParams rawRows
       let columns = query.Expressions |> List.map columnName
 
       return { Columns = columns; Rows = rows }
-    }
-
-  let private executeQuery reqParams queryAst =
-    asyncResult {
-      let! connection = SQLite.dbConnection reqParams.DatabasePath
-      do! connection.OpenAsync() |> Async.AwaitTask
-
-      let! result =
-        match queryAst with
-        | ShowQuery query -> executeShow connection query
-        | SelectQuery query -> executeSelect connection reqParams.AnonymizationParams query
-        | _ -> AsyncResult.returnError "Expecting an SQL query to run"
-
-      do! connection.CloseAsync() |> Async.AwaitTask
-      return result
     }
 
   let parseSql sqlQuery =
@@ -212,5 +189,9 @@ module QueryEngine =
   let runQuery reqParams =
     asyncResult {
       let! queryAst = parseSql reqParams.Query
-      return! executeQuery reqParams queryAst
+      let! connection = SQLite.dbConnection reqParams.DatabasePath
+      do! connection.OpenAsync() |> Async.AwaitTask
+      let! result = executeQuery connection reqParams.AnonymizationParams queryAst
+      do! connection.CloseAsync() |> Async.AwaitTask
+      return result
     }

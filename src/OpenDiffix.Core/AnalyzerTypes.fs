@@ -18,10 +18,9 @@ type SelectExpression =
 
 type GroupingSet = int list
 
-[<RequireQualifiedAccess>]
 type Query =
   | Union of distinct: bool * Query * Query
-  | Select of SelectQuery
+  | SelectQuery of SelectQuery
 
 and SelectQuery =
   {
@@ -35,9 +34,9 @@ and SelectQuery =
   }
 
 and SelectFrom =
-  | Query of query: Query * alias: string
+  | Query of query: Query
   | Join of Join
-  | Table of table: Table * alias: string
+  | Table of table: Table
 
 and Join =
   {

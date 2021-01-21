@@ -24,37 +24,6 @@ let runQuery query =
   QueryEngine.runQuery requestParams |> Async.RunSynchronously
 
 [<Fact>]
-let ``SHOW TABLES`` () =
-  let rows =
-    [ "customers"; "products"; "purchases" ]
-    |> List.map (fun v -> [ StringValue v ])
-
-  let expected = { Columns = [ "name" ]; Rows = rows }
-
-  let queryResult = runQuery "SHOW TABLES"
-
-  assertOkEqual queryResult expected
-
-[<Fact>]
-let ``SHOW columns FROM customers`` () =
-  let rows =
-    [
-      "id", "integer"
-      "first_name", "string"
-      "last_name", "string"
-      "age", "integer"
-      "city", "string"
-    ]
-    |> List.sortBy fst
-    |> List.map (fun (name, dataType) -> [ StringValue name; StringValue dataType ])
-
-  let expected = { Columns = [ "name"; "type" ]; Rows = rows }
-
-  let queryResult = runQuery "SHOW columns FROM Customers"
-
-  assertOkEqual queryResult expected
-
-[<Fact>]
 let ``SELECT city FROM customers`` () =
   let rows =
     [ "Berlin", 77; "London", 25; "Madrid", 25; "Paris", 26; "Rome", 50 ]

@@ -11,6 +11,7 @@
         <Compile Include="TestHelpers.fs" />
         <Compile Include="Value.Tests.fs" />
         <Compile Include="Expression.Tests.fs" />
+        <Compile Include="Analyzer.Tests.fs" />
         <Compile Include="Parser.Tests.fs" />
         <Compile Include="QueryEngine.Tests.fs" />
         <Compile Include="Program.fs" />

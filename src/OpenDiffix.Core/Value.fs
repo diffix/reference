@@ -35,3 +35,12 @@ module Value =
           | _, Null -> -nullsValue
           | x, y -> directionCoefficient * Operators.compare x y
     }
+
+  let isTruthy =
+    function
+    | Null -> false
+    | Boolean value -> value
+    | Integer n -> n <> 0
+    | Float n -> n <> 0.
+    | String "" -> false
+    | String value -> value.ToLower() = "true"

@@ -3,7 +3,7 @@
 open OpenDiffix.Core
 open OpenDiffix.Core.ParserTypes
 
-module Definitions =
+module QueryParser =
   open FParsec
 
   let opp = OperatorPrecedenceParser<Expression, unit, unit>()
@@ -32,22 +32,28 @@ module Definitions =
   // to the point of not being possible to combine. pint32 would parse 1.2 as 1,
   // and pfloat would parse 1 as 1.0.
   let number =
-    pint32 .>>.
-    opt (pchar '.' >>. many (pchar '0') .>>. pint32)
-    .>> spaces
+    pint32 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
     |>> fun (wholeValue, decimalPartOption) ->
-      match decimalPartOption with
-      | None -> Expression.Integer wholeValue
-      | Some (leadingZeros, decimalValue) ->
-        let divisor = List.length leadingZeros + 1
-        let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
-        Expression.Float (float wholeValue + decimalPart)
-  let boolean = (word "true" |>> fun _ -> Expression.Boolean true) <|> (word "false" |>> fun _ -> Expression.Boolean false)
-  let stringLiteral = skipChar '\'' >>. manySatisfy (fun c -> c <> '\'') .>> skipChar '\'' |>> Expression.String
+          match decimalPartOption with
+          | None -> Expression.Integer wholeValue
+          | Some (leadingZeros, decimalValue) ->
+              let divisor = List.length leadingZeros + 1
+              let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
+              Expression.Float(float wholeValue + decimalPart)
+
+  let boolean =
+    (word "true" |>> fun _ -> Expression.Boolean true)
+    <|> (word "false" |>> fun _ -> Expression.Boolean false)
+
+  let stringLiteral =
+    skipChar '\'' >>. manySatisfy (fun c -> c <> '\'') .>> skipChar '\''
+    |>> Expression.String
 
   let spaceSepUnaliasedExpressions = many1 expr
 
-  let functionExpression = simpleIdentifier .>>. inParenthesis expr .>> spaces |>> fun (funName, expr) -> Function (funName, [expr])
+  let functionExpression =
+    simpleIdentifier .>>. inParenthesis expr .>> spaces
+    |>> fun (funName, expr) -> Function(funName, [ expr ])
 
   let commaSepExpressions = commaSeparated expr .>> spaces
 
@@ -59,33 +65,29 @@ module Definitions =
 
   let from = word "FROM" >>. identifier
 
-  let parseSelectQuery =
-    word "SELECT" >>= fun _ ->
-    distinct >>= fun distinct ->
-    commaSepExpressions >>= fun columns ->
-    from >>= fun table ->
-    opt whereClause >>= fun whereClause ->
-    opt groupBy >>= fun groupBy ->
-      let query =
-        {
-          SelectDistinct = distinct
-          Expressions = columns
-          From = table
-          Where = whereClause
-          GroupBy = groupBy |> Option.defaultValue []
-        }
-      preturn (Expression.SelectQuery query)
+  let selectQuery =
+    word "SELECT"
+    >>= fun _ ->
+      distinct
+      >>= fun distinct ->
+            commaSepExpressions
+            >>= fun columns ->
+                  from
+                  >>= fun table ->
+                        opt whereClause
+                        >>= fun whereClause ->
+                              opt groupBy
+                              >>= fun groupBy ->
+                                    let query =
+                                      {
+                                        SelectDistinct = distinct
+                                        Expressions = columns
+                                        From = table
+                                        Where = whereClause
+                                        GroupBy = groupBy |> Option.defaultValue []
+                                      }
 
-  let identifiersColumnsInTable =
-    words [ "COLUMNS"; "FROM" ] >>. (simpleIdentifier <?> "table name")
-    |>> ShowQuery.Columns
-
-  let identifierTables = word "TABLES" |>> fun _ -> ShowQuery.Tables
-
-  let parseShowQuery =
-    word "SHOW"
-    >>. (identifierTables <|> identifiersColumnsInTable)
-    |>> Expression.ShowQuery
+                                    preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore
@@ -93,12 +95,13 @@ module Definitions =
   let allCasingPermutations (s: string) =
     let rec createPermutations acc next =
       match acc, next with
-      | [], c :: cs -> createPermutations [$"%c{System.Char.ToLower(c)}"; $"%c{System.Char.ToUpper(c)}"] cs
+      | [], c :: cs -> createPermutations [ $"%c{System.Char.ToLower(c)}"; $"%c{System.Char.ToUpper(c)}" ] cs
       | acc, c :: cs ->
-        let newLower = acc |> List.map(fun opVariant -> $"%s{opVariant}%c{System.Char.ToLower(c)}")
-        let newUpper = acc |> List.map(fun opVariant -> $"%s{opVariant}%c{System.Char.ToUpper(c)}")
-        createPermutations (newLower @ newUpper) cs
+          let newLower = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToLower(c)}")
+          let newUpper = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToUpper(c)}")
+          createPermutations (newLower @ newUpper) cs
       | acc, [] -> acc
+
     s.ToCharArray()
     |> Array.toList
     |> createPermutations []
@@ -108,7 +111,7 @@ module Definitions =
 
   let addOperator opType opName parseNext precedence associativity f =
     allCasingPermutations opName
-    |> List.iter(fun opVariant -> opp.AddOperator(opType(opVariant, parseNext, precedence, associativity, f)))
+    |> List.iter (fun opVariant -> opp.AddOperator(opType (opVariant, parseNext, precedence, associativity, f)))
 
   let addInfixOperator = addOperator InfixOperator
   let addPrefixOperator = addOperator PrefixOperator
@@ -117,45 +120,46 @@ module Definitions =
   addPrefixOperator "distinct" spaces 1 false Expression.Distinct
   addInfixOperator "as" spaces 1 Associativity.Left (fun left right -> Expression.As(left, right))
   addInfixOperator "and" spaces 1 Associativity.Left (fun left right -> Expression.And(left, right))
-  addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left (fun left right -> Expression.Or(left, right))
+
+  addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left (fun left right ->
+    Expression.Or(left, right))
+
   addInfixOperator "=" spaces 3 Associativity.Left (fun left right -> Expression.Equal(left, right))
   addInfixOperator "<>" spaces 3 Associativity.Left (fun left right -> Expression.Not(Expression.Equal(left, right)))
   addInfixOperator ">" spaces 3 Associativity.Left (fun left right -> Expression.Gt(left, right))
   addInfixOperator "<" spaces 3 Associativity.Left (fun left right -> Expression.Lt(left, right))
   addInfixOperator "<=" spaces 3 Associativity.Left (fun left right -> Expression.LtE(left, right))
   addInfixOperator ">=" spaces 3 Associativity.Left (fun left right -> Expression.GtE(left, right))
-  addInfixOperator "+" spaces 4 Associativity.Left (fun left right -> Expression.Function("+", [left; right]))
-  addInfixOperator "-" spaces 4 Associativity.Left (fun left right -> Expression.Function("-", [left; right]))
-  addInfixOperator "*" spaces 5 Associativity.Left (fun left right -> Expression.Function("*", [left; right]))
-  addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [left; right]))
-  addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [left; right]))
+  addInfixOperator "+" spaces 4 Associativity.Left (fun left right -> Expression.Function("+", [ left; right ]))
+  addInfixOperator "-" spaces 4 Associativity.Left (fun left right -> Expression.Function("-", [ left; right ]))
+  addInfixOperator "*" spaces 5 Associativity.Left (fun left right -> Expression.Function("*", [ left; right ]))
+  addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [ left; right ]))
+  addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [ left; right ]))
   addPrefixOperator "not" spaces 7 false Expression.Not
   addPostfixOperator "is null" spaces 8 false (fun expr -> Expression.Equal(expr, Expression.Null))
   addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.Equal(expr, Expression.Null)))
-  addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [left; right]))
+  addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [ left; right ]))
 
-  opp.TermParser <- choice [
-    (attempt parseShowQuery)
-    (attempt parseSelectQuery)
-    (attempt functionExpression)
-    inParenthesis expr
-    star
-    number
-    boolean
-    stringLiteral
-    identifier
-  ]
+  opp.TermParser <-
+    choice [
+      (attempt selectQuery)
+      (attempt functionExpression)
+      inParenthesis expr
+      star
+      number
+      boolean
+      stringLiteral
+      identifier
+    ]
 
-  let fullParser =
-    spaces >>. expr .>> (opt (pchar ';')) .>> spaces .>> eof
+  let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
 type SqlParserError = CouldNotParse of string
 
-let parse sql: Result<Expression, SqlParserError> =
-  match FParsec.CharParsers.run Definitions.fullParser sql with
+let parse sql: Result<SelectQuery, SqlParserError> =
+  match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
-    match result with
-    | SelectQuery _
-    | ShowQuery _ -> Ok result
-    | _ -> Error(CouldNotParse "Expecting a SELECT or SHOW query")
+      match result with
+      | SelectQuery selectQuery -> Ok selectQuery
+      | _ -> Error(CouldNotParse "Expecting SELECT query")
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)
