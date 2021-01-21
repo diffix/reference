@@ -40,9 +40,10 @@ and ScalarFunction =
     | Minus ->
         args
         |> List.tryFind (fun arg ->
-             match (Expression.GetType arg) with
-             | Ok FloatType -> true
-             | _ -> false)
+          match (Expression.GetType arg) with
+          | Ok FloatType -> true
+          | _ -> false
+        )
         |> Option.map (fun _ -> FloatType)
         |> Option.defaultValue IntegerType
         |> Ok
@@ -107,7 +108,8 @@ module ExpressionUtils =
 
   let mapSingleArg name (args: AggregateArgs) =
     args
-    |> Seq.map (function
+    |> Seq.map
+         (function
          | [ arg ] -> arg
          | _ -> invalidOverload name)
 
@@ -120,7 +122,8 @@ module ExpressionUtils =
       | _ -> failwith "Expected 2 arguments in function."
 
   let nullableBinaryFunction fn =
-    binaryFunction (function
+    binaryFunction
+      (function
       | Null, _ -> Null
       | _, Null -> Null
       | a, b -> fn (a, b))
@@ -129,7 +132,8 @@ module DefaultFunctions =
   open ExpressionUtils
 
   let add =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | Integer a, Integer b -> Integer(a + b)
       | Float a, Float b -> Float(a + b)
       | Float a, Integer b -> Float(a + float b)
@@ -137,7 +141,8 @@ module DefaultFunctions =
       | _ -> invalidOverload "+")
 
   let sub =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | Integer a, Integer b -> Integer(a - b)
       | Float a, Float b -> Float(a - b)
       | Float a, Integer b -> Float(a - float b)
@@ -145,7 +150,8 @@ module DefaultFunctions =
       | _ -> invalidOverload "-")
 
   let equals =
-    nullableBinaryFunction (function
+    nullableBinaryFunction
+      (function
       | a, b when a = b -> Boolean true
       | Integer a, Float b -> Boolean(float a = b)
       | Float a, Integer b -> Boolean(a = float b)
@@ -172,7 +178,8 @@ module DefaultAggregates =
 
   let count _ctx (values: AggregateArgs) =
     values
-    |> Seq.sumBy (function
+    |> Seq.sumBy
+         (function
          | [ Null ] -> 0
          | []
          | [ _ ] -> 1
