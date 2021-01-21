@@ -14,7 +14,7 @@ type Row = Value array
 type Function =
   | Plus
   | Minus
-  | Equality
+  | Equals
   | Not
   | And
   | Or
@@ -29,7 +29,7 @@ type Function =
     function
     | "+" -> Ok Plus
     | "-" -> Ok Minus
-    | "=" -> Ok Equality
+    | "=" -> Ok Equals
     | "count" -> Ok Count
     | "sum" -> Ok Sum
     | other -> Error $"Unknown function %A{other}"
@@ -38,7 +38,7 @@ type Function =
     function
     | Plus
     | Minus
-    | Equality
+    | Equals
     | Not
     | And
     | Or
@@ -63,7 +63,7 @@ type Function =
         |> Ok
     | Not
     | And
-    | Equality
+    | Equals
     | Or
     | Lt
     | LtE
@@ -190,7 +190,7 @@ module Expression =
     match fn with
     | Plus -> DefaultFunctions.add ctx args
     | Minus -> DefaultFunctions.sub ctx args
-    | Equality -> DefaultFunctions.equals ctx args
+    | Equals -> DefaultFunctions.equals ctx args
     | Not -> DefaultFunctions.not ctx args
     | And -> DefaultFunctions.binaryBooleanCheck (&&) ctx args
     | Or -> DefaultFunctions.binaryBooleanCheck (||) ctx args
@@ -207,7 +207,7 @@ module Expression =
     | Sum -> DefaultAggregates.sum ctx mappedArgs
     | Plus
     | Minus
-    | Equality
+    | Equals
     | Not
     | And
     | Or
