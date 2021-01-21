@@ -39,7 +39,6 @@ module AnalyzeSelect =
             ]
           Where = Boolean true |> Constant
           From = Table testTable
-          GroupBy = []
           GroupingSets = [ [] ]
           Having = Boolean true |> Constant
           OrderBy = []
@@ -86,13 +85,14 @@ module AnalyzeSelect =
               ]
             )
           From = Table testTable
-          GroupBy =
+          GroupingSets =
             [
-              ColumnReference(1, IntegerType)
-              FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
-              FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+              [
+                ColumnReference(1, IntegerType)
+                FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
+                FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+              ]
             ]
-          GroupingSets = [ [ 0; 1; 2 ] ]
           Having = Boolean true |> Constant
           OrderBy = []
         })

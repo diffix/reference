@@ -10,7 +10,7 @@ type JoinType =
 
 type SelectExpression = { Expression: Expression; Alias: string }
 
-type GroupingSet = int list
+type GroupingSet = Expression list
 
 type Query =
   | UnionQuery of distinct: bool * Query * Query
@@ -21,7 +21,6 @@ and SelectQuery =
     Columns: SelectExpression list
     Where: Expression
     From: SelectFrom
-    GroupBy: Expression list
     GroupingSets: GroupingSet list
     Having: Expression
     OrderBy: OrderByExpression list
