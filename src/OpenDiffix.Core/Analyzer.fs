@@ -23,7 +23,8 @@ and mapExpression table parsedExpression =
       result {
         let! column = Table.getColumn table identifierName
         let! columnType = columnToExpressionType column.Type
-        return Expression.ColumnReference(column.Index, columnType)
+        let! columnIndex = Table.getColumnIndex table column
+        return Expression.ColumnReference(columnIndex, columnType)
       }
   | ParserTypes.Expression.Integer value -> Value.Integer value |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok
@@ -76,10 +77,11 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
       result {
         let! column = Table.getColumn table identifierName
         let! columnType = columnToExpressionType column.Type
+        let! columnIndex = Table.getColumnIndex table column
 
         return
           {
-            Expression = Expression.ColumnReference(column.Index, columnType)
+            Expression = Expression.ColumnReference(columnIndex, columnType)
             Type = columnType
             Alias = ""
           }

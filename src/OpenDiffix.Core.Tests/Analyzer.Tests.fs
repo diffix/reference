@@ -18,10 +18,10 @@ module AnalyzeSelect =
       Name = "table"
       Columns =
         [
-          { Name = "str_col"; Type = ColumnType.StringType; Index = 0 }
-          { Name = "int_col"; Type = ColumnType.IntegerType; Index = 1 }
-          { Name = "float_col"; Type = ColumnType.FloatType; Index = 2 }
-          { Name = "bool_col"; Type = ColumnType.BooleanType; Index = 3 }
+          { Name = "str_col"; Type = ColumnType.StringType }
+          { Name = "int_col"; Type = ColumnType.IntegerType }
+          { Name = "float_col"; Type = ColumnType.FloatType }
+          { Name = "bool_col"; Type = ColumnType.BooleanType }
         ]
     }
 

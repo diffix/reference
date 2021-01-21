@@ -7,7 +7,7 @@ type ColumnType =
   | StringType
   | UnknownType of string
 
-type Column = { Name: string; Type: ColumnType; Index: int }
+type Column = { Name: string; Type: ColumnType }
 
 type Table = { Name: string; Columns: Column list }
 
@@ -38,9 +38,7 @@ module Table =
         |> List.map (fun table ->
              let columns =
                table.Columns
-               |> List.zip [ 0 .. (List.length (table.Columns) - 1) ]
-               |> List.map (fun (index, column) ->
-                    { Name = column.Name; Type = columnTypeFromString (column.Type); Index = index })
+               |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString (column.Type) })
 
              { Name = table.Name; Columns = columns })
     }
@@ -60,3 +58,10 @@ module Table =
   let getColumn table columnName =
     tryFindColumn table columnName
     |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
+
+  let getColumnIndex (table: Table) requestedColumn =
+    table.Columns
+    |> List.zip [ 0 .. table.Columns.Length - 1 ]
+    |> List.tryFind (fun (_index, column) -> column = requestedColumn)
+    |> Option.map (fst)
+    |> Result.requireSome $"Could not find column %s{requestedColumn.Name} in table %s{table.Name}"
