@@ -121,7 +121,7 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
           Where = whereClause
           From = AnalyzerTypes.SelectFrom.Table(table, "")
           GroupBy = groupBy
-          GroupingSets = []
+          GroupingSets = [[0..groupBy.Length-1]]
           Having = havingClause
           OrderBy = []
         }

@@ -45,11 +45,11 @@ module AnalyzeSelect =
                 Alias = ""
               }
             ]
-          Where = None
+          Where = Boolean true |> Constant
           From = Table(testTable, "")
           GroupBy = []
-          GroupingSets = []
-          Having = None
+          GroupingSets = [ [] ]
+          Having = Boolean true |> Constant
           OrderBy = []
         })
 
@@ -98,20 +98,19 @@ module AnalyzeSelect =
               }
             ]
           Where =
-            Some
-              (FunctionExpr
-                (Function.And,
-                 [
-                   FunctionExpr
-                     (Function.Gt,
-                      [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ],
-                      FunctionType.Scalar)
-                   FunctionExpr
-                     (Function.Lt,
-                      [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ],
-                      FunctionType.Scalar)
-                 ],
-                 FunctionType.Scalar))
+            FunctionExpr
+              (Function.And,
+               [
+                 FunctionExpr
+                   (Function.Gt,
+                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ],
+                    FunctionType.Scalar)
+                 FunctionExpr
+                   (Function.Lt,
+                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ],
+                    FunctionType.Scalar)
+               ],
+               FunctionType.Scalar)
           From = Table(testTable, "")
           GroupBy =
             [
@@ -125,7 +124,7 @@ module AnalyzeSelect =
                  [ ColumnReference(1, ExpressionType.IntegerType) ],
                  FunctionType.Aggregate AggregateOptions.Default)
             ]
-          GroupingSets = []
-          Having = None
+          GroupingSets = [ [ 0; 1; 2 ] ]
+          Having = Boolean true |> Constant
           OrderBy = []
         })
