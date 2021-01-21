@@ -3,7 +3,6 @@ namespace OpenDiffix.Core
 open FsToolkit.ErrorHandling
 
 type ExpressionType =
-  | NullType
   | StringType
   | IntegerType
   | FloatType
@@ -88,7 +87,7 @@ and Expression =
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Float _) -> Ok FloatType
-    | Constant Null -> Ok NullType
+    | Constant Null -> Ok StringType // This is clearly bogus, but we have no idea what the intended type was at this point
 
 and FunctionType =
   | Scalar
