@@ -25,11 +25,11 @@ type Query =
 and SelectQuery =
   {
     Columns: SelectExpression list
-    Where: Expression option
+    Where: Expression
     From: SelectFrom
     GroupBy: Expression list
     GroupingSets: GroupingSet list
-    Having: Expression option
+    Having: Expression
     OrderBy: OrderByExpression list
   }
 

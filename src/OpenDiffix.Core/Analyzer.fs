@@ -102,27 +102,27 @@ let selectedTableName =
   | ParserTypes.Expression.Identifier tableName -> Ok tableName
   | _ -> Error "Only selecting from a single table is supported"
 
-let optionalExprToAnalyzerExpression table optionalExpression =
+let optionalExprToAnalyzerExpressionWithDefaultTrue table optionalExpression =
   optionalExpression
-  |> Option.map (fun expr -> mapExpression table expr |> Result.map Some)
-  |> Option.defaultValue (Ok None)
+  |> Option.map (mapExpression table)
+  |> Option.defaultValue (Value.Boolean true |> Expression.Constant |> Ok)
 
 let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
-    let! whereClauseOption = optionalExprToAnalyzerExpression table selectQuery.Where
-    let! havingClauseOption = optionalExprToAnalyzerExpression table None
+    let! whereClause = optionalExprToAnalyzerExpressionWithDefaultTrue table selectQuery.Where
+    let! havingClause = optionalExprToAnalyzerExpressionWithDefaultTrue table None
     let! groupBy = selectQuery.GroupBy |> List.map (mapExpression table) |> List.sequenceResultM
 
     return
       AnalyzerTypes.SelectQuery
         {
           Columns = selectedExpressions
-          Where = whereClauseOption
+          Where = whereClause
           From = AnalyzerTypes.SelectFrom.Table(table, "")
           GroupBy = groupBy
           GroupingSets = []
-          Having = havingClauseOption
+          Having = havingClause
           OrderBy = []
         }
   }
