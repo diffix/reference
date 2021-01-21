@@ -29,11 +29,12 @@ module Table =
       return
         schema
         |> List.map (fun table ->
-             let columns =
-               table.Columns
-               |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString (column.Type) })
+          let columns =
+            table.Columns
+            |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString (column.Type) })
 
-             { Name = table.Name; Columns = columns })
+          { Name = table.Name; Columns = columns }
+        )
     }
 
   let getI connection tableName =
