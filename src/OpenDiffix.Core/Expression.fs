@@ -56,16 +56,16 @@ and ScalarFunction =
     | GtE -> Ok BooleanType
 
 and Function =
-  | ScalarFunction of fn:ScalarFunction
-  | AggregateFunction of fn:AggregateFunction * options:AggregateOptions
+  | ScalarFunction of fn: ScalarFunction
+  | AggregateFunction of fn: AggregateFunction * options: AggregateOptions
 
   static member FromString =
     function
-    | "count" -> Ok (AggregateFunction (Count, AggregateOptions.Default))
-    | "sum" -> Ok (AggregateFunction (Sum, AggregateOptions.Default))
-    | "+" -> Ok (ScalarFunction Plus)
-    | "-" -> Ok (ScalarFunction Minus)
-    | "=" -> Ok (ScalarFunction Equals)
+    | "count" -> Ok(AggregateFunction(Count, AggregateOptions.Default))
+    | "sum" -> Ok(AggregateFunction(Sum, AggregateOptions.Default))
+    | "+" -> Ok(ScalarFunction Plus)
+    | "-" -> Ok(ScalarFunction Minus)
+    | "=" -> Ok(ScalarFunction Equals)
     | other -> Error $"Unknown function %A{other}"
 
 and Expression =

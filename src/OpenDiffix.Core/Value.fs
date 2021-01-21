@@ -26,6 +26,7 @@ module Value =
       match nulls with
       | NullsFirst -> -1
       | NullsLast -> 1
+
     { new System.Collections.Generic.IComparer<Value> with
         member __.Compare(x, y) =
           match x, y with

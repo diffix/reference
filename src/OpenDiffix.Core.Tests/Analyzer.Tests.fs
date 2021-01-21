@@ -83,15 +83,14 @@ module AnalyzeSelect =
                 Expression =
                   FunctionExpr
                     (ScalarFunction Plus,
-                     [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ]
-                     )
+                     [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ])
                 Alias = ""
               }
               {
                 Type = ExpressionType.IntegerType
                 Expression =
                   FunctionExpr
-                    (AggregateFunction (Count, AggregateOptions.Default),
+                    (AggregateFunction(Count, AggregateOptions.Default),
                      [ ColumnReference(1, ExpressionType.IntegerType) ])
                 Alias = ""
               }
@@ -101,11 +100,9 @@ module AnalyzeSelect =
               (ScalarFunction And,
                [
                  FunctionExpr
-                   (ScalarFunction Gt,
-                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ])
+                   (ScalarFunction Gt, [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ])
                  FunctionExpr
-                   (ScalarFunction Lt,
-                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ])
+                   (ScalarFunction Lt, [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ])
                ])
           From = Table testTable
           GroupBy =
@@ -115,8 +112,7 @@ module AnalyzeSelect =
                 (ScalarFunction Plus,
                  [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ])
               FunctionExpr
-                (AggregateFunction (Count, AggregateOptions.Default),
-                 [ ColumnReference(1, ExpressionType.IntegerType) ])
+                (AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, ExpressionType.IntegerType) ])
             ]
           GroupingSets = [ [ 0; 1; 2 ] ]
           Having = Boolean true |> Constant

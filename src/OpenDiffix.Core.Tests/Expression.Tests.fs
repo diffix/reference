@@ -156,19 +156,21 @@ let evaluate () =
 [<Fact>]
 let evaluateAggregated () =
   // select sum(val_float - val_int)
-  evalAggr (FunctionExpr(AggregateFunction (Sum, AggregateOptions.Default), [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]))
+  evalAggr
+    (FunctionExpr
+      (AggregateFunction(Sum, AggregateOptions.Default), [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]))
   |> should equal (Float 2.0)
 
   // select count(*)
-  evalAggr (FunctionExpr(AggregateFunction (Count, AggregateOptions.Default), []))
+  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), []))
   |> should equal (Integer 4)
 
   // select count(1)
-  evalAggr (FunctionExpr(AggregateFunction (Count, AggregateOptions.Default), [ Constant(Integer 1) ]))
+  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ Constant(Integer 1) ]))
   |> should equal (Integer 4)
 
   // select count(distinct val_str)
-  evalAggr (FunctionExpr(AggregateFunction (Count, {AggregateOptions.Default with Distinct = true}), [ colRef0 ]))
+  evalAggr (FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }), [ colRef0 ]))
   |> should equal (Integer 2)
 
   // select val_str
