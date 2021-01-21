@@ -8,13 +8,7 @@ type JoinType =
   | RightJoin
   | FullJoin
 
-type SelectExpression =
-  {
-    //
-    Type: ExpressionType
-    Expression: Expression
-    Alias: string
-  }
+type SelectExpression = { Expression: Expression; Alias: string }
 
 type GroupingSet = int list
 
