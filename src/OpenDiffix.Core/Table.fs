@@ -61,7 +61,7 @@ module Table =
 
   let getColumnIndex (table: Table) requestedColumn =
     table.Columns
-    |> List.zip [ 0 .. table.Columns.Length - 1 ]
+    |> List.indexed
     |> List.tryFind (fun (_index, column) -> column = requestedColumn)
     |> Option.map (fst)
     |> Result.requireSome $"Could not find column %s{requestedColumn.Name} in table %s{table.Name}"
