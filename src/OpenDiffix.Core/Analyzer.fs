@@ -3,14 +3,6 @@ module OpenDiffix.Core.Analyzer
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
 
-let columnToExpressionType =
-  function
-  | ColumnType.BooleanType -> Ok ExpressionType.BooleanType
-  | ColumnType.IntegerType -> Ok ExpressionType.IntegerType
-  | ColumnType.FloatType -> Ok ExpressionType.FloatType
-  | ColumnType.StringType -> Ok ExpressionType.StringType
-  | ColumnType.UnknownType other -> Error $"Unknown type %s{other} cannot be selected"
-
 let rec functionExpression table fn children =
   children
   |> List.map (mapExpression table)
@@ -22,9 +14,8 @@ and mapExpression table parsedExpression =
   | ParserTypes.Identifier identifierName ->
       result {
         let! column = Table.getColumn table identifierName
-        let! columnType = columnToExpressionType column.Type
         let! columnIndex = Table.getColumnIndex table column
-        return Expression.ColumnReference(columnIndex, columnType)
+        return Expression.ColumnReference(columnIndex, column.Type)
       }
   | ParserTypes.Expression.Integer value -> Value.Integer value |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok

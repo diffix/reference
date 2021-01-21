@@ -7,6 +7,13 @@ type Value =
   | Float of float
   | String of string
 
+type ValueType =
+  | BooleanType
+  | IntegerType
+  | FloatType
+  | StringType
+  | UnknownType of string
+
 type OrderByDirection =
   | Ascending
   | Descending

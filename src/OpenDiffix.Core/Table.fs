@@ -1,13 +1,6 @@
 namespace OpenDiffix.Core
 
-type ColumnType =
-  | BooleanType
-  | IntegerType
-  | FloatType
-  | StringType
-  | UnknownType of string
-
-type Column = { Name: string; Type: ColumnType }
+type Column = { Name: string; Type: ValueType }
 
 type Table = { Name: string; Columns: Column list }
 

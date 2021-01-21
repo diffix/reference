@@ -2,12 +2,6 @@ namespace OpenDiffix.Core
 
 open FsToolkit.ErrorHandling
 
-type ExpressionType =
-  | StringType
-  | IntegerType
-  | FloatType
-  | BooleanType
-
 type Row = Value array
 
 type AggregateFunction =
@@ -71,7 +65,7 @@ and Function =
 
 and Expression =
   | FunctionExpr of fn: Function * args: Expression list
-  | ColumnReference of index: int * exprType: ExpressionType
+  | ColumnReference of index: int * exprType: ValueType
   | Constant of value: Value
 
   static member GetType =
@@ -83,7 +77,7 @@ and Expression =
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Float _) -> Ok FloatType
-    | Constant Null -> Ok StringType // This is clearly bogus, but we have no idea what the intended type was at this point
+    | Constant Null -> Ok(UnknownType null)
 
 and FunctionType =
   | Scalar
