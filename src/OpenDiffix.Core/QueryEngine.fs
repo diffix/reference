@@ -54,7 +54,6 @@ module QueryEngine =
     | Function (functionName, subExpressions) ->
         let functionArgs = subExpressions |> List.map expressionToSql |> List.reduceBack (sprintf "%s %s")
         sprintf "%s(%s)" functionName functionArgs
-    | ShowQuery _ -> failwith "SHOW-queries are not supported"
     | SelectQuery queryExpr ->
         let distinct = if queryExpr.SelectDistinct then "DISTINCT" else ""
 
@@ -168,15 +167,9 @@ module QueryEngine =
     | Identifier expr -> expr
     | As (_term, name) -> columnName name
     | Function (functionName, _expression) -> functionName
-    | ShowQuery _
     | SelectQuery _ -> failwith "Not a valid term for selection"
 
-  let executeShow (connection: SQLiteConnection) =
-    function
-    | ShowQueryKinds.Tables -> getTables connection
-    | ShowQueryKinds.Columns tableName -> getColumnsFromTable connection tableName
-
-  let private executeSelect (connection: DbConnection) anonymizationParams query =
+  let private executeQuery (connection: DbConnection) anonymizationParams query =
     asyncResult {
       let! aidColumn = extractAidColumn anonymizationParams query
 
@@ -188,21 +181,6 @@ module QueryEngine =
       return { Columns = columns; Rows = rows }
     }
 
-  let private executeQuery reqParams queryAst =
-    asyncResult {
-      let! connection = SQLite.dbConnection reqParams.DatabasePath
-      do! connection.OpenAsync() |> Async.AwaitTask
-
-      let! result =
-        match queryAst with
-        | ShowQuery query -> executeShow connection query
-        | SelectQuery query -> executeSelect connection reqParams.AnonymizationParams query
-        | _ -> AsyncResult.returnError "Expecting an SQL query to run"
-
-      do! connection.CloseAsync() |> Async.AwaitTask
-      return result
-    }
-
   let parseSql sqlQuery =
     match Parser.parse sqlQuery with
     | Ok ast -> Ok ast
@@ -211,5 +189,9 @@ module QueryEngine =
   let runQuery reqParams =
     asyncResult {
       let! queryAst = parseSql reqParams.Query
-      return! executeQuery reqParams queryAst
+      let! connection = SQLite.dbConnection reqParams.DatabasePath
+      do! connection.OpenAsync() |> Async.AwaitTask
+      let! result = executeQuery connection reqParams.AnonymizationParams queryAst
+      do! connection.CloseAsync() |> Async.AwaitTask
+      return result
     }

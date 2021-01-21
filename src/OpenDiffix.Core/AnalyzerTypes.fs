@@ -2,11 +2,6 @@ namespace OpenDiffix.Core.AnalyzerTypes
 
 open OpenDiffix.Core
 
-[<RequireQualifiedAccess>]
-type ShowQueryKind =
-  | Tables
-  | ColumnsInTable of tableName: string
-
 type JoinType =
   | InnerJoin
   | LeftJoin
@@ -26,7 +21,6 @@ type GroupingSet = int list
 type Query =
   | Union of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
-  | ShowQuery of ShowQueryKind
 
 and SelectQuery =
   {

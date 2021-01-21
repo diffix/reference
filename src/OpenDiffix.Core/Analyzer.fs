@@ -3,13 +3,6 @@ module OpenDiffix.Core.Analyzer
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
 
-let transformShowQuery showQuery: Result<AnalyzerTypes.Query, string> =
-  match showQuery with
-  | OpenDiffix.Core.ParserTypes.ShowQueryKinds.Tables -> AnalyzerTypes.ShowQueryKind.Tables
-  | ParserTypes.ShowQueryKinds.Columns tableName -> AnalyzerTypes.ShowQueryKind.ColumnsInTable tableName
-  |> AnalyzerTypes.ShowQuery
-  |> Ok
-
 let columnToExpressionType =
   function
   | ColumnType.BooleanType -> Ok ExpressionType.BooleanType
@@ -114,7 +107,7 @@ let optionalExprToAnalyzerExpression table optionalExpression =
   |> Option.map (fun expr -> mapExpression table expr |> Result.map Some)
   |> Option.defaultValue (Ok None)
 
-let transformSelectQueryWithTable table (selectQuery: ParserTypes.SelectQuery) =
+let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
     let! whereClauseOption = optionalExprToAnalyzerExpression table selectQuery.Where
@@ -134,15 +127,9 @@ let transformSelectQueryWithTable table (selectQuery: ParserTypes.SelectQuery) =
         }
   }
 
-let transformSelectQuery connection (selectQuery: ParserTypes.SelectQuery) =
+let analyze connection (parseTree: ParserTypes.SelectQuery): Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
-    let! tableName = selectedTableName selectQuery.From
+    let! tableName = selectedTableName parseTree.From
     let! table = Table.getI connection tableName
-    return! transformSelectQueryWithTable table selectQuery
+    return! transformQuery table parseTree
   }
-
-let analyze connection parseTree: Async<Result<AnalyzerTypes.Query, string>> =
-  match parseTree with
-  | ParserTypes.Expression.ShowQuery showQuery -> async { return transformShowQuery showQuery }
-  | ParserTypes.Expression.SelectQuery selectQuery -> transformSelectQuery connection selectQuery
-  | _ -> async { return Error "Expected a SHOW or SELECT query" }

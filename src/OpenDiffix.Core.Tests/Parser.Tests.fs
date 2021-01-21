@@ -3,7 +3,7 @@ module OpenDiffix.Core.ParserTests
 open Xunit
 open FParsec.CharParsers
 open OpenDiffix.Core
-open OpenDiffix.Core.Parser.Definitions
+open OpenDiffix.Core.Parser.QueryParser
 open OpenDiffix.Core.ParserTypes
 
 let parse p string =
@@ -100,7 +100,7 @@ let ``Parses GROUP BY statement`` () =
 [<Fact>]
 let ``Parses SELECT by itself`` () =
   assertOkEqual
-    (parse parseSelectQuery "SELECT col FROM table")
+    (parse selectQuery "SELECT col FROM table")
     (SelectQuery
       {
         SelectDistinct = false
@@ -113,7 +113,7 @@ let ``Parses SELECT by itself`` () =
 [<Fact>]
 let ``Parses SELECT DISTINCT`` () =
   assertOkEqual
-    (parse parseSelectQuery "SELECT DISTINCT col FROM table")
+    (parse selectQuery "SELECT DISTINCT col FROM table")
     (SelectQuery
       {
         SelectDistinct = true
@@ -127,42 +127,26 @@ let ``Parses SELECT DISTINCT`` () =
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 
 [<Fact>]
-let ``Parses "SHOW tables"`` () = assertOkEqual (Parser.parse "show tables") (ShowQuery ShowQueryKinds.Tables)
-
-[<Fact>]
-let ``Parses "SHOW columns FROM bar"`` () =
-  assertOkEqual (Parser.parse "show columns FROM bar") (ShowQuery(ShowQueryKinds.Columns("bar")))
-
-[<Fact>]
-let ``Not sensitive to whitespace`` () =
-  assertOkEqual<Expression, _>
-    (Parser.parse "   show
-                   tables   ")
-    (ShowQuery ShowQueryKinds.Tables)
-
-[<Fact>]
 let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table")
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions = [ Identifier "col1"; Identifier "col2" ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = []
-      })
+    {
+      SelectDistinct = false
+      Expressions = [ Identifier "col1"; Identifier "col2" ]
+      From = Identifier "table"
+      Where = None
+      GroupBy = []
+    }
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions = [ Identifier "col1"; Identifier "col2" ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = []
-      })
+    {
+      SelectDistinct = false
+      Expressions = [ Identifier "col1"; Identifier "col2" ]
+      From = Identifier "table"
+      Where = None
+      GroupBy = []
+    }
 
 [<Fact>]
 let ``Multiline select`` () =
@@ -173,14 +157,13 @@ let ``Multiline select`` () =
          FROM
            table
          """)
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions = [ Identifier "col1" ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = []
-      })
+    {
+      SelectDistinct = false
+      Expressions = [ Identifier "col1" ]
+      From = Identifier "table"
+      Where = None
+      GroupBy = []
+    }
 
 [<Fact>]
 let ``Parse aggregate query`` () =
@@ -190,14 +173,13 @@ let ``Parse aggregate query`` () =
          FROM table
          GROUP BY col1
          """)
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions = [ Identifier "col1"; Function("count", [ Distinct(Identifier "aid") ]) ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = [ Identifier "col1" ]
-      })
+    {
+      SelectDistinct = false
+      Expressions = [ Identifier "col1"; Function("count", [ Distinct(Identifier "aid") ]) ]
+      From = Identifier "table"
+      Where = None
+      GroupBy = [ Identifier "col1" ]
+    }
 
 [<Fact>]
 let ``Parse aggregate query with where clause`` () =
@@ -208,16 +190,14 @@ let ``Parse aggregate query with where clause`` () =
          WHERE col1 = 1 AND col2 = 2 or col2 = 3
          GROUP BY col1
          """)
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions =
-          [ As(Identifier "col1", Identifier "colAlias"); Function("count", [ Distinct(Identifier "aid") ]) ]
-        From = Identifier "table"
-        Where =
-          Some
-            (And
-              (Equal(Identifier "col1", Integer 1),
-               (Or(Equal(Identifier "col2", Integer 2), Equal(Identifier "col2", Integer 3)))))
-        GroupBy = [ Identifier "col1" ]
-      })
+    {
+      SelectDistinct = false
+      Expressions = [ As(Identifier "col1", Identifier "colAlias"); Function("count", [ Distinct(Identifier "aid") ]) ]
+      From = Identifier "table"
+      Where =
+        Some
+          (And
+            (Equal(Identifier "col1", Integer 1),
+             (Or(Equal(Identifier "col2", Integer 2), Equal(Identifier "col2", Integer 3)))))
+      GroupBy = [ Identifier "col1" ]
+    }

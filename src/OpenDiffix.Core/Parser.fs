@@ -3,7 +3,7 @@
 open OpenDiffix.Core
 open OpenDiffix.Core.ParserTypes
 
-module Definitions =
+module QueryParser =
   open FParsec
 
   let opp = OperatorPrecedenceParser<Expression, unit, unit>()
@@ -65,7 +65,7 @@ module Definitions =
 
   let from = word "FROM" >>. identifier
 
-  let parseSelectQuery =
+  let selectQuery =
     word "SELECT"
     >>= fun _ ->
       distinct
@@ -88,16 +88,6 @@ module Definitions =
                                       }
 
                                     preturn (Expression.SelectQuery query)
-
-  let identifiersColumnsInTable =
-    words [ "COLUMNS"; "FROM" ] >>. (simpleIdentifier <?> "table name")
-    |>> ShowQueryKinds.Columns
-
-  let identifierTables = word "TABLES" |>> fun _ -> ShowQueryKinds.Tables
-
-  let parseShowQuery =
-    word "SHOW" >>. (identifierTables <|> identifiersColumnsInTable)
-    |>> Expression.ShowQuery
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore
@@ -152,8 +142,7 @@ module Definitions =
 
   opp.TermParser <-
     choice [
-      (attempt parseShowQuery)
-      (attempt parseSelectQuery)
+      (attempt selectQuery)
       (attempt functionExpression)
       inParenthesis expr
       star
@@ -163,15 +152,14 @@ module Definitions =
       identifier
     ]
 
-  let fullParser = spaces >>. expr .>> (opt (pchar ';')) .>> spaces .>> eof
+  let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
 type SqlParserError = CouldNotParse of string
 
-let parse sql: Result<Expression, SqlParserError> =
-  match FParsec.CharParsers.run Definitions.fullParser sql with
+let parse sql: Result<SelectQuery, SqlParserError> =
+  match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
-      | SelectQuery _
-      | ShowQuery _ -> Ok result
-      | _ -> Error(CouldNotParse "Expecting a SELECT or SHOW query")
+      | SelectQuery selectQuery -> Ok selectQuery
+      | _ -> Error(CouldNotParse "Expecting SELECT query")
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)

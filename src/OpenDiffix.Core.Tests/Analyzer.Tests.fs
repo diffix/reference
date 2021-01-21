@@ -1,44 +1,18 @@
 module OpenDiffix.Core.AnalyzerTests
 
-open System.Linq.Expressions
 open Xunit
-open FsUnit.Xunit
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
-let testParsedQuery queryString queryTypeFilter callback (expected: Query) =
+let testParsedQuery queryString callback (expected: Query) =
   let testResult =
     Parser.parse queryString
     |> Result.mapError (fun e -> $"Failed to parse: %A{e}")
-    |> Result.bind queryTypeFilter
     |> Result.bind callback
 
   assertOkEqual testResult expected
 
-module AnalyzeShow =
-  let showQueries =
-    function
-    | ParserTypes.Expression.ShowQuery q -> Ok q
-    | _ -> Error "Expecting SHOW query"
-
-  [<Fact>]
-  let ``SHOW TABLES`` () =
-    testParsedQuery "SHOW TABLES" showQueries Analyzer.transformShowQuery (ShowQuery ShowQueryKind.Tables)
-
-  [<Fact>]
-  let ``SHOW columns FROM table`` () =
-    testParsedQuery
-      "SHOW columns FROM table"
-      showQueries
-      Analyzer.transformShowQuery
-      (ShowQuery(ShowQueryKind.ColumnsInTable "table"))
-
 module AnalyzeSelect =
-  let selectQueries =
-    function
-    | ParserTypes.Expression.SelectQuery q -> Ok q
-    | _ -> Error "Expecting SELECT query"
-
   let testTable: Table =
     {
       Name = "table"
@@ -55,8 +29,7 @@ module AnalyzeSelect =
   let ``Selecting columns from a table`` () =
     testParsedQuery
       "SELECT str_col, bool_col FROM table"
-      selectQueries
-      (Analyzer.transformSelectQueryWithTable testTable)
+      (Analyzer.transformQuery testTable)
       (SelectQuery
         {
           Columns =
@@ -95,8 +68,7 @@ module AnalyzeSelect =
 
     testParsedQuery
       query
-      selectQueries
-      (Analyzer.transformSelectQueryWithTable testTable)
+      (Analyzer.transformQuery testTable)
       (SelectQuery
         {
           Columns =
