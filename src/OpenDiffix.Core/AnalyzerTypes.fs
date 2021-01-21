@@ -8,18 +8,12 @@ type JoinType =
   | RightJoin
   | FullJoin
 
-type SelectExpression =
-  {
-    //
-    Type: ExpressionType
-    Expression: Expression
-    Alias: string
-  }
+type SelectExpression = { Expression: Expression; Alias: string }
 
-type GroupingSet = int list
+type GroupingSet = Expression list
 
 type Query =
-  | Union of distinct: bool * Query * Query
+  | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
 
 and SelectQuery =
@@ -27,7 +21,6 @@ and SelectQuery =
     Columns: SelectExpression list
     Where: Expression
     From: SelectFrom
-    GroupBy: Expression list
     GroupingSets: GroupingSet list
     Having: Expression
     OrderBy: OrderByExpression list

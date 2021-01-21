@@ -3,14 +3,6 @@ module OpenDiffix.Core.Analyzer
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
 
-let columnToExpressionType =
-  function
-  | ColumnType.BooleanType -> Ok ExpressionType.BooleanType
-  | ColumnType.IntegerType -> Ok ExpressionType.IntegerType
-  | ColumnType.FloatType -> Ok ExpressionType.FloatType
-  | ColumnType.StringType -> Ok ExpressionType.StringType
-  | ColumnType.UnknownType other -> Error $"Unknown type %s{other} cannot be selected"
-
 let rec functionExpression table fn children =
   children
   |> List.map (mapExpression table)
@@ -21,10 +13,8 @@ and mapExpression table parsedExpression =
   match parsedExpression with
   | ParserTypes.Identifier identifierName ->
       result {
-        let! column = Table.getColumn table identifierName
-        let! columnType = columnToExpressionType column.Type
-        let! columnIndex = Table.getColumnIndex table column
-        return Expression.ColumnReference(columnIndex, columnType)
+        let! (index, column) = Table.getColumn table identifierName
+        return Expression.ColumnReference(index, column.Type)
       }
   | ParserTypes.Expression.Integer value -> Value.Integer value |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok
@@ -53,14 +43,8 @@ let extractAlias =
 let wrapExpressionAsSelected table parserExpr =
   result {
     let! expr = mapExpression table parserExpr
-    let! exprType = Expression.GetType expr
 
-    return
-      {
-        AnalyzerTypes.Expression = expr
-        AnalyzerTypes.Type = exprType
-        AnalyzerTypes.Alias = ""
-      }
+    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = "" }
   }
 
 let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.SelectExpression, string> =
@@ -68,22 +52,14 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
   | ParserTypes.As (expr, exprAlias) ->
       result {
         let! childExpr = mapExpression table expr
-        let! childExprType = Expression.GetType childExpr
         let! alias = extractAlias exprAlias
-        return { Expression = childExpr; Type = childExprType; Alias = alias }
+        return { Expression = childExpr; Alias = alias }
       }
   | ParserTypes.Identifier identifierName ->
       result {
-        let! column = Table.getColumn table identifierName
-        let! columnType = columnToExpressionType column.Type
-        let! columnIndex = Table.getColumnIndex table column
+        let! (index, column) = Table.getColumn table identifierName
 
-        return
-          {
-            Expression = Expression.ColumnReference(columnIndex, columnType)
-            Type = columnType
-            Alias = ""
-          }
+        return { Expression = Expression.ColumnReference(index, column.Type); Alias = "" }
       }
   | ParserTypes.Expression.Function (fn, args) ->
       wrapExpressionAsSelected table (ParserTypes.Expression.Function(fn, args))
@@ -121,8 +97,7 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
           Columns = selectedExpressions
           Where = whereClause
           From = AnalyzerTypes.SelectFrom.Table table
-          GroupBy = groupBy
-          GroupingSets = [ [ 0 .. groupBy.Length - 1 ] ]
+          GroupingSets = [ groupBy ]
           Having = havingClause
           OrderBy = []
         }
