@@ -13,9 +13,8 @@ and mapExpression table parsedExpression =
   match parsedExpression with
   | ParserTypes.Identifier identifierName ->
       result {
-        let! column = Table.getColumn table identifierName
-        let! columnIndex = Table.getColumnIndex table column
-        return Expression.ColumnReference(columnIndex, column.Type)
+        let! (index, column) = Table.getColumn table identifierName
+        return Expression.ColumnReference(index, column.Type)
       }
   | ParserTypes.Expression.Integer value -> Value.Integer value |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok
@@ -58,14 +57,9 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
       }
   | ParserTypes.Identifier identifierName ->
       result {
-        let! column = Table.getColumn table identifierName
-        let! columnIndex = Table.getColumnIndex table column
+        let! (index, column) = Table.getColumn table identifierName
 
-        return
-          {
-            Expression = Expression.ColumnReference(columnIndex, column.Type)
-            Alias = ""
-          }
+        return { Expression = Expression.ColumnReference(index, column.Type); Alias = "" }
       }
   | ParserTypes.Expression.Function (fn, args) ->
       wrapExpressionAsSelected table (ParserTypes.Expression.Function(fn, args))
