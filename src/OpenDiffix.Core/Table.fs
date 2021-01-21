@@ -38,7 +38,6 @@ module Table =
         |> List.map (fun table ->
              let columns =
                table.Columns
-               |> List.sortBy (fun column -> column.Name)
                |> List.zip [ 0 .. (List.length (table.Columns) - 1) ]
                |> List.map (fun (index, column) ->
                     { Name = column.Name; Type = columnTypeFromString (column.Type); Index = index })
