@@ -10,7 +10,19 @@ type ExpressionType =
 
 type Row = Value array
 
-type Function =
+type AggregateFunction =
+  | Count
+  | Sum
+
+  static member ReturnType fn (args: Expression list) =
+    match fn with
+    | Count -> Ok IntegerType
+    | Sum ->
+        List.tryHead args
+        |> Result.requireSome "Sum requires an argument"
+        |> Result.bind Expression.GetType
+
+and ScalarFunction =
   | Plus
   | Minus
   | Equals
@@ -21,32 +33,6 @@ type Function =
   | LtE
   | Gt
   | GtE
-  | Count
-  | Sum
-
-  static member FromString =
-    function
-    | "+" -> Ok Plus
-    | "-" -> Ok Minus
-    | "=" -> Ok Equals
-    | "count" -> Ok Count
-    | "sum" -> Ok Sum
-    | other -> Error $"Unknown function %A{other}"
-
-  static member TypeInfo =
-    function
-    | Plus
-    | Minus
-    | Equals
-    | Not
-    | And
-    | Or
-    | Lt
-    | LtE
-    | Gt
-    | GtE -> Scalar
-    | Count
-    | Sum -> Aggregate AggregateOptions.Default
 
   static member ReturnType fn (args: Expression list) =
     match fn with
@@ -68,20 +54,29 @@ type Function =
     | LtE
     | Gt
     | GtE -> Ok BooleanType
-    | Count -> Ok IntegerType
-    | Sum ->
-        List.tryHead args
-        |> Result.requireSome "Sum requires an argument"
-        |> Result.bind Expression.GetType
+
+and Function =
+  | ScalarFunction of fn:ScalarFunction
+  | AggregateFunction of fn:AggregateFunction * options:AggregateOptions
+
+  static member FromString =
+    function
+    | "count" -> Ok (AggregateFunction (Count, AggregateOptions.Default))
+    | "sum" -> Ok (AggregateFunction (Sum, AggregateOptions.Default))
+    | "+" -> Ok (ScalarFunction Plus)
+    | "-" -> Ok (ScalarFunction Minus)
+    | "=" -> Ok (ScalarFunction Equals)
+    | other -> Error $"Unknown function %A{other}"
 
 and Expression =
-  | FunctionExpr of fn: Function * args: Expression list * functionType: FunctionType
+  | FunctionExpr of fn: Function * args: Expression list
   | ColumnReference of index: int * exprType: ExpressionType
   | Constant of value: Value
 
   static member GetType =
     function
-    | FunctionExpr (fn, args, _fnType) -> Function.ReturnType fn args
+    | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
+    | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
     | ColumnReference (_, exprType) -> Ok exprType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
@@ -185,7 +180,7 @@ module DefaultAggregates =
     |> Integer
 
 module Expression =
-  let invokeFunction ctx fn args =
+  let invokeScalarFunction ctx fn args =
     match fn with
     | Plus -> DefaultFunctions.add ctx args
     | Minus -> DefaultFunctions.sub ctx args
@@ -197,28 +192,16 @@ module Expression =
     | LtE -> DefaultFunctions.binaryBooleanCheck (<=) ctx args
     | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
     | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
-    | Count
-    | Sum -> failwith "Aggregate functions are invoked using invokeAggregate"
 
-  let invokeAggregate ctx fn mappedArgs =
+  let invokeAggregateFunction ctx fn mappedArgs =
     match fn with
     | Count -> DefaultAggregates.count ctx mappedArgs
     | Sum -> DefaultAggregates.sum ctx mappedArgs
-    | Plus
-    | Minus
-    | Equals
-    | Not
-    | And
-    | Or
-    | Lt
-    | LtE
-    | Gt
-    | GtE -> failwith "Aggregate functions are invoked using invokeAggregate"
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
-    | FunctionExpr (fn, args, Scalar) -> invokeFunction ctx fn (args |> List.map (evaluate ctx row))
-    | FunctionExpr (name, _, _) -> failwith $"Invalid usage of aggregate '{name}'."
+    | FunctionExpr (ScalarFunction fn, args) -> invokeScalarFunction ctx fn (args |> List.map (evaluate ctx row))
+    | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate '%A{fn}'."
     | ColumnReference (index, _) -> row.[index]
     | Constant value -> value
 
@@ -255,12 +238,12 @@ module Expression =
     | Some value -> value
     | None ->
         match expr with
-        | FunctionExpr (name, args, Scalar) ->
+        | FunctionExpr (ScalarFunction fn, args) ->
             let evaluatedArgs = args |> List.map (evaluateAggregated ctx groupings rows)
-            invokeFunction ctx name evaluatedArgs
-        | FunctionExpr (name, args, Aggregate opts) ->
+            invokeScalarFunction ctx fn evaluatedArgs
+        | FunctionExpr (AggregateFunction (fn, opts), args) ->
             let aggregateArgs = prepareAggregateArgs ctx args opts rows
-            invokeAggregate ctx name aggregateArgs
+            invokeAggregateFunction ctx fn aggregateArgs
         | ColumnReference _ -> failwith $"Incorrect column reference in aggregated context."
         | Constant value -> value
 

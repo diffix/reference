@@ -147,7 +147,7 @@ let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
 [<Fact>]
 let evaluate () =
   // select val_int + 3
-  eval (FunctionExpr(Plus, [ colRef1; Constant(Integer 3) ], Scalar))
+  eval (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3) ]))
   |> should equal (Integer 10)
 
   // select val_str
@@ -156,19 +156,19 @@ let evaluate () =
 [<Fact>]
 let evaluateAggregated () =
   // select sum(val_float - val_int)
-  evalAggr (FunctionExpr(Sum, [ FunctionExpr(Minus, [ colRef2; colRef1 ], Scalar) ], Expression.defaultAggregate))
+  evalAggr (FunctionExpr(AggregateFunction (Sum, AggregateOptions.Default), [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]))
   |> should equal (Float 2.0)
 
   // select count(*)
-  evalAggr (FunctionExpr(Count, [], Expression.defaultAggregate))
+  evalAggr (FunctionExpr(AggregateFunction (Count, AggregateOptions.Default), []))
   |> should equal (Integer 4)
 
   // select count(1)
-  evalAggr (FunctionExpr(Count, [ Constant(Integer 1) ], Expression.defaultAggregate))
+  evalAggr (FunctionExpr(AggregateFunction (Count, AggregateOptions.Default), [ Constant(Integer 1) ]))
   |> should equal (Integer 4)
 
   // select count(distinct val_str)
-  evalAggr (FunctionExpr(Count, [ colRef0 ], Expression.distinctAggregate))
+  evalAggr (FunctionExpr(AggregateFunction (Count, {AggregateOptions.Default with Distinct = true}), [ colRef0 ]))
   |> should equal (Integer 2)
 
   // select val_str

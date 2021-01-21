@@ -15,7 +15,7 @@ let rec functionExpression table fn children =
   children
   |> List.map (mapExpression table)
   |> List.sequenceResultM
-  |> Result.map (fun children -> FunctionExpr(fn, children, Function.TypeInfo fn))
+  |> Result.map (fun children -> FunctionExpr(fn, children))
 
 and mapExpression table parsedExpression =
   match parsedExpression with
@@ -30,19 +30,18 @@ and mapExpression table parsedExpression =
   | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok
   | ParserTypes.Expression.String value -> Value.String value |> Constant |> Ok
   | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant |> Ok
-  | ParserTypes.Not expr -> functionExpression table Not [ expr ]
-  | ParserTypes.Lt (left, right) -> functionExpression table Lt [ left; right ]
-  | ParserTypes.LtE (left, right) -> functionExpression table LtE [ left; right ]
-  | ParserTypes.Gt (left, right) -> functionExpression table Gt [ left; right ]
-  | ParserTypes.GtE (left, right) -> functionExpression table GtE [ left; right ]
-  | ParserTypes.And (left, right) -> functionExpression table And [ left; right ]
-  | ParserTypes.Or (left, right) -> functionExpression table Or [ left; right ]
+  | ParserTypes.Not expr -> functionExpression table (ScalarFunction Not) [ expr ]
+  | ParserTypes.Lt (left, right) -> functionExpression table (ScalarFunction Lt) [ left; right ]
+  | ParserTypes.LtE (left, right) -> functionExpression table (ScalarFunction LtE) [ left; right ]
+  | ParserTypes.Gt (left, right) -> functionExpression table (ScalarFunction Gt) [ left; right ]
+  | ParserTypes.GtE (left, right) -> functionExpression table (ScalarFunction GtE) [ left; right ]
+  | ParserTypes.And (left, right) -> functionExpression table (ScalarFunction And) [ left; right ]
+  | ParserTypes.Or (left, right) -> functionExpression table (ScalarFunction Or) [ left; right ]
   | ParserTypes.Function (name, args) ->
       result {
         let! fn = Function.FromString name
         let! childExpressions = args |> List.map (mapExpression table) |> List.sequenceResultM
-        let fnType = Function.TypeInfo fn
-        return FunctionExpr(fn, childExpressions, fnType)
+        return FunctionExpr(fn, childExpressions)
       }
   | other -> Error $"The expression is not permitted in this context: %A{other}"
 

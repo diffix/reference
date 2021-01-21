@@ -82,47 +82,41 @@ module AnalyzeSelect =
                 Type = ExpressionType.FloatType
                 Expression =
                   FunctionExpr
-                    (Function.Plus,
-                     [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ],
-                     FunctionType.Scalar)
+                    (ScalarFunction Plus,
+                     [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ]
+                     )
                 Alias = ""
               }
               {
                 Type = ExpressionType.IntegerType
                 Expression =
                   FunctionExpr
-                    (Function.Count,
-                     [ ColumnReference(1, ExpressionType.IntegerType) ],
-                     FunctionType.Aggregate AggregateOptions.Default)
+                    (AggregateFunction (Count, AggregateOptions.Default),
+                     [ ColumnReference(1, ExpressionType.IntegerType) ])
                 Alias = ""
               }
             ]
           Where =
             FunctionExpr
-              (Function.And,
+              (ScalarFunction And,
                [
                  FunctionExpr
-                   (Function.Gt,
-                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ],
-                    FunctionType.Scalar)
+                   (ScalarFunction Gt,
+                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 0) ])
                  FunctionExpr
-                   (Function.Lt,
-                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ],
-                    FunctionType.Scalar)
-               ],
-               FunctionType.Scalar)
+                   (ScalarFunction Lt,
+                    [ ColumnReference(1, ExpressionType.IntegerType); Constant(Value.Integer 10) ])
+               ])
           From = Table testTable
           GroupBy =
             [
               ColumnReference(1, ExpressionType.IntegerType)
               FunctionExpr
-                (Function.Plus,
-                 [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ],
-                 FunctionType.Scalar)
+                (ScalarFunction Plus,
+                 [ ColumnReference(2, ExpressionType.FloatType); ColumnReference(1, ExpressionType.IntegerType) ])
               FunctionExpr
-                (Function.Count,
-                 [ ColumnReference(1, ExpressionType.IntegerType) ],
-                 FunctionType.Aggregate AggregateOptions.Default)
+                (AggregateFunction (Count, AggregateOptions.Default),
+                 [ ColumnReference(1, ExpressionType.IntegerType) ])
             ]
           GroupingSets = [ [ 0; 1; 2 ] ]
           Having = Boolean true |> Constant
