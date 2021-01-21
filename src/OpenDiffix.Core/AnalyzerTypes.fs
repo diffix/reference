@@ -13,7 +13,7 @@ type SelectExpression = { Expression: Expression; Alias: string }
 type GroupingSet = int list
 
 type Query =
-  | Union of distinct: bool * Query * Query
+  | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
 
 and SelectQuery =
