@@ -7,15 +7,6 @@ type Value =
   | Float of float
   | String of string
 
-  static member IsTruthy =
-    function
-    | Null -> false
-    | Boolean value -> value
-    | Integer n -> n <> 0
-    | Float n -> n <> 0.
-    | String "" -> false
-    | String value -> value.ToLower() = "true"
-
 type OrderByDirection =
   | Ascending
   | Descending
@@ -43,3 +34,12 @@ module Value =
           | _, Null -> -nullsValue
           | x, y -> directionCoefficient * Operators.compare x y
     }
+
+  let isTruthy =
+    function
+    | Null -> false
+    | Boolean value -> value
+    | Integer n -> n <> 0
+    | Float n -> n <> 0.
+    | String "" -> false
+    | String value -> value.ToLower() = "true"

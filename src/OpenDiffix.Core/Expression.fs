@@ -165,7 +165,7 @@ module DefaultFunctions =
 
   let binaryBooleanCheck check _ctx =
     function
-    | [ _a; _b ] as values -> values |> List.map Value.IsTruthy |> List.reduce check |> Value.Boolean
+    | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
     | _ -> failwith "Expected two arguments for binary condition"
 
 module DefaultAggregates =
