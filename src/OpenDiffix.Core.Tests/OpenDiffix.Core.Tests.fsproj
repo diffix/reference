@@ -13,6 +13,7 @@
         <Compile Include="Expression.Tests.fs" />
         <Compile Include="Analyzer.Tests.fs" />
         <Compile Include="Parser.Tests.fs" />
+        <Compile Include="Planner.Tests.fs" />
         <Compile Include="QueryEngine.Tests.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
