@@ -108,6 +108,7 @@ let ``Parses SELECT by itself`` () =
         From = Identifier "table"
         Where = None
         GroupBy = []
+        Having = None
       })
 
 [<Fact>]
@@ -121,6 +122,7 @@ let ``Parses SELECT DISTINCT`` () =
         From = Identifier "table"
         Where = None
         GroupBy = []
+        Having = None
       })
 
 [<Fact>]
@@ -136,6 +138,7 @@ let ``Parse SELECT query with columns and table`` () =
       From = Identifier "table"
       Where = None
       GroupBy = []
+      Having = None
     }
 
   assertOkEqual
@@ -146,6 +149,7 @@ let ``Parse SELECT query with columns and table`` () =
       From = Identifier "table"
       Where = None
       GroupBy = []
+      Having = None
     }
 
 [<Fact>]
@@ -163,6 +167,7 @@ let ``Multiline select`` () =
       From = Identifier "table"
       Where = None
       GroupBy = []
+      Having = None
     }
 
 [<Fact>]
@@ -179,16 +184,18 @@ let ``Parse aggregate query`` () =
       From = Identifier "table"
       Where = None
       GroupBy = [ Identifier "col1" ]
+      Having = None
     }
 
 [<Fact>]
-let ``Parse aggregate query with where clause`` () =
+let ``Parse complex aggregate query`` () =
   assertOkEqual
     (Parser.parse """
          SELECT col1 as colAlias, count(distinct aid)
          FROM table
          WHERE col1 = 1 AND col2 = 2 or col2 = 3
          GROUP BY col1
+         HAVING count(distinct aid) > 1
          """)
     {
       SelectDistinct = false
@@ -200,4 +207,5 @@ let ``Parse aggregate query with where clause`` () =
             (Equal(Identifier "col1", Integer 1),
              (Or(Equal(Identifier "col2", Integer 2), Equal(Identifier "col2", Integer 3)))))
       GroupBy = [ Identifier "col1" ]
+      Having = Some <| Gt(Function("count", [ Distinct (Identifier "aid") ]), Integer 1)
     }
