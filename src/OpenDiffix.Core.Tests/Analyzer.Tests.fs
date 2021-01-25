@@ -35,6 +35,23 @@ let testParsedQuery queryString callback (expected: Query) =
   assertOkEqual testResult expected
 
 [<Fact>]
+let ``Analyze count(*)`` () =
+  testParsedQuery
+    "SELECT count(*) from table"
+    (Analyzer.transformQuery testTable)
+    (SelectQuery
+      { defaultQuery with
+          Columns =
+            [
+              {
+                Expression =
+                  FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
+                Alias = ""
+              }
+            ]
+      })
+
+[<Fact>]
 let ``Analyze count(distinct col)`` () =
   testParsedQuery
     "SELECT count(distinct int_col) from table"

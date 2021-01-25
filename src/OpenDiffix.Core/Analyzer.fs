@@ -37,16 +37,15 @@ and mapExpression table parsedExpression =
 
 and mapFunctionExpression table fn args =
   match fn, args with
-  | AggregateFunction (Count, aggregateArgs), [ParserTypes.Distinct expr] ->
-    mapExpression table expr
-    |> Result.map(fun childArg ->
-      AggregateFunction(Count, {aggregateArgs with Distinct = true}), [childArg]
-    )
+  | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> Ok(AggregateFunction(Count, aggregateArgs), [])
+  | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Distinct expr ] ->
+      mapExpression table expr
+      |> Result.map (fun childArg -> AggregateFunction(Count, { aggregateArgs with Distinct = true }), [ childArg ])
   | _, _ ->
-    args
-    |> List.map (mapExpression table)
-    |> List.sequenceResultM
-    |> Result.map(fun childArgs -> fn, childArgs)
+      args
+      |> List.map (mapExpression table)
+      |> List.sequenceResultM
+      |> Result.map (fun childArgs -> fn, childArgs)
 
 let extractAlias =
   function
