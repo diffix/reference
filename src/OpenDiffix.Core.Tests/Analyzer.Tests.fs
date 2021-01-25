@@ -26,6 +26,30 @@ module AnalyzeSelect =
     }
 
   [<Fact>]
+  let ``Analyze count(distinct col)`` () =
+    testParsedQuery
+      "SELECT count(distinct int_col) from table"
+      (Analyzer.transformQuery testTable)
+      (SelectQuery
+        {
+          Columns =
+            [
+              {
+                Expression =
+                  FunctionExpr
+                    (AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
+                     [ ColumnReference(1, IntegerType) ])
+                Alias = ""
+              }
+            ]
+          Where = Boolean true |> Constant
+          From = Table testTable
+          GroupingSets = [ [] ]
+          Having = Boolean true |> Constant
+          OrderBy = []
+        })
+
+  [<Fact>]
   let ``Selecting columns from a table`` () =
     testParsedQuery
       "SELECT str_col, bool_col FROM table"

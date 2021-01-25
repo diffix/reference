@@ -30,10 +30,23 @@ and mapExpression table parsedExpression =
   | ParserTypes.Function (name, args) ->
       result {
         let! fn = Function.FromString name
-        let! childExpressions = args |> List.map (mapExpression table) |> List.sequenceResultM
+        let! fn, childExpressions = mapFunctionExpression table fn args
         return FunctionExpr(fn, childExpressions)
       }
   | other -> Error $"The expression is not permitted in this context: %A{other}"
+
+and mapFunctionExpression table fn args =
+  match fn, args with
+  | AggregateFunction (Count, aggregateArgs), [ParserTypes.Distinct expr] ->
+    mapExpression table expr
+    |> Result.map(fun childArg ->
+      AggregateFunction(Count, {aggregateArgs with Distinct = true}), [childArg]
+    )
+  | _, _ ->
+    args
+    |> List.map (mapExpression table)
+    |> List.sequenceResultM
+    |> Result.map(fun childArgs -> fn, childArgs)
 
 let extractAlias =
   function
