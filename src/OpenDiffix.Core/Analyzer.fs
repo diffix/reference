@@ -88,7 +88,7 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue table selectQuery.Where
-    let! havingClause = transformExpressionOptionWithDefaultTrue table None
+    let! havingClause = transformExpressionOptionWithDefaultTrue table selectQuery.Having
     let! groupBy = selectQuery.GroupBy |> List.map (mapExpression table) |> List.sequenceResultM
 
     return

@@ -55,6 +55,7 @@ module AnalyzeSelect =
     WHERE
       int_col > 0 and int_col < 10
     GROUP BY int_col, float_col + int_col, count(int_col)
+    HAVING count(int_col) > 1
     "
 
     testParsedQuery
@@ -77,13 +78,12 @@ module AnalyzeSelect =
               }
             ]
           Where =
-            FunctionExpr(
-              ScalarFunction And,
-              [
-                FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0) ])
-                FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10) ])
-              ]
-            )
+            FunctionExpr
+              (ScalarFunction And,
+               [
+                 FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0) ])
+                 FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10) ])
+               ])
           From = Table testTable
           GroupingSets =
             [
@@ -93,6 +93,12 @@ module AnalyzeSelect =
                 FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
               ]
             ]
-          Having = Boolean true |> Constant
+          Having =
+            FunctionExpr
+              (ScalarFunction Gt,
+               [
+                 FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+                 Constant(Value.Integer 1)
+               ])
           OrderBy = []
         })
