@@ -6,6 +6,16 @@ open OpenDiffix.Core
 open OpenDiffix.Core.Parser.QueryParser
 open OpenDiffix.Core.ParserTypes
 
+let defaultSelect =
+  {
+    SelectDistinct = false
+    Expressions = []
+    From = Identifier "table"
+    Where = None
+    GroupBy = []
+    Having = None
+  }
+
 let parse p string =
   match run p string with
   | ParserResult.Success (value, _, _) -> Ok value
@@ -101,29 +111,13 @@ let ``Parses GROUP BY statement`` () =
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse selectQuery "SELECT col FROM table")
-    (SelectQuery
-      {
-        SelectDistinct = false
-        Expressions = [ Identifier "col" ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = []
-        Having = None
-      })
+    (SelectQuery { defaultSelect with Expressions = [ Identifier "col" ] })
 
 [<Fact>]
 let ``Parses SELECT DISTINCT`` () =
   assertOkEqual
     (parse selectQuery "SELECT DISTINCT col FROM table")
-    (SelectQuery
-      {
-        SelectDistinct = true
-        Expressions = [ Identifier "col" ]
-        From = Identifier "table"
-        Where = None
-        GroupBy = []
-        Having = None
-      })
+    (SelectQuery { defaultSelect with SelectDistinct = true; Expressions = [ Identifier "col" ] })
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
@@ -132,25 +126,11 @@ let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table")
-    {
-      SelectDistinct = false
-      Expressions = [ Identifier "col1"; Identifier "col2" ]
-      From = Identifier "table"
-      Where = None
-      GroupBy = []
-      Having = None
-    }
+    { defaultSelect with Expressions = [ Identifier "col1"; Identifier "col2" ] }
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
-    {
-      SelectDistinct = false
-      Expressions = [ Identifier "col1"; Identifier "col2" ]
-      From = Identifier "table"
-      Where = None
-      GroupBy = []
-      Having = None
-    }
+    { defaultSelect with Expressions = [ Identifier "col1"; Identifier "col2" ] }
 
 [<Fact>]
 let ``Multiline select`` () =
@@ -161,14 +141,7 @@ let ``Multiline select`` () =
          FROM
            table
          """)
-    {
-      SelectDistinct = false
-      Expressions = [ Identifier "col1" ]
-      From = Identifier "table"
-      Where = None
-      GroupBy = []
-      Having = None
-    }
+    { defaultSelect with Expressions = [ Identifier "col1" ] }
 
 [<Fact>]
 let ``Parse aggregate query`` () =
@@ -178,13 +151,9 @@ let ``Parse aggregate query`` () =
          FROM table
          GROUP BY col1
          """)
-    {
-      SelectDistinct = false
-      Expressions = [ Identifier "col1"; Function("count", [ Distinct(Identifier "aid") ]) ]
-      From = Identifier "table"
-      Where = None
-      GroupBy = [ Identifier "col1" ]
-      Having = None
+    { defaultSelect with
+        Expressions = [ Identifier "col1"; Function("count", [ Distinct(Identifier "aid") ]) ]
+        GroupBy = [ Identifier "col1" ]
     }
 
 [<Fact>]
@@ -197,15 +166,14 @@ let ``Parse complex aggregate query`` () =
          GROUP BY col1
          HAVING count(distinct aid) > 1
          """)
-    {
-      SelectDistinct = false
-      Expressions = [ As(Identifier "col1", Identifier "colAlias"); Function("count", [ Distinct(Identifier "aid") ]) ]
-      From = Identifier "table"
-      Where =
-        Some
-          (And
-            (Equal(Identifier "col1", Integer 1),
-             (Or(Equal(Identifier "col2", Integer 2), Equal(Identifier "col2", Integer 3)))))
-      GroupBy = [ Identifier "col1" ]
-      Having = Some <| Gt(Function("count", [ Distinct (Identifier "aid") ]), Integer 1)
+    { defaultSelect with
+        Expressions =
+          [ As(Identifier "col1", Identifier "colAlias"); Function("count", [ Distinct(Identifier "aid") ]) ]
+        Where =
+          Some
+            (And
+              (Equal(Identifier "col1", Integer 1),
+               (Or(Equal(Identifier "col2", Integer 2), Equal(Identifier "col2", Integer 3)))))
+        GroupBy = [ Identifier "col1" ]
+        Having = Some <| Gt(Function("count", [ Distinct(Identifier "aid") ]), Integer 1)
     }
