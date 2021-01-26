@@ -5,6 +5,8 @@
   - [Design considerations](#design-considerations)
   - [Organization](#organization)
   - [Branches](#branches)
+- [Creating a release](#creating-a-release)
+  
 
 ## Purpose
 
@@ -41,3 +43,16 @@ The codebase is currently organized in a number of projects:
 
 To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
+
+## Creating a release
+
+To generate an executable of the command line interface, run one of:
+
+- `make release-win` for Windows
+- `make release-linux` for Linux
+- `make release-macos` for macOS
+
+The binary will be placed in the `build` folder. It is self-contained and can be placed anywhere.
+
+There are `new-XXX` equivalents to the above, which also first pull's the latest changes from Github before
+making a build. This might be the most appropriate command on non-development machines.
