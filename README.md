@@ -1,13 +1,10 @@
 # open-diffix reference implementation
 
-A live version of the reference implementation can be found at [prototype.open-diffix.org](https://prototype.open-diffix.org).
-
 - [Purpose](#purpose)
 - [Development process](#development-process)
   - [Design considerations](#design-considerations)
   - [Organization](#organization)
   - [Branches](#branches)
-- [API](#api)
 
 ## Purpose
 
@@ -38,47 +35,9 @@ around the complex and large codebase of a real world database engine.
 The codebase is currently organized in a number of projects:
 
 - `OpenDiffix.Core` and `OpenDiffix.Core.Tests`: Contains the meat of this project. It is the query and anonymization engine.
-- `OpenDiffix.Web`: API endpoint that is served on [prototype.open-diffix.org](https://prototype.open-diffix.org) and can be used for simple testing with external tools.
+- `OpenDiffix.CLI`: A command line interface that can be used to exercise the reference implementation.
 
 ### Branches
 
 To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
-
-## API
-
-- `GET /`: HTTP endpoint for issuing queries through the browser
-- `POST /api`: HTTP API endpoint for issuing queries (see format of queries below)
-- `POST /api/upload-db`: Endpoint for uploading new SQLite databases for testing
-
-### `/api`
-
-The `/api` endpoint expects the body of the request to be a JSON payload with the following format:
-
-```json
-{
-  "query": "SELECT ...",
-  "database": "test-db.sqlite",
-  "anonymization_parameters": {
-    "aid_columns": ["table_name.aid_column"],
-    "seed": 1,
-    "low_count_filter": {
-      "threshold": 5.0,
-      "std_dev": 2.0
-    }
-  }
-}
-```
-
-- The `query` field is required and should specify the SQL query to be executed
-- The `database` field is required and is the name of a database that has been previously uploaded and that should be used
-- The `aid_columns` parameter in the `anonymization_parameters` section is the only required anonymization parameter
-
-### `/api/upload-db`
-
-Requires two HTTP headers to be set:
-
-- `db-name`: the name to be used for the database when subsequently querying it
-- `password`: a password to prevent third parties uploading new databases
-
-The body of the request should be the binary representation of the SQLite database file itself.
