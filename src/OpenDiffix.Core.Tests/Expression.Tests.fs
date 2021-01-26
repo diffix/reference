@@ -85,6 +85,15 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let length () =
+    runs1
+      DefaultFunctions.length
+      [ //
+        String "abc", Integer 3L
+        Null, Null
+      ]
+
+  [<Fact>]
   let binaryChecks () =
     runs
       (DefaultFunctions.binaryBooleanCheck (&&))

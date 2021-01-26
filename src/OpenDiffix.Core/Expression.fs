@@ -25,6 +25,7 @@ and ScalarFunction =
   | LtE
   | Gt
   | GtE
+  | Length
 
   static member ReturnType fn (args: Expression list) =
     match fn with
@@ -47,6 +48,7 @@ and ScalarFunction =
     | LtE
     | Gt
     | GtE -> Ok BooleanType
+    | Length -> Ok IntegerType
 
 and Function =
   | ScalarFunction of fn: ScalarFunction
@@ -59,6 +61,7 @@ and Function =
     | "+" -> Ok(ScalarFunction Plus)
     | "-" -> Ok(ScalarFunction Minus)
     | "=" -> Ok(ScalarFunction Equals)
+    | "length" -> Ok(ScalarFunction Length)
     | other -> Error $"Unknown function %A{other}"
 
 and Expression =
@@ -155,6 +158,12 @@ module DefaultFunctions =
     | [ Null ] -> Null
     | _ -> invalidOverload "not"
 
+  let length _ctx args =
+    match args with
+    | [ String s ] -> Integer(int64 s.Length)
+    | [ Null ] -> Null
+    | _ -> invalidOverload "length"
+
   let binaryBooleanCheck check _ctx =
     function
     | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
@@ -191,6 +200,7 @@ module Expression =
     | LtE -> DefaultFunctions.binaryBooleanCheck (<=) ctx args
     | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
     | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
+    | Length -> DefaultFunctions.length ctx args
 
   let invokeAggregateFunction ctx fn mappedArgs =
     match fn with
