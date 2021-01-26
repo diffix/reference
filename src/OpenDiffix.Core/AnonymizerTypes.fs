@@ -44,6 +44,12 @@ type ColumnValue =
   | StringValue of string
   | NullValue
 
+  static member ToString =
+    function
+    | IntegerValue value -> $"%i{value}"
+    | StringValue value -> value
+    | NullValue -> "<null>"
+
 type NonPersonalRow = ColumnValue list
 type NonPersonalRows = NonPersonalRow list
 type PersonalRow = { AidValues: ColumnValue Set; RowValues: NonPersonalRow }
