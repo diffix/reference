@@ -36,6 +36,11 @@ let ensureFailParsedQuery queryString (errorFragment: string) =
         failwith $"Expecting error to contain '%s{errorFragment}'. Got '%s{str}' instead."
   | Ok _ -> failwith "Was excepting query analysis to fail"
 
+let ensureFailWithUnspecifiedError queryString =
+  match analyzeQuery queryString with
+  | Error _ -> ()
+  | Ok _ -> failwith "Was excepting query analysis to fail"
+
 let ensureAnalyzeValid queryString =
   assertOkEqual (analyzeQuery queryString) ()
 
@@ -48,3 +53,10 @@ let ``Only allow count(*) and count(distinct aid)`` () =
   ensureAnalyzeValid "SELECT count(*) FROM table"
   ensureAnalyzeValid "SELECT count(distinct int_col) FROM table"
   ensureFailParsedQuery "SELECT count(distinct str_col) FROM table" "distinct aid-column"
+
+[<Fact>]
+let ``Only allow single table FROM`` () =
+  ensureAnalyzeValid "SELECT int_col FROM table"
+  // We don't yet parse anything else... but add some fallback tests that should always fail
+  ensureFailWithUnspecifiedError "SELECT int_col FROM table, table"
+  ensureFailWithUnspecifiedError "SELECT int_col FROM table t1 INNER JOIN table t2 ON t1.int_col = t2.int_col"

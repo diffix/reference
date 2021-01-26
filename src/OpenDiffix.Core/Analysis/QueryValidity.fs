@@ -1,10 +1,9 @@
 module OpenDiffix.Core.Analysis.QueryValidity
 
 open OpenDiffix.Core
+open OpenDiffix.Core.AnalyzerTypes
 
 module private ExpressionExtractor =
-  open OpenDiffix.Core.AnalyzerTypes
-
   let toSeq item = Seq.ofList [ item ]
 
   let rec flattenExpression (exp: Expression) =
@@ -82,10 +81,27 @@ let private allowedCountUsage aidColIdx query =
        | _ -> true)
   |> assertEmpty query "Only count(*) and count(distinct aid-column) are supported"
 
+open FsToolkit.ErrorHandling
 open FsToolkit.ErrorHandling.Operator.Result
 
+let rec private validateSingleTableSelect (query: AnalyzerTypes.Query) =
+  match query with
+  | UnionQuery (_distinct, left, right) ->
+      result {
+        let! _ = validateSingleTableSelect left
+        let! _ = validateSingleTableSelect right
+        return query
+      }
+  | SelectQuery select ->
+      match select.From with
+      | SelectFrom.Table _ -> Ok query
+      | _ -> Error "JOIN queries are not supported at present"
+
 let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query): Result<AnalyzerTypes.Query, string> =
-  query |> validateOnlyCount >>= allowedCountUsage aidColIdx
+  query
+  |> validateOnlyCount
+  >>= allowedCountUsage aidColIdx
+  >>= validateSingleTableSelect
 
 let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
   query |> allowedAggregate aidColIdx |> Result.map ignore
