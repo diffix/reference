@@ -11,7 +11,7 @@
 This is a reference implementation of open-diffix.
 As such, this serves as a sandbox in which we can quickly try, and validate, new ideas for anonymization.
 The reference implementation is meant to offer anonymization quality matching that of a final product - however
-not necessarily SQL parity. It is not mean to be productized. As such it will not receive the type of polish
+not necessarily SQL parity. It is not mean to be be used in production. As such it will not receive the type of polish
 and usability work a commercial product would. It can safely be used to anonymize data, but there will be rough
 edges.
 
