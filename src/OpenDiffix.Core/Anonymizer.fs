@@ -16,23 +16,20 @@ let private randomNum (rnd: Random) mean stdDev =
 let private newRandom (anonymizationParams: AnonymizationParams) = Random(anonymizationParams.Seed)
 
 let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows: PersonalRows) =
-  match anonymizationParams.LowCountSettings with
-  | None -> rows
-  | Some lowCountParams ->
-      rows
-      |> List.groupBy (fun row -> row.RowValues)
-      |> List.filter (fun (_values, instancesOfRow) ->
-        let distinctUsersCount =
-          instancesOfRow
-          |> List.map (fun row -> row.AidValues)
-          |> Set.unionMany
-          |> Set.count
+  let threshold = anonymizationParams.LowCountThreshold
 
-        let lowCountThreshold = randomNum rnd lowCountParams.Threshold lowCountParams.StdDev
+  rows
+  |> List.groupBy (fun row -> row.RowValues)
+  |> List.filter (fun (_values, instancesOfRow) ->
+       let distinctUsersCount =
+         instancesOfRow
+         |> List.map (fun row -> row.AidValues)
+         |> Set.unionMany
+         |> Set.count
 
-        (float distinctUsersCount) >= lowCountThreshold
-      )
-      |> List.collect (fun (_values, instancesOfRow) -> instancesOfRow)
+       let lowCountThreshold = randomUniform rnd threshold.Lower threshold.Upper
+       distinctUsersCount >= lowCountThreshold)
+  |> List.collect (fun (_values, instancesOfRow) -> instancesOfRow)
 
 let anonymize (anonymizationParams: AnonymizationParams) (rows: PersonalRows) =
   let rnd = newRandom anonymizationParams

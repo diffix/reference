@@ -1,11 +1,25 @@
 namespace OpenDiffix.Core.AnonymizerTypes
 
+type Threshold =
+  {
+    Lower: int
+    Upper: int
+  }
+
+  static member Default = { Lower = 2; Upper = 5 }
+
+type NoiseParam =
+  {
+    StandardDev: float
+    Cutoff: int
+  }
+  static member Default = { StandardDev = 2.; Cutoff = 5 }
+
 type LowCountSettings =
   {
     Threshold: float
     StdDev: float
   }
-
   static member Defaults = { Threshold = 5.; StdDev = 2. }
 
 type TableSettings = { AidColumns: string list }
@@ -14,7 +28,12 @@ type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Seed: int
-    LowCountSettings: LowCountSettings option
+    LowCountThreshold: Threshold
+
+    // Count params
+    OutlierCount: Threshold
+    TopCount: Threshold
+    CountNoise: NoiseParam
   }
 
 type RequestParams =

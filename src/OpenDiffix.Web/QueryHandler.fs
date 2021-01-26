@@ -45,7 +45,10 @@ let deriveRequestParams pathToDbs (userRequest: QueryRequest) =
           {
             TableSettings = tableSettings
             Seed = userRequest.Anonymization.Seed
-            LowCountSettings = userRequest.Anonymization.LowCountFiltering
+            LowCountThreshold = Threshold.Default
+            OutlierCount = Threshold.Default
+            TopCount = Threshold.Default
+            CountNoise = NoiseParam.Default
           }
         Query = userRequest.Query.Trim()
         DatabasePath = dbPath
