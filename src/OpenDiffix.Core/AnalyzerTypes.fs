@@ -19,11 +19,11 @@ type Query =
 and SelectQuery =
   {
     Columns: SelectExpression list
-    Where: Expression
     From: SelectFrom
+    Where: Expression
     GroupingSets: GroupingSet list
-    Having: Expression
     OrderBy: OrderByExpression list
+    Having: Expression
   }
 
 and SelectFrom =
