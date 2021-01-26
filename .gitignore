@@ -10,3 +10,5 @@ dbs/*
 
 .fake
 .ionide
+
+build
