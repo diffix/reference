@@ -59,6 +59,8 @@ module QueryParser =
 
   let whereClause = word "WHERE" >>. expr
 
+  let havingClause = word "HAVING" >>. expr
+
   let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 
   let distinct = opt (word "distinct") |>> Option.isSome
@@ -78,16 +80,19 @@ module QueryParser =
                         >>= fun whereClause ->
                               opt groupBy
                               >>= fun groupBy ->
-                                    let query =
-                                      {
-                                        SelectDistinct = distinct
-                                        Expressions = columns
-                                        From = table
-                                        Where = whereClause
-                                        GroupBy = groupBy |> Option.defaultValue []
-                                      }
+                                    opt havingClause
+                                    >>= fun havingClause ->
+                                          let query =
+                                            {
+                                              SelectDistinct = distinct
+                                              Expressions = columns
+                                              From = table
+                                              Where = whereClause
+                                              GroupBy = groupBy |> Option.defaultValue []
+                                              Having = havingClause
+                                            }
 
-                                    preturn (Expression.SelectQuery query)
+                                          preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore

@@ -14,6 +14,7 @@ type SelectQuery =
     From: Expression
     Where: Expression option
     GroupBy: Expression list
+    Having: Expression option
   }
 
 and Expression =
