@@ -62,9 +62,10 @@ let ``Analyze count(distinct col)`` () =
             [
               {
                 Expression =
-                  FunctionExpr
-                    (AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
-                     [ ColumnReference(1, IntegerType) ])
+                  FunctionExpr(
+                    AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
+                    [ ColumnReference(1, IntegerType) ]
+                  )
                 Alias = ""
               }
             ]
