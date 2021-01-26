@@ -115,11 +115,15 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
         }
   }
 
-let analyze connection (parseTree: ParserTypes.SelectQuery): Async<Result<AnalyzerTypes.Query, string>> =
+let analyze connection
+            (aidColumnName: string)
+            (parseTree: ParserTypes.SelectQuery)
+            : Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
     let! tableName = selectedTableName parseTree.From
     let! table = Table.getI connection tableName
+    let! (aidColumnIndex, _) = Table.getColumn table aidColumnName
     let! analyzerQuery = transformQuery table parseTree
-    do! Analysis.QueryValidity.validateQuery analyzerQuery
+    do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
     return analyzerQuery
   }

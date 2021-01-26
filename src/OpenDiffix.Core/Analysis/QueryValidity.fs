@@ -58,21 +58,34 @@ module private ExpressionExtractor =
   let aggregates query =
     allExpressions query
     |> Seq.map (function
-         | FunctionExpr (AggregateFunction (aggregateFn, aggregateOptions), _) ->
-             Some {| Function = aggregateFn; Options = aggregateOptions |}
+         | FunctionExpr (AggregateFunction (aggregateFn, aggregateOptions), args) ->
+             Some {| Function = aggregateFn; Options = aggregateOptions; Args = args |}
          | _ -> None)
     |> Seq.choose id
 
-let private allowedAggregate (query: AnalyzerTypes.Query): Result<AnalyzerTypes.Query, string> =
+let private assertEmpty query errorMsg seq = if Seq.isEmpty seq then Ok query else Error errorMsg
+
+let private validateOnlyCount query =
   query
   |> ExpressionExtractor.aggregates
   |> Seq.filter (fun aggregate -> aggregate.Function <> AggregateFunction.Count)
-  |> Seq.isEmpty
-  |> function
-  | true -> Ok query
-  | _ -> Error "Only count aggregates are supported"
+  |> assertEmpty query "Only count aggregates are supported"
 
-let validateQuery (query: AnalyzerTypes.Query): Result<unit, string> =
+let private allowedCountUsage aidColIdx query =
   query
-  |> allowedAggregate
-  |> Result.map ignore
+  |> ExpressionExtractor.aggregates
+  |> Seq.filter (fun aggregate -> aggregate.Function = AggregateFunction.Count)
+  |> Seq.map (fun aggregate -> aggregate.Args)
+  |> Seq.filter (function
+       | [] -> false
+       | [ ColumnReference (index, _) ] when index = aidColIdx -> false
+       | _ -> true)
+  |> assertEmpty query "Only count(*) and count(distinct aid-column) are supported"
+
+open FsToolkit.ErrorHandling.Operator.Result
+
+let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query): Result<AnalyzerTypes.Query, string> =
+  query |> validateOnlyCount >>= allowedCountUsage aidColIdx
+
+let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
+  query |> allowedAggregate aidColIdx |> Result.map ignore
