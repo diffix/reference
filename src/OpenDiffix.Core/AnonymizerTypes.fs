@@ -15,13 +15,6 @@ type NoiseParam =
   }
   static member Default = { StandardDev = 2.; Cutoff = 5 }
 
-type LowCountSettings =
-  {
-    Threshold: float
-    StdDev: float
-  }
-  static member Defaults = { Threshold = 5.; StdDev = 2. }
-
 type TableSettings = { AidColumns: string list }
 
 type AnonymizationParams =
