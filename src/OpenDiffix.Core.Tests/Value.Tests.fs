@@ -12,36 +12,36 @@ module ComparerTests =
 
   [<Fact>]
   let ``Sorts in ascending direction`` () =
-    [ Integer 5; Integer 9; Integer 3; Integer -4; Integer 12 ]
+    [ Integer 5L; Integer 9L; Integer 3L; Integer -4L; Integer 12L ]
     |> sort Ascending NullsFirst
-    |> should equal [ Integer -4; Integer 3; Integer 5; Integer 9; Integer 12 ]
+    |> should equal [ Integer -4L; Integer 3L; Integer 5L; Integer 9L; Integer 12L ]
 
   [<Fact>]
   let ``Sorts in descending direction`` () =
-    [ Integer 5; Integer 9; Integer 3; Integer -4; Integer 12 ]
+    [ Integer 5L; Integer 9L; Integer 3L; Integer -4L; Integer 12L ]
     |> sort Descending NullsFirst
-    |> should equal [ Integer 12; Integer 9; Integer 5; Integer 3; Integer -4 ]
+    |> should equal [ Integer 12L; Integer 9L; Integer 5L; Integer 3L; Integer -4L ]
 
   [<Fact>]
   let ``Nulls first in ascending order`` () =
-    [ Integer 10; Null; Integer 1; Null; Integer 5 ]
+    [ Integer 10L; Null; Integer 1L; Null; Integer 5L ]
     |> sort Ascending NullsFirst
-    |> should equal [ Null; Null; Integer 1; Integer 5; Integer 10 ]
+    |> should equal [ Null; Null; Integer 1L; Integer 5L; Integer 10L ]
 
   [<Fact>]
   let ``Nulls last in ascending order`` () =
-    [ Integer 10; Null; Integer 1; Null; Integer 5 ]
+    [ Integer 10L; Null; Integer 1L; Null; Integer 5L ]
     |> sort Ascending NullsLast
-    |> should equal [ Integer 1; Integer 5; Integer 10; Null; Null ]
+    |> should equal [ Integer 1L; Integer 5L; Integer 10L; Null; Null ]
 
   [<Fact>]
   let ``Nulls first in descending order`` () =
-    [ Integer 10; Null; Integer 1; Null; Integer 5 ]
+    [ Integer 10L; Null; Integer 1L; Null; Integer 5L ]
     |> sort Descending NullsFirst
-    |> should equal [ Null; Null; Integer 10; Integer 5; Integer 1 ]
+    |> should equal [ Null; Null; Integer 10L; Integer 5L; Integer 1L ]
 
   [<Fact>]
   let ``Nulls last in descending order`` () =
-    [ Integer 10; Null; Integer 1; Null; Integer 5 ]
+    [ Integer 10L; Null; Integer 1L; Null; Integer 5L ]
     |> sort Descending NullsLast
-    |> should equal [ Integer 10; Integer 5; Integer 1; Null; Null ]
+    |> should equal [ Integer 10L; Integer 5L; Integer 1L; Null; Null ]

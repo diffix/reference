@@ -26,19 +26,19 @@ module DefaultFunctionsTests =
     runs
       DefaultFunctions.add
       [
-        Integer 5, Integer 3, Integer 8
-        Float 2.5, Integer 3, Float 5.5
-        Integer 4, Float 2.5, Float 6.5
-        Integer 3, Null, Null
-        Null, Integer 3, Null
+        Integer 5L, Integer 3L, Integer 8L
+        Real 2.5, Integer 3L, Real 5.5
+        Integer 4L, Real 2.5, Real 6.5
+        Integer 3L, Null, Null
+        Null, Integer 3L, Null
       ]
 
     fails
       DefaultFunctions.add
       [ //
-        [ Integer 5; String "a" ]
-        [ Boolean true; Integer 1 ]
-        [ String "a"; Float 2.5 ]
+        [ Integer 5L; String "a" ]
+        [ Boolean true; Integer 1L ]
+        [ String "a"; Real 2.5 ]
       ]
 
   [<Fact>]
@@ -46,19 +46,19 @@ module DefaultFunctionsTests =
     runs
       DefaultFunctions.sub
       [
-        Integer 5, Integer 3, Integer 2
-        Float 2.5, Integer 3, Float -0.5
-        Integer 3, Float 2.5, Float 0.5
-        Integer 3, Null, Null
-        Null, Integer 3, Null
+        Integer 5L, Integer 3L, Integer 2L
+        Real 2.5, Integer 3L, Real -0.5
+        Integer 3L, Real 2.5, Real 0.5
+        Integer 3L, Null, Null
+        Null, Integer 3L, Null
       ]
 
     fails
       DefaultFunctions.sub
       [ //
-        [ Integer 5; String "a" ]
-        [ Boolean true; Integer 1 ]
-        [ String "a"; Float 2.5 ]
+        [ Integer 5L; String "a" ]
+        [ Boolean true; Integer 1L ]
+        [ String "a"; Real 2.5 ]
       ]
 
   [<Fact>]
@@ -66,11 +66,11 @@ module DefaultFunctionsTests =
     runs
       DefaultFunctions.equals
       [
-        Integer 3, Integer 3, Boolean true
-        Float 3., Integer 3, Boolean true
+        Integer 3L, Integer 3L, Boolean true
+        Real 3., Integer 3L, Boolean true
         Null, Null, Null
-        Null, Integer 3, Null
-        Integer 3, Null, Null
+        Null, Integer 3L, Null
+        Integer 3L, Null, Null
         String "a", String "a", Boolean true
       ]
 
@@ -92,8 +92,8 @@ module DefaultFunctionsTests =
         Boolean true, Boolean true, Boolean true
         Boolean true, Boolean false, Boolean false
         Boolean false, Boolean false, Boolean false
-        Integer 0, Boolean true, Boolean false
-        Float 0., Boolean true, Boolean false
+        Integer 0L, Boolean true, Boolean false
+        Real 0., Boolean true, Boolean false
         String "", Boolean true, Boolean false
         String "bar", Boolean true, Boolean false
         String "true", Boolean true, Boolean true
@@ -103,41 +103,41 @@ module DefaultFunctionsTests =
 module DefaultAggregatorsTests =
   [<Fact>]
   let sum () =
-    DefaultAggregates.sum ctx [ [ Integer 5 ]; [ Integer 3 ]; [ Integer -2 ] ]
-    |> should equal (Integer 6)
+    DefaultAggregates.sum ctx [ [ Integer 5L ]; [ Integer 3L ]; [ Integer -2L ] ]
+    |> should equal (Integer 6L)
 
     DefaultAggregates.sum ctx [] |> should equal Null
 
   [<Fact>]
   let count () =
-    DefaultAggregates.count ctx [ [ Integer 7 ]; [ Integer 15 ]; [ Integer -3 ] ]
-    |> should equal (Integer 3)
+    DefaultAggregates.count ctx [ [ Integer 7L ]; [ Integer 15L ]; [ Integer -3L ] ]
+    |> should equal (Integer 3L)
 
-    DefaultAggregates.count ctx [] |> should equal (Integer 0)
+    DefaultAggregates.count ctx [] |> should equal (Integer 0L)
 
     DefaultAggregates.count ctx [ [ String "str1" ]; [ String "" ]; [ Null ] ]
-    |> should equal (Integer 2)
+    |> should equal (Integer 2L)
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
-let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Float floatValue |]
+let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |]
 
-let testRow = makeRow "Some text" 7 0.25
+let testRow = makeRow "Some text" 7L 0.25
 
 let testRows =
   makeRows
-    (String, Integer, Float)
+    (String, Integer, Real)
     [ //
-      "row1", 1, 1.5
-      "row1", 2, 2.5
-      "row2", 3, 3.5
-      "row2", 4, 4.5
+      "row1", 1L, 1.5
+      "row1", 2L, 2.5
+      "row2", 3L, 3.5
+      "row2", 4L, 4.5
     ]
 
 let colRef0 = ColumnReference(0, StringType)
 let colRef1 = ColumnReference(1, IntegerType)
-let colRef2 = ColumnReference(2, FloatType)
+let colRef2 = ColumnReference(2, RealType)
 
 let eval expr = Expression.evaluate ctx testRow expr
 
@@ -147,8 +147,8 @@ let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
 [<Fact>]
 let evaluate () =
   // select val_int + 3
-  eval (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3) ]))
-  |> should equal (Integer 10)
+  eval (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3L) ]))
+  |> should equal (Integer 10L)
 
   // select val_str
   eval colRef0 |> should equal (String "Some text")
@@ -162,19 +162,19 @@ let evaluateAggregated () =
       [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
     )
   )
-  |> should equal (Float 2.0)
+  |> should equal (Real 2.0)
 
   // select count(*)
   evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), []))
-  |> should equal (Integer 4)
+  |> should equal (Integer 4L)
 
   // select count(1)
-  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ Constant(Integer 1) ]))
-  |> should equal (Integer 4)
+  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ Constant(Integer 1L) ]))
+  |> should equal (Integer 4L)
 
   // select count(distinct val_str)
   evalAggr (FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }), [ colRef0 ]))
-  |> should equal (Integer 2)
+  |> should equal (Integer 2L)
 
   // select val_str
   (fun () -> evalAggr colRef0 |> ignore) |> shouldFail
@@ -182,14 +182,14 @@ let evaluateAggregated () =
 [<Fact>]
 let sortRows () =
   [
-    [| String "b"; Integer 1 |]
-    [| String "b"; Integer 2 |]
+    [| String "b"; Integer 1L |]
+    [| String "b"; Integer 2L |]
     [| String "b"; Null |]
-    [| String "a"; Integer 1 |]
-    [| String "a"; Integer 2 |]
+    [| String "a"; Integer 1L |]
+    [| String "a"; Integer 2L |]
     [| String "a"; Null |]
-    [| Null; Integer 1 |]
-    [| Null; Integer 2 |]
+    [| Null; Integer 1L |]
+    [| Null; Integer 2L |]
     [| Null; Null |]
   ]
   |> Expression.sortRows
@@ -203,12 +203,12 @@ let sortRows () =
        equal
        [
          [| String "a"; Null |]
-         [| String "a"; Integer 2 |]
-         [| String "a"; Integer 1 |]
+         [| String "a"; Integer 2L |]
+         [| String "a"; Integer 1L |]
          [| String "b"; Null |]
-         [| String "b"; Integer 2 |]
-         [| String "b"; Integer 1 |]
+         [| String "b"; Integer 2L |]
+         [| String "b"; Integer 1L |]
          [| Null; Null |]
-         [| Null; Integer 2 |]
-         [| Null; Integer 1 |]
+         [| Null; Integer 2L |]
+         [| Null; Integer 1L |]
        ]

@@ -126,8 +126,8 @@ module QueryParser =
   addInfixOperator "as" spaces 1 Associativity.Left (fun left right -> Expression.As(left, right))
   addInfixOperator "and" spaces 1 Associativity.Left (fun left right -> Expression.And(left, right))
 
-  addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left (fun left right ->
-    Expression.Or(left, right))
+  addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left
+  <| (fun left right -> Expression.Or(left, right))
 
   addInfixOperator "=" spaces 3 Associativity.Left (fun left right -> Expression.Equal(left, right))
   addInfixOperator "<>" spaces 3 Associativity.Left (fun left right -> Expression.Not(Expression.Equal(left, right)))

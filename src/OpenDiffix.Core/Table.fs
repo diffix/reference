@@ -12,6 +12,8 @@ module Table =
     function
     | "integer" -> IntegerType
     | "text" -> StringType
+    | "boolean" -> BooleanType
+    | "real" -> RealType
     | other -> UnknownType other
 
   let columnTypeToString =
@@ -19,7 +21,7 @@ module Table =
     | IntegerType -> "integer"
     | StringType -> "string"
     | BooleanType -> "boolean"
-    | FloatType -> "float"
+    | RealType -> "real"
     | UnknownType typeName -> $"unknown ({typeName})"
 
   let getAll (connection: SQLite.DbConnection) =
@@ -55,3 +57,13 @@ module Table =
   let getColumn table columnName =
     tryFindColumn table columnName
     |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
+
+  let load connection table =
+    let columns =
+      table.Columns
+      |> List.map (fun column -> column.Name)
+      |> List.reduce (sprintf "%s, %s")
+
+    let loadQuery = $"SELECT {columns} FROM {table.Name}"
+
+    SQLite.executeQuery connection loadQuery

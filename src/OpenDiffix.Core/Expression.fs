@@ -2,8 +2,6 @@ namespace OpenDiffix.Core
 
 open FsToolkit.ErrorHandling
 
-type Row = Value array
-
 type AggregateFunction =
   | Count
   | Sum
@@ -35,10 +33,10 @@ and ScalarFunction =
         args
         |> List.tryFind (fun arg ->
           match (Expression.GetType arg) with
-          | Ok FloatType -> true
+          | Ok RealType -> true
           | _ -> false
         )
-        |> Option.map (fun _ -> FloatType)
+        |> Option.map (fun _ -> RealType)
         |> Option.defaultValue IntegerType
         |> Ok
     | Not
@@ -76,7 +74,7 @@ and Expression =
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
-    | Constant (Float _) -> Ok FloatType
+    | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
 
 and FunctionType =
@@ -129,26 +127,26 @@ module DefaultFunctions =
     nullableBinaryFunction
       (function
       | Integer a, Integer b -> Integer(a + b)
-      | Float a, Float b -> Float(a + b)
-      | Float a, Integer b -> Float(a + float b)
-      | Integer a, Float b -> Float(float a + b)
+      | Real a, Real b -> Real(a + b)
+      | Real a, Integer b -> Real(a + double b)
+      | Integer a, Real b -> Real(double a + b)
       | _ -> invalidOverload "+")
 
   let sub =
     nullableBinaryFunction
       (function
       | Integer a, Integer b -> Integer(a - b)
-      | Float a, Float b -> Float(a - b)
-      | Float a, Integer b -> Float(a - float b)
-      | Integer a, Float b -> Float(float a - b)
+      | Real a, Real b -> Real(a - b)
+      | Real a, Integer b -> Real(a - double b)
+      | Integer a, Real b -> Real(double a - b)
       | _ -> invalidOverload "-")
 
   let equals =
     nullableBinaryFunction
       (function
       | a, b when a = b -> Boolean true
-      | Integer a, Float b -> Boolean(float a = b)
-      | Float a, Integer b -> Boolean(a = float b)
+      | Integer a, Real b -> Boolean(float a = b)
+      | Real a, Integer b -> Boolean(a = float b)
       | _ -> Boolean false)
 
   let not _ctx args =
@@ -174,9 +172,9 @@ module DefaultAggregates =
     values
     |> Seq.sumBy
          (function
-         | [ Null ] -> 0
+         | [ Null ] -> 0L
          | []
-         | [ _ ] -> 1
+         | [ _ ] -> 1L
          | _ -> invalidOverload "count")
     |> Integer
 

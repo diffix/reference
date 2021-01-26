@@ -16,8 +16,8 @@ and mapExpression table parsedExpression =
         let! (index, column) = Table.getColumn table identifierName
         return Expression.ColumnReference(index, column.Type)
       }
-  | ParserTypes.Expression.Integer value -> Value.Integer value |> Constant |> Ok
-  | ParserTypes.Expression.Float value -> Value.Float value |> Constant |> Ok
+  | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant |> Ok
+  | ParserTypes.Expression.Float value -> Value.Real value |> Constant |> Ok
   | ParserTypes.Expression.String value -> Value.String value |> Constant |> Ok
   | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant |> Ok
   | ParserTypes.Not expr -> functionExpression table (ScalarFunction Not) [ expr ]

@@ -1,33 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
-
-        <IsPackable>false</IsPackable>
-        <GenerateProgramFile>false</GenerateProgramFile>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <Compile Include="TestHelpers.fs" />
-        <Compile Include="Value.Tests.fs" />
-        <Compile Include="Expression.Tests.fs" />
-        <Compile Include="Analyzer.Tests.fs" />
-        <Compile Include="Parser.Tests.fs" />
-        <Compile Include="Planner.Tests.fs" />
-        <Compile Include="QueryEngine.Tests.fs" />
-        <Compile Include="Program.fs" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <PackageReference Include="FsUnit.xUnit" Version="4.0.2" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
-        <PackageReference Include="xunit" Version="2.4.1" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
-        <PackageReference Include="coverlet.collector" Version="1.2.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
-    </ItemGroup>
-
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="TestHelpers.fs" />
+    <Compile Include="Value.Tests.fs" />
+    <Compile Include="Expression.Tests.fs" />
+    <Compile Include="Analyzer.Tests.fs" />
+    <Compile Include="Parser.Tests.fs" />
+    <Compile Include="Planner.Tests.fs" />
+    <Compile Include="Executor.Tests.fs" />
+    <Compile Include="QueryEngine.Tests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FsUnit.xUnit" Version="4.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
+    <PackageReference Include="coverlet.collector" Version="1.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
+  </ItemGroup>
 </Project>
