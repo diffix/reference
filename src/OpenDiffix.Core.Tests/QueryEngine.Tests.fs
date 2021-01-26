@@ -15,7 +15,7 @@ let runQuery query =
               "purchases", { AidColumns = [ "cid" ] } //
             ]
           Seed = 1
-          LowCountThreshold = Threshold.Default
+          LowCountThreshold = {Threshold.Default with Lower = 5; Upper = 7}
           OutlierCount = Threshold.Default
           TopCount = Threshold.Default
           CountNoise = NoiseParam.Default
