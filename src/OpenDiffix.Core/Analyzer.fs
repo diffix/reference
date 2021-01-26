@@ -119,5 +119,7 @@ let analyze connection (parseTree: ParserTypes.SelectQuery): Async<Result<Analyz
   asyncResult {
     let! tableName = selectedTableName parseTree.From
     let! table = Table.getI connection tableName
-    return! transformQuery table parseTree
+    let! analyzerQuery = transformQuery table parseTree
+    do! Analysis.QueryValidity.validateQuery analyzerQuery
+    return analyzerQuery
   }
