@@ -4,8 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Utils.fs" />
-    <Compile Include="SQLite.fs" />
     <Compile Include="Value.fs" />
+    <Compile Include="SQLite.fs" />
     <Compile Include="Table.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="ParserTypes.fs" />

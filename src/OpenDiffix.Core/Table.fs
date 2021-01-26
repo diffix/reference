@@ -57,3 +57,13 @@ module Table =
   let getColumn table columnName =
     tryFindColumn table columnName
     |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
+
+  let load connection table =
+    let columns =
+      table.Columns
+      |> List.map (fun column -> column.Name)
+      |> List.reduce (sprintf "%s, %s")
+
+    let loadQuery = $"SELECT {columns} FROM {table.Name}"
+
+    SQLite.executeQuery connection loadQuery

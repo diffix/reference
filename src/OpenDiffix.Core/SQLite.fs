@@ -1,9 +1,9 @@
 module OpenDiffix.Core.SQLite
 
-open System
 open System.Data.SQLite
 open Dapper
 open FsToolkit.ErrorHandling
+open OpenDiffix.Core
 
 type DbConnection = SQLiteConnection
 
@@ -51,4 +51,32 @@ let dbSchema (connection: SQLiteConnection) =
     with ex ->
       printfn "Exception: %A" ex
       return! Error("Execution error: " + ex.Message)
+  }
+
+let private readValue (reader: SQLiteDataReader) index =
+  if reader.IsDBNull index then
+    Null
+  else
+    match reader.GetFieldType(index) with
+    | fieldType when fieldType = typeof<bool> -> Boolean(reader.GetBoolean index)
+    | fieldType when fieldType = typeof<int32> || fieldType = typeof<int64> ->
+        Integer(reader.GetFieldValue<int64> index)
+    | fieldType when fieldType = typeof<single> || fieldType = typeof<double> ->
+        Real(reader.GetFieldValue<double> index)
+    | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
+    | _unknownType -> Null
+
+let executeQuery (connection: SQLiteConnection) (query: string) =
+  asyncResult {
+    use command = new SQLiteCommand(query, connection)
+
+    try
+      let reader = command.ExecuteReader()
+
+      return
+        seq<Row> {
+          while reader.Read() do
+            yield [| 0 .. reader.FieldCount - 1 |] |> Array.map (readValue reader)
+        }
+    with ex -> return! Error("Execution error: " + ex.Message)
   }

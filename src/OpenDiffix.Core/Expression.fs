@@ -2,8 +2,6 @@ namespace OpenDiffix.Core
 
 open FsToolkit.ErrorHandling
 
-type Row = Value array
-
 type AggregateFunction =
   | Count
   | Sum
