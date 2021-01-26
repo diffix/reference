@@ -1,15 +1,10 @@
 ﻿open System
 open System.IO
-open System.Security.Cryptography
 open Argu
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
-
-let version = "0.0.1"
-
 type CliArguments =
-  | [<AltCommandLine("-v")>] Version
   | DryRun
   | [<Mandatory; Unique; AltCommandLine("-d")>] Database of db_path: string
   | [<Mandatory; Unique; AltCommandLine("-aid")>] Aid_Column of column_name: string
@@ -27,7 +22,6 @@ type CliArguments =
   interface IArgParserTemplate with
     member this.Usage =
       match this with
-      | Version -> "Outputs the version of the OpenDiffix reference implementation"
       | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data"
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized"
       | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName"
@@ -103,28 +97,22 @@ Low count threshold: %s{formatThreshold anonParams.LowCountThreshold}
 Outlier count threshold: %s{formatThreshold anonParams.OutlierCount}
 Top count threshold: %s{formatThreshold anonParams.TopCount}
 Count noise: %s{formatNoise anonParams.CountNoise}
-  "
+  ",
+  0
 
 let anonymize query dbPath anonParams =
-  let request = {
-    Query = query
-    DatabasePath = dbPath
-    AnonymizationParams = anonParams
-  }
+  let request = { Query = query; DatabasePath = dbPath; AnonymizationParams = anonParams }
   let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
+
   match queryResult with
   | Ok result ->
-    let resultSet =
-      result.Rows
-      |> List.map(fun columnValues ->
-        columnValues
-        |> List.map ColumnValue.ToString
-        |> List.reduce (sprintf "%s;%s")
-      )
-      |> List.reduce (sprintf "%s\n%s")
-    resultSet, 0
-  | Error err ->
-    $"ERROR: %s{err}", 1
+      let resultSet =
+        result.Rows
+        |> List.map (fun columnValues -> columnValues |> List.map ColumnValue.ToString |> List.reduce (sprintf "%s;%s"))
+        |> List.reduce (sprintf "%s\n%s")
+
+      resultSet, 0
+  | Error err -> $"ERROR: %s{err}", 1
 
 [<EntryPoint>]
 let main argv =
@@ -132,20 +120,14 @@ let main argv =
     let parsedArguments =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
-    let output, exitCode =
-      match parsedArguments.GetAllResults() with
-      | [ Version ] -> $"OpenDiffix - %s{version}", 0
-      | _ ->
-          let query = getQuery parsedArguments
-          let dbPath = getDbPath parsedArguments
-          let anonParams = constructAnonParameters parsedArguments
+    let query = getQuery parsedArguments
+    let dbPath = getDbPath parsedArguments
+    let anonParams = constructAnonParameters parsedArguments
 
-          if parsedArguments.Contains DryRun
-          then dryRun query dbPath anonParams, 0
-          else anonymize query dbPath anonParams
-
-    printfn "%s" output
-    exitCode
+    (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
+    |> fun (output, exitCode) ->
+      printfn "%s" output
+      exitCode
 
   with e ->
     printfn "%s" e.Message
