@@ -38,7 +38,7 @@ let selectColumn index =
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
-let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1) ])
+let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1L) ])
 
 [<Fact>]
 let ``plan select`` () =
@@ -86,7 +86,7 @@ let ``plan all`` () =
   let groupingSet = [ column 0 ]
   let selectedColumns = [ { Expression = plus1 (column 0); Alias = "" }; { Expression = countStar; Alias = "" } ]
   let whereCondition = FunctionExpr(ScalarFunction Equals, [ column 1; Constant(String "abc") ])
-  let havingCondition = FunctionExpr(ScalarFunction Equals, [ countStar; Constant(Integer 0) ])
+  let havingCondition = FunctionExpr(ScalarFunction Equals, [ countStar; Constant(Integer 0L) ])
   let orderBy = [ OrderByExpression(plus1 countStar, Ascending, NullsFirst) ]
 
   let select =
@@ -110,7 +110,7 @@ let ``plan all`` () =
             groupingSet,
             [ countStar ]
           ),
-          FunctionExpr(ScalarFunction Equals, [ ColumnReference(1, IntegerType); Constant(Integer 0) ])
+          FunctionExpr(ScalarFunction Equals, [ ColumnReference(1, IntegerType); Constant(Integer 0L) ])
         ),
         [ OrderByExpression(plus1 (ColumnReference(1, IntegerType)), Ascending, NullsFirst) ]
       ),

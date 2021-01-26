@@ -12,6 +12,8 @@ module Table =
     function
     | "integer" -> IntegerType
     | "text" -> StringType
+    | "boolean" -> BooleanType
+    | "real" -> RealType
     | other -> UnknownType other
 
   let columnTypeToString =
@@ -19,7 +21,7 @@ module Table =
     | IntegerType -> "integer"
     | StringType -> "string"
     | BooleanType -> "boolean"
-    | FloatType -> "float"
+    | RealType -> "real"
     | UnknownType typeName -> $"unknown ({typeName})"
 
   let getAll (connection: SQLite.DbConnection) =

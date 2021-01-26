@@ -3,14 +3,16 @@ namespace OpenDiffix.Core
 type Value =
   | Null
   | Boolean of bool
-  | Integer of int
-  | Float of float
+  | Integer of int64
+  | Real of float
   | String of string
+
+type Row = Value array
 
 type ValueType =
   | BooleanType
   | IntegerType
-  | FloatType
+  | RealType
   | StringType
   | UnknownType of string
 
@@ -47,7 +49,7 @@ module Value =
     function
     | Null -> false
     | Boolean value -> value
-    | Integer n -> n <> 0
-    | Float n -> n <> 0.
+    | Integer n -> n <> 0L
+    | Real n -> n <> 0.
     | String "" -> false
     | String value -> value.ToLower() = "true"

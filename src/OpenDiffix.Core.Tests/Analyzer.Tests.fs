@@ -11,7 +11,7 @@ let testTable: Table =
       [
         { Name = "str_col"; Type = StringType }
         { Name = "int_col"; Type = IntegerType }
-        { Name = "float_col"; Type = FloatType }
+        { Name = "float_col"; Type = RealType }
         { Name = "bool_col"; Type = BooleanType }
       ]
   }
@@ -108,7 +108,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
             {
               Expression =
-                FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
+                FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               Alias = ""
             }
             {
@@ -118,27 +118,29 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             }
           ]
         Where =
-          FunctionExpr
-            (ScalarFunction And,
-             [
-               FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0) ])
-               FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10) ])
-             ])
+          FunctionExpr(
+            ScalarFunction And,
+            [
+              FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0L) ])
+              FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
+            ]
+          )
         From = Table testTable
         GroupingSets =
           [
             [
               ColumnReference(1, IntegerType)
-              FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, FloatType); ColumnReference(1, IntegerType) ])
+              FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
             ]
           ]
         Having =
-          FunctionExpr
-            (ScalarFunction Gt,
-             [
-               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-               Constant(Value.Integer 1)
-             ])
+          FunctionExpr(
+            ScalarFunction Gt,
+            [
+              FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+              Constant(Value.Integer 1L)
+            ]
+          )
         OrderBy = []
       })
