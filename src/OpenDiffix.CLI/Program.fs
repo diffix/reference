@@ -29,8 +29,7 @@ type CliArguments =
       | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
       | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
-      | Query_Path _ ->
-          "Path to a file containing the SQL to be executed. If not present the query will be read from standard in"
+      | Query_Path _ -> "Path to a file containing the SQL to be executed."
       | Query _ -> "The SQL query to execute."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
@@ -84,7 +83,7 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
   | Some query, _ -> query
   | None, Some path ->
       if File.Exists(path) then File.ReadAllText(path) else failwith $"ERROR: Could not find a query at %s{path}"
-  | _, _ -> Console.In.ReadLine()
+  | _, _ -> failwith "ERROR: Please specify a query to run!"
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.Database with
