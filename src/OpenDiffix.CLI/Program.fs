@@ -17,7 +17,7 @@ type CliArguments =
   | [<Unique>] Threshold_Low_Count of lower: int * upper: int
 
   // General anonymization parameters
-  | [<Unique>] Noise_Distinct_count of std_dev: float * limit: int
+  | [<Unique>] Noise_Distinct_count of std_dev: float * limit: float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -47,12 +47,12 @@ let parser = ArgumentParser.Create<CliArguments>(programName = "opendiffix")
 let toThreshold =
   function
   | Some (lower, upper) -> { Lower = lower; Upper = upper }
-  | _ -> { Lower = 2; Upper = 5 }
+  | _ -> Threshold.Default
 
 let toNoise =
   function
   | Some (stdDev, cutoffLimit) -> { StandardDev = stdDev; Cutoff = cutoffLimit }
-  | _ -> { StandardDev = 2.; Cutoff = 5 }
+  | _ -> NoiseParam.Default
 
 let private toTableSettings (aidColumns: string list) =
   aidColumns
@@ -88,7 +88,7 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
 
 let dryRun query dbPath (anonParams: AnonymizationParams) =
   let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper})"
-  let formatNoise np = $"0 +- %.2f{np.StandardDev}std limited to [-%i{np.Cutoff}, %i{np.Cutoff}]"
+  let formatNoise np = $"0 +- %.2f{np.StandardDev}std limited to [-%.2f{np.Cutoff}, %.2f{np.Cutoff}]"
 
   $"
 OpenDiffix dry run:

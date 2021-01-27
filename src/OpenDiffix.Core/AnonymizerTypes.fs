@@ -11,9 +11,9 @@ type Threshold =
 type NoiseParam =
   {
     StandardDev: float
-    Cutoff: int
+    Cutoff: float
   }
-  static member Default = { StandardDev = 2.; Cutoff = 5 }
+  static member Default = { StandardDev = 2.; Cutoff = 5. }
 
 type TableSettings = { AidColumns: string list }
 
