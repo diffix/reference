@@ -4,12 +4,10 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
 module private ExpressionExtractor =
-  let toSeq item = Seq.ofList [ item ]
-
   let rec flattenExpression (exp: Expression) =
     match exp with
-    | Constant _ as constant -> toSeq constant
-    | ColumnReference _ as columnRef -> toSeq columnRef
+    | Constant _ as constant -> Seq.singleton constant
+    | ColumnReference _ as columnRef -> Seq.singleton columnRef
     | FunctionExpr (_, args) as fnExp ->
         seq {
           yield fnExp
