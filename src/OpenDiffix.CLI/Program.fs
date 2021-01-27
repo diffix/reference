@@ -6,7 +6,7 @@ open OpenDiffix.Core.AnonymizerTypes
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
-  | DryRun
+  | Dry_Run
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
   | Aid_Columns of column_name: string list
   | Query_Path of path: string
@@ -25,7 +25,7 @@ type CliArguments =
     member this.Usage =
       match this with
       | Version -> "Prints the version number of the program."
-      | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
+      | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query_Path _ -> "Path to a file containing the SQL to be executed."
@@ -125,7 +125,7 @@ let main argv =
           AnonymizationParams = constructAnonParameters parsedArguments
         }
 
-      (if parsedArguments.Contains DryRun then dryRun request else anonymize request)
+      (if parsedArguments.Contains Dry_Run then dryRun request else anonymize request)
       |> fun (output, exitCode) ->
            printfn "%s" output
            exitCode
