@@ -26,7 +26,7 @@ type AnonymizationParams =
     // Count params
     OutlierCount: Threshold
     TopCount: Threshold
-    CountNoise: NoiseParam
+    Noise: NoiseParam
   }
 
 type RequestParams =

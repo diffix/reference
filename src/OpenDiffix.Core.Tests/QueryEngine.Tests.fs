@@ -18,7 +18,7 @@ let runQuery query =
           LowCountThreshold = {Threshold.Default with Lower = 5; Upper = 7}
           OutlierCount = Threshold.Default
           TopCount = Threshold.Default
-          CountNoise = NoiseParam.Default
+          Noise = NoiseParam.Default
         }
       DatabasePath = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
       Query = query

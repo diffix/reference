@@ -17,7 +17,7 @@ type CliArguments =
   | [<Unique>] Threshold_Low_Count of lower: int * upper: int
 
   // General anonymization parameters
-  | [<Unique>] Noise_Distinct_count of std_dev: float * limit: float
+  | [<Unique>] Noise of std_dev: float * limit: float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -38,9 +38,9 @@ type CliArguments =
       | Threshold_Low_Count _ ->
           "Threshold used to determine whether a bucket is low count or not. A number is picked from a uniform "
           + "distribution between the upper and lower limit."
-      | Noise_Distinct_count _ ->
-          "Specifies the standard deviation used when calculating the noise applied to the count aggregate. "
-          + "Additionally a limit should be specified which is used to truncate the normal distributed value generated."
+      | Noise _ ->
+          "Specifies the standard deviation used when calculating the noise throughout the system. "
+          + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
 
 let parser = ArgumentParser.Create<CliArguments>(programName = "opendiffix")
 
@@ -73,7 +73,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
     LowCountThreshold = parsedArgs.TryGetResult Threshold_Low_Count |> toThreshold
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
-    CountNoise = parsedArgs.TryGetResult Noise_Distinct_count |> toNoise
+    Noise = parsedArgs.TryGetResult Noise |> toNoise
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
@@ -100,10 +100,11 @@ Query:
 Anonymization parameters:
 ------------------------
 Low count threshold: %s{formatThreshold anonParams.LowCountThreshold}
+Noise: %s{formatNoise anonParams.Noise}
 
+Count specific:
 Outlier count threshold: %s{formatThreshold anonParams.OutlierCount}
 Top count threshold: %s{formatThreshold anonParams.TopCount}
-Count noise: %s{formatNoise anonParams.CountNoise}
   ",
   0
 
