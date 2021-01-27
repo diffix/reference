@@ -115,7 +115,7 @@ let main argv =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
     if parsedArguments.Contains(Version) then
-      (printfn "OpenDiffix Reference - %s" AssemblyInfo.version)
+      (printfn "%s" AssemblyInfo.versionJson)
       0
     else
       let request =

@@ -28,13 +28,18 @@ open System.Reflection
 
 do ()
 
-let version =
-  sprintf
-    "%s.%s.%s (commits: %s / %s / %s) %s"
-    ThisAssembly.Git.SemVer.Major
-    ThisAssembly.Git.SemVer.Minor
-    ThisAssembly.Git.SemVer.Patch
-    ThisAssembly.Git.Commits
-    ThisAssembly.Git.Branch
-    ThisAssembly.Git.Commit
-    (if ThisAssembly.Git.IsDirtyString = "true" then "- Contains uncommitted changes!" else "")
+open Thoth.Json.Net
+
+let versionJson =
+  let versionInfo =
+    Encode.object [
+      "name", Encode.string "OpenDiffix Reference implementation"
+      "version", Encode.object [
+        "version", Encode.string (sprintf "%s.%s.%s" ThisAssembly.Git.SemVer.Major ThisAssembly.Git.SemVer.Minor ThisAssembly.Git.SemVer.Patch)
+        "commit_number", Encode.int (int ThisAssembly.Git.Commits)
+        "branch", Encode.string ThisAssembly.Git.Branch
+        "sha", Encode.string ThisAssembly.Git.Commit
+        "dirty_build", Encode.bool ThisAssembly.Git.IsDirty
+      ]
+    ]
+  Encode.toString 2 versionInfo
