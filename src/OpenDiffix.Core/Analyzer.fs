@@ -54,11 +54,18 @@ let extractAlias =
   | ParserTypes.Expression.Identifier aliasName -> Ok aliasName
   | other -> Error $"Expected an alias, but got an expression: %A{other}"
 
+let expressionName =
+  function
+  | ParserTypes.Identifier identifierName -> identifierName
+  | ParserTypes.Function (name, _args) -> name
+  | _ -> ""
+
 let wrapExpressionAsSelected table parserExpr =
   result {
     let! expr = mapExpression table parserExpr
+    let name = expressionName parserExpr
 
-    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = "" }
+    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
   }
 
 let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.SelectExpression, string> =
@@ -73,7 +80,11 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
       result {
         let! (index, column) = Table.getColumn table identifierName
 
-        return { Expression = Expression.ColumnReference(index, column.Type); Alias = "" }
+        return
+          {
+            Expression = Expression.ColumnReference(index, column.Type)
+            Alias = identifierName
+          }
       }
   | ParserTypes.Expression.Function (fn, args) ->
       wrapExpressionAsSelected table (ParserTypes.Expression.Function(fn, args))
