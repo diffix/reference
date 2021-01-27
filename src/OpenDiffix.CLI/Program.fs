@@ -87,7 +87,7 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   if File.Exists(dbPath) then dbPath else failwith $"ERROR: Could not find a database at %s{dbPath}"
 
 let dryRun query dbPath (anonParams: AnonymizationParams) =
-  let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper})"
+  let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper}]"
   let formatNoise np = $"0 +- %.2f{np.StandardDev}std limited to [-%.2f{np.Cutoff}, %.2f{np.Cutoff}]"
 
   $"

@@ -3,7 +3,7 @@ module OpenDiffix.Core.Anonymizer
 open System
 open OpenDiffix.Core.AnonymizerTypes
 
-let private randomUniform (rnd: Random) lower upper = rnd.Next(lower, upper)
+let private randomUniform (rnd: Random) lower upper = rnd.Next(lower, upper + 1)
 
 let private randomNum (rnd: Random) mean stdDev =
   let u1 = 1.0 - rnd.NextDouble()
