@@ -109,12 +109,30 @@ let transformExpressionOptionWithDefaultTrue table optionalExpression =
   |> Option.map (mapExpression table)
   |> Option.defaultValue (Value.Boolean true |> Expression.Constant |> Ok)
 
+let transformGroupByIndex (expressions: Expression list) groupByExpression =
+  match groupByExpression with
+  | Constant (Integer index) ->
+      if index < 1L || index > int64 expressions.Length then
+        Error $"Invalid `GROUP BY` index: {index}"
+      else
+        expressions |> List.item (int index - 1) |> Ok
+  | _ -> Ok groupByExpression
+
+let transformGroupByIndices (selectedExpressions: AnalyzerTypes.SelectExpression list) groupByExpressions =
+  let selectedExpressions =
+    selectedExpressions
+    |> List.map (fun selectedExpression -> selectedExpression.Expression)
+
+  groupByExpressions |> List.map (transformGroupByIndex selectedExpressions)
+
 let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue table selectQuery.Where
     let! havingClause = transformExpressionOptionWithDefaultTrue table selectQuery.Having
+
     let! groupBy = selectQuery.GroupBy |> List.map (mapExpression table) |> List.sequenceResultM
+    let! groupBy = groupBy |> transformGroupByIndices selectedExpressions |> List.sequenceResultM
 
     return
       AnalyzerTypes.SelectQuery
