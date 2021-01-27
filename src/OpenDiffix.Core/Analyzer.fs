@@ -147,17 +147,12 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   }
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
-  result {
-    let! tableSettings =
-      anonParams.TableSettings
-      |> Map.tryFind tableName
-      |> Result.requireSome $"Cannot find table settings for table %s{tableName}"
+  match anonParams.TableSettings.TryFind(tableName) with
+  | None
+  | Some { AidColumns = [] } -> Ok(None)
+  | Some { AidColumns = [ column ] } -> Ok(Some column)
+  | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
 
-    return!
-      tableSettings.AidColumns
-      |> List.tryHead
-      |> Result.requireSome $"No AID column configured for table %s{tableName}"
-  }
 
 let analyze connection
             (anonParams: AnonymizationParams)
@@ -167,8 +162,13 @@ let analyze connection
     let! tableName = selectedTableName parseTree.From
     let! aidColumn = aidColumn anonParams tableName
     let! table = Table.getI connection tableName
-    let! (aidColumnIndex, _) = Table.getColumn table aidColumn
     let! analyzerQuery = transformQuery table parseTree
-    do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+
+    match aidColumn with
+    | None -> ()
+    | Some aidColumn ->
+        let! (aidColumnIndex, _) = Table.getColumn table aidColumn
+        do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+
     return analyzerQuery
   }
