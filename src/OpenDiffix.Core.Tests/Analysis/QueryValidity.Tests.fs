@@ -37,12 +37,10 @@ let ensureFailWithUnspecifiedError queryString =
   | Error _ -> ()
   | Ok _ -> failwith "Was excepting query analysis to fail"
 
-let ensureAnalyzeValid queryString =
-  assertOkEqual (analyzeQuery queryString) ()
+let ensureAnalyzeValid queryString = assertOkEqual (analyzeQuery queryString) ()
 
 [<Fact>]
-let ``Fail on sum aggregate`` () =
-  ensureFailParsedQuery "SELECT sum(int_col) FROM table" "only count"
+let ``Fail on sum aggregate`` () = ensureFailParsedQuery "SELECT sum(int_col) FROM table" "only count"
 
 [<Fact>]
 let ``Only allow count(*) and count(distinct aid)`` () =
