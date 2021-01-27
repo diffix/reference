@@ -118,7 +118,6 @@ module QueryEngine =
       let! table = Table.getI connection tableName
 
       let sqlQuery = generateSqlQuery table.Name aidColumnName query
-      printfn "Using query:\n%s" sqlQuery
       use command = new SQLiteCommand(sqlQuery, connection)
 
       try
