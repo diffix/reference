@@ -1,10 +1,12 @@
 ﻿open System
 open System.IO
 open Argu
+open OpenDiffix.CLI
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
 type CliArguments =
+  | [<AltCommandLine("-v")>] Version
   | DryRun
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
   | [<AltCommandLine("-aid")>] Aid_Column of column_name: string
@@ -131,14 +133,18 @@ let main argv =
     let parsedArguments =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
-    let query = getQuery parsedArguments
-    let dbPath = getDbPath parsedArguments
-    let anonParams = constructAnonParameters parsedArguments
+    if parsedArguments.Contains(Version) then
+      (printfn "OpenDiffix Reference - %s" AssemblyInfo.version)
+      0
+    else
+      let query = getQuery parsedArguments
+      let dbPath = getDbPath parsedArguments
+      let anonParams = constructAnonParameters parsedArguments
 
-    (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
-    |> fun (output, exitCode) ->
-         printfn "%s" output
-         exitCode
+      (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
+      |> fun (output, exitCode) ->
+           printfn "%s" output
+           exitCode
 
   with e ->
     printfn "%s" e.Message
