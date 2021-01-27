@@ -6,8 +6,8 @@ open OpenDiffix.Core.AnonymizerTypes
 
 type CliArguments =
   | DryRun
-  | [<Mandatory; Unique; AltCommandLine("-d")>] Database of db_path: string
-  | [<Mandatory; AltCommandLine("-aid")>] Aid_Column of column_name: string
+  | [<Unique; AltCommandLine("-d")>] Database of db_path: string
+  | [<AltCommandLine("-aid")>] Aid_Column of column_name: string
   | Query_Path of path: string
   | [<AltCommandLine("-q")>] Query of sql: string
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
@@ -23,6 +23,7 @@ type CliArguments =
   interface IArgParserTemplate with
     member this.Usage =
       match this with
+      | Version -> "Prints the version number of the program."
       | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
       | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
@@ -84,8 +85,9 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
   | _, _ -> Console.In.ReadLine()
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
-  let dbPath = parsedArgs.GetResult CliArguments.Database
-  if File.Exists(dbPath) then dbPath else failwith $"ERROR: Could not find a database at %s{dbPath}"
+  match parsedArgs.TryGetResult CliArguments.Database with
+  | Some dbPath -> if File.Exists(dbPath) then dbPath else failwith $"ERROR: Could not find a database at %s{dbPath}"
+  | None -> failwith $"ERROR: Please specify the database path!"
 
 let dryRun query dbPath (anonParams: AnonymizationParams) =
   let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper}]"
