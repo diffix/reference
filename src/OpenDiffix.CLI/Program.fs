@@ -54,14 +54,21 @@ let toNoise =
   | Some (stdDev, cutoffLimit) -> { StandardDev = stdDev; Cutoff = cutoffLimit }
   | _ -> { StandardDev = 2.; Cutoff = 5 }
 
-let private toTableSettings (aidColumn: string) =
-  match aidColumn.Split '.' with
-  | [| tableName; columnName |] -> Map [ tableName, { AidColumns = [ columnName ] } ]
-  | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`"
+let private toTableSettings (aidColumns: string list) =
+  aidColumns
+  |> List.map(fun aidColumn ->
+    match aidColumn.Split '.' with
+    | [| tableName; columnName |] -> (tableName, columnName)
+    | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`"
+  )
+  |> List.groupBy(fst)
+  |> List.map(fun (tableName, fullAidColumnList) ->
+    (tableName, { AidColumns = fullAidColumnList |> List.map(snd)}))
+  |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
   {
-    TableSettings = parsedArgs.GetResult Aid_Column |> toTableSettings
+    TableSettings = parsedArgs.GetResults Aid_Column |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
     LowCountThreshold = parsedArgs.TryGetResult Threshold_Low_Count |> toThreshold
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
