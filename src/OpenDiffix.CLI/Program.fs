@@ -48,6 +48,8 @@ type CliArguments =
 
 let parser = ArgumentParser.Create<CliArguments>(programName = "opendiffix")
 
+let failWithUsageInfo errorMsg = failwith $"ERROR: %s{errorMsg}\n\n%s{parser.PrintUsage()}"
+
 let toThreshold =
   function
   | Some (lower, upper) -> { Lower = lower; Upper = upper }
@@ -63,7 +65,7 @@ let private toTableSettings (aidColumns: string list) =
   |> List.map (fun aidColumn ->
        match aidColumn.Split '.' with
        | [| tableName; columnName |] -> (tableName, columnName)
-       | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`")
+       | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`")
   |> List.groupBy (fst)
   |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
@@ -82,13 +84,13 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path with
   | Some query, _ -> query
   | None, Some path ->
-      if File.Exists(path) then File.ReadAllText(path) else failwith $"ERROR: Could not find a query at %s{path}"
-  | _, _ -> failwith "ERROR: Please specify a query to run!"
+      if File.Exists(path) then File.ReadAllText(path) else failWithUsageInfo $"Could not find a query at %s{path}"
+  | _, _ -> failWithUsageInfo "Please specify a query to run!"
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.Database with
-  | Some dbPath -> if File.Exists(dbPath) then dbPath else failwith $"ERROR: Could not find a database at %s{dbPath}"
-  | None -> failwith $"ERROR: Please specify the database path!"
+  | Some dbPath -> if File.Exists(dbPath) then dbPath else failWithUsageInfo $"Could not find a database at %s{dbPath}"
+  | None -> failWithUsageInfo $"Please specify the database path!"
 
 let dryRun query dbPath (anonParams: AnonymizationParams) =
   let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper}]"
