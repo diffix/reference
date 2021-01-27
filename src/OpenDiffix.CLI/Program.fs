@@ -58,14 +58,12 @@ let toNoise =
 
 let private toTableSettings (aidColumns: string list) =
   aidColumns
-  |> List.map(fun aidColumn ->
-    match aidColumn.Split '.' with
-    | [| tableName; columnName |] -> (tableName, columnName)
-    | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`"
-  )
-  |> List.groupBy(fst)
-  |> List.map(fun (tableName, fullAidColumnList) ->
-    (tableName, { AidColumns = fullAidColumnList |> List.map(snd)}))
+  |> List.map (fun aidColumn ->
+       match aidColumn.Split '.' with
+       | [| tableName; columnName |] -> (tableName, columnName)
+       | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`")
+  |> List.groupBy (fst)
+  |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
@@ -137,8 +135,8 @@ let main argv =
 
     (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
     |> fun (output, exitCode) ->
-      printfn "%s" output
-      exitCode
+         printfn "%s" output
+         exitCode
 
   with e ->
     printfn "%s" e.Message
