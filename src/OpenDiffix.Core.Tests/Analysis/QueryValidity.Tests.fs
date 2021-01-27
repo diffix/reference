@@ -15,11 +15,7 @@ let testTable: Table =
       ]
   }
 
-let aidColIndex =
-  Table.getColumn testTable "int_col"
-  |> function
-    | Ok (index, _) -> index
-    | Error _ -> failwith "Couldn't find the int_col in the test table. Check scaffold"
+let aidColIndex = Table.getColumn testTable "int_col" |> Utils.unwrap |> fst
 
 let analyzeQuery queryString =
   Parser.parse queryString
