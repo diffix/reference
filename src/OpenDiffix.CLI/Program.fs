@@ -8,7 +8,8 @@ type CliArguments =
   | DryRun
   | [<Mandatory; Unique; AltCommandLine("-d")>] Database of db_path: string
   | [<Mandatory; AltCommandLine("-aid")>] Aid_Column of column_name: string
-  | [<AltCommandLine("-q")>] Query_Path of path: string
+  | Query_Path of path: string
+  | [<AltCommandLine("-q")>] Query of sql: string
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
 
   // Threshold values
@@ -27,6 +28,7 @@ type CliArguments =
       | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
       | Query_Path _ ->
           "Path to a file containing the SQL to be executed. If not present the query will be read from standard in"
+      | Query _ -> "The SQL query to execute."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -77,10 +79,11 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult Query_Path with
-  | Some path ->
+  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path with
+  | Some query, _ -> query
+  | None, Some path ->
       if File.Exists(path) then File.ReadAllText(path) else failwith $"ERROR: Could not find a query at %s{path}"
-  | None -> Console.In.ReadLine()
+  | _, _ -> Console.In.ReadLine()
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   let dbPath = parsedArgs.GetResult CliArguments.Database
