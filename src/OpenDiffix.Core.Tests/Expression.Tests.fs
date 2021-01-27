@@ -85,6 +85,15 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let length () =
+    runs1
+      DefaultFunctions.length
+      [ //
+        String "abc", Integer 3L
+        Null, Null
+      ]
+
+  [<Fact>]
   let binaryChecks () =
     runs
       (DefaultFunctions.binaryBooleanCheck (&&))
@@ -141,8 +150,9 @@ let colRef2 = ColumnReference(2, RealType)
 
 let eval expr = Expression.evaluate ctx testRow expr
 
-let evalAggr expr = Expression.evaluateAggregated ctx Map.empty testRows expr
-
+let evalAggr expr =
+  let accumulator = List.fold (Expression.accumulate ctx expr) (Expression.createAccumulator ctx expr) testRows
+  accumulator.Evaluate
 
 [<Fact>]
 let evaluate () =

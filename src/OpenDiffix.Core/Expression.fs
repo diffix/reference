@@ -25,6 +25,7 @@ and ScalarFunction =
   | LtE
   | Gt
   | GtE
+  | Length
 
   static member ReturnType fn (args: Expression list) =
     match fn with
@@ -47,6 +48,7 @@ and ScalarFunction =
     | LtE
     | Gt
     | GtE -> Ok BooleanType
+    | Length -> Ok IntegerType
 
 and Function =
   | ScalarFunction of fn: ScalarFunction
@@ -59,6 +61,7 @@ and Function =
     | "+" -> Ok(ScalarFunction Plus)
     | "-" -> Ok(ScalarFunction Minus)
     | "=" -> Ok(ScalarFunction Equals)
+    | "length" -> Ok(ScalarFunction Length)
     | other -> Error $"Unknown function %A{other}"
 
 and Expression =
@@ -155,6 +158,12 @@ module DefaultFunctions =
     | [ Null ] -> Null
     | _ -> invalidOverload "not"
 
+  let length _ctx args =
+    match args with
+    | [ String s ] -> Integer(int64 s.Length)
+    | [ Null ] -> Null
+    | _ -> invalidOverload "length"
+
   let binaryBooleanCheck check _ctx =
     function
     | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
@@ -191,6 +200,7 @@ module Expression =
     | LtE -> DefaultFunctions.binaryBooleanCheck (<=) ctx args
     | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
     | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
+    | Length -> DefaultFunctions.length ctx args
 
   let invokeAggregateFunction ctx fn mappedArgs =
     match fn with
@@ -220,32 +230,37 @@ module Expression =
         let firstSort = rows.OrderBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
         thenSort ctx tail firstSort :> seq<Row>
 
-  let private prepareAggregateArgs ctx args opts rows =
-    let projectedArgs =
-      rows
-      |> sortRows ctx opts.OrderBy
-      |> Seq.map (fun row -> args |> List.map (evaluate ctx row))
+  [<RequireQualifiedAccess>]
+  type Accumulator =
+    | Count of int64
+    | Sum of Value
+    | CountDistinct of Set<Value>
 
-    if opts.Distinct then Seq.distinct projectedArgs else projectedArgs
+    member internal this.Process value =
+      match this, value with
+      | _, Null -> this
+      | Count value, _ -> Count(value + 1L)
+      | Sum Null, _ -> Sum(value)
+      | Sum (Integer oldValue), Integer newValue -> Sum(Integer(oldValue + newValue))
+      | Sum (Real oldValue), Real newValue -> Sum(Real(oldValue + newValue))
+      | CountDistinct set, value -> CountDistinct(set.Add value)
+      | _ -> failwith "Invalid accumulated types"
 
-  let rec evaluateAggregated (ctx: EvaluationContext)
-                             (groupings: Map<Expression, Value>)
-                             (rows: seq<Row>)
-                             (expr: Expression)
-                             =
-    match Map.tryFind expr groupings with
-    | Some value -> value
-    | None ->
-        match expr with
-        | FunctionExpr (ScalarFunction fn, args) ->
-            let evaluatedArgs = args |> List.map (evaluateAggregated ctx groupings rows)
-            invokeScalarFunction ctx fn evaluatedArgs
-        | FunctionExpr (AggregateFunction (fn, opts), args) ->
-            let aggregateArgs = prepareAggregateArgs ctx args opts rows
-            invokeAggregateFunction ctx fn aggregateArgs
-        | ColumnReference _ -> failwith $"Incorrect column reference in aggregated context."
-        | Constant value -> value
+    member this.Evaluate =
+      match this with
+      | Count count -> Integer(count)
+      | Sum sum -> sum
+      | CountDistinct set -> Integer(int64 set.Count)
 
-  let defaultAggregate = Aggregate AggregateOptions.Default
+  let createAccumulator ctx expr =
+    match expr with
+    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), _args) -> Accumulator.Count(0L)
+    | FunctionExpr (AggregateFunction (Count, { Distinct = true }), _args) -> Accumulator.CountDistinct(Set.empty)
+    | FunctionExpr (AggregateFunction (Sum, { Distinct = false }), _args) -> Accumulator.Sum(Null)
+    | _ -> failwith "Expression is not a supported aggregator"
 
-  let distinctAggregate = Aggregate { AggregateOptions.Default with Distinct = true }
+  let accumulate ctx expr (accumulator: Accumulator) row =
+    match expr with
+    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), []) -> accumulator.Process(Integer 1L)
+    | FunctionExpr (AggregateFunction _, [ arg ]) -> accumulator.Process(evaluate ctx row arg)
+    | _ -> failwith "Expression is not a supported aggregator"
