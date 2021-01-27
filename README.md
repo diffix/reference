@@ -54,5 +54,5 @@ To generate an executable of the command line interface, run one of:
 
 The binary will be placed in the `build` folder. It is self-contained and can be placed anywhere.
 
-There are `new-XXX` equivalents to the above, which also first pull's the latest changes from Github before
+There are `new-XXX` equivalents to the above, which also first pull the latest changes from Github before
 making a build. This might be the most appropriate command on non-development machines.
