@@ -15,7 +15,10 @@ let runQuery query =
               "purchases", { AidColumns = [ "cid" ] } //
             ]
           Seed = 1
-          LowCountSettings = Some LowCountSettings.Defaults
+          LowCountThreshold = {Threshold.Default with Lower = 5; Upper = 7}
+          OutlierCount = Threshold.Default
+          TopCount = Threshold.Default
+          Noise = NoiseParam.Default
         }
       DatabasePath = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
       Query = query
