@@ -17,4 +17,4 @@ new-win: update release-win
 release-linux:
 	dotnet publish -r linux-x64 -o build/ -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
 
-new-win: update release-linux
+new-linus: update release-linux
