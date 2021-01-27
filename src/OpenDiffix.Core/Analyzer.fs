@@ -28,6 +28,7 @@ and mapExpression table parsedExpression =
   | ParserTypes.GtE (left, right) -> functionExpression table (ScalarFunction GtE) [ left; right ]
   | ParserTypes.And (left, right) -> functionExpression table (ScalarFunction And) [ left; right ]
   | ParserTypes.Or (left, right) -> functionExpression table (ScalarFunction Or) [ left; right ]
+  | ParserTypes.Equals (left, right) -> functionExpression table (ScalarFunction Equals) [ left; right ]
   | ParserTypes.Function (name, args) ->
       result {
         let! fn = Function.FromString name
