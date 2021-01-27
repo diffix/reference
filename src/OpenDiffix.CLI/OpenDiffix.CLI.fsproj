@@ -3,6 +3,8 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net5.0</TargetFramework>
+        <Authors>Open Diffix</Authors>
+        <Description>CLI interface to the Open Diffix Reference anonymizer</Description>
     </PropertyGroup>
 
     <ItemGroup>
