@@ -27,11 +27,7 @@ let defaultQuery =
   }
 
 let testParsedQuery queryString callback (expected: Query) =
-  let testResult =
-    Parser.parse queryString
-    |> Result.mapError (fun e -> $"Failed to parse: %A{e}")
-    |> Result.bind callback
-
+  let testResult = queryString |> Parser.parse |> Result.bind callback
   assertOkEqual testResult expected
 
 [<Fact>]

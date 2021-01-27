@@ -59,9 +59,10 @@ let toNoise =
 let private toTableSettings (aidColumns: string list) =
   aidColumns
   |> List.map (fun aidColumn ->
-       match aidColumn.Split '.' with
-       | [| tableName; columnName |] -> (tableName, columnName)
-       | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`")
+    match aidColumn.Split '.' with
+    | [| tableName; columnName |] -> (tableName, columnName)
+    | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`"
+  )
   |> List.groupBy (fst)
   |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
@@ -110,14 +111,17 @@ Top count threshold: %s{formatThreshold anonParams.TopCount}
   0
 
 let anonymize query dbPath anonParams =
-  let request = { Query = query; DatabasePath = dbPath; AnonymizationParams = anonParams }
-  let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
+  let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
+
+  connection.Open()
+  let queryResult = QueryEngine.run connection query anonParams |> Async.RunSynchronously
+  connection.Close()
 
   match queryResult with
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun columnValues -> columnValues |> List.map ColumnValue.ToString |> List.reduce (sprintf "%s;%s"))
+        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
         |> List.reduce (sprintf "%s\n%s")
 
       resultSet, 0

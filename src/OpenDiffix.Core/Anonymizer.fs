@@ -21,14 +21,15 @@ let private lowCountFilter (anonymizationParams: AnonymizationParams) rnd (rows:
   rows
   |> List.groupBy (fun row -> row.RowValues)
   |> List.filter (fun (_values, instancesOfRow) ->
-       let distinctUsersCount =
-         instancesOfRow
-         |> List.map (fun row -> row.AidValues)
-         |> Set.unionMany
-         |> Set.count
+    let distinctUsersCount =
+      instancesOfRow
+      |> List.map (fun row -> row.AidValues)
+      |> Set.unionMany
+      |> Set.count
 
-       let lowCountThreshold = randomUniform rnd threshold.Lower threshold.Upper
-       distinctUsersCount >= lowCountThreshold)
+    let lowCountThreshold = randomUniform rnd threshold.Lower threshold.Upper
+    distinctUsersCount >= lowCountThreshold
+  )
   |> List.collect (fun (_values, instancesOfRow) -> instancesOfRow)
 
 let anonymize (anonymizationParams: AnonymizationParams) (rows: PersonalRows) =

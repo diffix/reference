@@ -159,12 +159,12 @@ module QueryParser =
 
   let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
-type SqlParserError = CouldNotParse of string
+type SqlParserError = string
 
 let parse sql: Result<SelectQuery, SqlParserError> =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
       | SelectQuery selectQuery -> Ok selectQuery
-      | _ -> Error(CouldNotParse "Expecting SELECT query")
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)
+      | _ -> Error("Parse error: Expecting SELECT query")
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)

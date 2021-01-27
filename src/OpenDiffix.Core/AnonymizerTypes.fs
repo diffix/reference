@@ -29,16 +29,6 @@ type AnonymizationParams =
     Noise: NoiseParam
   }
 
-type RequestParams =
-  {
-    AnonymizationParams: AnonymizationParams
-    Query: string
-    DatabasePath: string
-  }
-
-type ColumnName = string
-type Columns = ColumnName list
-
 type ColumnValue =
   | IntegerValue of int
   | StringValue of string
@@ -54,7 +44,3 @@ type NonPersonalRow = ColumnValue list
 type NonPersonalRows = NonPersonalRow list
 type PersonalRow = { AidValues: ColumnValue Set; RowValues: NonPersonalRow }
 type PersonalRows = PersonalRow list
-
-type QueryResult = { Columns: Columns; Rows: NonPersonalRows }
-
-type QueryError = string
