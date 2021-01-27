@@ -1,5 +1,4 @@
-﻿open System
-open System.IO
+﻿open System.IO
 open Argu
 open OpenDiffix.CLI
 open OpenDiffix.Core
@@ -92,30 +91,11 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   | Some dbPath -> if File.Exists(dbPath) then dbPath else failWithUsageInfo $"Could not find a database at %s{dbPath}"
   | None -> failWithUsageInfo $"Please specify the database path!"
 
-let dryRun query dbPath (anonParams: AnonymizationParams) =
-  let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper}]"
-  let formatNoise np = $"0 +- %.2f{np.StandardDev}std limited to [-%.2f{np.Cutoff}, %.2f{np.Cutoff}]"
+let dryRun queryRequest =
+  let encodedRequest = RequestParams.Encoder queryRequest
+  $"%s{Thoth.Json.Net.Encode.toString 2 encodedRequest}", 0
 
-  $"
-OpenDiffix dry run:
-
-Database: %s{dbPath}
-Query:
-%s{query}
-
-Anonymization parameters:
-------------------------
-Low count threshold: %s{formatThreshold anonParams.LowCountThreshold}
-Noise: %s{formatNoise anonParams.Noise}
-
-Count specific:
-Outlier count threshold: %s{formatThreshold anonParams.OutlierCount}
-Top count threshold: %s{formatThreshold anonParams.TopCount}
-  ",
-  0
-
-let anonymize query dbPath anonParams =
-  let request = { Query = query; DatabasePath = dbPath; AnonymizationParams = anonParams }
+let anonymize request =
   let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
 
   match queryResult with
@@ -138,11 +118,14 @@ let main argv =
       (printfn "OpenDiffix Reference - %s" AssemblyInfo.version)
       0
     else
-      let query = getQuery parsedArguments
-      let dbPath = getDbPath parsedArguments
-      let anonParams = constructAnonParameters parsedArguments
+      let request =
+        {
+          Query = getQuery parsedArguments
+          DatabasePath = getDbPath parsedArguments
+          AnonymizationParams = constructAnonParameters parsedArguments
+        }
 
-      (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
+      (if parsedArguments.Contains DryRun then dryRun request else anonymize request)
       |> fun (output, exitCode) ->
            printfn "%s" output
            exitCode
