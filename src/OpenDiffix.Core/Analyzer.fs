@@ -2,6 +2,7 @@ module OpenDiffix.Core.Analyzer
 
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
+open OpenDiffix.Core.AnonymizerTypes
 
 let rec functionExpression table fn children =
   children
@@ -115,9 +116,29 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
         }
   }
 
-let analyze connection (parseTree: ParserTypes.SelectQuery): Async<Result<AnalyzerTypes.Query, string>> =
+let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
+  result {
+    let! tableSettings =
+      anonParams.TableSettings
+      |> Map.tryFind tableName
+      |> Result.requireSome $"Cannot find table settings for table %s{tableName}"
+
+    return!
+      tableSettings.AidColumns
+      |> List.tryHead
+      |> Result.requireSome $"No AID column configured for table %s{tableName}"
+  }
+
+let analyze connection
+            (anonParams: AnonymizationParams)
+            (parseTree: ParserTypes.SelectQuery)
+            : Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
     let! tableName = selectedTableName parseTree.From
+    let! aidColumn = aidColumn anonParams tableName
     let! table = Table.getI connection tableName
-    return! transformQuery table parseTree
+    let! (aidColumnIndex, _) = Table.getColumn table aidColumn
+    let! analyzerQuery = transformQuery table parseTree
+    do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+    return analyzerQuery
   }
