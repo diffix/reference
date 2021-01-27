@@ -7,7 +7,7 @@ open OpenDiffix.Core.AnonymizerTypes
 type CliArguments =
   | DryRun
   | [<Mandatory; Unique; AltCommandLine("-d")>] Database of db_path: string
-  | [<Mandatory; Unique; AltCommandLine("-aid")>] Aid_Column of column_name: string
+  | [<Mandatory; AltCommandLine("-aid")>] Aid_Column of column_name: string
   | [<AltCommandLine("-q")>] Query_Path of path: string
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
 
