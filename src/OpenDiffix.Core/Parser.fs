@@ -53,7 +53,7 @@ module QueryParser =
 
   let functionExpression =
     simpleIdentifier .>>. inParenthesis expr .>> spaces
-    |>> fun (funName, expr) -> Function(funName, [ expr ])
+    |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
 
   let commaSepExpressions = commaSeparated expr .>> spaces
 
