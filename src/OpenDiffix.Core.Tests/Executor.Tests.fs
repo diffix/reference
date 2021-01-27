@@ -17,6 +17,12 @@ type Tests(db: DBFixture) =
 
   let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1L) ])
 
+  let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
+  let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
+
+  let countDistinct expression =
+    FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
+
   let execute plan = plan |> Executor.execute db.Connection |> Seq.toList
 
   [<Fact>]
@@ -45,5 +51,43 @@ type Tests(db: DBFixture) =
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
     let expected = [ [| Integer 10L |]; [| Integer 9L |]; [| Integer 8L |] ]
     plan |> execute |> List.take 3 |> should equal expected
+
+  [<Fact>]
+  let ``execute grouping aggregate`` () =
+    let plan = Plan.Aggregate(Plan.Scan(products), [ nameLength ], [ countStar ])
+
+    let expected =
+      [
+        [| Null; Integer 1L |]
+        [| Integer 4L; Integer 2L |]
+        [| Integer 5L; Integer 4L |]
+        [| Integer 6L; Integer 3L |]
+        [| Integer 7L; Integer 1L |]
+      ]
+
+    plan |> execute |> should equal expected
+
+  [<Fact>]
+  let ``execute global aggregate`` () =
+    let plan = Plan.Aggregate(Plan.Scan(products), [], [ countStar; countDistinct nameLength ])
+
+    let expected = [ [| Integer 11L; Integer 4L |] ]
+    plan |> execute |> should equal expected
+
+  [<Fact>]
+  let ``execute grouping aggregate over nothing`` () =
+    let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
+    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [ nameLength ], [ countStar ])
+
+    let expected: Row list = []
+    plan |> execute |> should equal expected
+
+  [<Fact>]
+  let ``execute global aggregate over nothing`` () =
+    let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
+    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [], [ countStar ])
+
+    let expected = [ [| Integer 0L |] ]
+    plan |> execute |> should equal expected
 
   interface IClassFixture<DBFixture>
