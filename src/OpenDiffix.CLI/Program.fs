@@ -9,7 +9,7 @@ type CliArguments =
   | [<AltCommandLine("-v")>] Version
   | DryRun
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
-  | [<AltCommandLine("-aid")>] Aid_Column of column_name: string
+  | Aid_Columns of column_name: string list
   | Query_Path of path: string
   | [<AltCommandLine("-q")>] Query of sql: string
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
@@ -28,7 +28,7 @@ type CliArguments =
       | Version -> "Prints the version number of the program."
       | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
-      | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
+      | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query_Path _ -> "Path to a file containing the SQL to be executed."
       | Query _ -> "The SQL query to execute."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
@@ -70,7 +70,7 @@ let private toTableSettings (aidColumns: string list) =
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
   {
-    TableSettings = parsedArgs.GetResults Aid_Column |> toTableSettings
+    TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
     LowCountThreshold = parsedArgs.TryGetResult Threshold_Low_Count |> toThreshold
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
