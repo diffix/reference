@@ -10,7 +10,7 @@ let testTable: Table =
       [
         { Name = "str_col"; Type = StringType }
         { Name = "int_col"; Type = IntegerType } // AID column
-        { Name = "float_col"; Type = FloatType }
+        { Name = "float_col"; Type = RealType }
         { Name = "bool_col"; Type = BooleanType }
       ]
   }
