@@ -22,12 +22,12 @@ type CliArguments =
   interface IArgParserTemplate with
     member this.Usage =
       match this with
-      | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data"
-      | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized"
-      | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName"
+      | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
+      | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
+      | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
       | Query_Path _ ->
           "Path to a file containing the SQL to be executed. If not present the query will be read from standard in"
-      | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result"
+      | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
           + "should be excluded. A number is picked from a uniform distribution between the upper and lower limit."
