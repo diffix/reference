@@ -1,5 +1,7 @@
 namespace OpenDiffix.Core.AnonymizerTypes
 
+open Thoth.Json.Net
+
 type Threshold =
   {
     Lower: int
@@ -13,9 +15,13 @@ type NoiseParam =
     StandardDev: float
     Cutoff: float
   }
+
   static member Default = { StandardDev = 2.; Cutoff = 5. }
 
-type TableSettings = { AidColumns: string list }
+type TableSettings =
+  {
+    AidColumns: string list
+  }
 
 type AnonymizationParams =
   {
