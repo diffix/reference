@@ -33,14 +33,18 @@ let private planAggregate (groupingLabels: Expression list) (aggregators: Expres
 let private getType expression = expression |> Expression.GetType |> Utils.unwrap
 
 let rec private projectExpression expression columns =
-  match columns |> List.tryFindIndex (fun column -> column = expression) with
-  | None ->
-      match expression with
-      | FunctionExpr (fn, args) ->
-          let args = args |> List.map (fun expression -> projectExpression expression columns)
-          FunctionExpr(fn, args)
-      | _ -> expression
-  | Some i -> ColumnReference(i, getType expression)
+  if List.isEmpty columns then
+    expression
+  else
+    match columns |> List.tryFindIndex (fun column -> column = expression) with
+    | None ->
+        match expression with
+        | FunctionExpr (fn, args) ->
+            let args = args |> List.map (fun arg -> projectExpression arg columns)
+            FunctionExpr(fn, args)
+        | Constant _ -> expression
+        | ColumnReference _ -> failwith "Expression projection failed"
+    | Some i -> ColumnReference(i, getType expression)
 
 let private planSelect query =
   let selectedExpressions = query.Columns |> List.map (fun column -> column.Expression)

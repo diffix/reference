@@ -27,11 +27,7 @@ let defaultQuery =
   }
 
 let testParsedQuery queryString callback (expected: Query) =
-  let testResult =
-    Parser.parse queryString
-    |> Result.mapError (fun e -> $"Failed to parse: %A{e}")
-    |> Result.bind callback
-
+  let testResult = queryString |> Parser.parse |> Result.bind callback
   assertOkEqual testResult expected
 
 [<Fact>]
@@ -46,7 +42,7 @@ let ``Analyze count(*)`` () =
               {
                 Expression =
                   FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
-                Alias = ""
+                Alias = "count"
               }
             ]
       })
@@ -66,7 +62,7 @@ let ``Analyze count(distinct col)`` () =
                     AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
                     [ ColumnReference(1, IntegerType) ]
                   )
-                Alias = ""
+                Alias = "count"
               }
             ]
       })
@@ -80,8 +76,8 @@ let ``Selecting columns from a table`` () =
       { defaultQuery with
           Columns =
             [
-              { Expression = ColumnReference(0, StringType); Alias = "" }
-              { Expression = ColumnReference(3, BooleanType); Alias = "" }
+              { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
             ]
       })
 
@@ -110,12 +106,12 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             {
               Expression =
                 FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
-              Alias = ""
+              Alias = "+"
             }
             {
               Expression =
                 FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-              Alias = ""
+              Alias = "count"
             }
           ]
         Where =

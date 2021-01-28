@@ -14,20 +14,22 @@ let encodeTableSettings (ts: TableSettings) =
 let encodeAnonParams (ap: AnonymizationParams) =
   Encode.object [
     "table_settings",
-    Encode.list
-      (ap.TableSettings
-       |> Map.toList
-       |> List.map (fun (table, settings) ->
-            Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]))
+    Encode.list (
+      ap.TableSettings
+      |> Map.toList
+      |> List.map (fun (table, settings) ->
+        Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
+      )
+    )
     "low_count_threshold", encodeThreshold ap.LowCountThreshold
     "outlier_count", encodeThreshold ap.OutlierCount
     "top_count", encodeThreshold ap.TopCount
     "noise", encodeNoiseParam ap.Noise
   ]
 
-let encodeRequestParams (rp: RequestParams) =
+let encodeRequestParams query dbPath anonParams =
   Encode.object [
-    "anonymization_parameters", encodeAnonParams rp.AnonymizationParams
-    "query", Encode.string rp.Query
-    "database_path", Encode.string rp.DatabasePath
+    "anonymization_parameters", encodeAnonParams anonParams
+    "query", Encode.string query
+    "database_path", Encode.string dbPath
   ]

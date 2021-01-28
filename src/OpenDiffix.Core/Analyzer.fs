@@ -28,6 +28,7 @@ and mapExpression table parsedExpression =
   | ParserTypes.GtE (left, right) -> functionExpression table (ScalarFunction GtE) [ left; right ]
   | ParserTypes.And (left, right) -> functionExpression table (ScalarFunction And) [ left; right ]
   | ParserTypes.Or (left, right) -> functionExpression table (ScalarFunction Or) [ left; right ]
+  | ParserTypes.Equals (left, right) -> functionExpression table (ScalarFunction Equals) [ left; right ]
   | ParserTypes.Function (name, args) ->
       result {
         let! fn = Function.FromString name
@@ -53,11 +54,18 @@ let extractAlias =
   | ParserTypes.Expression.Identifier aliasName -> Ok aliasName
   | other -> Error $"Expected an alias, but got an expression: %A{other}"
 
+let expressionName =
+  function
+  | ParserTypes.Identifier identifierName -> identifierName
+  | ParserTypes.Function (name, _args) -> name
+  | _ -> ""
+
 let wrapExpressionAsSelected table parserExpr =
   result {
     let! expr = mapExpression table parserExpr
+    let name = expressionName parserExpr
 
-    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = "" }
+    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
   }
 
 let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.SelectExpression, string> =
@@ -72,7 +80,11 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
       result {
         let! (index, column) = Table.getColumn table identifierName
 
-        return { Expression = Expression.ColumnReference(index, column.Type); Alias = "" }
+        return
+          {
+            Expression = Expression.ColumnReference(index, column.Type)
+            Alias = identifierName
+          }
       }
   | ParserTypes.Expression.Function (fn, args) ->
       wrapExpressionAsSelected table (ParserTypes.Expression.Function(fn, args))
@@ -97,12 +109,30 @@ let transformExpressionOptionWithDefaultTrue table optionalExpression =
   |> Option.map (mapExpression table)
   |> Option.defaultValue (Value.Boolean true |> Expression.Constant |> Ok)
 
+let transformGroupByIndex (expressions: Expression list) groupByExpression =
+  match groupByExpression with
+  | Constant (Integer index) ->
+      if index < 1L || index > int64 expressions.Length then
+        Error $"Invalid `GROUP BY` index: {index}"
+      else
+        expressions |> List.item (int index - 1) |> Ok
+  | _ -> Ok groupByExpression
+
+let transformGroupByIndices (selectedExpressions: AnalyzerTypes.SelectExpression list) groupByExpressions =
+  let selectedExpressions =
+    selectedExpressions
+    |> List.map (fun selectedExpression -> selectedExpression.Expression)
+
+  groupByExpressions |> List.map (transformGroupByIndex selectedExpressions)
+
 let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue table selectQuery.Where
     let! havingClause = transformExpressionOptionWithDefaultTrue table selectQuery.Having
+
     let! groupBy = selectQuery.GroupBy |> List.map (mapExpression table) |> List.sequenceResultM
+    let! groupBy = groupBy |> transformGroupByIndices selectedExpressions |> List.sequenceResultM
 
     return
       AnalyzerTypes.SelectQuery
@@ -117,17 +147,12 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
   }
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
-  result {
-    let! tableSettings =
-      anonParams.TableSettings
-      |> Map.tryFind tableName
-      |> Result.requireSome $"Cannot find table settings for table %s{tableName}"
+  match anonParams.TableSettings.TryFind(tableName) with
+  | None
+  | Some { AidColumns = [] } -> Ok(None)
+  | Some { AidColumns = [ column ] } -> Ok(Some column)
+  | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
 
-    return!
-      tableSettings.AidColumns
-      |> List.tryHead
-      |> Result.requireSome $"No AID column configured for table %s{tableName}"
-  }
 
 let analyze connection
             (anonParams: AnonymizationParams)
@@ -137,8 +162,13 @@ let analyze connection
     let! tableName = selectedTableName parseTree.From
     let! aidColumn = aidColumn anonParams tableName
     let! table = Table.getI connection tableName
-    let! (aidColumnIndex, _) = Table.getColumn table aidColumn
     let! analyzerQuery = transformQuery table parseTree
-    do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+
+    match aidColumn with
+    | None -> ()
+    | Some aidColumn ->
+        let! (aidColumnIndex, _) = Table.getColumn table aidColumn
+        do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+
     return analyzerQuery
   }

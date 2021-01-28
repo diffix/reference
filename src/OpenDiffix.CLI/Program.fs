@@ -66,9 +66,10 @@ let toNoise =
 let private toTableSettings (aidColumns: string list) =
   aidColumns
   |> List.map (fun aidColumn ->
-       match aidColumn.Split '.' with
-       | [| tableName; columnName |] -> (tableName, columnName)
-       | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`")
+    match aidColumn.Split '.' with
+    | [| tableName; columnName |] -> (tableName, columnName)
+    | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`"
+  )
   |> List.groupBy (fst)
   |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
@@ -96,18 +97,22 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   | Some dbPath -> if File.Exists(dbPath) then dbPath else failWithUsageInfo $"Could not find a database at %s{dbPath}"
   | None -> failWithUsageInfo $"Please specify the database path!"
 
-let dryRun queryRequest =
-  let encodedRequest = JsonEncoders.encodeRequestParams queryRequest
+let dryRun query dbPath anonParams =
+  let encodedRequest = JsonEncoders.encodeRequestParams query dbPath anonParams
   Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
-let anonymize request =
-  let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
+let anonymize query dbPath anonParams =
+  let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
+
+  connection.Open()
+  let queryResult = QueryEngine.run connection query anonParams |> Async.RunSynchronously
+  connection.Close()
 
   match queryResult with
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun columnValues -> columnValues |> List.map ColumnValue.ToString |> List.reduce (sprintf "%s;%s"))
+        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
         |> List.reduce (sprintf "%s\n%s")
 
       resultSet, 0
@@ -123,14 +128,13 @@ let main argv =
       (printfn "%s" AssemblyInfo.versionJson)
       0
     else
-      let request =
-        {
-          Query = getQuery parsedArguments
-          DatabasePath = getDbPath parsedArguments
-          AnonymizationParams = constructAnonParameters parsedArguments
-        }
+      let query = getQuery parsedArguments
+      let dbPath = getDbPath parsedArguments
+      let anonParams = constructAnonParameters parsedArguments
 
-      (if parsedArguments.Contains Dry_Run then dryRun request else anonymize request)
+      let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize
+
+      (processor query dbPath anonParams)
       |> fun (output, exitCode) ->
            printfn "%s" output
            exitCode

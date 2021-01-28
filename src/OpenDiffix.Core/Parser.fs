@@ -53,7 +53,7 @@ module QueryParser =
 
   let functionExpression =
     simpleIdentifier .>>. inParenthesis expr .>> spaces
-    |>> fun (funName, expr) -> Function(funName, [ expr ])
+    |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
 
   let commaSepExpressions = commaSeparated expr .>> spaces
 
@@ -129,8 +129,8 @@ module QueryParser =
   addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left
   <| (fun left right -> Expression.Or(left, right))
 
-  addInfixOperator "=" spaces 3 Associativity.Left (fun left right -> Expression.Equal(left, right))
-  addInfixOperator "<>" spaces 3 Associativity.Left (fun left right -> Expression.Not(Expression.Equal(left, right)))
+  addInfixOperator "=" spaces 3 Associativity.Left (fun left right -> Expression.Equals(left, right))
+  addInfixOperator "<>" spaces 3 Associativity.Left (fun left right -> Expression.Not(Expression.Equals(left, right)))
   addInfixOperator ">" spaces 3 Associativity.Left (fun left right -> Expression.Gt(left, right))
   addInfixOperator "<" spaces 3 Associativity.Left (fun left right -> Expression.Lt(left, right))
   addInfixOperator "<=" spaces 3 Associativity.Left (fun left right -> Expression.LtE(left, right))
@@ -141,8 +141,8 @@ module QueryParser =
   addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [ left; right ]))
   addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [ left; right ]))
   addPrefixOperator "not" spaces 7 false Expression.Not
-  addPostfixOperator "is null" spaces 8 false (fun expr -> Expression.Equal(expr, Expression.Null))
-  addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.Equal(expr, Expression.Null)))
+  addPostfixOperator "is null" spaces 8 false (fun expr -> Expression.Equals(expr, Expression.Null))
+  addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.Equals(expr, Expression.Null)))
   addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [ left; right ]))
 
   opp.TermParser <-
@@ -159,12 +159,12 @@ module QueryParser =
 
   let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
-type SqlParserError = CouldNotParse of string
+type SqlParserError = string
 
 let parse sql: Result<SelectQuery, SqlParserError> =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
       | SelectQuery selectQuery -> Ok selectQuery
-      | _ -> Error(CouldNotParse "Expecting SELECT query")
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error(CouldNotParse errorMessage)
+      | _ -> Error("Parse error: Expecting SELECT query")
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)

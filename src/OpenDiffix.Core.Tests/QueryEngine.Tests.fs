@@ -4,58 +4,46 @@ open Xunit
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
-let runQuery query =
-  let requestParams =
+type Tests(db: DBFixture) =
+  let anonParams =
     {
-      AnonymizationParams =
-        {
-          TableSettings =
-            Map [
-              "customers", { AidColumns = [ "id" ] } //
-              "purchases", { AidColumns = [ "cid" ] } //
-            ]
-          Seed = 1
-          LowCountThreshold = {Threshold.Default with Lower = 5; Upper = 7}
-          OutlierCount = Threshold.Default
-          TopCount = Threshold.Default
-          Noise = NoiseParam.Default
-        }
-      DatabasePath = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-      Query = query
+      TableSettings =
+        Map [
+          "customers", { AidColumns = [ "id" ] } //
+          "purchases", { AidColumns = [ "cid" ] } //
+        ]
+      Seed = 1
+      LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
+      OutlierCount = Threshold.Default
+      TopCount = Threshold.Default
+      Noise = NoiseParam.Default
     }
 
-  QueryEngine.runQuery requestParams |> Async.RunSynchronously
+  let runQuery query = QueryEngine.run db.Connection query anonParams |> Async.RunSynchronously
 
-[<Fact>]
-let ``SELECT city FROM customers`` () =
-  let rows =
-    [ "Berlin", 77; "London", 25; "Madrid", 25; "Paris", 26; "Rome", 50 ]
-    |> List.collect (fun (city, occurrences) -> List.replicate occurrences [ StringValue city ])
+  [<Fact>]
+  let ``query 1`` () =
+    let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
 
-  let expected = { Columns = [ "city" ]; Rows = rows }
+    let queryResult = runQuery "SELECT name AS n FROM products WHERE id = 1"
 
-  let queryResult =
-    match runQuery "SELECT city FROM customers" with
-    | Ok result ->
-        let sortedRows = result.Rows |> List.sort
-        { result with Rows = sortedRows } |> Ok
-    | other -> other
+    assertOkEqual queryResult expected
 
-  assertOkEqual queryResult expected
+  [<Fact>]
+  let ``query 2`` () =
+    let expected = { Columns = [ "c1"; "c2" ]; Rows = [ [| Integer 11L; Integer 4L |] ] }
 
-[<Fact>]
-let ``SELECT pid FROM purchases`` () =
-  let rows =
-    [ 1, 67; 2, 58; 3, 64; 4, 63; 5, 70; 6, 59; 7, 58; 8, 64 ]
-    |> List.collect (fun (pid, occurrences) -> List.replicate occurrences [ IntegerValue pid ])
+    let queryResult = runQuery "SELECT COUNT(*) AS c1, COUNT(DISTINCT length(name)) AS c2 FROM products"
 
-  let expected = { Columns = [ "pid" ]; Rows = rows }
+    assertOkEqual queryResult expected
 
-  let queryResult =
-    match runQuery "SELECT pid FROM purchases" with
-    | Ok result ->
-        let sortedRows = result.Rows |> List.sort
-        { result with Rows = sortedRows } |> Ok
-    | other -> other
+  [<Fact>]
+  let ``query 3`` () =
+    let expected = { Columns = [ "name"; "sum" ]; Rows = [ [| String "Chicken"; Real 12.81 |] ] }
 
-  assertOkEqual queryResult expected
+    let queryResult = runQuery "SELECT name, SUM(price) FROM products GROUP BY 1 HAVING length(name) = 7"
+
+    assertOkEqual queryResult expected
+
+
+  interface IClassFixture<DBFixture>

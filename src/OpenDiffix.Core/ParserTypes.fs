@@ -32,7 +32,7 @@ and Expression =
   | LtE of left: Expression * right: Expression
   | Gt of left: Expression * right: Expression
   | GtE of left: Expression * right: Expression
-  | Equal of left: Expression * right: Expression
+  | Equals of left: Expression * right: Expression
   | As of left: Expression * right: Expression
   | Identifier of identifierName: string
   | Function of functionName: string * Expression list
