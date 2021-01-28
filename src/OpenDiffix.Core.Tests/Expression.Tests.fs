@@ -109,24 +109,6 @@ module DefaultFunctionsTests =
         Null, Boolean true, Boolean false
       ]
 
-module DefaultAggregatorsTests =
-  [<Fact>]
-  let sum () =
-    DefaultAggregates.sum ctx [ [ Integer 5L ]; [ Integer 3L ]; [ Integer -2L ] ]
-    |> should equal (Integer 6L)
-
-    DefaultAggregates.sum ctx [] |> should equal Null
-
-  [<Fact>]
-  let count () =
-    DefaultAggregates.count ctx [ [ Integer 7L ]; [ Integer 15L ]; [ Integer -3L ] ]
-    |> should equal (Integer 3L)
-
-    DefaultAggregates.count ctx [] |> should equal (Integer 0L)
-
-    DefaultAggregates.count ctx [ [ String "str1" ]; [ String "" ]; [ Null ] ]
-    |> should equal (Integer 2L)
-
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 

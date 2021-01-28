@@ -169,24 +169,6 @@ module DefaultFunctions =
     | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
     | _ -> failwith "Expected two arguments for binary condition"
 
-module DefaultAggregates =
-  open ExpressionUtils
-
-  let sum ctx (values: AggregateArgs) =
-    let values = values |> mapSingleArg "sum" |> filterNulls
-
-    if Seq.isEmpty values then Null else values |> Seq.reduce (fun a b -> DefaultFunctions.add ctx [ a; b ])
-
-  let count _ctx (values: AggregateArgs) =
-    values
-    |> Seq.sumBy
-         (function
-         | [ Null ] -> 0L
-         | []
-         | [ _ ] -> 1L
-         | _ -> invalidOverload "count")
-    |> Integer
-
 module Expression =
   let invokeScalarFunction ctx fn args =
     match fn with
@@ -201,11 +183,6 @@ module Expression =
     | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
     | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
     | Length -> DefaultFunctions.length ctx args
-
-  let invokeAggregateFunction ctx fn mappedArgs =
-    match fn with
-    | Count -> DefaultAggregates.count ctx mappedArgs
-    | Sum -> DefaultAggregates.sum ctx mappedArgs
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
