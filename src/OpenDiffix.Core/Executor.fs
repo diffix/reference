@@ -16,10 +16,17 @@ let private executeFilter condition rowsStream =
 
 let private executeSort orderings rowsStream = rowsStream |> Expression.sortRows EmptyContext orderings
 
+let private unpackAggregator =
+  function
+  | FunctionExpr (AggregateFunction _ as fn, args) -> fn, args
+  | _ -> failwith "Expression is not an aggregator"
+
+let private unpackAggregators aggregators = aggregators |> Array.map (unpackAggregator) |> Array.unzip
+
 let private executeAggregate groupingLabels aggregators rowsStream =
   let groupingLabels = Array.ofList groupingLabels
-  let aggregators = Array.ofList aggregators
-  let defaultAccumulators = aggregators |> Array.map (Expression.createAccumulator EmptyContext)
+  let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
+  let defaultAccumulators = aggFns |> Array.map (Expression.createAccumulator EmptyContext)
 
   let initialState: Map<Row, Expression.Accumulator array> =
     if groupingLabels.Length = 0 then Map [ [||], defaultAccumulators ] else Map []
@@ -33,8 +40,8 @@ let private executeAggregate groupingLabels aggregators rowsStream =
         match Map.tryFind group state with
         | Some accumulator -> accumulator
         | None -> defaultAccumulators
-        |> Array.zip aggregators
-        |> Array.map (fun (aggregator, accumulator) -> Expression.accumulate EmptyContext aggregator accumulator row)
+        |> Array.zip aggArgs
+        |> Array.map (fun (args, accumulator) -> accumulator.Process EmptyContext args row)
 
       Map.add group accumulator state
     )

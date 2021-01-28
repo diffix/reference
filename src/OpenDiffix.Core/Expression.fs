@@ -213,14 +213,16 @@ module Expression =
     | Sum of Value
     | CountDistinct of Set<Value>
 
-    member internal this.Process value =
-      match this, value with
-      | _, Null -> this
+    member this.Process ctx args row =
+      let values = List.map (evaluate ctx row) args
+
+      match this, values with
+      | _, [ Null ] -> this
       | Count value, _ -> Count(value + 1L)
-      | Sum Null, _ -> Sum(value)
-      | Sum (Integer oldValue), Integer newValue -> Sum(Integer(oldValue + newValue))
-      | Sum (Real oldValue), Real newValue -> Sum(Real(oldValue + newValue))
-      | CountDistinct set, value -> CountDistinct(set.Add value)
+      | Sum Null, [ value ] -> Sum(value)
+      | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
+      | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
+      | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
       | _ -> failwith "Invalid accumulated types"
 
     member this.Evaluate =
@@ -229,15 +231,9 @@ module Expression =
       | Sum sum -> sum
       | CountDistinct set -> Integer(int64 set.Count)
 
-  let createAccumulator ctx expr =
-    match expr with
-    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), _args) -> Accumulator.Count(0L)
-    | FunctionExpr (AggregateFunction (Count, { Distinct = true }), _args) -> Accumulator.CountDistinct(Set.empty)
-    | FunctionExpr (AggregateFunction (Sum, { Distinct = false }), _args) -> Accumulator.Sum(Null)
-    | _ -> failwith "Expression is not a supported aggregator"
-
-  let accumulate ctx expr (accumulator: Accumulator) row =
-    match expr with
-    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), []) -> accumulator.Process(Integer 1L)
-    | FunctionExpr (AggregateFunction _, [ arg ]) -> accumulator.Process(evaluate ctx row arg)
-    | _ -> failwith "Expression is not a supported aggregator"
+  let createAccumulator ctx fn =
+    match fn with
+    | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
+    | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
+    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
+    | _ -> failwith "Invalid aggregator"

@@ -132,8 +132,9 @@ let colRef2 = ColumnReference(2, RealType)
 
 let eval expr = Expression.evaluate ctx testRow expr
 
-let evalAggr expr =
-  let accumulator = List.fold (Expression.accumulate ctx expr) (Expression.createAccumulator ctx expr) testRows
+let evalAggr fn args =
+  let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
+  let accumulator = List.fold processor (Expression.createAccumulator ctx fn) testRows
   accumulator.Evaluate
 
 [<Fact>]
@@ -147,29 +148,25 @@ let evaluate () =
 
 [<Fact>]
 let evaluateAggregated () =
+  let count = AggregateFunction(Count, AggregateOptions.Default)
+  let sum = AggregateFunction(Sum, AggregateOptions.Default)
+  let countDistinct = AggregateFunction(Count, { AggregateOptions.Default with Distinct = true })
+
   // select sum(val_float - val_int)
-  evalAggr (
-    FunctionExpr(
-      AggregateFunction(Sum, AggregateOptions.Default),
-      [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
-    )
-  )
+  evalAggr sum [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
   |> should equal (Real 2.0)
 
   // select count(*)
-  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), []))
-  |> should equal (Integer 4L)
+  evalAggr count [] |> should equal (Integer 4L)
 
   // select count(1)
-  evalAggr (FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ Constant(Integer 1L) ]))
-  |> should equal (Integer 4L)
+  evalAggr count [ Constant(Integer 1L) ] |> should equal (Integer 4L)
 
   // select count(distinct val_str)
-  evalAggr (FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }), [ colRef0 ]))
-  |> should equal (Integer 2L)
+  evalAggr countDistinct [ colRef0 ] |> should equal (Integer 2L)
 
-  // select val_str
-  (fun () -> evalAggr colRef0 |> ignore) |> shouldFail
+  // select sum()
+  (fun () -> evalAggr sum [] |> ignore) |> shouldFail
 
 [<Fact>]
 let sortRows () =
