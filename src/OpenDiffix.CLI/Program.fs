@@ -9,8 +9,9 @@ type CliArguments =
   | Dry_Run
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
   | Aid_Columns of column_name: string list
-  | Query_Path of path: string
   | [<AltCommandLine("-q")>] Query of sql: string
+  | Query_Path of path: string
+  | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
 
   // Threshold values
@@ -28,8 +29,9 @@ type CliArguments =
       | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
-      | Query_Path _ -> "Path to a file containing the SQL to be executed."
       | Query _ -> "The SQL query to execute."
+      | Query_Path _ -> "Path to a file containing the SQL to be executed."
+      | Query_Stdin -> "Reads the query from standard in."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -80,11 +82,12 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path with
-  | Some query, _ -> query
-  | None, Some path ->
+  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path, parsedArgs.Contains Query_Stdin with
+  | Some query, None, false -> query
+  | None, Some path, false ->
       if File.Exists(path) then File.ReadAllText(path) else failWithUsageInfo $"Could not find a query at %s{path}"
-  | _, _ -> failWithUsageInfo "Please specify a query to run!"
+  | None, None, true -> System.Console.In.ReadLine()
+  | _, _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.Database with
