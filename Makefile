@@ -10,7 +10,7 @@ release-macos:
 new-macos: update release-macos
 
 release-win:
-	dotnet publish -r win-x64 -o build -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
+	dotnet publish -r win-x64 -o build -c Release /p:PublishSingleFile=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
 
 new-win: update release-win
 
