@@ -1,15 +1,17 @@
-﻿open System
-open System.IO
+﻿open System.IO
 open Argu
+open OpenDiffix.CLI
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
 type CliArguments =
-  | DryRun
-  | [<Mandatory; Unique; AltCommandLine("-d")>] Database of db_path: string
-  | [<Mandatory; AltCommandLine("-aid")>] Aid_Column of column_name: string
-  | Query_Path of path: string
+  | [<AltCommandLine("-v")>] Version
+  | Dry_Run
+  | [<Unique; AltCommandLine("-d")>] Database of db_path: string
+  | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
+  | Query_Path of path: string
+  | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
 
   // Threshold values
@@ -23,12 +25,13 @@ type CliArguments =
   interface IArgParserTemplate with
     member this.Usage =
       match this with
-      | DryRun -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
+      | Version -> "Prints the version number of the program."
+      | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
-      | Aid_Column _ -> "Specifies the AID column. Should follow the format tableName.columnName."
-      | Query_Path _ ->
-          "Path to a file containing the SQL to be executed. If not present the query will be read from standard in"
+      | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
+      | Query_Path _ -> "Path to a file containing the SQL to be executed."
+      | Query_Stdin -> "Reads the query from standard in."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -44,7 +47,11 @@ type CliArguments =
           "Specifies the standard deviation used when calculating the noise throughout the system. "
           + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
 
-let parser = ArgumentParser.Create<CliArguments>(programName = "opendiffix")
+let executableName = "OpenDiffix.CLI"
+
+let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
+
+let failWithUsageInfo errorMsg = failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
 let toThreshold =
   function
@@ -61,14 +68,14 @@ let private toTableSettings (aidColumns: string list) =
   |> List.map (fun aidColumn ->
        match aidColumn.Split '.' with
        | [| tableName; columnName |] -> (tableName, columnName)
-       | _ -> failwith "Invalid request: AID doesn't have the format `table_name.column_name`")
+       | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`")
   |> List.groupBy (fst)
   |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
   {
-    TableSettings = parsedArgs.GetResults Aid_Column |> toTableSettings
+    TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
     LowCountThreshold = parsedArgs.TryGetResult Threshold_Low_Count |> toThreshold
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
@@ -77,40 +84,23 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path with
-  | Some query, _ -> query
-  | None, Some path ->
-      if File.Exists(path) then File.ReadAllText(path) else failwith $"ERROR: Could not find a query at %s{path}"
-  | _, _ -> Console.In.ReadLine()
+  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path, parsedArgs.Contains Query_Stdin with
+  | Some query, None, false -> query
+  | None, Some path, false ->
+      if File.Exists(path) then File.ReadAllText(path) else failWithUsageInfo $"Could not find a query at %s{path}"
+  | None, None, true -> System.Console.In.ReadLine()
+  | _, _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
-  let dbPath = parsedArgs.GetResult CliArguments.Database
-  if File.Exists(dbPath) then dbPath else failwith $"ERROR: Could not find a database at %s{dbPath}"
+  match parsedArgs.TryGetResult CliArguments.Database with
+  | Some dbPath -> if File.Exists(dbPath) then dbPath else failWithUsageInfo $"Could not find a database at %s{dbPath}"
+  | None -> failWithUsageInfo $"Please specify the database path!"
 
-let dryRun query dbPath (anonParams: AnonymizationParams) =
-  let formatThreshold threshold = $"[%i{threshold.Lower}, %i{threshold.Upper}]"
-  let formatNoise np = $"0 +- %.2f{np.StandardDev}std limited to [-%.2f{np.Cutoff}, %.2f{np.Cutoff}]"
+let dryRun queryRequest =
+  let encodedRequest = JsonEncoders.encodeRequestParams queryRequest
+  Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
-  $"
-OpenDiffix dry run:
-
-Database: %s{dbPath}
-Query:
-%s{query}
-
-Anonymization parameters:
-------------------------
-Low count threshold: %s{formatThreshold anonParams.LowCountThreshold}
-Noise: %s{formatNoise anonParams.Noise}
-
-Count specific:
-Outlier count threshold: %s{formatThreshold anonParams.OutlierCount}
-Top count threshold: %s{formatThreshold anonParams.TopCount}
-  ",
-  0
-
-let anonymize query dbPath anonParams =
-  let request = { Query = query; DatabasePath = dbPath; AnonymizationParams = anonParams }
+let anonymize request =
   let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
 
   match queryResult with
@@ -129,14 +119,21 @@ let main argv =
     let parsedArguments =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
-    let query = getQuery parsedArguments
-    let dbPath = getDbPath parsedArguments
-    let anonParams = constructAnonParameters parsedArguments
+    if parsedArguments.Contains(Version) then
+      (printfn "%s" AssemblyInfo.versionJson)
+      0
+    else
+      let request =
+        {
+          Query = getQuery parsedArguments
+          DatabasePath = getDbPath parsedArguments
+          AnonymizationParams = constructAnonParameters parsedArguments
+        }
 
-    (if parsedArguments.Contains DryRun then dryRun else anonymize) query dbPath anonParams
-    |> fun (output, exitCode) ->
-         printfn "%s" output
-         exitCode
+      (if parsedArguments.Contains Dry_Run then dryRun request else anonymize request)
+      |> fun (output, exitCode) ->
+           printfn "%s" output
+           exitCode
 
   with e ->
     printfn "%s" e.Message
