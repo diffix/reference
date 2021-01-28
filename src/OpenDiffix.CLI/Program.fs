@@ -47,9 +47,11 @@ type CliArguments =
           "Specifies the standard deviation used when calculating the noise throughout the system. "
           + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
 
-let parser = ArgumentParser.Create<CliArguments>(programName = "OpenDiffix.CLI")
+let executableName = "OpenDiffix.CLI"
 
-let failWithUsageInfo errorMsg = failwith $"ERROR: %s{errorMsg}\n\n%s{parser.PrintUsage()}"
+let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
+
+let failWithUsageInfo errorMsg = failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
 let toThreshold =
   function
