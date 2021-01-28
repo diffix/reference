@@ -97,8 +97,8 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   | None -> failWithUsageInfo $"Please specify the database path!"
 
 let dryRun queryRequest =
-  let encodedRequest = RequestParams.Encoder queryRequest
-  $"%s{Thoth.Json.Net.Encode.toString 2 encodedRequest}", 0
+  let encodedRequest = JsonEncoders.encodeRequestParams queryRequest
+  Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
 let anonymize request =
   let queryResult = QueryEngine.runQuery request |> Async.RunSynchronously
