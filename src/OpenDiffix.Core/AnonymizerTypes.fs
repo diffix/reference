@@ -51,6 +51,7 @@ type AnonymizationParams =
          |> Map.toList
          |> List.map (fun (table, settings) ->
               Encode.object [ "table", Encode.string table; "settings", TableSettings.Encoder settings ]))
+      "low_count_threshold", Threshold.Encoder ap.LowCountThreshold
       "outlier_count", Threshold.Encoder ap.OutlierCount
       "top_count", Threshold.Encoder ap.TopCount
       "noise", NoiseParam.Encoder ap.Noise
