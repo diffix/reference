@@ -12,9 +12,9 @@ module QueryEngine =
   open OpenDiffix.Core
   open OpenDiffix.Core.AnalyzerTypes
 
-  let rec private extractColumns =
+  let rec private extractColumnNames =
     function
-    | UnionQuery (_, query1, _query2) -> extractColumns query1
+    | UnionQuery (_, query1, _query2) -> extractColumnNames query1
     | SelectQuery query -> query.Columns |> List.map (fun column -> column.Alias)
 
   let run connection statement anonParams =
@@ -27,7 +27,7 @@ module QueryEngine =
 
       let rows = plan |> Executor.execute connection |> Seq.toList
 
-      let columns = extractColumns query
+      let columns = extractColumnNames query
 
       return { Columns = columns; Rows = rows }
     }
