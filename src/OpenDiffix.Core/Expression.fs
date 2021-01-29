@@ -2,13 +2,17 @@ namespace OpenDiffix.Core
 
 open FsToolkit.ErrorHandling
 
+open OpenDiffix.Core.AnonymizerTypes
+
 type AggregateFunction =
   | Count
   | Sum
+  | DiffixCount
 
   static member ReturnType fn (args: Expression list) =
     match fn with
-    | Count -> Ok IntegerType
+    | Count
+    | DiffixCount -> Ok IntegerType
     | Sum ->
         List.tryHead args
         |> Result.requireSome "Sum requires an argument"
@@ -58,6 +62,7 @@ and Function =
     function
     | "count" -> Ok(AggregateFunction(Count, AggregateOptions.Default))
     | "sum" -> Ok(AggregateFunction(Sum, AggregateOptions.Default))
+    | "diffix_count" -> Ok(AggregateFunction(DiffixCount, AggregateOptions.Default))
     | "+" -> Ok(ScalarFunction Plus)
     | "-" -> Ok(ScalarFunction Minus)
     | "=" -> Ok(ScalarFunction Equals)
@@ -93,7 +98,11 @@ and AggregateOptions =
   }
   static member Default = { Distinct = false; OrderBy = [] }
 
-type EvaluationContext = EmptyContext
+type EvaluationContext =
+  {
+    AnonymizationParams: AnonymizationParams
+  }
+  static member Default = { AnonymizationParams = AnonymizationParams.Default }
 
 type ScalarArgs = Value list
 type AggregateArgs = seq<Value list>
@@ -169,24 +178,6 @@ module DefaultFunctions =
     | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
     | _ -> failwith "Expected two arguments for binary condition"
 
-module DefaultAggregates =
-  open ExpressionUtils
-
-  let sum ctx (values: AggregateArgs) =
-    let values = values |> mapSingleArg "sum" |> filterNulls
-
-    if Seq.isEmpty values then Null else values |> Seq.reduce (fun a b -> DefaultFunctions.add ctx [ a; b ])
-
-  let count _ctx (values: AggregateArgs) =
-    values
-    |> Seq.sumBy
-         (function
-         | [ Null ] -> 0L
-         | []
-         | [ _ ] -> 1L
-         | _ -> invalidOverload "count")
-    |> Integer
-
 module Expression =
   let invokeScalarFunction ctx fn args =
     match fn with
@@ -201,11 +192,6 @@ module Expression =
     | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
     | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
     | Length -> DefaultFunctions.length ctx args
-
-  let invokeAggregateFunction ctx fn mappedArgs =
-    match fn with
-    | Count -> DefaultAggregates.count ctx mappedArgs
-    | Sum -> DefaultAggregates.sum ctx mappedArgs
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
@@ -235,32 +221,32 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
+    | DiffixCountDistinct of Set<int>
 
-    member internal this.Process value =
-      match this, value with
-      | _, Null -> this
+    member this.Process ctx args row =
+      let values = List.map (evaluate ctx row) args
+
+      match this, values with
+      | _, [ Null ] -> this
       | Count value, _ -> Count(value + 1L)
-      | Sum Null, _ -> Sum(value)
-      | Sum (Integer oldValue), Integer newValue -> Sum(Integer(oldValue + newValue))
-      | Sum (Real oldValue), Real newValue -> Sum(Real(oldValue + newValue))
-      | CountDistinct set, value -> CountDistinct(set.Add value)
+      | Sum Null, [ value ] -> Sum(value)
+      | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
+      | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
+      | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
+      | DiffixCountDistinct set, [ value ] -> value.GetHashCode() |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
 
-    member this.Evaluate =
+    member this.Evaluate(ctx: EvaluationContext) =
       match this with
       | Count count -> Integer(count)
       | Sum sum -> sum
       | CountDistinct set -> Integer(int64 set.Count)
+      | DiffixCountDistinct set -> set.Count |> Anonymizer.noisyCount ctx.AnonymizationParams |> int64 |> Integer
 
-  let createAccumulator ctx expr =
-    match expr with
-    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), _args) -> Accumulator.Count(0L)
-    | FunctionExpr (AggregateFunction (Count, { Distinct = true }), _args) -> Accumulator.CountDistinct(Set.empty)
-    | FunctionExpr (AggregateFunction (Sum, { Distinct = false }), _args) -> Accumulator.Sum(Null)
-    | _ -> failwith "Expression is not a supported aggregator"
-
-  let accumulate ctx expr (accumulator: Accumulator) row =
-    match expr with
-    | FunctionExpr (AggregateFunction (Count, { Distinct = false }), []) -> accumulator.Process(Integer 1L)
-    | FunctionExpr (AggregateFunction _, [ arg ]) -> accumulator.Process(evaluate ctx row arg)
-    | _ -> failwith "Expression is not a supported aggregator"
+  let createAccumulator ctx fn =
+    match fn with
+    | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
+    | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
+    | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
+    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
+    | _ -> failwith "Invalid aggregator"
