@@ -25,7 +25,8 @@ module QueryEngine =
 
       let plan = Planner.plan query
 
-      let rows = plan |> Executor.execute connection |> Seq.toList
+      let context = { AnonymizationParams = anonParams }
+      let rows = plan |> Executor.execute connection context |> Seq.toList
 
       let columns = extractColumnNames query
 

@@ -23,7 +23,9 @@ type Tests(db: DBFixture) =
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
-  let execute plan = plan |> Executor.execute db.Connection |> Seq.toList
+  let context = EvaluationContext.Default
+
+  let execute plan = plan |> Executor.execute db.Connection context |> Seq.toList
 
   [<Fact>]
   let ``execute scan`` () =

@@ -4,7 +4,7 @@ open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
 
-let ctx = EmptyContext
+let ctx = EvaluationContext.Default
 
 module DefaultFunctionsTests =
   let runs fn expectations =
@@ -135,7 +135,7 @@ let eval expr = Expression.evaluate ctx testRow expr
 let evalAggr fn args =
   let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
   let accumulator = List.fold processor (Expression.createAccumulator ctx fn) testRows
-  accumulator.Evaluate
+  accumulator.Evaluate ctx
 
 [<Fact>]
 let evaluate () =

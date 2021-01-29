@@ -18,10 +18,7 @@ type NoiseParam =
 
   static member Default = { StandardDev = 2.; Cutoff = 5. }
 
-type TableSettings =
-  {
-    AidColumns: string list
-  }
+type TableSettings = { AidColumns: string list }
 
 type AnonymizationParams =
   {
@@ -35,18 +32,12 @@ type AnonymizationParams =
     Noise: NoiseParam
   }
 
-type ColumnValue =
-  | IntegerValue of int
-  | StringValue of string
-  | NullValue
-
-  static member ToString =
-    function
-    | IntegerValue value -> $"%i{value}"
-    | StringValue value -> value
-    | NullValue -> "<null>"
-
-type NonPersonalRow = ColumnValue list
-type NonPersonalRows = NonPersonalRow list
-type PersonalRow = { AidValues: ColumnValue Set; RowValues: NonPersonalRow }
-type PersonalRows = PersonalRow list
+  static member Default =
+    {
+      TableSettings = Map.empty
+      Seed = 0
+      LowCountThreshold = Threshold.Default
+      OutlierCount = Threshold.Default
+      TopCount = Threshold.Default
+      Noise = NoiseParam.Default
+    }

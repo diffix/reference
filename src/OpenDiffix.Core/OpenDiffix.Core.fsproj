@@ -7,17 +7,17 @@
     <Compile Include="Value.fs" />
     <Compile Include="SQLite.fs" />
     <Compile Include="Table.fs" />
+    <Compile Include="AnonymizerTypes.fs" />
+    <Compile Include="Anonymizer.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="ParserTypes.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="AnalyzerTypes.fs" />
-    <Compile Include="AnonymizerTypes.fs" />
     <Compile Include="Analysis\QueryValidity.fs" />
     <Compile Include="Analyzer.fs" />
     <Compile Include="PlannerTypes.fs" />
     <Compile Include="Planner.fs" />
     <Compile Include="Executor.fs" />
-    <Compile Include="Anonymizer.fs" />
     <Compile Include="QueryEngine.fs" />
   </ItemGroup>
   <ItemGroup>

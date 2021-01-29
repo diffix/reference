@@ -2,13 +2,17 @@ namespace OpenDiffix.Core
 
 open FsToolkit.ErrorHandling
 
+open OpenDiffix.Core.AnonymizerTypes
+
 type AggregateFunction =
   | Count
   | Sum
+  | DiffixCount
 
   static member ReturnType fn (args: Expression list) =
     match fn with
-    | Count -> Ok IntegerType
+    | Count
+    | DiffixCount -> Ok IntegerType
     | Sum ->
         List.tryHead args
         |> Result.requireSome "Sum requires an argument"
@@ -58,6 +62,7 @@ and Function =
     function
     | "count" -> Ok(AggregateFunction(Count, AggregateOptions.Default))
     | "sum" -> Ok(AggregateFunction(Sum, AggregateOptions.Default))
+    | "diffix_count" -> Ok(AggregateFunction(DiffixCount, AggregateOptions.Default))
     | "+" -> Ok(ScalarFunction Plus)
     | "-" -> Ok(ScalarFunction Minus)
     | "=" -> Ok(ScalarFunction Equals)
@@ -93,7 +98,11 @@ and AggregateOptions =
   }
   static member Default = { Distinct = false; OrderBy = [] }
 
-type EvaluationContext = EmptyContext
+type EvaluationContext =
+  {
+    AnonymizationParams: AnonymizationParams
+  }
+  static member Default = { AnonymizationParams = AnonymizationParams.Default }
 
 type ScalarArgs = Value list
 type AggregateArgs = seq<Value list>
@@ -212,6 +221,7 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
+    | DiffixCountDistinct of Set<int>
 
     member this.Process ctx args row =
       let values = List.map (evaluate ctx row) args
@@ -223,17 +233,20 @@ module Expression =
       | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
       | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
       | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
+      | DiffixCountDistinct set, [ value ] -> value.GetHashCode() |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
 
-    member this.Evaluate =
+    member this.Evaluate(ctx: EvaluationContext) =
       match this with
       | Count count -> Integer(count)
       | Sum sum -> sum
       | CountDistinct set -> Integer(int64 set.Count)
+      | DiffixCountDistinct set -> set.Count |> Anonymizer.noisyCount ctx.AnonymizationParams |> int64 |> Integer
 
   let createAccumulator ctx fn =
     match fn with
     | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
     | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
+    | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
     | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | _ -> failwith "Invalid aggregator"
