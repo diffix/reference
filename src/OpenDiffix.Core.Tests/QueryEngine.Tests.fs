@@ -14,9 +14,9 @@ type Tests(db: DBFixture) =
         ]
       Seed = 1
       LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
-      OutlierCount = Threshold.Default
-      TopCount = Threshold.Default
-      Noise = NoiseParam.Default
+      OutlierCount = { Lower = 1; Upper = 1 }
+      TopCount = { Lower = 1; Upper = 1 }
+      Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
   let runQuery query = QueryEngine.run db.Connection query anonParams |> Async.RunSynchronously
@@ -47,7 +47,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 4`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 9L |] ] }
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
 
     let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM products"
 

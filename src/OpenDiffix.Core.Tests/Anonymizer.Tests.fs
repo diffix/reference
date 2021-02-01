@@ -13,7 +13,18 @@ let ids =
 
 let aidColumn = ColumnReference(0, IntegerType)
 
-let context = EvaluationContext.Default
+let context =
+  { EvaluationContext.Default with
+      AnonymizationParams =
+        {
+          TableSettings = Map.empty
+          Seed = 0
+          LowCountThreshold = { Lower = 1; Upper = 1 }
+          OutlierCount = { Lower = 1; Upper = 1 }
+          TopCount = { Lower = 1; Upper = 1 }
+          Noise = { StandardDev = 1.; Cutoff = 0. }
+        }
+  }
 
 let evalAggr fn args rows =
   let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
