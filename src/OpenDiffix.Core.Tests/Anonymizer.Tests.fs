@@ -7,7 +7,7 @@ open OpenDiffix.Core
 let ctx = EvaluationContext.Default
 
 let ids =
-  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3 ]
+  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (int64 >> Integer >> Array.singleton)
 
@@ -37,36 +37,30 @@ let evalAggr fn args rows =
   let accumulator = List.fold processor (Expression.createAccumulator ctx fn) rows
   accumulator.Evaluate context
 
-[<Fact>]
-let ``anon count distinct aid 1`` () =
-  let diffixCountDistinct = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
-  // count(distinct aid_column) --> count_diffix(aid_column) with distinct = true
-  ids |> evalAggr diffixCountDistinct [ aidColumn ] |> should equal (Integer 7L)
+let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
+let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
-let ``anon count(*) 1`` () =
-  let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
-  // - count(*) --> diffix_count(aid) with distinct = false
-  // - outlier is 5, top is 5, so no substitution.
+let ``anon count distinct aid 1`` () = ids |> evalAggr distinctDiffixCount [ aidColumn ] |> should equal (Integer 8L)
+
+[<Fact>]
+let ``anon count(*)`` () =
+  // - replacing outlier 6, with top 5
   // - 0 noise
-  ids |> evalAggr diffixCount [ aidColumn ] |> should equal (Integer 24L)
+  ids |> evalAggr diffixCount [ aidColumn ] |> should equal (Integer 29L)
 
 [<Fact>]
-let ``anon count(col) 1`` () =
-  let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
-  // - count(col) --> diffix_count(aid, col) with distinct = false
+let ``anon count(col)`` () =
   // - 1 user with Null string is ignored
-  // - outlier is 5, top is 5, so no substitution.
+  // - replacing outlier 6 with top 5
   // - 0 noise
   rows
   |> evalAggr diffixCount [ aidColumn; strColumn ]
-  |> should equal (Integer 24L)
+  |> should equal (Integer 29L)
 
 [<Fact>]
 let ``anon count returns Null if insufficient data`` () =
-  let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
-  let diffixCountDistinct = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
   let firstRow = rows |> List.take 1
   firstRow |> evalAggr diffixCount [ aidColumn; strColumn ] |> should equal Null
   firstRow |> evalAggr diffixCount [ aidColumn ] |> should equal Null
-  firstRow |> evalAggr diffixCountDistinct [ aidColumn ] |> should equal Null
+  firstRow |> evalAggr distinctDiffixCount [ aidColumn ] |> should equal Null
