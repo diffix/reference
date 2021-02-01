@@ -11,7 +11,7 @@ let ids =
   |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (int64 >> Integer >> Array.singleton)
 
-let idColumn = ColumnReference(0, IntegerType)
+let aidColumn = ColumnReference(0, IntegerType)
 
 let context = EvaluationContext.Default
 
@@ -23,5 +23,5 @@ let evalAggr fn args rows =
 [<Fact>]
 let ``anon count distinct 1`` () =
   let diffixCountDistinct = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
-  // select count(distinct val_str)
-  ids |> evalAggr diffixCountDistinct [ idColumn ] |> should equal (Integer 8L)
+  // select count(distinct aid_column)
+  ids |> evalAggr diffixCountDistinct [ aidColumn ] |> should equal (Integer 7L)
