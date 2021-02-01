@@ -29,7 +29,7 @@ let private addNoise rnd (anonymizationParams: AnonymizationParams) value =
 
   max (value + noise) 0
 
-let anonymousCount (anonymizationParams: AnonymizationParams) (perUserContribution: Map<Value, int>) =
+let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<Value, int>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
   let rnd = newRandom aids anonymizationParams
 

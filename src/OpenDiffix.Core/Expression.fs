@@ -249,13 +249,13 @@ module Expression =
       | Sum sum -> sum
       | Count count -> Integer(count)
       | CountDistinct set -> Integer(int64 set.Count)
-      | DiffixCount perAidMap -> perAidMap |> Anonymizer.anonymousCount ctx.AnonymizationParams
+      | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams
       | DiffixCountDistinct aidSet ->
           aidSet
           |> Set.toList
           |> List.map (fun aid -> (aid, 1))
           |> Map.ofList
-          |> Anonymizer.anonymousCount ctx.AnonymizationParams
+          |> Anonymizer.count ctx.AnonymizationParams
 
   let createAccumulator ctx fn =
     match fn with
