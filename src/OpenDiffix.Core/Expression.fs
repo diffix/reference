@@ -229,10 +229,10 @@ module Expression =
 
       match this, values with
       | _, [ Null ] -> this
-      | Count value, _ -> Count(value + 1L)
       | Sum Null, [ value ] -> Sum(value)
       | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
       | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
+      | Count value, _ -> Count(value + 1L)
       | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
       | DiffixCount map, [ _aidColumn; Null ] -> DiffixCount map
       | DiffixCount map, [ aidColumn ]
@@ -246,8 +246,8 @@ module Expression =
 
     member this.Evaluate(ctx: EvaluationContext) =
       match this with
-      | Count count -> Integer(count)
       | Sum sum -> sum
+      | Count count -> Integer(count)
       | CountDistinct set -> Integer(int64 set.Count)
       | DiffixCount perAidMap -> perAidMap |> Anonymizer.anonymousCount ctx.AnonymizationParams
       | DiffixCountDistinct aidSet ->
@@ -259,9 +259,9 @@ module Expression =
 
   let createAccumulator ctx fn =
     match fn with
+    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
     | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
     | AggregateFunction (DiffixCount, { Distinct = false }) -> Accumulator.DiffixCount(Map.empty)
     | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
-    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | _ -> failwith "Invalid aggregator"
