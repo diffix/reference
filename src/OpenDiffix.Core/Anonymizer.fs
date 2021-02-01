@@ -13,8 +13,13 @@ let private randomNormal (rnd: Random) stdDev =
 
   stdDev * randStdNormal
 
-let private newRandom (aidSet: Set<Value>) (anonymizationParams: AnonymizationParams) =
-  Random(aidSet.GetHashCode() ^^^ anonymizationParams.Seed)
+let private newRandom (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
+  let XORedAids =
+    aidSet
+    |> Set.toList
+    |> List.reduce (^^^)
+  let seed = XORedAids ^^^ anonymizationParams.Seed
+  Random(seed)
 
 let private addNoise rnd (anonymizationParams: AnonymizationParams) value =
   let noiseParams = anonymizationParams.Noise
@@ -29,7 +34,7 @@ let private addNoise rnd (anonymizationParams: AnonymizationParams) value =
 
   max (value + noise) 0L
 
-let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<Value, int64>) =
+let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
   let rnd = newRandom aids anonymizationParams
 

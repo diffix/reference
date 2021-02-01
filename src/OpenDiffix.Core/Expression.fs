@@ -221,8 +221,8 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
-    | DiffixCount of Map<Value, int64>
-    | DiffixCountDistinct of Set<Value>
+    | DiffixCount of Map<AidHash, int64>
+    | DiffixCountDistinct of Set<AidHash>
 
     member this.Process ctx args row =
       let values = List.map (evaluate ctx row) args
@@ -237,11 +237,13 @@ module Expression =
       | DiffixCount map, [ _aidColumn; Null ] -> DiffixCount map
       | DiffixCount map, [ aidColumn ]
       | DiffixCount map, [ aidColumn; _ ] ->
-          match Map.tryFind aidColumn map with
-          | Some existingCount -> Map.add aidColumn (existingCount + 1L) map
-          | None -> Map.add aidColumn 1L map
+          let aidHash = aidColumn.GetHashCode()
+
+          match Map.tryFind aidHash map with
+          | Some existingCount -> Map.add aidHash (existingCount + 1L) map
+          | None -> Map.add aidHash 1L map
           |> DiffixCount
-      | DiffixCountDistinct set, [ aidValue ] -> aidValue |> set.Add |> DiffixCountDistinct
+      | DiffixCountDistinct set, [ aidValue ] -> aidValue.GetHashCode() |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
 
     member this.Evaluate(ctx: EvaluationContext) =
@@ -250,8 +252,8 @@ module Expression =
       | Count count -> Integer(count)
       | CountDistinct set -> Integer(int64 set.Count)
       | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams
-      | DiffixCountDistinct aidSet ->
-          aidSet
+      | DiffixCountDistinct aidHashSet ->
+          aidHashSet
           |> Set.toList
           |> List.map (fun aid -> (aid, 1L))
           |> Map.ofList
