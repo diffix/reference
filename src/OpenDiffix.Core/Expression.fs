@@ -221,7 +221,7 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
-    | DiffixCount of Map<Value, int>
+    | DiffixCount of Map<Value, int64>
     | DiffixCountDistinct of Set<Value>
 
     member this.Process ctx args row =
@@ -238,8 +238,8 @@ module Expression =
       | DiffixCount map, [ aidColumn ]
       | DiffixCount map, [ aidColumn; _ ] ->
           match Map.tryFind aidColumn map with
-          | Some existingCount -> Map.add aidColumn (existingCount + 1) map
-          | None -> Map.add aidColumn 1 map
+          | Some existingCount -> Map.add aidColumn (existingCount + 1L) map
+          | None -> Map.add aidColumn 1L map
           |> DiffixCount
       | DiffixCountDistinct set, [ aidValue ] -> aidValue |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
@@ -253,7 +253,7 @@ module Expression =
       | DiffixCountDistinct aidSet ->
           aidSet
           |> Set.toList
-          |> List.map (fun aid -> (aid, 1))
+          |> List.map (fun aid -> (aid, 1L))
           |> Map.ofList
           |> Anonymizer.count ctx.AnonymizationParams
 

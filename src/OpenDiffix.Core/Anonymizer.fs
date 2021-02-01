@@ -25,11 +25,11 @@ let private addNoise rnd (anonymizationParams: AnonymizationParams) value =
     |> max -noiseParams.Cutoff
     |> min noiseParams.Cutoff
     |> round
-    |> int
+    |> int64
 
-  max (value + noise) 0
+  max (value + noise) 0L
 
-let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<Value, int>) =
+let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<Value, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
   let rnd = newRandom aids anonymizationParams
 
@@ -48,9 +48,9 @@ let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<V
       |> List.sum
 
     let topValueAverage = (float topValueSummed) / (float topCount)
-    let outlierReplacement = topValueAverage * (float outlierCount) |> int
+    let outlierReplacement = topValueAverage * (float outlierCount) |> int64
 
     let sumExcludingOutliers = sortedUserContributions |> List.skip (outlierCount) |> List.sum
 
     let totalCount = sumExcludingOutliers + outlierReplacement
-    addNoise rnd anonymizationParams totalCount |> int64 |> Value.Integer
+    addNoise rnd anonymizationParams totalCount |> Value.Integer
