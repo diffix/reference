@@ -8,7 +8,7 @@ let ctx = EvaluationContext.Default
 
 let ids =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3 ]
-  |> List.collect (fun (id, count) -> List.replicate id count)
+  |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (int64 >> Integer >> Array.singleton)
 
 let idColumn = ColumnReference(0, IntegerType)
