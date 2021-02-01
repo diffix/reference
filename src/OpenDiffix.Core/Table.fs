@@ -61,7 +61,7 @@ module Table =
   let load connection table =
     let columns =
       table.Columns
-      |> List.map (fun column -> column.Name)
+      |> List.map (fun column -> $"\"%s{column.Name}\"")
       |> List.reduce (sprintf "%s, %s")
 
     let loadQuery = $"SELECT {columns} FROM {table.Name}"
