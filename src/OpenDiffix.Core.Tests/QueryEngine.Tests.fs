@@ -53,4 +53,12 @@ type Tests(db: DBFixture) =
 
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 5`` () =
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
+
+    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM products"
+
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>

@@ -221,7 +221,8 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
-    | DiffixCountDistinct of Set<int>
+    | DiffixCount of Map<Value, int>
+    | DiffixCountDistinct of Set<Value>
 
     member this.Process ctx args row =
       let values = List.map (evaluate ctx row) args
@@ -233,7 +234,14 @@ module Expression =
       | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
       | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
       | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
-      | DiffixCountDistinct set, [ value ] -> value.GetHashCode() |> set.Add |> DiffixCountDistinct
+      | DiffixCount map, [ _aidColumn; Null ] -> DiffixCount map
+      | DiffixCount map, [ aidColumn ]
+      | DiffixCount map, [ aidColumn; _ ] ->
+          match Map.tryFind aidColumn map with
+          | Some existingCount -> Map.add aidColumn (existingCount + 1) map
+          | None -> Map.add aidColumn 1 map
+          |> DiffixCount
+      | DiffixCountDistinct set, [ aidValue ] -> aidValue |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
 
     member this.Evaluate(ctx: EvaluationContext) =
@@ -241,12 +249,19 @@ module Expression =
       | Count count -> Integer(count)
       | Sum sum -> sum
       | CountDistinct set -> Integer(int64 set.Count)
-      | DiffixCountDistinct set -> set.Count |> Anonymizer.noisyCount ctx.AnonymizationParams |> int64 |> Integer
+      | DiffixCount perAidMap -> perAidMap |> Anonymizer.anonymousCount ctx.AnonymizationParams
+      | DiffixCountDistinct aidSet ->
+          aidSet
+          |> Set.toList
+          |> List.map (fun aid -> (aid, 1))
+          |> Map.ofList
+          |> Anonymizer.anonymousCount ctx.AnonymizationParams
 
   let createAccumulator ctx fn =
     match fn with
     | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
     | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
+    | AggregateFunction (DiffixCount, { Distinct = false }) -> Accumulator.DiffixCount(Map.empty)
     | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
     | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | _ -> failwith "Invalid aggregator"
