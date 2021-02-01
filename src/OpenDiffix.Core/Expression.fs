@@ -259,7 +259,7 @@ module Expression =
           |> Map.ofList
           |> Anonymizer.count ctx.AnonymizationParams
 
-  let createAccumulator ctx fn =
+  let createAccumulator _ctx fn =
     match fn with
     | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
