@@ -63,4 +63,3 @@ let ``anon count returns Null if insufficient data`` () =
   let firstRow = rows |> List.take 1
   firstRow |> evalAggr diffixCount [ aidColumn; strColumn ] |> should equal Null
   firstRow |> evalAggr diffixCount [ aidColumn ] |> should equal Null
-  firstRow |> evalAggr distinctDiffixCount [ aidColumn ] |> should equal Null
