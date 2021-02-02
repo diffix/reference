@@ -1,6 +1,7 @@
 # open-diffix reference implementation
 
 - [Purpose](#purpose)
+- [Gotcha - Please read!](#gotcha)
 - [Development process](#development-process)
   - [Design considerations](#design-considerations)
   - [Organization](#organization)
@@ -16,6 +17,15 @@ The reference implementation is meant to offer anonymization quality matching th
 not necessarily SQL parity. It is not mean to be be used in production. As such it will not receive the type of polish
 and usability work a commercial product would. It can safely be used to anonymize data, but there will be rough
 edges.
+
+## Gotcha 
+
+Due to the way hashes are generated from the AID values, please take the following into consideration when generating 
+test data for the reference implementation:
+
+**If you use numerical AIDs please make sure they are all positive, or all negative. Failing to do so will result in
+the AID space collapsing and the anonymization going wrong. More specifically user -1 will be seen as identical to
+user 0, user -2 will be seen as identical to user 1, etc.**
 
 ## Development process
 

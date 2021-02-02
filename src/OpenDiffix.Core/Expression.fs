@@ -221,32 +221,46 @@ module Expression =
     | Count of int64
     | Sum of Value
     | CountDistinct of Set<Value>
-    | DiffixCountDistinct of Set<int>
+    | DiffixCount of Map<AidHash, int64>
+    | DiffixCountDistinct of Set<AidHash>
 
     member this.Process ctx args row =
       let values = List.map (evaluate ctx row) args
 
       match this, values with
       | _, [ Null ] -> this
-      | Count value, _ -> Count(value + 1L)
       | Sum Null, [ value ] -> Sum(value)
       | Sum (Integer oldValue), [ Integer newValue ] -> Sum(Integer(oldValue + newValue))
       | Sum (Real oldValue), [ Real newValue ] -> Sum(Real(oldValue + newValue))
+      | Count value, _ -> Count(value + 1L)
       | CountDistinct set, [ value ] -> CountDistinct(set.Add value)
-      | DiffixCountDistinct set, [ value ] -> value.GetHashCode() |> set.Add |> DiffixCountDistinct
+      | DiffixCount map, [ _aidColumn; Null ] -> DiffixCount map
+      | DiffixCount map, [ aidColumn ]
+      | DiffixCount map, [ aidColumn; _ ] ->
+          let aidHash = aidColumn.GetHashCode()
+
+          match Map.tryFind aidHash map with
+          | Some existingCount -> Map.add aidHash (existingCount + 1L) map
+          | None -> Map.add aidHash 1L map
+          |> DiffixCount
+      | DiffixCountDistinct set, [ aidValue ] -> aidValue.GetHashCode() |> set.Add |> DiffixCountDistinct
       | _ -> failwith "Invalid accumulated types"
 
     member this.Evaluate(ctx: EvaluationContext) =
       match this with
-      | Count count -> Integer(count)
       | Sum sum -> sum
+      | Count count -> Integer(count)
       | CountDistinct set -> Integer(int64 set.Count)
-      | DiffixCountDistinct set -> set.Count |> Anonymizer.noisyCount ctx.AnonymizationParams |> int64 |> Integer
+      | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams
+      | DiffixCountDistinct aidHashSet ->
+          let count = aidHashSet.Count |> int64
+          Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer
 
-  let createAccumulator ctx fn =
+  let createAccumulator _ctx fn =
     match fn with
+    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | AggregateFunction (Count, { Distinct = false }) -> Accumulator.Count(0L)
     | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
+    | AggregateFunction (DiffixCount, { Distinct = false }) -> Accumulator.DiffixCount(Map.empty)
     | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
-    | AggregateFunction (Sum, { Distinct = false }) -> Accumulator.Sum(Null)
     | _ -> failwith "Invalid aggregator"

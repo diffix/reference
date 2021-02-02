@@ -1,5 +1,7 @@
 namespace OpenDiffix.Core
 
+type AidHash = int
+
 type Value =
   | Null
   | Boolean of bool
