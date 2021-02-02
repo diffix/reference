@@ -41,14 +41,14 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 4`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM products"
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 13L |] ] }
+    let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM customers_small"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 5`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM products"
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 33L |] ] }
+    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM customers_small"
     assertOkEqual queryResult expected
 
   interface IClassFixture<DBFixture>
