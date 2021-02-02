@@ -253,11 +253,8 @@ module Expression =
       | CountDistinct set -> Integer(int64 set.Count)
       | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams
       | DiffixCountDistinct aidHashSet ->
-          aidHashSet
-          |> Set.toList
-          |> List.map (fun aid -> (aid, 1L))
-          |> Map.ofList
-          |> Anonymizer.count ctx.AnonymizationParams
+          let count = aidHashSet.Count |> int64
+          Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer
 
   let createAccumulator _ctx fn =
     match fn with

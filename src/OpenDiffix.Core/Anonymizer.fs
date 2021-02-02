@@ -14,29 +14,29 @@ let private randomNormal (rnd: Random) stdDev =
   stdDev * randStdNormal
 
 let private newRandom (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
-  let XORedAids =
-    aidSet
-    |> Set.toList
-    |> List.reduce (^^^)
+  let XORedAids = aidSet |> Set.toList |> List.reduce (^^^)
   let seed = XORedAids ^^^ anonymizationParams.Seed
   Random(seed)
 
-let private addNoise rnd (anonymizationParams: AnonymizationParams) value =
-  let noiseParams = anonymizationParams.Noise
+let private noiseValue rnd (noiseParam: NoiseParam) =
+  noiseParam.StandardDev
+  |> randomNormal rnd
+  |> max -noiseParam.Cutoff
+  |> min noiseParam.Cutoff
+  |> round
+  |> int64
 
-  let noise =
-    noiseParams.StandardDev
-    |> randomNormal rnd
-    |> max -noiseParams.Cutoff
-    |> min noiseParams.Cutoff
-    |> round
-    |> int64
-
+let addNoise (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) value =
+  let rnd = newRandom aidSet anonymizationParams
+  let noise = noiseValue rnd anonymizationParams.Noise
   max (value + noise) 0L
 
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
   let rnd = newRandom aids anonymizationParams
+  // The noise value must be generated first to make sure the random number generator is fresh.
+  // This ensures count(distinct aid) which uses addNoise directly produces the same results.
+  let noise = noiseValue rnd anonymizationParams.Noise
 
   let sortedUserContributions = perUserContribution |> Map.toList |> List.map snd |> List.sortDescending
 
@@ -58,4 +58,4 @@ let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<A
     let sumExcludingOutliers = sortedUserContributions |> List.skip (outlierCount) |> List.sum
 
     let totalCount = sumExcludingOutliers + outlierReplacement
-    addNoise rnd anonymizationParams totalCount |> Value.Integer
+    max (totalCount + noise) 0L |> Integer
