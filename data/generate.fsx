@@ -123,11 +123,11 @@ let customers =
 
     StaticRows =
       [
-        [ Integer 0L; Null; Null; Null; Null ]
-        [ Integer -1L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo" ]
-        [ Integer -2L; Text "2"; Text "outlier"; Integer 90L; Text "Paris" ]
-        [ Integer -3L; Text "3"; Text "outlier"; Null; Text "Berlin" ]
-        [ Integer -4L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin" ]
+        [ Integer 1000L; Null; Null; Null; Null ]
+        [ Integer 1001L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo" ]
+        [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris" ]
+        [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin" ]
+        [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin" ]
       ]
   }
 
