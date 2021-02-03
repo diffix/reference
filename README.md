@@ -58,11 +58,12 @@ or merged into `master`.
 
 To generate an executable of the command line interface, run one of:
 
-- `make release-win` for Windows
 - `make release-linux` for Linux
 - `make release-macos` for macOS
+- execute the `release.bat` file
 
-The binary will be placed in the `build` folder. It is self-contained and can be placed anywhere.
+If the build succeeds, the binary will be placed in the `build` folder. It is self-contained and can be moved anywhere
+you desire.
 
-There are `new-XXX` equivalents to the above, which also first pull the latest changes from Github before
-making a build. This might be the most appropriate command on non-development machines.
+For linux and macos there are `new-XXX` equivalents to the above. These commandns will first pull the latest changes
+from Github before making a build. This might be the most appropriate command on non-development machines.
