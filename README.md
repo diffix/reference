@@ -64,6 +64,3 @@ To generate an executable of the command line interface, run one of:
 
 If the build succeeds, the binary will be placed in the `build` folder. It is self-contained and can be moved anywhere
 you desire.
-
-For linux and macos there are `new-XXX` equivalents to the above. These commandns will first pull the latest changes
-from Github before making a build. This might be the most appropriate command on non-development machines.

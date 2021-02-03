@@ -1,15 +1,8 @@
 start:
 	dotnet watch -p src/OpenDiffix.Web/ run
 
-update:
-	git checkout master && git pull
-
 release-macos:
 	dotnet publish -r osx-x64 -o build -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
 
-new-macos: update release-macos
-
 release-linux:
 	dotnet publish -r linux-x64 -o build -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
-
-new-linux: update release-linux
