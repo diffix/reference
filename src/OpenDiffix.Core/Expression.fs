@@ -1,8 +1,12 @@
 namespace OpenDiffix.Core
 
+open Aether
 open FsToolkit.ErrorHandling
-
+open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
+
+module OrderByExpression =
+  let _expression: Lens<'a * 'b * 'c, 'a> = (fun (e, _, _) -> e), (fun e (_, od, on) -> (e, od, on))
 
 type AggregateFunction =
   | Count
@@ -84,6 +88,13 @@ and Expression =
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
+
+  static member mapExpression f =
+    function
+    | FunctionExpr (fn, args) ->
+        f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.mapExpression f arg) args))
+    | expr -> f expr
+
 
 and FunctionType =
   | Scalar
