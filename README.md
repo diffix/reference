@@ -7,7 +7,7 @@
   - [Organization](#organization)
   - [Branches](#branches)
 - [Creating a release](#creating-a-release)
-  
+
 
 ## Purpose
 
@@ -18,9 +18,9 @@ not necessarily SQL parity. It is not mean to be be used in production. As such 
 and usability work a commercial product would. It can safely be used to anonymize data, but there will be rough
 edges.
 
-## Gotcha 
+## Gotcha
 
-Due to the way hashes are generated from the AID values, please take the following into consideration when generating 
+Due to the way hashes are generated from the AID values, please take the following into consideration when generating
 test data for the reference implementation:
 
 **If you use numerical AIDs please make sure they are all positive, or all negative. Failing to do so will result in
@@ -32,7 +32,7 @@ user 0, user -2 will be seen as identical to user 1, etc.**
 The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility.
 Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
-The tests rely on the presence of a test database existing. 
+The tests rely on the presence of a test database existing.
 For more information on how to create it, please read the [data/README](data/README.md).
 
 ### Design considerations
@@ -58,11 +58,9 @@ or merged into `master`.
 
 To generate an executable of the command line interface, run one of:
 
-- `make release-win` for Windows
 - `make release-linux` for Linux
 - `make release-macos` for macOS
+- execute the `release.bat` file
 
-The binary will be placed in the `build` folder. It is self-contained and can be placed anywhere.
-
-There are `new-XXX` equivalents to the above, which also first pull the latest changes from Github before
-making a build. This might be the most appropriate command on non-development machines.
+If the build succeeds, the binary will be placed in the `build` folder. It is self-contained and can be moved anywhere
+you desire.
