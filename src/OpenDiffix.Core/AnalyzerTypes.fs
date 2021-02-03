@@ -26,6 +26,11 @@ type Query =
   | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
 
+  static member mapQuery f =
+    function
+    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.mapQuery f q1, Query.mapQuery f q2)
+    | SelectQuery selectQuery -> SelectQuery(f selectQuery)
+
 and SelectQuery =
   {
     Columns: SelectExpression list
@@ -57,17 +62,7 @@ and SelectFrom =
   | Join of Join
   | Table of table: Table
 
-and Join =
-  {
-    //
-    Type: JoinType
-    Condition: Expression
-    Left: SelectFrom
-    Right: SelectFrom
-  }
-
-module SelectFrom =
-  let _table =
+  static member _table =
     (function
     | Table t -> Some t
     | _ -> None),
@@ -76,8 +71,11 @@ module SelectFrom =
       | Table _t -> Table a
       | other -> other)
 
-module Query =
-  let rec mapQuery f =
-    function
-    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, mapQuery f q1, mapQuery f q2)
-    | SelectQuery selectQuery -> SelectQuery(f selectQuery)
+and Join =
+  {
+    //
+    Type: JoinType
+    Condition: Expression
+    Left: SelectFrom
+    Right: SelectFrom
+  }
