@@ -36,6 +36,7 @@ and SelectQuery =
     Having: Expression
   }
   static member _columns = (fun s -> s.Columns), (fun a s -> { s with SelectQuery.Columns = a })
+  static member _From = (fun s -> s.From), (fun a s -> { s with From = a })
   static member _where = (fun s -> s.Where), (fun a s -> { s with SelectQuery.Where = a })
   static member _groupingSets = (fun s -> s.GroupingSets), (fun a s -> { s with GroupingSets = a })
   static member _orderBy = (fun s -> s.OrderBy), (fun a s -> { s with SelectQuery.OrderBy = a })
@@ -64,3 +65,13 @@ and Join =
     Left: SelectFrom
     Right: SelectFrom
   }
+
+module SelectFrom =
+  let _table =
+    (function
+    | Table t -> Some t
+    | _ -> None),
+    (fun a ->
+      function
+      | Table _t -> Table a
+      | other -> other)
