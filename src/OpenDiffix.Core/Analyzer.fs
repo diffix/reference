@@ -2,6 +2,7 @@ module OpenDiffix.Core.Analyzer
 
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
+open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
 let rec functionExpression table fn children =
@@ -68,7 +69,7 @@ let wrapExpressionAsSelected table parserExpr =
     return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
   }
 
-let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.SelectExpression, string> =
+let rec mapSelectedExpression table selectedExpression: Result<SelectExpression, string> =
   match selectedExpression with
   | ParserTypes.As (expr, exprAlias) ->
       result {
@@ -118,7 +119,7 @@ let transformGroupByIndex (expressions: Expression list) groupByExpression =
         expressions |> List.item (int index - 1) |> Ok
   | _ -> Ok groupByExpression
 
-let transformGroupByIndices (selectedExpressions: AnalyzerTypes.SelectExpression list) groupByExpressions =
+let transformGroupByIndices (selectedExpressions: SelectExpression list) groupByExpressions =
   let selectedExpressions =
     selectedExpressions
     |> List.map (fun selectedExpression -> selectedExpression.Expression)
@@ -135,16 +136,34 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
     let! groupBy = groupBy |> transformGroupByIndices selectedExpressions |> List.sequenceResultM
 
     return
-      AnalyzerTypes.SelectQuery
+      SelectQuery
         {
           Columns = selectedExpressions
           Where = whereClause
-          From = AnalyzerTypes.SelectFrom.Table table
+          From = SelectFrom.Table table
           GroupingSets = [ groupBy ]
           Having = havingClause
           OrderBy = []
         }
   }
+
+let rewriteToDiffixAggregate aidColumnExpression query =
+  query
+  |> Query.mapQuery (
+    SelectQuery.mapExpressions
+      (function
+      | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
+          let args =
+            match opts.Distinct, args with
+            | true, [ colExpr ] when colExpr = aidColumnExpression -> args
+            | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
+            | false, _ -> aidColumnExpression :: args
+
+          let newExpr = FunctionExpr(AggregateFunction(DiffixCount, opts), args)
+          printfn "Rewrite: %A to %A" original newExpr
+          newExpr
+      | expression -> expression)
+  )
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   match anonParams.TableSettings.TryFind(tableName) with
@@ -152,7 +171,6 @@ let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   | Some { AidColumns = [] } -> Ok(None)
   | Some { AidColumns = [ column ] } -> Ok(Some column)
   | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
-
 
 let analyze connection
             (anonParams: AnonymizationParams)
@@ -162,13 +180,17 @@ let analyze connection
     let! tableName = selectedTableName parseTree.From
     let! aidColumn = aidColumn anonParams tableName
     let! table = Table.getI connection tableName
-    let! analyzerQuery = transformQuery table parseTree
+    let! analyzerQuery = parseTree |> transformQuery table
 
-    match aidColumn with
-    | None -> ()
-    | Some aidColumn ->
-        let! (aidColumnIndex, _) = Table.getColumn table aidColumn
-        do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+    return!
+      match aidColumn with
+      | None -> Ok analyzerQuery
+      | Some aidColumn ->
+          result {
+            let! (aidColumnIndex, aidColumn) = Table.getColumn table aidColumn
+            do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
 
-    return analyzerQuery
+            let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
+            return rewriteToDiffixAggregate aidColumnExpression analyzerQuery
+          }
   }
