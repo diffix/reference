@@ -5,15 +5,9 @@ open Aether.Operators
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
-let rec onSelectQuery f =
-  function
-  | UnionQuery (_distinct, q1, q2) ->
-      onSelectQuery f q1
-      onSelectQuery f q2
-  | SelectQuery selectQuery -> f selectQuery
-
-let onAggregates (f: Expression -> unit) =
-  onSelectQuery (fun selectQuery ->
+let onAggregates (f: Expression -> unit) query =
+  query
+  |> Query.mapQuery (fun selectQuery ->
     selectQuery
     |> SelectQuery.mapExpressions
          (function
@@ -21,8 +15,8 @@ let onAggregates (f: Expression -> unit) =
              f aggregateExpression
              aggregateExpression
          | other -> other)
-    |> ignore
   )
+  |> ignore
 
 let private assertEmpty query errorMsg seq = if Seq.isEmpty seq then Ok query else Error errorMsg
 
@@ -45,14 +39,17 @@ let private allowedCountUsage aidColIdx query =
            | _ -> failwith "Only count(*) and count(distinct aid-column) are supported"
        | _ -> ())
 
-let rec private validateSingleTableSelect =
-  onSelectQuery (fun query ->
+let rec private validateSingleTableSelect query =
+  query
+  |> Query.mapQuery (fun query ->
     query
     |> Optic.get (SelectQuery._From >-> SelectFrom._table)
     |> function
     | None -> failwith "JOIN queries and sub queries are not supported at present"
     | Some _ -> ()
+    query
   )
+  |> ignore
 
 let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query) =
   validateOnlyCount query

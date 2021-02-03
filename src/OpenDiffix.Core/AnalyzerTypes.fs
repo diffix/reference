@@ -75,3 +75,9 @@ module SelectFrom =
       function
       | Table _t -> Table a
       | other -> other)
+
+module Query =
+  let rec mapQuery f =
+    function
+    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, mapQuery f q1, mapQuery f q2)
+    | SelectQuery selectQuery -> SelectQuery(f selectQuery)
