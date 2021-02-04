@@ -11,6 +11,7 @@ type Tests(db: DBFixture) =
         Map [
           "customers", { AidColumns = [ "id" ] } //
           "purchases", { AidColumns = [ "cid" ] } //
+          "customers_small", { AidColumns = [ "id" ] } //
         ]
       Seed = 1
       LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
@@ -41,14 +42,14 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 4`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 13L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM customers_small"
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
+    let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM products"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 5`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 33L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM customers_small"
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
+    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM products"
     assertOkEqual queryResult expected
 
   interface IClassFixture<DBFixture>
