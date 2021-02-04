@@ -8,11 +8,13 @@ type AggregateFunction =
   | Count
   | Sum
   | DiffixCount
+  | JunkUserCount
 
   static member ReturnType fn (args: Expression list) =
     match fn with
     | Count
-    | DiffixCount -> Ok IntegerType
+    | DiffixCount
+    | JunkUserCount -> Ok IntegerType
     | Sum ->
         List.tryHead args
         |> Result.requireSome "Sum requires an argument"
@@ -223,6 +225,7 @@ module Expression =
     | CountDistinct of Set<Value>
     | DiffixCount of Map<AidHash, int64>
     | DiffixCountDistinct of Set<AidHash>
+    | JunkUserCount of Set<AidHash>
 
     member this.Process ctx args row =
       let values = List.map (evaluate ctx row) args
@@ -244,17 +247,21 @@ module Expression =
           | None -> Map.add aidHash 1L map
           |> DiffixCount
       | DiffixCountDistinct set, [ aidValue ] -> aidValue.GetHashCode() |> set.Add |> DiffixCountDistinct
+      | JunkUserCount set, [ aidValue ] -> aidValue.GetHashCode() |> set.Add |> JunkUserCount
       | _ -> failwith "Invalid accumulated types"
 
     member this.Evaluate(ctx: EvaluationContext) =
       match this with
-      | Sum sum -> sum
-      | Count count -> Integer(count)
-      | CountDistinct set -> Integer(int64 set.Count)
-      | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams
+      | Sum sum -> sum |> OnlyValue
+      | Count count -> Integer(count) |> OnlyValue
+      | CountDistinct set -> Integer(int64 set.Count) |> OnlyValue
+      | DiffixCount perAidMap -> perAidMap |> Anonymizer.count ctx.AnonymizationParams |> OnlyValue
       | DiffixCountDistinct aidHashSet ->
           let count = aidHashSet.Count |> int64
-          Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer
+          Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer |> OnlyValue
+      | JunkUserCount aidHashSet ->
+          let count = aidHashSet.Count |> int64 |> Integer
+          ValueAndJunk (count, UserCount, count)
 
   let createAccumulator _ctx fn =
     match fn with
@@ -263,4 +270,5 @@ module Expression =
     | AggregateFunction (Count, { Distinct = true }) -> Accumulator.CountDistinct(Set.empty)
     | AggregateFunction (DiffixCount, { Distinct = false }) -> Accumulator.DiffixCount(Map.empty)
     | AggregateFunction (DiffixCount, { Distinct = true }) -> Accumulator.DiffixCountDistinct(Set.empty)
+    | AggregateFunction (JunkUserCount, _) -> Accumulator.JunkUserCount(Set.empty)
     | _ -> failwith "Invalid aggregator"

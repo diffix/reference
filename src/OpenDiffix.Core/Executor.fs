@@ -8,7 +8,7 @@ let private executeProject context expressions rowsStream =
   let expressions = Array.ofList expressions
 
   rowsStream
-  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row) |> Row.OfValues)
+  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row) |> row.UpdateValues)
 
 let private executeFilter context condition rowsStream =
   rowsStream
@@ -29,12 +29,12 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
   let defaultAccumulators = aggFns |> Array.map (Expression.createAccumulator context)
 
   let initialState: Map<Row, Expression.Accumulator array> =
-    if groupingLabels.Length = 0 then Map [ Row.OfValues [||], defaultAccumulators ] else Map []
+    if groupingLabels.Length = 0 then Map [ Row.Empty, defaultAccumulators ] else Map []
 
   rowsStream
   |> Seq.fold
     (fun state row ->
-      let group = groupingLabels |> Array.map (Expression.evaluate context row) |> Row.OfValues
+      let group = groupingLabels |> Array.map (Expression.evaluate context row) |> Row.OfValuesRetainingJunk row
 
       let accumulator =
         match Map.tryFind group state with

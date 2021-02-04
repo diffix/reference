@@ -35,7 +35,7 @@ let context =
 let evalAggr fn args rows =
   let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
   let accumulator = List.fold processor (Expression.createAccumulator ctx fn) rows
-  accumulator.Evaluate context
+  accumulator.Evaluate context |> FunctionReturnValue.Value
 
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })

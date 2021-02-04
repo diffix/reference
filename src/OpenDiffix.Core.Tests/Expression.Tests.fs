@@ -110,7 +110,11 @@ module DefaultFunctionsTests =
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
-  rows |> List.map (fun (a, b, c) -> Row.OfValues [| ctor1 a; ctor2 b; ctor3 c |])
+  rows
+  |> List.map (fun (a, b, c) ->
+    let valueRow: Value array = [| ctor1 a; ctor2 b; ctor3 c |]
+    Row.OfValues valueRow
+  )
 
 let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |] |> Row.OfValues
 
@@ -135,7 +139,7 @@ let eval expr = Expression.evaluate ctx testRow expr
 let evalAggr fn args =
   let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
   let accumulator = List.fold processor (Expression.createAccumulator ctx fn) testRows
-  accumulator.Evaluate ctx
+  accumulator.Evaluate ctx |> FunctionReturnValue.Value
 
 [<Fact>]
 let evaluate () =
@@ -201,5 +205,5 @@ let sortRows () =
          [| Null; Null |]
          [| Null; Integer 2L |]
          [| Null; Integer 1L |]
-       ]
-       |> List.map Row.OfValues)
+        ]
+        |> List.map Row.OfValues)

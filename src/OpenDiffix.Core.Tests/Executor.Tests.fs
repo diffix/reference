@@ -15,17 +15,25 @@ type Tests(db: DBFixture) =
     let column = table.Columns |> List.item index
     ColumnReference(index, column.Type)
 
+  let idColumn = column products 0
+
   let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1L) ])
 
   let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
+
   let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
+
+  let junkCount expression =
+    FunctionExpr(AggregateFunction(JunkUserCount, { Distinct = false; OrderBy = [] }), [ expression ])
 
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
   let context = EvaluationContext.Default
 
-  let execute plan = plan |> Executor.execute db.Connection context |> Seq.toList |> List.map Row.GetValues
+  let executeToRows plan = plan |> Executor.execute db.Connection context |> Seq.toList
+
+  let execute plan = plan |> executeToRows |> List.map Row.GetValues
 
   [<Fact>]
   let ``execute scan`` () =
@@ -48,7 +56,6 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute sort`` () =
-    let idColumn = column products 0
     let orderById = idColumn, Descending, NullsFirst
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
     let expected = [ [| Integer 10L |]; [| Integer 9L |]; [| Integer 8L |] ]
@@ -91,5 +98,15 @@ type Tests(db: DBFixture) =
 
     let expected = [ [| Integer 0L |] ]
     plan |> execute |> should equal expected
+
+  [<Fact>]
+  let ``execute aggregate with junk`` () =
+    let plan = Plan.Aggregate(Plan.Scan(products), [], [ junkCount idColumn ])
+    let expectedCounts = Integer 11L
+
+    let row = plan |> executeToRows |> List.head
+
+    should equal expectedCounts row.[0]
+    should equal (Some expectedCounts) (row.TryGetJunk UserCount)
 
   interface IClassFixture<DBFixture>
