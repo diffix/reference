@@ -102,11 +102,12 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute aggregate with junk`` () =
     let plan = Plan.Aggregate(Plan.Scan(products), [], [ junkCount idColumn ])
-    let expectedCounts = Integer 11L
 
     let row = plan |> executeToRows |> List.head
 
-    should equal expectedCounts row.[0]
-    should equal expectedCounts (row.GetJunk UserCount)
+    should equal [||] (Row.DropJunkValues(row).Values)
+    should equal [| UselessJunk |] row.Values
+    should equal (Integer 9L) (row.GetJunk NoisyUserCount)
+    should equal (Boolean false) (row.GetJunk LowCount)
 
   interface IClassFixture<DBFixture>

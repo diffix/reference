@@ -34,7 +34,10 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
   rowsStream
   |> Seq.fold
     (fun state row ->
-      let group = groupingLabels |> Array.map (Expression.evaluate context row) |> Row.OfValuesRetainingJunk row
+      let group =
+        groupingLabels
+        |> Array.map (Expression.evaluate context row)
+        |> Row.OfValuesRetainingJunk row
 
       let accumulator =
         match Map.tryFind group state with
@@ -52,6 +55,17 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Row.Append group values
   )
 
+let private executeExpand _context rowsStream =
+  rowsStream
+  |> Seq.collect (fun (row: Row) ->
+    let count =
+      match row.GetJunk NoisyUserCount with
+      | Integer count -> count |> int
+      | _ -> failwith "Expected an integer user count junk"
+
+    Seq.replicate count (row.SetJunk NoisyUserCount (Integer 1L))
+  )
+
 let rec execute connection context plan =
   match plan with
   | Plan.Scan table -> executeScan connection table
@@ -62,4 +76,8 @@ let rec execute connection context plan =
       plan
       |> execute connection context
       |> executeAggregate context labels aggregators
+  | Plan.ExpandRows plan ->
+    plan
+    |> execute connection context
+    |> executeExpand context
   | _ -> failwith "Plan execution not implemented"

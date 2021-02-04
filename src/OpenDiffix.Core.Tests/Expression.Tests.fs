@@ -118,7 +118,7 @@ let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
 
 let makeRow strValue intValue floatValue =
   let row = Row.OfValues [| String strValue; Integer intValue; Real floatValue |]
-  row.SetJunk UserCount (Integer 5L)
+  row.SetJunk NoisyUserCount (Integer 5L)
 
 let testRow = makeRow "Some text" 7L 0.25
 
@@ -132,7 +132,7 @@ let testRows =
       "row2", 4L, 4.5
     ]
 
-let junkRef = JunkReference JunkType.UserCount
+let junkRef = JunkReference JunkType.NoisyUserCount
 let colRef0 = ColumnReference(0, StringType)
 let colRef1 = ColumnReference(1, IntegerType)
 let colRef2 = ColumnReference(2, RealType)

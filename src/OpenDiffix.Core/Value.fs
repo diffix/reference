@@ -8,6 +8,7 @@ type Value =
   | Integer of int64
   | Real of float
   | String of string
+  | UselessJunk
   static member ToString =
     function
     | Null -> "NULL"
@@ -15,17 +16,27 @@ type Value =
     | Integer i -> i.ToString()
     | Real r -> r.ToString()
     | String s -> s
+    | UselessJunk -> "<Useless junk>"
 
-type JunkType = | UserCount
+type JunkType =
+  | NoisyUserCount
+  | LowCount
+
+type JunkValue = JunkType * Value
 
 type FunctionReturnValue =
   | OnlyValue of Value
-  | ValueAndJunk of value: Value * junkType: JunkType * junkValue: Value
+  | OnlyJunk of JunkValue array
 
   static member Value =
     function
-    | OnlyValue value
-    | ValueAndJunk (value, _, _) -> value
+    | OnlyValue value -> value
+    | OnlyJunk _ -> UselessJunk
+
+  static member Junk =
+    function
+    | OnlyValue _ -> None
+    | OnlyJunk junk -> Some junk
 
 type Row =
   {
@@ -35,21 +46,14 @@ type Row =
 
   static member private ExtractValues(values: Value array) = values
 
-  static member private ExtractValues(values: FunctionReturnValue array) =
-    values
-    |> Array.map
-         (function
-         | OnlyValue value
-         | ValueAndJunk (value, _, _) -> value)
+  static member private ExtractValues(values: FunctionReturnValue array) = Array.map FunctionReturnValue.Value values
 
   static member private UpdateJunk(_values: Value array, existingJunk) = existingJunk
 
   static member private UpdateJunk(values: FunctionReturnValue array, existingJunk) =
     values
-    |> Array.choose
-         (function
-         | OnlyValue _ -> None
-         | ValueAndJunk (_value, junkName, junkValue) -> Some(junkName, junkValue))
+    |> Array.choose FunctionReturnValue.Junk
+    |> Array.concat
     |> Array.fold (fun junkMap (name, value) -> Map.add name value junkMap) existingJunk
 
   static member Empty = { Values = [||]; Junk = Map.empty }
@@ -66,6 +70,8 @@ type Row =
     let values = Array.append row1.Values row2.Values
     let junk = row2.Junk |> Map.fold (fun map key value -> Map.add key value map) row1.Junk
     { Values = values; Junk = junk }
+
+  static member DropJunkValues row = { row with Values = row.Values |> Array.filter ((<>) UselessJunk) }
 
   member this.SetJunk key junk = { this with Junk = Map.add key junk this.Junk }
   member this.GetJunk key = Map.find key this.Junk
@@ -92,6 +98,7 @@ type ValueType =
   | IntegerType
   | RealType
   | StringType
+  | JunkType
   | UnknownType of string
 
 type OrderByDirection =
@@ -113,6 +120,7 @@ module Value =
       match nulls with
       | NullsFirst -> -1
       | NullsLast -> 1
+
     { new System.Collections.Generic.IComparer<Value> with
         member __.Compare(x, y) =
           match x, y with
@@ -128,5 +136,6 @@ module Value =
     | Boolean value -> value
     | Integer n -> n <> 0L
     | Real n -> n <> 0.
+    | UselessJunk -> false
     | String "" -> false
     | String value -> value.ToLower() = "true"

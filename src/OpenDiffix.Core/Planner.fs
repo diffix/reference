@@ -16,6 +16,9 @@ let private planFilter condition plan =
   | Constant (Boolean true) -> plan
   | _ -> Plan.Filter(plan, condition)
 
+let private planExpand query plan =
+  if query.QueryPostProcessing.ExpandRowsByUserCount then Plan.ExpandRows plan else plan
+
 let private planSort sortExpressions plan =
   match sortExpressions with
   | [] -> plan
@@ -42,9 +45,9 @@ let rec private projectExpression expression columns =
         | FunctionExpr (fn, args) ->
             let args = args |> List.map (fun arg -> projectExpression arg columns)
             FunctionExpr(fn, args)
+        | JunkReference _
         | Constant _ -> expression
-        | ColumnReference _
-        | JunkReference _ -> failwith "Expression projection failed"
+        | ColumnReference _ -> failwith "Expression projection failed"
     | Some i -> ColumnReference(i, getType expression)
 
 let private planSelect query =
@@ -73,6 +76,7 @@ let private planSelect query =
   |> planFilter query.Where
   |> planAggregate groupingLabels aggregators
   |> planFilter havingExpression
+  |> planExpand query
   |> planSort orderByExpressions
   |> planProject selectedExpressions
 

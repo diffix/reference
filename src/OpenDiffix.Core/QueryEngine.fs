@@ -15,7 +15,10 @@ module QueryEngine =
   let rec private extractColumnNames =
     function
     | UnionQuery (_, query1, _query2) -> extractColumnNames query1
-    | SelectQuery query -> query.Columns |> List.map (fun column -> column.Alias)
+    | SelectQuery query ->
+      query.Columns
+      |> List.filter (fun column -> not <| Expression.IsJunk column.Expression)
+      |> List.map (fun column -> column.Alias)
 
   let run connection statement anonParams =
     asyncResult {
@@ -26,7 +29,11 @@ module QueryEngine =
       let plan = Planner.plan query
 
       let context = { AnonymizationParams = anonParams }
-      let rows = plan |> Executor.execute connection context |> Seq.toList
+      let rows =
+        plan
+        |> Executor.execute connection context
+        |> Seq.map Row.DropJunkValues
+        |> Seq.toList
 
       let columns = extractColumnNames query
 

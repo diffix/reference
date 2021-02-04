@@ -13,3 +13,4 @@ type Plan =
   | Unique of Plan
   | Join of left: Plan * right: Plan * JoinType * condition: Expression
   | Append of first: Plan * second: Plan
+  | ExpandRows of Plan

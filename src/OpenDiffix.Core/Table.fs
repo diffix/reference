@@ -23,6 +23,7 @@ module Table =
     | BooleanType -> "boolean"
     | RealType -> "real"
     | UnknownType typeName -> $"unknown ({typeName})"
+    | JunkType -> failwith "Junk type is not representable"
 
   let getAll (connection: SQLite.DbConnection) =
     asyncResult {

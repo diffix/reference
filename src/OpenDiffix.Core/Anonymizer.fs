@@ -31,6 +31,11 @@ let addNoise (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) v
   let noise = noiseValue rnd anonymizationParams.Noise
   max (value + noise) 0L
 
+let isLowCount aidSet (anonymizationParams: AnonymizationParams) =
+  let rnd = newRandom aidSet anonymizationParams
+  let threshold = randomUniform rnd anonymizationParams.LowCountThreshold
+  aidSet.Count < threshold
+
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
   let rnd = newRandom aids anonymizationParams

@@ -13,8 +13,8 @@ type AggregateFunction =
   static member ReturnType fn (args: Expression list) =
     match fn with
     | Count
-    | DiffixCount
-    | JunkUserCount -> Ok IntegerType
+    | DiffixCount -> Ok IntegerType
+    | JunkUserCount -> Ok JunkType
     | Sum ->
         List.tryHead args
         |> Result.requireSome "Sum requires an argument"
@@ -82,12 +82,18 @@ and Expression =
     | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
     | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
     | ColumnReference (_, exprType) -> Ok exprType
-    | JunkReference UserCount -> Ok IntegerType
+    | JunkReference _
+    | Constant(UselessJunk) -> Ok JunkType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
+
+  static member IsJunk expression =
+    match Expression.GetType expression with
+    | Ok JunkType -> true
+    | _ -> false
 
 and FunctionType =
   | Scalar
@@ -263,8 +269,10 @@ module Expression =
           let count = aidHashSet.Count |> int64
           Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer |> OnlyValue
       | JunkUserCount aidHashSet ->
-          let count = aidHashSet.Count |> int64 |> Integer
-          ValueAndJunk (count, UserCount, count)
+          let isLowCount = Anonymizer.isLowCount aidHashSet ctx.AnonymizationParams |> Boolean
+          let count = aidHashSet.Count |> int64
+          let userCount = Anonymizer.addNoise aidHashSet ctx.AnonymizationParams count |> Integer
+          OnlyJunk [| LowCount, isLowCount; NoisyUserCount, userCount |]
 
   let createAccumulator _ctx fn =
     match fn with

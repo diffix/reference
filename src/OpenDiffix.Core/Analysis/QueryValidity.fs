@@ -7,7 +7,8 @@ module private ExpressionExtractor =
   let rec flattenExpression (exp: Expression) =
     match exp with
     | Constant _ as constant -> Seq.singleton constant
-    | ColumnReference _ as columnRef -> Seq.singleton columnRef
+    | JunkReference _ as ref -> Seq.singleton ref
+    | ColumnReference _ as ref -> Seq.singleton ref
     | FunctionExpr (_, args) as fnExp ->
         seq {
           yield fnExp

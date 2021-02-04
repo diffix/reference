@@ -24,6 +24,7 @@ let defaultQuery =
     GroupingSets = [ [] ]
     Having = Boolean true |> Constant
     OrderBy = []
+    QueryPostProcessing = QueryPostProcessing.Default
   }
 
 let testParsedQuery queryString callback (expected: Query) =
@@ -76,8 +77,8 @@ let ``Selecting columns from a table`` () =
       { defaultQuery with
           Columns =
             [
-              { Expression = ColumnReference(0, StringType); Alias = "str_col" }
-              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+              { Expression = ColumnReference(0, StringType); Alias = "str_col"}
+              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col"}
             ]
       })
 
@@ -102,7 +103,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
       {
         Columns =
           [
-            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
+            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias"}
             {
               Expression =
                 FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
@@ -140,4 +141,5 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             ]
           )
         OrderBy = []
+        QueryPostProcessing = QueryPostProcessing.Default
       })

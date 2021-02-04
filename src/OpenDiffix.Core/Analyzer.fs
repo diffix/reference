@@ -65,7 +65,7 @@ let wrapExpressionAsSelected table parserExpr =
     let! expr = mapExpression table parserExpr
     let name = expressionName parserExpr
 
-    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
+    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name}
   }
 
 let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.SelectExpression, string> =
@@ -74,7 +74,7 @@ let rec mapSelectedExpression table selectedExpression: Result<AnalyzerTypes.Sel
       result {
         let! childExpr = mapExpression table expr
         let! alias = extractAlias exprAlias
-        return { Expression = childExpr; Alias = alias }
+        return { Expression = childExpr; Alias = alias}
       }
   | ParserTypes.Identifier identifierName ->
       result {
@@ -143,8 +143,51 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
           GroupingSets = [ groupBy ]
           Having = havingClause
           OrderBy = []
+          QueryPostProcessing = AnalyzerTypes.QueryPostProcessing.Default
         }
   }
+
+let rec notAggregate =
+  function
+  | FunctionExpr (ScalarFunction _, args) -> List.forall notAggregate args
+  | FunctionExpr (AggregateFunction _, _) -> false
+  | _ -> true
+
+let private addLowCountFilterToSelect aidColumnIndex (select: AnalyzerTypes.SelectQuery) =
+  let userCountAggregateSelection =
+    {
+      AnalyzerTypes.SelectExpression.Expression =
+        FunctionExpr(AggregateFunction(JunkUserCount, AggregateOptions.Default), [ aidColumnIndex ])
+      AnalyzerTypes.SelectExpression.Alias = "low_count_aggregate"
+    }
+
+  let lowCountFilter = FunctionExpr(ScalarFunction Not, [ JunkReference LowCount ])
+
+  if select.GroupingSets = [ [] ] then
+    let nonAggregateSelectedExpressions =
+      select.Columns
+      |> List.map (fun selectedColumn -> selectedColumn.Expression)
+      |> List.filter notAggregate
+
+    let needsExpanding = List.length nonAggregateSelectedExpressions > 0
+
+    { select with
+        Columns = select.Columns @ [ userCountAggregateSelection ]
+        GroupingSets = [ nonAggregateSelectedExpressions ]
+        QueryPostProcessing = { select.QueryPostProcessing with ExpandRowsByUserCount = needsExpanding }
+        Having = lowCountFilter
+    }
+  else
+    { select with
+        Columns = select.Columns @ [ userCountAggregateSelection ]
+        Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; select.Having ])
+    }
+
+let rec private addLowCountFilter aidColumnIndex =
+  function
+  | AnalyzerTypes.UnionQuery (distinct, q1, q2) ->
+      AnalyzerTypes.UnionQuery(distinct, addLowCountFilter aidColumnIndex q1, addLowCountFilter aidColumnIndex q2)
+  | AnalyzerTypes.SelectQuery select -> addLowCountFilterToSelect aidColumnIndex select |> AnalyzerTypes.SelectQuery
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   match anonParams.TableSettings.TryFind(tableName) with
@@ -152,7 +195,6 @@ let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   | Some { AidColumns = [] } -> Ok(None)
   | Some { AidColumns = [ column ] } -> Ok(Some column)
   | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
-
 
 let analyze connection
             (anonParams: AnonymizationParams)
@@ -164,11 +206,14 @@ let analyze connection
     let! table = Table.getI connection tableName
     let! analyzerQuery = transformQuery table parseTree
 
-    match aidColumn with
-    | None -> ()
-    | Some aidColumn ->
-        let! (aidColumnIndex, _) = Table.getColumn table aidColumn
-        do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
-
-    return analyzerQuery
+    return!
+      match aidColumn with
+      | None -> Ok analyzerQuery
+      | Some aidColumn ->
+          result {
+            let! (aidColumnIndex, aidColumn) = Table.getColumn table aidColumn
+            let aidColumnReference = ColumnReference(aidColumnIndex, aidColumn.Type)
+            do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+            return addLowCountFilter aidColumnReference analyzerQuery
+          }
   }

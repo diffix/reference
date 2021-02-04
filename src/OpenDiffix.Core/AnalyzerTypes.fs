@@ -12,6 +12,13 @@ type SelectExpression = { Expression: Expression; Alias: string }
 
 type GroupingSet = Expression list
 
+type QueryPostProcessing =
+  {
+    ExpandRowsByUserCount: bool
+  }
+
+  static member Default = { ExpandRowsByUserCount = false }
+
 type Query =
   | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
@@ -24,6 +31,7 @@ and SelectQuery =
     GroupingSets: GroupingSet list
     OrderBy: OrderByExpression list
     Having: Expression
+    QueryPostProcessing: QueryPostProcessing
   }
 
 and SelectFrom =
