@@ -38,13 +38,13 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute scan`` () =
     let plan = Plan.Scan(products)
-    let expected = [ [| Integer -1L; String "Drugs"; Real 30.7 |]; [| Integer 0L; Null; Null |] ]
+    let expected = [ [| Integer 0L; Null; Null |]; [| Integer 1L; String "Water"; Real 1.3 |] ]
     plan |> execute |> List.take 2 |> should equal expected
 
   [<Fact>]
   let ``execute project`` () =
     let plan = Plan.Project(Plan.Scan(products), [ plus1 (column products 0) ])
-    let expected = [ [| Integer 0L |]; [| Integer 1L |]; [| Integer 2L |] ]
+    let expected = [ [| Integer 1L |]; [| Integer 2L |]; [| Integer 3L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
@@ -58,7 +58,7 @@ type Tests(db: DBFixture) =
   let ``execute sort`` () =
     let orderById = idColumn, Descending, NullsFirst
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
-    let expected = [ [| Integer 10L |]; [| Integer 9L |]; [| Integer 8L |] ]
+    let expected = [ [| Integer 1000L |]; [| Integer 10L |]; [| Integer 9L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
@@ -107,6 +107,6 @@ type Tests(db: DBFixture) =
     let row = plan |> executeToRows |> List.head
 
     should equal expectedCounts row.[0]
-    should equal (Some expectedCounts) (row.TryGetJunk UserCount)
+    should equal expectedCounts (row.GetJunk UserCount)
 
   interface IClassFixture<DBFixture>
