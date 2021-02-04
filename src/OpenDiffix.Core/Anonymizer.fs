@@ -14,8 +14,8 @@ let private randomNormal (rnd: Random) stdDev =
   stdDev * randStdNormal
 
 let private newRandom (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
-  let XORedAids = aidSet |> Set.toList |> List.reduce (^^^)
-  let seed = XORedAids ^^^ anonymizationParams.Seed
+  let combinedAids = aidSet |> Set.toList |> List.reduce (^^^)
+  let seed = combinedAids ^^^ anonymizationParams.Seed
   Random(seed)
 
 let private noiseValue rnd (noiseParam: NoiseParam) =
