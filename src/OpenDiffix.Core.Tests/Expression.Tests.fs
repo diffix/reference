@@ -110,9 +110,9 @@ module DefaultFunctionsTests =
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
-  rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
+  rows |> List.map (fun (a, b, c) -> Row.OfValues [| ctor1 a; ctor2 b; ctor3 c |])
 
-let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |]
+let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |] |> Row.OfValues
 
 let testRow = makeRow "Some text" 7L 0.25
 
@@ -181,6 +181,7 @@ let sortRows () =
     [| Null; Integer 2L |]
     [| Null; Null |]
   ]
+  |> List.map Row.OfValues
   |> Expression.sortRows
        ctx
        [ //
@@ -190,7 +191,7 @@ let sortRows () =
   |> List.ofSeq
   |> should
        equal
-       [
+       ([
          [| String "a"; Null |]
          [| String "a"; Integer 2L |]
          [| String "a"; Integer 1L |]
@@ -201,3 +202,4 @@ let sortRows () =
          [| Null; Integer 2L |]
          [| Null; Integer 1L |]
        ]
+       |> List.map Row.OfValues)

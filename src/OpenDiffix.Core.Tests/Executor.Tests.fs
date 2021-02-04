@@ -25,7 +25,7 @@ type Tests(db: DBFixture) =
 
   let context = EvaluationContext.Default
 
-  let execute plan = plan |> Executor.execute db.Connection context |> Seq.toList
+  let execute plan = plan |> Executor.execute db.Connection context |> Seq.toList |> List.map Row.GetValues
 
   [<Fact>]
   let ``execute scan`` () =
@@ -81,7 +81,7 @@ type Tests(db: DBFixture) =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
     let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [ nameLength ], [ countStar ])
 
-    let expected: Row list = []
+    let expected: Value array list = []
     plan |> execute |> should equal expected
 
   [<Fact>]

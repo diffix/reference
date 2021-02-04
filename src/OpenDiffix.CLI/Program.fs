@@ -112,7 +112,7 @@ let anonymize query dbPath anonParams =
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
+        |> List.map (fun row -> row.Values |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
         |> List.reduce (sprintf "%s\n%s")
 
       resultSet, 0

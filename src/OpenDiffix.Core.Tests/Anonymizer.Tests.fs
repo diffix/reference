@@ -9,11 +9,11 @@ let ctx = EvaluationContext.Default
 let ids =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
-  |> List.map (int64 >> Integer >> Array.singleton)
+  |> List.map (int64 >> Integer >> Array.singleton >> Row.OfValues)
 
 let rows =
-  let defaultUserRows = ids |> List.map (fun idArray -> Array.append idArray [| String "value" |])
-  let extraUserRow = [ [| Integer 8L; Null |] ]
+  let defaultUserRows = ids |> List.map (fun idArray -> Row.Append idArray (Row.OfValues [| String "value" |]))
+  let extraUserRow = [ Row.OfValues [| Integer 8L; Null |] ]
   List.append defaultUserRows extraUserRow
 
 let aidColumn = ColumnReference(0, IntegerType)

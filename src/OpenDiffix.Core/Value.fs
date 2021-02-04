@@ -16,7 +16,27 @@ type Value =
     | Real r -> r.ToString()
     | String s -> s
 
-type Row = Value array
+type Row =
+  {
+    Values: Value array
+    Junk: Map<string, Value>
+  }
+  member this.Item
+    with get (index) = this.Values.[index]
+    and set index value = this.Values.[index] <- value
+
+  static member OfValues values = { Values = values; Junk = Map.empty }
+  static member GetValues row = row.Values
+
+  /// Junk from row2 overwrites the junk in row1 if there is a clash
+  static member Append row1 row2 =
+    let values = Array.append row1.Values row2.Values
+    let junk = row2.Junk |> Map.fold (fun map key value -> Map.add key value map) row1.Junk
+    { Values = values; Junk = junk }
+
+  member this.SetJunk key junk = { this with Junk = Map.add key junk this.Junk }
+  member this.TryGetJunk key = Map.tryFind key this.Junk
+
 
 type ValueType =
   | BooleanType

@@ -76,7 +76,8 @@ let executeQuery (connection: SQLiteConnection) (query: string) =
       return
         seq<Row> {
           while reader.Read() do
-            yield [| 0 .. reader.FieldCount - 1 |] |> Array.map (readValue reader)
+            let values = [| 0 .. reader.FieldCount - 1 |] |> Array.map (readValue reader)
+            yield Row.OfValues values
         }
     with ex -> return! Error("Execution error: " + ex.Message)
   }

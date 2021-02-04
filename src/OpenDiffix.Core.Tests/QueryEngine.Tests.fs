@@ -23,31 +23,31 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 1`` () =
-    let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
+    let expected = { Columns = [ "n" ]; Rows = [ Row.OfValues [| String "Water" |] ] }
     let queryResult = runQuery "SELECT name AS n FROM products WHERE id = 1"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 2`` () =
-    let expected = { Columns = [ "c1"; "c2" ]; Rows = [ [| Integer 11L; Integer 4L |] ] }
+    let expected = { Columns = [ "c1"; "c2" ]; Rows = [ Row.OfValues [| Integer 11L; Integer 4L |] ] }
     let queryResult = runQuery "SELECT COUNT(*) AS c1, COUNT(DISTINCT length(name)) AS c2 FROM products"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 3`` () =
-    let expected = { Columns = [ "name"; "sum" ]; Rows = [ [| String "Chicken"; Real 12.81 |] ] }
+    let expected = { Columns = [ "name"; "sum" ]; Rows = [ Row.OfValues [| String "Chicken"; Real 12.81 |] ] }
     let queryResult = runQuery "SELECT name, SUM(price) FROM products GROUP BY 1 HAVING length(name) = 7"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 4`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 13L |] ] }
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ Row.OfValues [| Integer 13L |] ] }
     let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM customers_small"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 5`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 33L |] ] }
+    let expected = { Columns = [ "diffix_count" ]; Rows = [ Row.OfValues [| Integer 33L |] ] }
     let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM customers_small"
     assertOkEqual queryResult expected
 
