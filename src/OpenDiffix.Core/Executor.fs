@@ -26,29 +26,30 @@ let private unpackAggregators aggregators = aggregators |> Array.map (unpackAggr
 let private executeAggregate context groupingLabels aggregators rowsStream =
   let groupingLabels = Array.ofList groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
-  let defaultAccumulators = aggFns |> Array.map (Expression.createAccumulator context)
+  let defaultAggregators = aggFns |> Array.map (Aggregator.create context)
 
-  let initialState: Map<Row, Expression.Accumulator array> =
-    if groupingLabels.Length = 0 then Map [ [||], defaultAccumulators ] else Map []
+  let initialState: Map<Row, IAggregator array> =
+    if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []
 
   rowsStream
   |> Seq.fold
     (fun state row ->
       let group = groupingLabels |> Array.map (Expression.evaluate context row)
+      let argEvaluator = Expression.evaluate context row
 
-      let accumulator =
+      let aggregators =
         match Map.tryFind group state with
-        | Some accumulator -> accumulator
-        | None -> defaultAccumulators
+        | Some aggregators -> aggregators
+        | None -> defaultAggregators
         |> Array.zip aggArgs
-        |> Array.map (fun (args, accumulator) -> accumulator.Process context args row)
+        |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Digest)
 
-      Map.add group accumulator state
+      Map.add group aggregators state
     )
     initialState
   |> Map.toSeq
-  |> Seq.map (fun (group, accumulators) ->
-    let values = accumulators |> Array.map (fun acc -> acc.Evaluate context)
+  |> Seq.map (fun (group, aggregators) ->
+    let values = aggregators |> Array.map (fun acc -> acc.Evaluate context)
     Array.append group values
   )
 

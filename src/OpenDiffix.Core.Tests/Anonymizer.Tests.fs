@@ -4,8 +4,6 @@ open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
 
-let ctx = EvaluationContext.Default
-
 let ids =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
@@ -32,22 +30,24 @@ let context =
         }
   }
 
-let evalAggr fn args rows =
-  let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
-  let accumulator = List.fold processor (Expression.createAccumulator ctx fn) rows
-  accumulator.Evaluate context
+let evaluateAggregator = evaluateAggregator context
 
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
-let ``anon count distinct aid 1`` () = ids |> evalAggr distinctDiffixCount [ aidColumn ] |> should equal (Integer 8L)
+let ``anon count distinct aid 1`` () =
+  ids
+  |> evaluateAggregator distinctDiffixCount [ aidColumn ]
+  |> should equal (Integer 8L)
 
 [<Fact>]
-let ``anon count(*)`` () =
+let ``anon count()`` () =
   // - replacing outlier 6, with top 5
   // - 0 noise
-  ids |> evalAggr diffixCount [ aidColumn ] |> should equal (Integer 29L)
+  ids
+  |> evaluateAggregator diffixCount [ aidColumn ]
+  |> should equal (Integer 29L)
 
 [<Fact>]
 let ``anon count(col)`` () =
@@ -55,11 +55,15 @@ let ``anon count(col)`` () =
   // - replacing outlier 6 with top 5
   // - 0 noise
   rows
-  |> evalAggr diffixCount [ aidColumn; strColumn ]
+  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
   |> should equal (Integer 29L)
 
 [<Fact>]
 let ``anon count returns Null if insufficient data`` () =
   let firstRow = rows |> List.take 1
-  firstRow |> evalAggr diffixCount [ aidColumn; strColumn ] |> should equal Null
-  firstRow |> evalAggr diffixCount [ aidColumn ] |> should equal Null
+
+  firstRow
+  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
+  |> should equal Null
+
+  firstRow |> evaluateAggregator diffixCount [ aidColumn ] |> should equal Null

@@ -26,10 +26,10 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> round
   |> int64
 
-let addNoise (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) value =
+let countAids (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
   let noise = noiseValue rnd anonymizationParams.Noise
-  max (value + noise) 0L
+  max (int64 aidSet.Count + noise) 0L
 
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
