@@ -68,7 +68,7 @@ type Row =
     { Values = values; Junk = junk }
 
   member this.SetJunk key junk = { this with Junk = Map.add key junk this.Junk }
-  member this.TryGetJunk key = Map.tryFind key this.Junk
+  member this.GetJunk key = Map.find key this.Junk
 
   member this.UpdateValues(values: FunctionReturnValue array) =
     { this with

@@ -74,6 +74,7 @@ and Function =
 and Expression =
   | FunctionExpr of fn: Function * args: Expression list
   | ColumnReference of index: int * exprType: ValueType
+  | JunkReference of junkType: JunkType
   | Constant of value: Value
 
   static member GetType =
@@ -81,6 +82,7 @@ and Expression =
     | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
     | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
     | ColumnReference (_, exprType) -> Ok exprType
+    | JunkReference UserCount -> Ok IntegerType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
@@ -200,6 +202,7 @@ module Expression =
     | FunctionExpr (ScalarFunction fn, args) -> invokeScalarFunction ctx fn (args |> List.map (evaluate ctx row))
     | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate '%A{fn}'."
     | ColumnReference (index, _) -> row.[index]
+    | JunkReference junkType -> row.GetJunk junkType
     | Constant value -> value
 
   open System.Linq

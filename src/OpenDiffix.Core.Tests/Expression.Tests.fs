@@ -116,7 +116,9 @@ let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
     Row.OfValues valueRow
   )
 
-let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |] |> Row.OfValues
+let makeRow strValue intValue floatValue =
+  let row = Row.OfValues [| String strValue; Integer intValue; Real floatValue |]
+  row.SetJunk UserCount (Integer 5L)
 
 let testRow = makeRow "Some text" 7L 0.25
 
@@ -130,6 +132,7 @@ let testRows =
       "row2", 4L, 4.5
     ]
 
+let junkRef = JunkReference JunkType.UserCount
 let colRef0 = ColumnReference(0, StringType)
 let colRef1 = ColumnReference(1, IntegerType)
 let colRef2 = ColumnReference(2, RealType)
@@ -149,6 +152,9 @@ let evaluate () =
 
   // select val_str
   eval colRef0 |> should equal (String "Some text")
+
+  // select get junk
+  eval junkRef |> should equal (Integer 5L)
 
 [<Fact>]
 let evaluateAggregated () =
