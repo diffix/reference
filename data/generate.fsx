@@ -176,8 +176,6 @@ let products =
 
     StaticRows =
       [
-        [ Integer -1L; Text "Drugs"; Real 30.7 ]
-        [ Integer 0L; Null; Null ]
         [ Integer 1L; Text "Water"; Real 1.3 ]
         [ Integer 2L; Text "Pasta"; Real 7.5 ]
         [ Integer 3L; Text "Chicken"; Real 12.81 ]
@@ -187,6 +185,8 @@ let products =
         [ Integer 8L; Text "Coffee"; Real 6.14 ]
         [ Integer 9L; Text "Bread"; Real 1.4 ]
         [ Integer 10L; Text "Banana"; Real 4.78 ]
+        [ Integer 1000L; Null; Null ]
+        [ Integer 1001L; Text "Drugs"; Real 30.7 ]
       ]
   }
 
@@ -215,12 +215,12 @@ let purchases =
     StaticRows =
       [
         [ Null; Null; Null ]
-        [ Integer 0L; Integer 0L; Real 0.0 ]
-        [ Integer -1L; Integer -1L; Real 1.0 ]
-        [ Integer -2L; Integer -1L; Real 5.0 ]
-        [ Integer -3L; Integer -1L; Real 3.5 ]
-        [ Integer -3L; Integer -1L; Real 4.5 ]
-        [ Integer -4L; Integer 1L; Real 20.0 ]
+        [ Integer 1000L; Integer 1000L; Real 0.0 ]
+        [ Integer 1001L; Integer 1001L; Real 1.0 ]
+        [ Integer 1002L; Integer 1001L; Real 5.0 ]
+        [ Integer 1003L; Integer 1001L; Real 3.5 ]
+        [ Integer 1003L; Integer 1001L; Real 4.5 ]
+        [ Integer 1004L; Integer 1L; Real 20.0 ]
         [ Integer 1L; Integer 1L; Real 7.0 ]
         [ Integer 2L; Integer 1L; Real 0.1 ]
       ]
