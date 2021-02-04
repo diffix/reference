@@ -125,6 +125,16 @@ let customersSmall =
       [
         [ Integer 1000L; Null; Null; Null; Null ]
         [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
       ]
   }
