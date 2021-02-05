@@ -101,6 +101,14 @@ let dryRun query dbPath anonParams =
   let encodedRequest = JsonEncoders.encodeRequestParams query dbPath anonParams
   Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
+let valueToString =
+  function
+  | Null -> "NULL"
+  | Boolean b -> b.ToString()
+  | Integer i -> i.ToString()
+  | Real r -> r.ToString()
+  | String s -> s
+
 let anonymize query dbPath anonParams =
   let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
 
@@ -112,7 +120,7 @@ let anonymize query dbPath anonParams =
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
+        |> List.map (fun row -> row |> Array.map valueToString |> Array.reduce (sprintf "%s;%s"))
         |> List.reduce (sprintf "%s\n%s")
 
       resultSet, 0
