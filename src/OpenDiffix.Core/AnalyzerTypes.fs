@@ -26,10 +26,13 @@ type Query =
   | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
 
-  static member mapQuery f =
+  static member map (f: SelectQuery -> SelectQuery) =
     function
-    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.mapQuery f q1, Query.mapQuery f q2)
+    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.map f q1, Query.map f q2)
     | SelectQuery selectQuery -> SelectQuery(f selectQuery)
+
+  static member map (f: SelectFrom -> SelectFrom) =
+    Query.map (fun (query: SelectQuery) -> SelectQuery.map f query)
 
 and SelectQuery =
   {
@@ -47,6 +50,8 @@ and SelectQuery =
   static member _orderBy = (fun s -> s.OrderBy), (fun a s -> { s with SelectQuery.OrderBy = a })
   static member _having = (fun s -> s.Having), (fun a s -> { s with SelectQuery.Having = a })
 
+  static member map (f: SelectFrom -> SelectFrom) query = {query with From = f query.From}
+
   static member mapExpressions f selectQuery =
     let expressionMapper = Expression.mapExpression f
 
@@ -61,15 +66,6 @@ and SelectFrom =
   | Query of query: Query
   | Join of Join
   | Table of table: Table
-
-  static member _table =
-    (function
-    | Table t -> Some t
-    | _ -> None),
-    (fun a ->
-      function
-      | Table _t -> Table a
-      | other -> other)
 
 and Join =
   {

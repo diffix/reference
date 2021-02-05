@@ -1,13 +1,11 @@
 module OpenDiffix.Core.Analysis.QueryValidity
 
-open Aether
-open Aether.Operators
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
 let onAggregates (f: Expression -> unit) query =
   query
-  |> Query.mapQuery (fun selectQuery ->
+  |> Query.map (fun selectQuery ->
     selectQuery
     |> SelectQuery.mapExpressions
          (function
@@ -41,13 +39,10 @@ let private allowedCountUsage aidColIdx query =
 
 let rec private validateSingleTableSelect query =
   query
-  |> Query.mapQuery (fun query ->
-    query
-    |> Optic.get (SelectQuery._From >-> SelectFrom._table)
-    |> function
-    | None -> failwith "JOIN queries and sub queries are not supported at present"
-    | Some _ -> ()
-    query
+  |> Query.map (function
+    | Query _
+    | Join _ -> failwith "JOIN queries and sub queries are not supported at present"
+    | Table _ as t -> t
   )
   |> ignore
 

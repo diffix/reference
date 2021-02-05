@@ -149,7 +149,7 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
 
 let rewriteToDiffixAggregate aidColumnExpression query =
   query
-  |> Query.mapQuery (
+  |> Query.map (
     SelectQuery.mapExpressions
       (function
       | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
