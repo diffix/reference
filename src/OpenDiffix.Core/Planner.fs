@@ -48,11 +48,17 @@ let rec private projectExpression expression columns =
 
 let private planSelect query =
   let selectedExpressions = query.Columns |> List.map (fun column -> column.Expression)
-  let orderByExpressions = query.OrderBy |> List.map (fun (expression, _, _) -> expression)
+  let orderByExpressions = query.OrderBy |> List.map (fun (OrderBy (expression, _, _)) -> expression)
   let expressions = selectedExpressions @ orderByExpressions
 
   let aggregators = expressions |> List.collect extractAggregators |> List.distinct
-  let groupingLabels = query.GroupingSets |> List.concat |> List.distinct
+
+  let groupingLabels =
+    query.GroupingSets
+    |> List.map GroupingSet.Unwrap
+    |> List.concat
+    |> List.distinct
+
   let aggregatedColumns = groupingLabels @ aggregators
 
   let selectedExpressions =
@@ -60,10 +66,9 @@ let private planSelect query =
     |> List.map (fun expression -> projectExpression expression aggregatedColumns)
 
   let orderByExpressions =
-    query.OrderBy
-    |> List.map (fun (expression, direction, nulls) ->
-      let expression = projectExpression expression aggregatedColumns
-      expression, direction, nulls
+    OrderByExpression.Map(
+      query.OrderBy,
+      (fun (expression: Expression) -> projectExpression expression aggregatedColumns)
     )
 
   let havingExpression = projectExpression query.Having aggregatedColumns

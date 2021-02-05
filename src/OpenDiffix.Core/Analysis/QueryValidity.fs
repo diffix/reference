@@ -4,15 +4,13 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
 let onAggregates (f: Expression -> unit) query =
-  query
-  |> Query.map (fun selectQuery ->
-    selectQuery
-    |> SelectQuery.mapExpressions
-         (function
-         | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
-             f aggregateExpression
-             aggregateExpression
-         | other -> other)
+  Query.Map(
+    query,
+    (function
+    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
+        f aggregateExpression
+        aggregateExpression
+    | other -> other)
   )
   |> ignore
 
@@ -38,11 +36,12 @@ let private allowedCountUsage aidColIdx query =
        | _ -> ())
 
 let rec private validateSingleTableSelect query =
-  query
-  |> Query.map (function
+  Query.Map(
+    query,
+    (function
     | Query _
     | Join _ -> failwith "JOIN queries and sub queries are not supported at present"
-    | Table _ as t -> t
+    | Table _ as t -> t)
   )
   |> ignore
 

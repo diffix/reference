@@ -1,12 +1,8 @@
 namespace OpenDiffix.Core
 
-open Aether
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
-
-module OrderByExpression =
-  let _expression: Lens<'a * 'b * 'c, 'a> = (fun (e, _, _) -> e), (fun e (_, od, on) -> (e, od, on))
 
 type AggregateFunction =
   | Count
@@ -89,18 +85,28 @@ and Expression =
     | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
 
-  static member mapExpression f =
-    function
-    | FunctionExpr (fn, args) ->
-        f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.mapExpression f arg) args))
-    | expr -> f expr
+  static member Map (expressions: Expression list, f: Expression -> Expression) =
+    List.map (fun (exp: Expression) -> Expression.Map(exp, f)) expressions
 
+  static member Map (expression, f: Expression -> Expression) =
+    match expression with
+    | FunctionExpr (fn, args) ->
+        f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.Map(arg, f)) args))
+    | expr -> f expr
 
 and FunctionType =
   | Scalar
   | Aggregate of options: AggregateOptions
 
-and OrderByExpression = Expression * OrderByDirection * OrderByNullsBehavior
+and OrderByExpression =
+  | OrderBy of Expression * OrderByDirection * OrderByNullsBehavior
+
+  static member Map (orderBy: OrderByExpression list, f: Expression -> Expression) =
+    List.map (fun (orderBy: OrderByExpression) -> OrderByExpression.Map(orderBy, f)) orderBy
+
+  static member Map (orderBy: OrderByExpression, f: Expression -> Expression) =
+    match orderBy with
+    | OrderBy (exp, direction, nullBehavior) -> OrderBy (f exp, direction, nullBehavior)
 
 and AggregateOptions =
   {
@@ -216,14 +222,14 @@ module Expression =
   let rec private thenSort ctx orderings (rows: IOrderedEnumerable<Row>) =
     match orderings with
     | [] -> rows
-    | (expr, direction, nulls) :: tail ->
+    | (OrderBy (expr, direction, nulls)) :: tail ->
         let sorted = rows.ThenBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
         thenSort ctx tail sorted
 
   let sortRows ctx orderings (rows: seq<Row>) =
     match orderings with
     | [] -> rows
-    | (expr, direction, nulls) :: tail ->
+    | (OrderBy (expr, direction, nulls)) :: tail ->
         let firstSort = rows.OrderBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
         thenSort ctx tail firstSort :> seq<Row>
 

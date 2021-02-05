@@ -25,9 +25,9 @@ let selectQuery =
     Columns = [ { Expression = expression; Alias = "col" } ]
     Where = expression
     From = Table testTable
-    GroupingSets = [ [ expression ] ]
+    GroupingSets = [ GroupingSet [ expression ] ]
     Having = expression
-    OrderBy = [ expression, Ascending, NullsFirst ]
+    OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
   }
 
 let selectQueryNegative =
@@ -35,17 +35,19 @@ let selectQueryNegative =
     Columns = [ { Expression = negativeExpression; Alias = "col" } ]
     Where = negativeExpression
     From = Table testTable
-    GroupingSets = [ [ negativeExpression ] ]
+    GroupingSets = [ GroupingSet [ negativeExpression ] ]
     Having = negativeExpression
-    OrderBy = [ negativeExpression, Ascending, NullsFirst ]
+    OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
   }
 
 [<Fact>]
 let ``Map expressions`` () =
   let data =
-    SelectQuery.mapExpressions
+    SelectQuery.Map(
+      selectQuery,
       (function
       | Constant (Boolean true) -> Constant(Boolean false)
-      | other -> other) selectQuery
+      | other -> other)
+    )
 
   should equal selectQueryNegative data

@@ -141,28 +141,27 @@ let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
           Columns = selectedExpressions
           Where = whereClause
           From = SelectFrom.Table table
-          GroupingSets = [ groupBy ]
+          GroupingSets = [ GroupingSet groupBy ]
           Having = havingClause
           OrderBy = []
         }
   }
 
 let rewriteToDiffixAggregate aidColumnExpression query =
-  query
-  |> Query.map (
-    SelectQuery.mapExpressions
-      (function
-      | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
-          let args =
-            match opts.Distinct, args with
-            | true, [ colExpr ] when colExpr = aidColumnExpression -> args
-            | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
-            | false, _ -> aidColumnExpression :: args
+  Query.Map(
+    query,
+    (function
+    | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
+        let args =
+          match opts.Distinct, args with
+          | true, [ colExpr ] when colExpr = aidColumnExpression -> args
+          | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
+          | false, _ -> aidColumnExpression :: args
 
-          let newExpr = FunctionExpr(AggregateFunction(DiffixCount, opts), args)
-          printfn "Rewrite: %A to %A" original newExpr
-          newExpr
-      | expression -> expression)
+        let newExpr = FunctionExpr(AggregateFunction(DiffixCount, opts), args)
+        printfn "Rewrite: %A to %A" original newExpr
+        newExpr
+    | expression -> expression)
   )
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =

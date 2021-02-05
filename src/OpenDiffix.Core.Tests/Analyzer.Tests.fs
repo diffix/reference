@@ -23,7 +23,7 @@ let defaultQuery =
     Columns = []
     Where = Boolean true |> Constant
     From = Table testTable
-    GroupingSets = [ [] ]
+    GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
   }
@@ -127,7 +127,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
         From = Table testTable
         GroupingSets =
           [
-            [
+            GroupingSet [
               ColumnReference(1, IntegerType)
               FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
