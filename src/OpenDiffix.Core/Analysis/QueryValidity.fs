@@ -3,103 +3,55 @@ module OpenDiffix.Core.Analysis.QueryValidity
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
-module private ExpressionExtractor =
-  let rec flattenExpression (exp: Expression) =
-    match exp with
-    | Constant _ as constant -> Seq.singleton constant
-    | ColumnReference _ as columnRef -> Seq.singleton columnRef
-    | FunctionExpr (_, args) as fnExp ->
-        seq {
-          yield fnExp
-
-          for arg in args do
-            yield! flattenExpression arg
-        }
-
-  let selectExpression (column: SelectExpression) = flattenExpression column.Expression
-
-  let rec from (fromClause: SelectFrom) =
-    match fromClause with
-    | Query query -> allExpressions query
-    | Join join ->
-        seq {
-          yield! from join.Left
-          yield! from join.Right
-        }
-    | Table _ -> Seq.empty
-
-  and allExpressions (query: AnalyzerTypes.Query): Expression seq =
-    match query with
-    | UnionQuery (_, q1, q2) ->
-        seq {
-          yield! allExpressions q1
-          yield! allExpressions q2
-        }
-    | SelectQuery select ->
-        seq {
-          for column in select.Columns do
-            yield! selectExpression column
-
-          yield! from select.From
-          yield! flattenExpression select.Where
-
-          for expression in List.concat select.GroupingSets do
-            yield! flattenExpression expression
-
-          for (expression, _, _) in select.OrderBy do
-            yield! flattenExpression expression
-
-          yield! flattenExpression select.Having
-        }
-
-  let aggregates query =
-    allExpressions query
-    |> Seq.map (function
-         | FunctionExpr (AggregateFunction (aggregateFn, aggregateOptions), args) ->
-             Some {| Function = aggregateFn; Options = aggregateOptions; Args = args |}
-         | _ -> None)
-    |> Seq.choose id
+let onAggregates (f: Expression -> unit) query =
+  Query.Map(
+    query,
+    (function
+    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
+        f aggregateExpression
+        aggregateExpression
+    | other -> other)
+  )
+  |> ignore
 
 let private assertEmpty query errorMsg seq = if Seq.isEmpty seq then Ok query else Error errorMsg
 
 let private validateOnlyCount query =
   query
-  |> ExpressionExtractor.aggregates
-  |> Seq.filter (fun aggregate -> aggregate.Function <> AggregateFunction.Count)
-  |> assertEmpty query "Only count aggregates are supported"
+  |> onAggregates
+       (function
+       | FunctionExpr (AggregateFunction (Count, _), _) -> ()
+       | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
+       | _ -> ())
 
 let private allowedCountUsage aidColIdx query =
   query
-  |> ExpressionExtractor.aggregates
-  |> Seq.filter (fun aggregate -> aggregate.Function = AggregateFunction.Count)
-  |> Seq.map (fun aggregate -> aggregate.Args)
-  |> Seq.filter (function
-       | [] -> false
-       | [ ColumnReference (index, _) ] when index = aidColIdx -> false
-       | _ -> true)
-  |> assertEmpty query "Only count(*) and count(distinct aid-column) are supported"
+  |> onAggregates
+       (function
+       | FunctionExpr (AggregateFunction (Count, _), args) ->
+           match args with
+           | [] -> ()
+           | [ ColumnReference (index, _) ] when index = aidColIdx -> ()
+           | _ -> failwith "Only count(*) and count(distinct aid-column) are supported"
+       | _ -> ())
 
-open FsToolkit.ErrorHandling
-open FsToolkit.ErrorHandling.Operator.Result
+let rec private validateSingleTableSelect query =
+  Query.Map(
+    query,
+    (function
+    | Query _
+    | Join _ -> failwith "JOIN queries and sub queries are not supported at present"
+    | Table _ as t -> t)
+  )
+  |> ignore
 
-let rec private validateSingleTableSelect (query: AnalyzerTypes.Query) =
-  match query with
-  | UnionQuery (_distinct, left, right) ->
-      result {
-        let! _ = validateSingleTableSelect left
-        let! _ = validateSingleTableSelect right
-        return query
-      }
-  | SelectQuery select ->
-      match select.From with
-      | SelectFrom.Table _ -> Ok query
-      | _ -> Error "JOIN queries are not supported at present"
-
-let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query): Result<AnalyzerTypes.Query, string> =
-  query
-  |> validateOnlyCount
-  >>= allowedCountUsage aidColIdx
-  >>= validateSingleTableSelect
+let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query) =
+  validateOnlyCount query
+  allowedCountUsage aidColIdx query
+  validateSingleTableSelect query
 
 let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
-  query |> allowedAggregate aidColIdx |> Result.map ignore
+  try
+    allowedAggregate aidColIdx query
+    Ok()
+  with exn -> Error exn.Message

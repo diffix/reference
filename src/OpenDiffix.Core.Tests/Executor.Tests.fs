@@ -49,7 +49,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute sort`` () =
     let idColumn = column products 0
-    let orderById = idColumn, Descending, NullsFirst
+    let orderById = OrderBy (idColumn, Descending, NullsFirst)
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
     let expected = [ [| Integer 10L |]; [| Integer 9L |]; [| Integer 8L |] ]
     plan |> execute |> List.take 3 |> should equal expected

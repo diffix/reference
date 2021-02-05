@@ -1,8 +1,10 @@
 module OpenDiffix.Core.AnalyzerTests
 
 open Xunit
+open FsUnit.Xunit
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
+open OpenDiffix.Core.AnonymizerTypes
 
 let testTable: Table =
   {
@@ -21,7 +23,7 @@ let defaultQuery =
     Columns = []
     Where = Boolean true |> Constant
     From = Table testTable
-    GroupingSets = [ [] ]
+    GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
   }
@@ -125,7 +127,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
         From = Table testTable
         GroupingSets =
           [
-            [
+            GroupingSet [
               ColumnReference(1, IntegerType)
               FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
@@ -141,3 +143,54 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           )
         OrderBy = []
       })
+
+type Tests(db: DBFixture) =
+  let anonParams =
+    {
+      TableSettings =
+        Map [
+          "customers", { AidColumns = [ "id" ] }
+          "customers_small", { AidColumns = [ "id" ] }
+          "purchases", { AidColumns = [ "cid" ] }
+        ]
+      Seed = 1
+      LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
+      OutlierCount = { Lower = 1; Upper = 1 }
+      TopCount = { Lower = 1; Upper = 1 }
+      Noise = { StandardDev = 1.; Cutoff = 0. }
+    }
+
+  let idColumn = ColumnReference(3, IntegerType)
+
+  let analyzeQuery query =
+    query
+    |> Parser.parse
+    |> Result.bind (fun parseTree -> Analyzer.analyze db.Connection anonParams parseTree |> Async.RunSynchronously)
+    |> Utils.unwrap
+    |> function
+    | SelectQuery s -> s
+    | _other -> failwith "Expected a top-level SELECT query"
+
+
+  [<Fact>]
+  let ``Analyze count transforms`` () =
+    let result =
+      analyzeQuery
+        "
+    SELECT count(*), count(distinct id)
+    FROM customers_small
+    HAVING count(*) > 1
+    "
+
+    let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ idColumn ])
+
+    let countDistinct =
+      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
+
+    let expected = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
+    result.Columns |> should equal expected
+
+    let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
+    result.Having |> should equal expected
+
+  interface IClassFixture<DBFixture>

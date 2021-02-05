@@ -60,7 +60,7 @@ let ``plan where`` () =
 
 [<Fact>]
 let ``plan order by`` () =
-  let orderBy = [ column 1, Ascending, NullsFirst ]
+  let orderBy = [ OrderBy (column 1, Ascending, NullsFirst) ]
   let select = { emptySelect with OrderBy = orderBy }
 
   let expected = Plan.Project(Plan.Sort(Plan.Scan(table), orderBy), [])
@@ -71,7 +71,7 @@ let ``plan order by`` () =
 let ``plan aggregation`` () =
   let groupingSet = [ column 1 ]
   let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = "" } ]
-  let select = { emptySelect with Columns = selectedColumns; GroupingSets = [ groupingSet ] }
+  let select = { emptySelect with Columns = selectedColumns; GroupingSets = [ GroupingSet groupingSet ] }
 
   let expected =
     Plan.Project(
@@ -87,12 +87,12 @@ let ``plan all`` () =
   let selectedColumns = [ { Expression = plus1 (column 0); Alias = "" }; { Expression = countStar; Alias = "" } ]
   let whereCondition = FunctionExpr(ScalarFunction Equals, [ column 1; Constant(String "abc") ])
   let havingCondition = FunctionExpr(ScalarFunction Equals, [ countStar; Constant(Integer 0L) ])
-  let orderBy = [ OrderByExpression(plus1 countStar, Ascending, NullsFirst) ]
+  let orderBy = [ OrderBy(plus1 countStar, Ascending, NullsFirst) ]
 
   let select =
     { emptySelect with
         Columns = selectedColumns
-        GroupingSets = [ groupingSet ]
+        GroupingSets = [ GroupingSet groupingSet ]
         Where = whereCondition
         OrderBy = orderBy
         Having = havingCondition
@@ -112,7 +112,7 @@ let ``plan all`` () =
           ),
           FunctionExpr(ScalarFunction Equals, [ ColumnReference(1, IntegerType); Constant(Integer 0L) ])
         ),
-        [ OrderByExpression(plus1 (ColumnReference(1, IntegerType)), Ascending, NullsFirst) ]
+        [ OrderBy(plus1 (ColumnReference(1, IntegerType)), Ascending, NullsFirst) ]
       ),
       [ plus1 (ColumnReference(0, IntegerType)); ColumnReference(1, IntegerType) ]
     )

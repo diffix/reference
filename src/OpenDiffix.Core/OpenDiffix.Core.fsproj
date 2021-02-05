@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.0.35" />
+    <PackageReference Include="FSharpPlus" Version="1.1.7" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="1.4.3" />
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.113.6" />
     <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />

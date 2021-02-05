@@ -184,8 +184,8 @@ let sortRows () =
   |> Expression.sortRows
        ctx
        [ //
-         ColumnReference(0, StringType), Ascending, NullsLast
-         ColumnReference(1, IntegerType), Descending, NullsFirst
+         OrderBy (ColumnReference(0, StringType), Ascending, NullsLast)
+         OrderBy (ColumnReference(1, IntegerType), Descending, NullsFirst)
        ]
   |> List.ofSeq
   |> should
