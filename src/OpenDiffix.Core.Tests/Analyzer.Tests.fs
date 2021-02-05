@@ -149,9 +149,9 @@ type Tests(db: DBFixture) =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id" ] } //
-          "customers_small", { AidColumns = [ "id" ] } //
-          "purchases", { AidColumns = [ "cid" ] } //
+          "customers", { AidColumns = [ "id" ] }
+          "customers_small", { AidColumns = [ "id" ] }
+          "purchases", { AidColumns = [ "cid" ] }
         ]
       Seed = 1
       LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
@@ -190,7 +190,7 @@ type Tests(db: DBFixture) =
     let columns = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
     should equal columns result.Columns
 
-    let having = FunctionExpr(ScalarFunction Gt, [countStar; 1L |> Integer |> Constant] )
+    let having = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
     should equal having result.Having
 
   interface IClassFixture<DBFixture>
