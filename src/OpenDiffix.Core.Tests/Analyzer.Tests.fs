@@ -187,10 +187,10 @@ type Tests(db: DBFixture) =
     let countDistinct =
       FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
 
-    let columns = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
-    should equal columns result.Columns
+    let expected = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
+    result.Columns |> should equal expected
 
-    let having = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
-    should equal having result.Having
+    let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
+    result.Having |> should equal expected
 
   interface IClassFixture<DBFixture>
