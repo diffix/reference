@@ -1,5 +1,6 @@
 namespace OpenDiffix.Core.AnalyzerTypes
 
+open FSharpPlus
 open OpenDiffix.Core
 
 type JoinType =
@@ -13,20 +14,14 @@ type SelectExpression =
     Expression: Expression
     Alias: string
   }
-  static member Map(se: SelectExpression, f: Expression -> Expression) = { se with Expression = f se.Expression }
-
-  static member Map(ses: SelectExpression list, f: Expression -> Expression) =
-    List.map (fun (se: SelectExpression) -> SelectExpression.Map(se, f)) ses
+  static member Map(se: SelectExpression, f: Expression -> Expression) = { se with Expression = map f se.Expression }
 
 type GroupingSet =
   | GroupingSet of Expression list
 
-  static member Map(groupingSets: GroupingSet list, f: Expression -> Expression) =
-    List.map (fun (groupingSet: GroupingSet) -> GroupingSet.Map(groupingSet, f)) groupingSets
-
   static member Map(groupingSet: GroupingSet, f: Expression -> Expression) =
     match groupingSet with
-    | GroupingSet expressions -> GroupingSet(Expression.Map(expressions, f))
+    | GroupingSet expressions -> GroupingSet(map f expressions)
 
   static member Unwrap =
     function
@@ -41,11 +36,11 @@ type Query =
     | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.Map(q1, f), Query.Map(q2, f))
     | SelectQuery selectQuery -> SelectQuery(f selectQuery)
 
-  static member Map(query: Query, f: SelectFrom -> SelectFrom) =
-    Query.Map(query, (fun (query: SelectQuery) -> SelectQuery.Map(query, f)))
+  static member Map(query: Query, f: SelectFrom -> SelectFrom): Query =
+    Query.Map (query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
-  static member Map(query: Query, f: Expression -> Expression) =
-    Query.Map(query, (fun (query: SelectQuery) -> SelectQuery.Map(query, f)))
+  static member Map(query: Query, f: Expression -> Expression): Query =
+    Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
 and SelectQuery =
   {
@@ -57,16 +52,16 @@ and SelectQuery =
     Having: Expression
   }
 
-  static member Map(query, f: SelectFrom -> SelectFrom) = { query with From = SelectFrom.Map(query.From, f) }
+  static member Map(query: SelectQuery, f: SelectFrom -> SelectFrom) = { query with From = SelectFrom.Map(query.From, f) }
 
-  static member Map(query, f: Expression -> Expression) =
+  static member Map(query: SelectQuery, f: Expression -> Expression) =
     { query with
-        Columns = SelectExpression.Map(query.Columns, f)
+        Columns = map (map f) query.Columns
         From = SelectFrom.Map(query.From, f)
-        Where = Expression.Map(query.Where, f)
-        GroupingSets = GroupingSet.Map(query.GroupingSets, f)
-        OrderBy = OrderByExpression.Map(query.OrderBy, f)
-        Having = Expression.Map(query.Having, f)
+        Where = map f query.Where
+        GroupingSets = map (map f) query.GroupingSets
+        OrderBy = map (map f) query.OrderBy
+        Having = map f query.Having
     }
 
 and SelectFrom =
@@ -74,19 +69,19 @@ and SelectFrom =
   | Join of Join
   | Table of table: Table
 
-  static member Map(selectFrom, f: Query -> Query) =
+  static member Map(selectFrom: SelectFrom, f: Query -> Query) =
     match selectFrom with
     | Query q -> Query(f q)
     | other -> other
 
-  static member Map(selectFrom, f: Table -> Table) =
+  static member Map(selectFrom: SelectFrom, f: Table -> Table) =
     match selectFrom with
     | Table t -> Table(f t)
     | other -> other
 
-  static member Map(selectFrom, f: SelectFrom -> SelectFrom) = f selectFrom
+  static member Map(selectFrom: SelectFrom, f: SelectFrom -> SelectFrom) = f selectFrom
 
-  static member Map(selectFrom, f: Expression -> Expression) =
+  static member Map(selectFrom: SelectFrom, f: Expression -> Expression) =
     match selectFrom with
     | Query q -> Query(Query.Map(q, f))
     | other -> other

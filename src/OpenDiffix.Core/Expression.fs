@@ -85,9 +85,6 @@ and Expression =
     | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
 
-  static member Map (expressions: Expression list, f: Expression -> Expression) =
-    List.map (fun (exp: Expression) -> Expression.Map(exp, f)) expressions
-
   static member Map (expression, f: Expression -> Expression) =
     match expression with
     | FunctionExpr (fn, args) ->
