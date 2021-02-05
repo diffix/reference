@@ -7,6 +7,7 @@
   - [Organization](#organization)
   - [Branches](#branches)
 - [Creating a release](#creating-a-release)
+- [Using CLI](#using-cli)
 
 
 ## Purpose
@@ -64,3 +65,19 @@ To generate an executable of the command line interface, run one of:
 
 If the build succeeds, the binary will be placed in the `build` folder. It is self-contained and can be moved anywhere
 you desire.
+
+## Using CLI
+
+The reference implementation can be used through the provided command line interface offered as part of the solution.
+See "Creating a release" for more information on how to build the command line interface.
+
+The `-h` command gives you an overview of the available paramters. Typical usage should achievable with one of the
+two following sample commands:
+
+- Run a single query: `OpenDiffix.CLI -d data/data.sqlite --aid-columns customers.id -q "SELECT city, count(*) FROM
+  customers GROUP BY city". The query result will be written back to the terminal (standard out).
+- Run a batch of queries (significantly faster if you want to run many queries at one time): `OpenDiffix.CLI
+  --queries-file queries-sample.json`. The results will be written to a file taking its name from the input file,
+  but with `-results` appended to the file name. For an example of what the input file format should look like,
+  please consult [queries-sample.json].
+

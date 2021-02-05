@@ -8,7 +8,7 @@
 
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
-        <Compile Include="JsonEncoders.fs" />
+        <Compile Include="JsonEncodersDecoders.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 

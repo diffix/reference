@@ -1,4 +1,5 @@
-﻿open System.IO
+﻿open System
+open System.IO
 open Argu
 open OpenDiffix.CLI
 open OpenDiffix.Core
@@ -10,7 +11,7 @@ type CliArguments =
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
   | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
-  | Query_Path of path: string
+  | Queries_Path of path: string
   | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
 
@@ -30,7 +31,10 @@ type CliArguments =
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
-      | Query_Path _ -> "Path to a file containing the SQL to be executed."
+      | Queries_Path _ ->
+          "Path to a file containing a list of query specifications. All queries will be executed in "
+          + "batch mode, and the results will be written to a file at the same path with a name marking it as "
+          + "containing the results. Please consult the README for the query file specification."
       | Query_Stdin -> "Reads the query from standard in."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
@@ -85,12 +89,10 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult Query, parsedArgs.TryGetResult Query_Path, parsedArgs.Contains Query_Stdin with
-  | Some query, None, false -> query
-  | None, Some path, false ->
-      if File.Exists(path) then File.ReadAllText(path) else failWithUsageInfo $"Could not find a query at %s{path}"
-  | None, None, true -> System.Console.In.ReadLine()
-  | _, _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
+  match parsedArgs.TryGetResult Query, parsedArgs.Contains Query_Stdin with
+  | Some query, false -> query
+  | None, true -> Console.In.ReadLine()
+  | _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.Database with
@@ -98,8 +100,17 @@ let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   | None -> failWithUsageInfo $"Please specify the database path!"
 
 let dryRun query dbPath anonParams =
-  let encodedRequest = JsonEncoders.encodeRequestParams query dbPath anonParams
+  let encodedRequest = JsonEncodersDecoders.encodeRequestParams query dbPath anonParams
   Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
+
+let runQuery query dbPath anonParams =
+  let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
+
+  connection.Open()
+  let queryResult = QueryEngine.run connection query anonParams |> Async.RunSynchronously
+  connection.Close()
+
+  queryResult
 
 let valueToString =
   function
@@ -110,13 +121,7 @@ let valueToString =
   | String s -> s
 
 let anonymize query dbPath anonParams =
-  let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
-
-  connection.Open()
-  let queryResult = QueryEngine.run connection query anonParams |> Async.RunSynchronously
-  connection.Close()
-
-  match queryResult with
+  match runQuery query dbPath anonParams with
   | Ok result ->
       let resultSet =
         result.Rows
@@ -126,6 +131,35 @@ let anonymize query dbPath anonParams =
       resultSet, 0
   | Error err -> $"ERROR: %s{err}", 1
 
+let batchExecuteQueries (queriesPath: string) =
+  if not <| File.Exists queriesPath then
+    failWithUsageInfo $"Could not find a queries file at %s{queriesPath}"
+
+  let queryFileContent = File.ReadAllText queriesPath
+
+  let querySpecs =
+    match JsonEncodersDecoders.decodeRequestParams queryFileContent with
+    | Ok queries -> queries
+    | Error error -> failWithUsageInfo $"Could not parse queries: %s{error}"
+
+  let time = DateTime.Now
+
+  let results =
+    querySpecs
+    |> List.map (fun queryRequest ->
+      runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
+      |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
+    )
+
+  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
+  let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
+
+  let outputDir = Path.GetDirectoryName(queriesPath)
+  let outputPathFull = Path.Join [| outputDir; Path.GetFileNameWithoutExtension(queriesPath) + "-result.json" |]
+  File.WriteAllText(outputPathFull, resultJsonEncoded)
+
+  0
+
 [<EntryPoint>]
 let main argv =
   try
@@ -133,8 +167,12 @@ let main argv =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
     if parsedArguments.Contains(Version) then
-      (printfn "%s" AssemblyInfo.versionJson)
+      let version = Thoth.Json.Net.Encode.toString 2 AssemblyInfo.versionJsonValue
+      printfn $"%s{version}"
       0
+    else if parsedArguments.Contains(Queries_Path) then
+      batchExecuteQueries (parsedArguments.GetResult Queries_Path)
+
     else
       let query = getQuery parsedArguments
       let dbPath = getDbPath parsedArguments
