@@ -6,13 +6,15 @@ open OpenDiffix.Core.AnonymizerTypes
 
 type AggregateFunction =
   | Count
-  | Sum
   | DiffixCount
+  | DiffixLowCount
+  | Sum
 
   static member ReturnType fn (args: Expression list) =
     match fn with
     | Count
     | DiffixCount -> Ok IntegerType
+    | DiffixLowCount -> Ok BooleanType
     | Sum ->
         List.tryHead args
         |> Result.requireSome "Sum requires an argument"
