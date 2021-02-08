@@ -45,6 +45,7 @@ let ``Analyze count(*)`` () =
                 Expression =
                   FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
                 Alias = "count"
+                Junk = false
               }
             ]
       })
@@ -65,6 +66,7 @@ let ``Analyze count(distinct col)`` () =
                     [ ColumnReference(1, IntegerType) ]
                   )
                 Alias = "count"
+                Junk = false
               }
             ]
       })
@@ -78,8 +80,8 @@ let ``Selecting columns from a table`` () =
       { defaultQuery with
           Columns =
             [
-              { Expression = ColumnReference(0, StringType); Alias = "str_col" }
-              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+              { Expression = ColumnReference(0, StringType); Alias = "str_col"; Junk = false }
+              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col"; Junk = false }
             ]
       })
 
@@ -104,16 +106,18 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
       {
         Columns =
           [
-            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
+            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias"; Junk = false }
             {
               Expression =
                 FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               Alias = "+"
+              Junk = false
             }
             {
               Expression =
                 FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
               Alias = "count"
+              Junk = false
             }
           ]
         Where =
@@ -187,7 +191,7 @@ type Tests(db: DBFixture) =
     let countDistinct =
       FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
 
-    let expected = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
+    let expected = [ { Expression = countStar; Alias = "count"; Junk = false }; { Expression = countDistinct; Alias = "count"; Junk = false } ]
     result.Columns |> should equal expected
 
     let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])

@@ -34,7 +34,7 @@ let column index =
 
 let selectColumn index =
   let column = table.Columns |> List.item index
-  { Expression = ColumnReference(index, column.Type); Alias = column.Name }
+  { Expression = ColumnReference(index, column.Type); Alias = column.Name; Junk = false }
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
@@ -70,7 +70,7 @@ let ``plan order by`` () =
 [<Fact>]
 let ``plan aggregation`` () =
   let groupingSet = [ column 1 ]
-  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = "" } ]
+  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = ""; Junk = false } ]
   let select = { emptySelect with Columns = selectedColumns; GroupingSets = [ GroupingSet groupingSet ] }
 
   let expected =
@@ -84,7 +84,7 @@ let ``plan aggregation`` () =
 [<Fact>]
 let ``plan all`` () =
   let groupingSet = [ column 0 ]
-  let selectedColumns = [ { Expression = plus1 (column 0); Alias = "" }; { Expression = countStar; Alias = "" } ]
+  let selectedColumns = [ { Expression = plus1 (column 0); Alias = ""; Junk = false }; { Expression = countStar; Alias = ""; Junk = false } ]
   let whereCondition = FunctionExpr(ScalarFunction Equals, [ column 1; Constant(String "abc") ])
   let havingCondition = FunctionExpr(ScalarFunction Equals, [ countStar; Constant(Integer 0L) ])
   let orderBy = [ OrderBy(plus1 countStar, Ascending, NullsFirst) ]

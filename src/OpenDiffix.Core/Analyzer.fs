@@ -66,7 +66,7 @@ let wrapExpressionAsSelected table parserExpr =
     let! expr = mapExpression table parserExpr
     let name = expressionName parserExpr
 
-    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
+    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name; Junk = false }
   }
 
 let rec mapSelectedExpression table selectedExpression: Result<SelectExpression, string> =
@@ -75,7 +75,7 @@ let rec mapSelectedExpression table selectedExpression: Result<SelectExpression,
       result {
         let! childExpr = mapExpression table expr
         let! alias = extractAlias exprAlias
-        return { Expression = childExpr; Alias = alias }
+        return { Expression = childExpr; Alias = alias; Junk = false }
       }
   | ParserTypes.Identifier identifierName ->
       result {
@@ -85,6 +85,7 @@ let rec mapSelectedExpression table selectedExpression: Result<SelectExpression,
           {
             Expression = Expression.ColumnReference(index, column.Type)
             Alias = identifierName
+            Junk = false
           }
       }
   | ParserTypes.Expression.Function (fn, args) ->

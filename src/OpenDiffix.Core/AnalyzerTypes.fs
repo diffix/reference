@@ -13,6 +13,7 @@ type SelectExpression =
   {
     Expression: Expression
     Alias: string
+    Junk: bool
   }
   static member Map(se: SelectExpression, f: Expression -> Expression) = { se with Expression = map f se.Expression }
 
@@ -37,7 +38,7 @@ type Query =
     | SelectQuery selectQuery -> SelectQuery(f selectQuery)
 
   static member Map(query: Query, f: SelectFrom -> SelectFrom): Query =
-    Query.Map (query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
+    Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
   static member Map(query: Query, f: Expression -> Expression): Query =
     Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
@@ -52,7 +53,8 @@ and SelectQuery =
     Having: Expression
   }
 
-  static member Map(query: SelectQuery, f: SelectFrom -> SelectFrom) = { query with From = SelectFrom.Map(query.From, f) }
+  static member Map(query: SelectQuery, f: SelectFrom -> SelectFrom) =
+    { query with From = SelectFrom.Map(query.From, f) }
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     { query with
