@@ -9,9 +9,9 @@ type Tests(db: DBFixture) =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id" ] } //
-          "purchases", { AidColumns = [ "cid" ] } //
-          "customers_small", { AidColumns = [ "id" ] } //
+          "customers", { AidColumns = [ "id" ] }
+          "customers_small", { AidColumns = [ "id" ] }
+          "purchases", { AidColumns = [ "cid" ] }
         ]
       Seed = 1
       LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
