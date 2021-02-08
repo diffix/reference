@@ -165,6 +165,41 @@ let rewriteToDiffixAggregate aidColumnExpression query =
     | expression -> expression)
   )
 
+let rec notAggregate =
+  function
+  | FunctionExpr (ScalarFunction _, args) -> List.forall notAggregate args
+  | FunctionExpr (AggregateFunction _, _) -> false
+  | _ -> true
+
+let addLowCountFilter aidColumnExpression query =
+  let lowCountAggregate =
+    FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
+
+  let selectLowCountAggregate = { Expression = lowCountAggregate; Alias = "low_count_aggregate"; Junk = true }
+
+  Query.Map(
+    query,
+    (fun (selectQuery: AnalyzerTypes.SelectQuery) ->
+      let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
+
+      let selectQuery =
+        { selectQuery with
+            Columns = selectQuery.Columns @ [ selectLowCountAggregate ]
+            Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+        }
+
+      if selectQuery.GroupingSets = [ GroupingSet [] ] then
+        let nonAggregateSelectedExpressions =
+          selectQuery.Columns
+          |> List.map (fun selectedColumn -> selectedColumn.Expression)
+          |> List.filter notAggregate
+          |> GroupingSet
+
+        { selectQuery with GroupingSets = [ nonAggregateSelectedExpressions ] }
+      else
+        selectQuery)
+  )
+
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   match anonParams.TableSettings.TryFind(tableName) with
   | None
@@ -191,6 +226,10 @@ let analyze connection
             do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
 
             let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
-            return rewriteToDiffixAggregate aidColumnExpression analyzerQuery
+
+            return
+              analyzerQuery
+              |> rewriteToDiffixAggregate aidColumnExpression
+              |> addLowCountFilter aidColumnExpression
           }
   }

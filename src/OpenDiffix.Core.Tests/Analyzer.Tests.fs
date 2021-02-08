@@ -81,7 +81,11 @@ let ``Selecting columns from a table`` () =
           Columns =
             [
               { Expression = ColumnReference(0, StringType); Alias = "str_col"; Junk = false }
-              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col"; Junk = false }
+              {
+                Expression = ColumnReference(3, BooleanType)
+                Alias = "bool_col"
+                Junk = false
+              }
             ]
       })
 
@@ -106,7 +110,11 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
       {
         Columns =
           [
-            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias"; Junk = false }
+            {
+              Expression = ColumnReference(1, IntegerType)
+              Alias = "colAlias"
+              Junk = false
+            }
             {
               Expression =
                 FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
@@ -191,10 +199,26 @@ type Tests(db: DBFixture) =
     let countDistinct =
       FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
 
-    let expected = [ { Expression = countStar; Alias = "count"; Junk = false }; { Expression = countDistinct; Alias = "count"; Junk = false } ]
+    let lowCountJunk = FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ idColumn ])
+
+    let expected =
+      [
+        { Expression = countStar; Alias = "count"; Junk = false }
+        { Expression = countDistinct; Alias = "count"; Junk = false }
+        { Expression = lowCountJunk; Alias = "low_count_aggregate"; Junk = true }
+      ]
+
     result.Columns |> should equal expected
 
-    let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
+    let expected =
+      FunctionExpr(
+        ScalarFunction And,
+        [
+          FunctionExpr(ScalarFunction Not, [ lowCountJunk ])
+          FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
+        ]
+      )
+
     result.Having |> should equal expected
 
   interface IClassFixture<DBFixture>
