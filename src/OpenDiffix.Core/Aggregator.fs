@@ -19,7 +19,6 @@ module Aggregator =
     Map.add aidHash newValue aidMap
 
   type private Count(counter) =
-
     interface IAggregator with
       member this.Digest values =
         match values with
@@ -54,7 +53,6 @@ module Aggregator =
       member this.Evaluate _ctx = sum
 
   type private DiffixCount(perAidCounts: Map<AidHash, int64>) =
-
     interface IAggregator with
       member this.Digest values =
         match values with
