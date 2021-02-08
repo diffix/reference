@@ -87,10 +87,9 @@ and Expression =
     | Constant (Real _) -> Ok RealType
     | Constant Null -> Ok(UnknownType null)
 
-  static member Map (expression, f: Expression -> Expression) =
+  static member Map(expression, f: Expression -> Expression) =
     match expression with
-    | FunctionExpr (fn, args) ->
-        f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.Map(arg, f)) args))
+    | FunctionExpr (fn, args) -> f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.Map(arg, f)) args))
     | expr -> f expr
 
 and FunctionType =
@@ -100,12 +99,12 @@ and FunctionType =
 and OrderByExpression =
   | OrderBy of Expression * OrderByDirection * OrderByNullsBehavior
 
-  static member Map (orderBy: OrderByExpression list, f: Expression -> Expression) =
+  static member Map(orderBy: OrderByExpression list, f: Expression -> Expression) =
     List.map (fun (orderBy: OrderByExpression) -> OrderByExpression.Map(orderBy, f)) orderBy
 
-  static member Map (orderBy: OrderByExpression, f: Expression -> Expression) =
+  static member Map(orderBy: OrderByExpression, f: Expression -> Expression) =
     match orderBy with
-    | OrderBy (exp, direction, nullBehavior) -> OrderBy (f exp, direction, nullBehavior)
+    | OrderBy (exp, direction, nullBehavior) -> OrderBy(f exp, direction, nullBehavior)
 
 and AggregateOptions =
   {
