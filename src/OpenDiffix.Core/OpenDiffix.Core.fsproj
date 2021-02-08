@@ -10,6 +10,7 @@
     <Compile Include="AnonymizerTypes.fs" />
     <Compile Include="Anonymizer.fs" />
     <Compile Include="Expression.fs" />
+    <Compile Include="Aggregator.fs" />
     <Compile Include="ParserTypes.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="AnalyzerTypes.fs" />

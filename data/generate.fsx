@@ -99,7 +99,7 @@ let lastNames =
   ]
   |> List.map Field.Text
 
-let customers_small =
+let customersSmall =
   {
     Name = "customers_small"
     Columns =
@@ -111,47 +111,31 @@ let customers_small =
         { Name = "city"; Type = Type.Text }
       ]
 
-    GeneratedRowsCount = 10
+    GeneratedRowsCount = 20
     Generators =
       [
         sequentialGenerator ()
-        listGenerator firstNames
-        listGenerator lastNames
-        randomGenerator 18 80
-        listGenerator cities
+        listGenerator [ Text "Alice"; Text "Bob" ]
+        listGenerator [ Text "Regular" ]
+        listGenerator [ Integer 25L; Integer 30L; Integer 35L ]
+        listGenerator [ Text "Berlin"; Text "Rome" ]
       ]
 
     StaticRows =
       [
         [ Integer 1000L; Null; Null; Null; Null ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1000L; Text "Alice"; Text "Outlier"; Integer 100L; Text "Bucharest" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1001L; Text "Bob"; Text "Outlier"; Integer 150L; Text "Pristina" ]
-        [ Integer 1002L; Null; Null; Null; Null ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
       ]
   }
 
@@ -202,8 +186,6 @@ let products =
 
     StaticRows =
       [
-        [ Integer -1L; Text "Drugs"; Real 30.7 ]
-        [ Integer 0L; Null; Null ]
         [ Integer 1L; Text "Water"; Real 1.3 ]
         [ Integer 2L; Text "Pasta"; Real 7.5 ]
         [ Integer 3L; Text "Chicken"; Real 12.81 ]
@@ -213,6 +195,8 @@ let products =
         [ Integer 8L; Text "Coffee"; Real 6.14 ]
         [ Integer 9L; Text "Bread"; Real 1.4 ]
         [ Integer 10L; Text "Banana"; Real 4.78 ]
+        [ Integer 1000L; Null; Null ]
+        [ Integer 1001L; Text "Drugs"; Real 30.7 ]
       ]
   }
 
@@ -241,12 +225,12 @@ let purchases =
     StaticRows =
       [
         [ Null; Null; Null ]
-        [ Integer 0L; Integer 0L; Real 0.0 ]
-        [ Integer -1L; Integer -1L; Real 1.0 ]
-        [ Integer -2L; Integer -1L; Real 5.0 ]
-        [ Integer -3L; Integer -1L; Real 3.5 ]
-        [ Integer -3L; Integer -1L; Real 4.5 ]
-        [ Integer -4L; Integer 1L; Real 20.0 ]
+        [ Integer 1000L; Integer 1000L; Real 0.0 ]
+        [ Integer 1001L; Integer 1001L; Real 1.0 ]
+        [ Integer 1002L; Integer 1001L; Real 5.0 ]
+        [ Integer 1003L; Integer 1001L; Real 3.5 ]
+        [ Integer 1003L; Integer 1001L; Real 4.5 ]
+        [ Integer 1004L; Integer 1L; Real 20.0 ]
         [ Integer 1L; Integer 1L; Real 7.0 ]
         [ Integer 2L; Integer 1L; Real 0.1 ]
       ]
@@ -294,7 +278,7 @@ conn.Open()
 generate conn customers
 generate conn products
 generate conn purchases
-generate conn customers_small
+generate conn customersSmall
 
 conn.Close()
 

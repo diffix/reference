@@ -1,7 +1,5 @@
 namespace OpenDiffix.Core.AnonymizerTypes
 
-open Thoth.Json.Net
-
 type Threshold =
   {
     Lower: int

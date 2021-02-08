@@ -130,43 +130,40 @@ let colRef0 = ColumnReference(0, StringType)
 let colRef1 = ColumnReference(1, IntegerType)
 let colRef2 = ColumnReference(2, RealType)
 
-let eval expr = Expression.evaluate ctx testRow expr
+let evaluate expr = Expression.evaluate ctx testRow expr
 
-let evalAggr fn args =
-  let processor = fun (acc: Expression.Accumulator) row -> acc.Process ctx args row
-  let accumulator = List.fold processor (Expression.createAccumulator ctx fn) testRows
-  accumulator.Evaluate ctx
+let evaluateAggregator fn args = evaluateAggregator ctx fn args testRows
 
 [<Fact>]
-let evaluate () =
+let ``evaluate scalar expressions`` () =
   // select val_int + 3
-  eval (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3L) ]))
+  evaluate (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3L) ]))
   |> should equal (Integer 10L)
 
   // select val_str
-  eval colRef0 |> should equal (String "Some text")
+  evaluate colRef0 |> should equal (String "Some text")
 
 [<Fact>]
-let evaluateAggregated () =
+let ``evaluate standard aggregators`` () =
   let count = AggregateFunction(Count, AggregateOptions.Default)
   let sum = AggregateFunction(Sum, AggregateOptions.Default)
   let countDistinct = AggregateFunction(Count, { AggregateOptions.Default with Distinct = true })
 
   // select sum(val_float - val_int)
-  evalAggr sum [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
+  evaluateAggregator sum [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
   |> should equal (Real 2.0)
 
   // select count(*)
-  evalAggr count [] |> should equal (Integer 4L)
+  evaluateAggregator count [] |> should equal (Integer 4L)
 
   // select count(1)
-  evalAggr count [ Constant(Integer 1L) ] |> should equal (Integer 4L)
+  evaluateAggregator count [ Constant(Integer 1L) ] |> should equal (Integer 4L)
 
   // select count(distinct val_str)
-  evalAggr countDistinct [ colRef0 ] |> should equal (Integer 2L)
+  evaluateAggregator countDistinct [ colRef0 ] |> should equal (Integer 2L)
 
   // select sum()
-  (fun () -> evalAggr sum [] |> ignore) |> shouldFail
+  (fun () -> evaluateAggregator sum [] |> ignore) |> shouldFail
 
 [<Fact>]
 let sortRows () =

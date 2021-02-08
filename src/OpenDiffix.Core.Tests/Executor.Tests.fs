@@ -30,13 +30,13 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute scan`` () =
     let plan = Plan.Scan(products)
-    let expected = [ [| Integer -1L; String "Drugs"; Real 30.7 |]; [| Integer 0L; Null; Null |] ]
+    let expected = [ [| Integer 1L; String "Water"; Real 1.3 |]; [| Integer 2L; String "Pasta"; Real 7.5 |] ]
     plan |> execute |> List.take 2 |> should equal expected
 
   [<Fact>]
   let ``execute project`` () =
     let plan = Plan.Project(Plan.Scan(products), [ plus1 (column products 0) ])
-    let expected = [ [| Integer 0L |]; [| Integer 1L |]; [| Integer 2L |] ]
+    let expected = [ [| Integer 2L |]; [| Integer 3L |]; [| Integer 4L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
@@ -51,7 +51,7 @@ type Tests(db: DBFixture) =
     let idColumn = column products 0
     let orderById = OrderBy (idColumn, Descending, NullsFirst)
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
-    let expected = [ [| Integer 10L |]; [| Integer 9L |]; [| Integer 8L |] ]
+    let expected = [ [| Integer 1001L |]; [| Integer 1000L |]; [| Integer 10L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
