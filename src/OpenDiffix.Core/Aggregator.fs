@@ -19,6 +19,8 @@ module Aggregator =
     Map.add aidHash newValue aidMap
 
   type private Count(counter) =
+    new() = Count(0L)
+
     interface IAggregator with
       member this.Digest values =
         match values with
@@ -29,6 +31,8 @@ module Aggregator =
       member this.Evaluate _ctx = Integer counter
 
   type private CountDistinct(set: Set<Value>) =
+    new() = CountDistinct(Set.empty)
+
     interface IAggregator with
       member this.Digest values =
         match values with
@@ -40,6 +44,8 @@ module Aggregator =
       member this.Evaluate _ctx = set.Count |> int64 |> Integer
 
   type private Sum(sum: Value) =
+    new() = Sum(Null)
+
     interface IAggregator with
       member this.Digest values =
         match sum, values with
@@ -53,6 +59,8 @@ module Aggregator =
       member this.Evaluate _ctx = sum
 
   type private DiffixCount(perAidCounts: Map<AidHash, int64>) =
+    new() = DiffixCount(Map.empty)
+
     interface IAggregator with
       member this.Digest values =
         match values with
@@ -65,6 +73,8 @@ module Aggregator =
       member this.Evaluate ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
   type private DiffixCountDistinct(aids: Set<AidHash>) =
+    new() = DiffixCountDistinct(Set.empty)
+
     interface IAggregator with
       member this.Digest values =
         match values with
@@ -77,9 +87,9 @@ module Aggregator =
 
   let create _ctx fn: IAggregator =
     match fn with
-    | AggregateFunction (Count, { Distinct = false }) -> Count(0L) :> IAggregator
-    | AggregateFunction (Count, { Distinct = true }) -> CountDistinct(Set.empty) :> IAggregator
-    | AggregateFunction (Sum, { Distinct = false }) -> Sum(Null) :> IAggregator
-    | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount(Map.empty) :> IAggregator
-    | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct(Set.empty) :> IAggregator
+    | AggregateFunction (Count, { Distinct = false }) -> Count() :> IAggregator
+    | AggregateFunction (Count, { Distinct = true }) -> CountDistinct() :> IAggregator
+    | AggregateFunction (Sum, { Distinct = false }) -> Sum() :> IAggregator
+    | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount() :> IAggregator
+    | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct() :> IAggregator
     | _ -> failwith "Invalid aggregator"
