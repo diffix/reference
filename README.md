@@ -75,9 +75,10 @@ The `-h` command gives you an overview of the available paramters. Typical usage
 two following sample commands:
 
 - Run a single query: `OpenDiffix.CLI -d data/data.sqlite --aid-columns customers.id -q "SELECT city, count(*) FROM
-  customers GROUP BY city". The query result will be written back to the terminal (standard out).
+  customers GROUP BY city". 
 - Run a batch of queries (significantly faster if you want to run many queries at one time): `OpenDiffix.CLI
-  --queries-file queries-sample.json`. The results will be written to a file taking its name from the input file,
-  but with `-results` appended to the file name. For an example of what the input file format should look like,
+  --queries-file queries-sample.json`. For an example of what the input file format should look like,
   please consult [queries-sample.json].
+
+In both cases the query result will be written back to the terminal (standard out).
 

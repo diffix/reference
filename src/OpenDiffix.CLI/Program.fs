@@ -153,10 +153,7 @@ let batchExecuteQueries (queriesPath: string) =
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
   let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
-
-  let outputDir = Path.GetDirectoryName(queriesPath)
-  let outputPathFull = Path.Join [| outputDir; Path.GetFileNameWithoutExtension(queriesPath) + "-result.json" |]
-  File.WriteAllText(outputPathFull, resultJsonEncoded)
+  printf "%s" resultJsonEncoded
 
   0
 
