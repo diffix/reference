@@ -105,10 +105,12 @@ let selectedTableName =
   | ParserTypes.Expression.Identifier tableName -> Ok tableName
   | _ -> Error "Only selecting from a single table is supported"
 
+let booleanTrueExpression = Value.Boolean true |> Expression.Constant
+
 let transformExpressionOptionWithDefaultTrue table optionalExpression =
   optionalExpression
   |> Option.map (mapExpression table)
-  |> Option.defaultValue (Value.Boolean true |> Expression.Constant |> Ok)
+  |> Option.defaultValue (Ok booleanTrueExpression)
 
 let transformGroupByIndex (expressions: Expression list) groupByExpression =
   match groupByExpression with
@@ -162,6 +164,58 @@ let rewriteToDiffixAggregate aidColumnExpression query =
     | expression -> expression)
   )
 
+let rec notAggregate =
+  function
+  | FunctionExpr (ScalarFunction _, args) -> List.forall notAggregate args
+  | FunctionExpr (AggregateFunction _, _) -> false
+  | _ -> true
+
+let addLowCountFilter aidColumnExpression query =
+  let lowCountAggregate =
+    FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
+
+  let selectLowCountAggregate = { Expression = lowCountAggregate; Alias = "low_count_aggregate" }
+
+  Query.Map(
+    query,
+    (fun (selectQuery: AnalyzerTypes.SelectQuery) ->
+      let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
+
+      let selectQuery =
+        { selectQuery with
+            Columns = selectQuery.Columns @ [ selectLowCountAggregate ]
+            Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+        }
+
+      let selectQuery =
+        if selectQuery.GroupingSets = [ GroupingSet [] ] then
+          let nonAggregateSelectedExpressions =
+            selectQuery.Columns
+            |> List.map (fun selectedColumn -> selectedColumn.Expression)
+            |> List.filter notAggregate
+            |> GroupingSet
+
+          { selectQuery with GroupingSets = [ nonAggregateSelectedExpressions ] }
+        else
+          selectQuery
+
+      {
+        Columns =
+          selectQuery.Columns
+          |> List.indexed
+          |> List.take (selectQuery.Columns.Length - 1)
+          |> List.map (fun (index, selectedExpression) ->
+            let expressionType = selectedExpression.Expression |> Expression.GetType |> Utils.unwrap
+            { selectedExpression with Expression = ColumnReference(index, expressionType) }
+          )
+        From = selectQuery |> SelectQuery |> Query
+        Where = booleanTrueExpression
+        GroupingSets = [ GroupingSet [] ]
+        OrderBy = []
+        Having = booleanTrueExpression
+      })
+  )
+
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   match anonParams.TableSettings.TryFind(tableName) with
   | None
@@ -188,6 +242,10 @@ let analyze connection
             do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
 
             let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
-            return rewriteToDiffixAggregate aidColumnExpression analyzerQuery
+
+            return
+              analyzerQuery
+              |> rewriteToDiffixAggregate aidColumnExpression
+              |> addLowCountFilter aidColumnExpression
           }
   }
