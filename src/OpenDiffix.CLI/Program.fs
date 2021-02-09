@@ -126,7 +126,7 @@ let anonymize query dbPath anonParams =
       let resultSet =
         result.Rows
         |> List.map (fun row -> row |> Array.map valueToString |> Array.reduce (sprintf "%s;%s"))
-        |> List.reduce (sprintf "%s\n%s")
+        |> List.fold (sprintf "%s\n%s") ""
 
       resultSet, 0
   | Error err -> $"ERROR: %s{err}", 1
