@@ -151,7 +151,7 @@ let rewriteToDiffixAggregate aidColumnExpression query =
   Query.Map(
     query,
     (function
-    | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
+    | FunctionExpr (AggregateFunction (Count, opts), args) ->
         let args =
           match opts.Distinct, args with
           | true, [ colExpr ] when colExpr = aidColumnExpression -> args
