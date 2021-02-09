@@ -6,8 +6,8 @@ open OpenDiffix.Core.AnonymizerTypes
 
 type AggregateFunction =
   | Count
-  | Sum
   | DiffixCount
+  | Sum
 
   static member ReturnType fn (args: Expression list) =
     match fn with
