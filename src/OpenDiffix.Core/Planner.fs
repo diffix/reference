@@ -1,4 +1,4 @@
-module OpenDiffix.Core.Planner
+module rec OpenDiffix.Core.Planner
 
 open OpenDiffix.Core.PlannerTypes
 open OpenDiffix.Core.AnalyzerTypes
@@ -7,7 +7,7 @@ let private planFrom =
   function
   | Table table -> Plan.Scan table
   | Join _ -> failwith "join planning not yet supported"
-  | Query _ -> failwith "subquery planning not yet supported"
+  | Query query -> plan query
 
 let private planProject expressions plan = Plan.Project(plan, expressions)
 

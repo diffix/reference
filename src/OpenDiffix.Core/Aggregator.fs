@@ -85,6 +85,21 @@ module Aggregator =
 
       member this.Evaluate ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> Integer
 
+  type private DiffixLowCount(aids: Set<AidHash>) =
+    new() = DiffixLowCount(Set.empty)
+
+    interface IAggregator with
+      member this.Digest values =
+        match values with
+        | [ Null ] -> this
+        | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixLowCount
+        | _ -> invalidArgs values
+        :> IAggregator
+
+      member this.Evaluate ctx =
+        let count = aids.Count
+        Anonymizer.isLowCount aids ctx.AnonymizationParams count |> Boolean
+
   let create _ctx fn: IAggregator =
     match fn with
     | AggregateFunction (Count, { Distinct = false }) -> Count() :> IAggregator
@@ -92,4 +107,5 @@ module Aggregator =
     | AggregateFunction (Sum, { Distinct = false }) -> Sum() :> IAggregator
     | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount() :> IAggregator
     | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct() :> IAggregator
+    | AggregateFunction (DiffixLowCount, _) -> DiffixLowCount() :> IAggregator
     | _ -> failwith "Invalid aggregator"

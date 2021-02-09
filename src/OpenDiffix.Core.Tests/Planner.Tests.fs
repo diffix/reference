@@ -118,3 +118,14 @@ let ``plan all`` () =
     )
 
   SelectQuery select |> Planner.plan |> should equal expected
+
+[<Fact>]
+let ``sub-query plan`` () =
+  let selectedColumns = [ selectColumn 1 ]
+  let subQuery = { emptySelect with Columns = selectedColumns}
+  let query =
+    { subQuery with Columns = [ selectColumn 0 ]; From = Query <| SelectQuery subQuery }
+
+  let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
+
+  SelectQuery query |> Planner.plan |> should equal expected

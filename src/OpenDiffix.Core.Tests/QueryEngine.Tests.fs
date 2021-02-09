@@ -52,4 +52,15 @@ type Tests(db: DBFixture) =
     let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM products"
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 6`` () =
+    let expected =
+      {
+        Columns = [ "city"; "count" ]
+        Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+      }
+
+    let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>

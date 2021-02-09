@@ -171,6 +171,10 @@ type Tests(db: DBFixture) =
     | SelectQuery s -> s
     | _other -> failwith "Expected a top-level SELECT query"
 
+  let unwrapSelectQuery =
+    function
+    | Query (SelectQuery q) -> q
+    | _ -> failwith "Expected a select query"
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -187,10 +191,38 @@ type Tests(db: DBFixture) =
     let countDistinct =
       FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
 
-    let expected = [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
-    result.Columns |> should equal expected
+    let diffixLowCount = FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ idColumn ])
 
-    let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
-    result.Having |> should equal expected
+    let expectedInSubQuery =
+      [
+        { Expression = countStar; Alias = "count" }
+        { Expression = countDistinct; Alias = "count" }
+        { Expression = diffixLowCount; Alias = "low_count_aggregate" }
+      ]
+
+    result.From
+    |> unwrapSelectQuery
+    |> fun select -> select.Columns |> should equal expectedInSubQuery
+
+    let expectedInTopQuery =
+      [
+        { Expression = ColumnReference(0, IntegerType); Alias = "count" }
+        { Expression = ColumnReference(1, IntegerType); Alias = "count" }
+      ]
+
+    result.Columns |> should equal expectedInTopQuery
+
+    let expected =
+      FunctionExpr(
+        ScalarFunction And,
+        [
+          FunctionExpr(ScalarFunction Not, [ diffixLowCount ])
+          FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
+        ]
+      )
+
+    result.From
+    |> unwrapSelectQuery
+    |> fun select -> select.Having |> should equal expected
 
   interface IClassFixture<DBFixture>
