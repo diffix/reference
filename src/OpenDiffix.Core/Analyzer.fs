@@ -158,9 +158,7 @@ let rewriteToDiffixAggregate aidColumnExpression query =
           | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
           | false, _ -> aidColumnExpression :: args
 
-        let newExpr = FunctionExpr(AggregateFunction(DiffixCount, opts), args)
-        printfn "Rewrite: %A to %A" original newExpr
-        newExpr
+        FunctionExpr(AggregateFunction(DiffixCount, opts), args)
     | expression -> expression)
   )
 
