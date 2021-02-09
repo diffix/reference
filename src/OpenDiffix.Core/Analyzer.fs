@@ -151,16 +151,14 @@ let rewriteToDiffixAggregate aidColumnExpression query =
   Query.Map(
     query,
     (function
-    | FunctionExpr (AggregateFunction (Count, opts), args) as original ->
+    | FunctionExpr (AggregateFunction (Count, opts), args) ->
         let args =
           match opts.Distinct, args with
           | true, [ colExpr ] when colExpr = aidColumnExpression -> args
           | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
           | false, _ -> aidColumnExpression :: args
 
-        let newExpr = FunctionExpr(AggregateFunction(DiffixCount, opts), args)
-        printfn "Rewrite: %A to %A" original newExpr
-        newExpr
+        FunctionExpr(AggregateFunction(DiffixCount, opts), args)
     | expression -> expression)
   )
 
