@@ -46,5 +46,29 @@
         "cutoff": 6
       }
     }
+  },
+  {
+    "query": "SELECT city, count(*), count(distinct id) FROM customers",
+    "db_path": "data/data.sqlite",
+    "anonymization_parameters": {
+      "table_settings": {"customers": {"aid_columns":  ["id"]}},
+      "seed": 1,
+      "low_count_threshold": {
+        "lower": 2,
+        "upper": 5
+      },
+      "outlier_count": {
+        "lower": 1,
+        "upper": 2
+      },
+      "top_count": {
+        "lower": 1,
+        "upper": 2
+      },
+      "noise": {
+        "standard_dev": 3,
+        "cutoff": 6
+      }
+    }
   }
 ]

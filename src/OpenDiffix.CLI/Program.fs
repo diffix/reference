@@ -147,8 +147,10 @@ let batchExecuteQueries (queriesPath: string) =
   let results =
     querySpecs
     |> List.map (fun queryRequest ->
-      runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
-      |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
+      try
+        runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
+        |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
+      with (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg (exn.Message)
     )
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
