@@ -61,6 +61,12 @@ let encodeRequestParams query dbPath anonParams =
     "database_path", Encode.string dbPath
   ]
 
+let encodeErrorMsg errorMsg =
+  Encode.object [
+    "success", Encode.bool false
+    "error", Encode.string errorMsg
+  ]
+
 let encodeIndividualQueryResponse (queryRequest: QueryRequest) =
   function
   | Ok queryResult ->
@@ -70,10 +76,7 @@ let encodeIndividualQueryResponse (queryRequest: QueryRequest) =
       "result", encodeQueryResult queryResult
     ]
   | Error parseError ->
-    Encode.object [
-      "success", Encode.bool false
-      "error", Encode.string (parseError.ToString())
-    ]
+    encodeErrorMsg (parseError.ToString())
 
 let encodeBatchRunResult (time: System.DateTime) version queryResults =
   Encode.object [
