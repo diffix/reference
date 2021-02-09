@@ -7,8 +7,7 @@ let private planFrom =
   function
   | Table table -> Plan.Scan table
   | Join _ -> failwith "join planning not yet supported"
-  | Query (UnionQuery _) -> failwith "planning for union queries not supported"
-  | Query (SelectQuery q) -> planSelect q
+  | Query query -> plan query
 
 let private planProject expressions plan = Plan.Project(plan, expressions)
 
