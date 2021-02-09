@@ -33,8 +33,8 @@ type CliArguments =
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
           "Path to a file containing a list of query specifications. All queries will be executed in "
-          + "batch mode, and the results will be written to a file at the same path with a name marking it as "
-          + "containing the results. Please consult the README for the query file specification."
+          + "batch mode, and the results will be written to standard out. Please consult the README for the query "
+          + "file specification."
       | Query_Stdin -> "Reads the query from standard in."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
       | Threshold_Outlier_Count _ ->
