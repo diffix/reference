@@ -42,14 +42,14 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
         | Some aggregators -> aggregators
         | None -> defaultAggregators
         |> Array.zip aggArgs
-        |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Digest)
+        |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Transition)
 
       Map.add group aggregators state
     )
     initialState
   |> Map.toSeq
   |> Seq.map (fun (group, aggregators) ->
-    let values = aggregators |> Array.map (fun acc -> acc.Evaluate context)
+    let values = aggregators |> Array.map (fun acc -> acc.Final context)
     Array.append group values
   )
 

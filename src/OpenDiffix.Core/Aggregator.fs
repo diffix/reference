@@ -1,8 +1,8 @@
 namespace OpenDiffix.Core
 
 type IAggregator =
-  abstract Digest: Value list -> IAggregator
-  abstract Evaluate: EvaluationContext -> Value
+  abstract Transition: Value list -> IAggregator
+  abstract Final: EvaluationContext -> Value
 
 module Aggregator =
 
@@ -22,32 +22,32 @@ module Aggregator =
     new() = Count(0L)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match values with
         | [ Null ] -> this
         | _ -> Count(counter + 1L)
         :> IAggregator
 
-      member this.Evaluate _ctx = Integer counter
+      member this.Final _ctx = Integer counter
 
   type private CountDistinct(set: Set<Value>) =
     new() = CountDistinct(Set.empty)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match values with
         | [ Null ] -> this
         | [ value ] -> set |> Set.add value |> CountDistinct
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Evaluate _ctx = set.Count |> int64 |> Integer
+      member this.Final _ctx = set.Count |> int64 |> Integer
 
   type private Sum(sum: Value) =
     new() = Sum(Null)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match sum, values with
         | _, [ Null ] -> this
         | Null, [ value ] -> Sum(value)
@@ -56,13 +56,13 @@ module Aggregator =
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Evaluate _ctx = sum
+      member this.Final _ctx = sum
 
   type private DiffixCount(perAidCounts: Map<AidHash, int64>) =
     new() = DiffixCount(Map.empty)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match values with
         | [ _aid; Null ] -> this
         | [ aid ]
@@ -70,33 +70,33 @@ module Aggregator =
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Evaluate ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
+      member this.Final ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
   type private DiffixCountDistinct(aids: Set<AidHash>) =
     new() = DiffixCountDistinct(Set.empty)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match values with
         | [ Null ] -> this
         | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixCountDistinct
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Evaluate ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> Integer
+      member this.Final ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> Integer
 
   type private DiffixLowCount(aids: Set<AidHash>) =
     new() = DiffixLowCount(Set.empty)
 
     interface IAggregator with
-      member this.Digest values =
+      member this.Transition values =
         match values with
         | [ Null ] -> this
         | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Evaluate ctx =
+      member this.Final ctx =
         let count = aids.Count
         Anonymizer.isLowCount aids ctx.AnonymizationParams count |> Boolean
 

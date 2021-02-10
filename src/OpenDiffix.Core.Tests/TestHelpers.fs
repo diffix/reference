@@ -47,6 +47,6 @@ let assertErrorEqual (result: Result<'a, 'b>) (expected: 'b) =
   )
 
 let evaluateAggregator ctx fn args rows =
-  let processor = fun (agg: IAggregator) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Digest
+  let processor = fun (agg: IAggregator) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Transition
   let aggregator = List.fold processor (Aggregator.create ctx fn) rows
-  aggregator.Evaluate ctx
+  aggregator.Final ctx
