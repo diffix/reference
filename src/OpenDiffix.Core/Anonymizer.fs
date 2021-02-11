@@ -24,17 +24,18 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> max -noiseParam.Cutoff
   |> min noiseParam.Cutoff
   |> round
-  |> int64
+  |> int32
 
 let countAids (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
   let noise = noiseValue rnd anonymizationParams.Noise
-  max (int64 aidSet.Count + noise) 0L
+  max (aidSet.Count + noise) 0
 
-let isLowCount (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) count =
+let isLowCount (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
+  let noise = noiseValue rnd anonymizationParams.Noise
   let threshold = randomUniform rnd anonymizationParams.LowCountThreshold
-  count <= threshold
+  aidSet.Count + noise <= threshold
 
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
@@ -63,4 +64,4 @@ let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<A
     let sumExcludingOutliers = sortedUserContributions |> List.skip (outlierCount) |> List.sum
 
     let totalCount = sumExcludingOutliers + outlierReplacement
-    max (totalCount + noise) 0L |> Integer
+    (max (totalCount + int64 noise) 0L) |> Integer

@@ -83,7 +83,7 @@ module Aggregator =
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> Integer
+      member this.Final ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> int64 |> Integer
 
   type private DiffixLowCount(aids: Set<AidHash>) =
     new() = DiffixLowCount(Set.empty)
@@ -96,9 +96,7 @@ module Aggregator =
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx =
-        let count = aids.Count
-        Anonymizer.isLowCount aids ctx.AnonymizationParams count |> Boolean
+      member this.Final ctx = Anonymizer.isLowCount aids ctx.AnonymizationParams |> Boolean
 
   let create _ctx fn: IAggregator =
     match fn with
