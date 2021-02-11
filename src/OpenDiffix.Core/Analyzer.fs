@@ -171,19 +171,16 @@ let rec notAggregate =
   | _ -> true
 
 let addLowCountFilter aidColumnExpression query =
-  let lowCountAggregate =
-    FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
-
-  let selectLowCountAggregate = { Expression = lowCountAggregate; Alias = "low_count_aggregate" }
-
   Query.Map(
     query,
-    (fun (selectQuery: AnalyzerTypes.SelectQuery) ->
+    (fun selectQuery ->
+      let lowCountAggregate =
+        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
+
       let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
 
       let selectQuery =
         { selectQuery with
-            Columns = selectQuery.Columns @ [ selectLowCountAggregate ]
             Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
         }
 
@@ -199,21 +196,7 @@ let addLowCountFilter aidColumnExpression query =
         else
           selectQuery
 
-      {
-        Columns =
-          selectQuery.Columns
-          |> List.indexed
-          |> List.take (selectQuery.Columns.Length - 1)
-          |> List.map (fun (index, selectedExpression) ->
-            let expressionType = selectedExpression.Expression |> Expression.GetType |> Utils.unwrap
-            { selectedExpression with Expression = ColumnReference(index, expressionType) }
-          )
-        From = selectQuery |> SelectQuery |> Query
-        Where = booleanTrueExpression
-        GroupingSets = [ GroupingSet [] ]
-        OrderBy = []
-        Having = booleanTrueExpression
-      })
+      selectQuery)
   )
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =

@@ -193,22 +193,8 @@ type Tests(db: DBFixture) =
 
     let diffixLowCount = FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ idColumn ])
 
-    let expectedInSubQuery =
-      [
-        { Expression = countStar; Alias = "count" }
-        { Expression = countDistinct; Alias = "count" }
-        { Expression = diffixLowCount; Alias = "low_count_aggregate" }
-      ]
-
-    result.From
-    |> unwrapSelectQuery
-    |> fun select -> select.Columns |> should equal expectedInSubQuery
-
     let expectedInTopQuery =
-      [
-        { Expression = ColumnReference(0, IntegerType); Alias = "count" }
-        { Expression = ColumnReference(1, IntegerType); Alias = "count" }
-      ]
+      [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
 
     result.Columns |> should equal expectedInTopQuery
 
@@ -221,8 +207,6 @@ type Tests(db: DBFixture) =
         ]
       )
 
-    result.From
-    |> unwrapSelectQuery
-    |> fun select -> select.Having |> should equal expected
+    result.Having |> should equal expected
 
   interface IClassFixture<DBFixture>
