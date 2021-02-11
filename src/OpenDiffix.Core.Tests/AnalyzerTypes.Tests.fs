@@ -1,4 +1,4 @@
-module OpenDiffix.Core.Tests.AnalyzerTypes_Tests
+module OpenDiffix.Core.Tests.AnalyzerTypesTests
 
 open Xunit
 open FsUnit.Xunit

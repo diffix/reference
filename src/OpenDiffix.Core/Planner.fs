@@ -53,11 +53,7 @@ let private planSelect query =
 
   let aggregators = expressions |> List.collect extractAggregators |> List.distinct
 
-  let groupingLabels =
-    query.GroupingSets
-    |> List.map GroupingSet.Unwrap
-    |> List.concat
-    |> List.distinct
+  let groupingLabels = query.GroupingSets |> List.collect GroupingSet.Unwrap |> List.distinct
 
   let aggregatedColumns = groupingLabels @ aggregators
 
