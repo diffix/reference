@@ -182,3 +182,37 @@ let ``Parse complex aggregate query`` () =
         GroupBy = [ Identifier "col1" ]
         Having = Some <| Gt(Function("count", [ Distinct(Identifier "aid") ]), Integer 1)
     }
+
+[<Fact>]
+let ``Failed Paul attack query 1`` () =
+  assertOkEqual
+    (Parser.parse
+      """
+        select count(distinct aid1)
+        from tab where t1='y' and t2 = 'm'
+         """)
+    { defaultSelect with
+        Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
+        From = Identifier "tab"
+        Where = Some(And(Equals(Identifier "t1", String "y"), Equals(Identifier "t2", String "m")))
+    }
+
+[<Fact>]
+let ``Failed Paul attack query 2`` () =
+  assertOkEqual
+    (Parser.parse
+      """
+        select count(distinct aid1)
+        from tab where t1 = 'y' and not (i1 = 100 and t2 = 'x')
+         """)
+    { defaultSelect with
+        Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
+        From = Identifier "tab"
+        Where =
+          Some(
+            And(
+              Equals(Identifier "t1", String "y"),
+              Not(And(Equals(Identifier "i1", Integer 100), Equals(Identifier "t2", String "x")))
+            )
+          )
+    }

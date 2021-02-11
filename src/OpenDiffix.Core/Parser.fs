@@ -46,7 +46,7 @@ module QueryParser =
     <|> (word "false" |>> fun _ -> Expression.Boolean false)
 
   let stringLiteral =
-    skipChar '\'' >>. manySatisfy (fun c -> c <> '\'') .>> skipChar '\''
+    skipChar '\'' >>. manySatisfy (fun c -> c <> '\'') .>> skipChar '\'' .>> spaces
     |>> Expression.String
 
   let spaceSepUnaliasedExpressions = many1 expr
