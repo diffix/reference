@@ -11,8 +11,8 @@ let ids =
 
 let rows =
   let defaultUserRows = ids |> List.map (fun idArray -> Array.append idArray [| String "value" |])
-  let extraUserRow = [ [| Integer 8L; Null |] ]
-  List.append defaultUserRows extraUserRow
+  let extraUserRows = [ [| Integer 8L; Null |]; [| Null; String "" |] ]
+  List.append defaultUserRows extraUserRows
 
 let aidColumn = ColumnReference(0, IntegerType)
 let strColumn = ColumnReference(1, StringType)
@@ -37,7 +37,7 @@ let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Defa
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
-let ``anon count distinct aid 1`` () =
+let ``anon count distinct aid`` () =
   ids
   |> evaluateAggregator distinctDiffixCount [ aidColumn ]
   |> should equal (Integer 8L)
@@ -60,7 +60,7 @@ let ``anon count(col)`` () =
   |> should equal (Integer 29L)
 
 [<Fact>]
-let ``anon count returns Null if insufficient data`` () =
+let ``anon count returns Null if insufficient users`` () =
   let firstRow = rows |> List.take 1
 
   firstRow
