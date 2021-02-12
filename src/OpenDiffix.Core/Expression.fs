@@ -212,7 +212,7 @@ module Expression =
     match expr with
     | FunctionExpr (ScalarFunction fn, args) -> invokeScalarFunction ctx fn (args |> List.map (evaluate ctx row))
     | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate '%A{fn}'."
-    | ColumnReference (index, _) -> row.[index]
+    | ColumnReference (index, _) -> if index >= row.Length then Null else row.[index]
     | Constant value -> value
 
   open System.Linq

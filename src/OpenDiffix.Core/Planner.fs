@@ -3,10 +3,12 @@ module rec OpenDiffix.Core.Planner
 open OpenDiffix.Core.PlannerTypes
 open OpenDiffix.Core.AnalyzerTypes
 
+let private planJoin join = Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.Condition)
+
 let private planFrom =
   function
   | Table table -> Plan.Scan table
-  | Join _ -> failwith "join planning not yet supported"
+  | Join join -> planJoin join
   | Query query -> plan query
 
 let private planProject expressions plan = Plan.Project(plan, expressions)
