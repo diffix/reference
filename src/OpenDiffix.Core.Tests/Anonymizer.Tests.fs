@@ -4,15 +4,14 @@ open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
 
-let ids =
-  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
-  |> List.collect (fun (id, count) -> List.replicate count id)
-  |> List.map (int64 >> Integer >> Array.singleton)
 
 let rows =
-  let defaultUserRows = ids |> List.map (fun idArray -> Array.append idArray [| String "value" |])
-  let extraUserRows = [ [| Integer 8L; Null |]; [| Null; String "" |] ]
-  List.append defaultUserRows extraUserRows
+  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
+  |> List.collect (fun (id, count) -> List.replicate count id)
+  |> List.map (int64 >> Integer)
+  |> List.append [ Null ]
+  |> List.map (fun id -> [| id; String "value" |])
+  |> List.append [ [| Integer 8L; Null |] ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let strColumn = ColumnReference(1, StringType)
@@ -38,7 +37,7 @@ let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with
 
 [<Fact>]
 let ``anon count distinct aid`` () =
-  ids
+  rows
   |> evaluateAggregator distinctDiffixCount [ aidColumn ]
   |> should equal (Integer 8L)
 
@@ -46,7 +45,7 @@ let ``anon count distinct aid`` () =
 let ``anon count()`` () =
   // - replacing outlier 6, with top 5
   // - 0 noise
-  ids
+  rows
   |> evaluateAggregator diffixCount [ aidColumn ]
   |> should equal (Integer 29L)
 
