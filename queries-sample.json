@@ -5,6 +5,7 @@
     "anonymization_parameters": {
       "table_settings": {"customers": {"aid_columns":  ["id"]}},
       "seed": 1,
+      "low_count_absolute_lower_bound": 2,
       "low_count_threshold": {
         "lower": 2,
         "upper": 5
@@ -29,6 +30,7 @@
     "anonymization_parameters": {
       "table_settings": {"customers": {"aid_columns":  ["id"]}},
       "seed": 1,
+      "low_count_absolute_lower_bound": 2,
       "low_count_threshold": {
         "lower": 2,
         "upper": 5
@@ -53,6 +55,7 @@
     "anonymization_parameters": {
       "table_settings": {"customers": {"aid_columns":  ["id"]}},
       "seed": 1,
+      "low_count_absolute_lower_bound": 2,
       "low_count_threshold": {
         "lower": 2,
         "upper": 5

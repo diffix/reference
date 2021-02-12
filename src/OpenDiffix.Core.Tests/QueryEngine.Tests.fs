@@ -14,13 +14,18 @@ type Tests(db: DBFixture) =
           "customers_small", { AidColumns = [ "id" ] } //
         ]
       Seed = 1
+      LowCountAbsoluteLowerBound = 2
       LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
-  let runQuery query = QueryEngine.run db.Connection query anonParams |> Async.RunSynchronously
+  let runQueryWithCustomAnonParams anonymizationParams query =
+    QueryEngine.run db.Connection query anonymizationParams
+    |> Async.RunSynchronously
+
+  let runQuery = runQueryWithCustomAnonParams anonParams
 
   [<Fact>]
   let ``query 1`` () =
@@ -61,6 +66,27 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 7`` () =
+    // This will ensure only the absolute low count filter triggers, since it's less permissive
+    // than the subsequent noisy threshold.
+    let customAnonParams =
+      { anonParams with
+          LowCountAbsoluteLowerBound = 5
+          LowCountThreshold = { Lower = 0; Upper = 0 }
+      }
+
+    let expected =
+      {
+        Columns = [ "city"; "count" ]
+        Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+      }
+
+    let queryResult =
+      runQueryWithCustomAnonParams customAnonParams "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
+
     assertOkEqual queryResult expected
 
   interface IClassFixture<DBFixture>

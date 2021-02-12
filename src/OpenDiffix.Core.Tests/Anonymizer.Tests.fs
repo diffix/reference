@@ -23,6 +23,7 @@ let context =
         {
           TableSettings = Map.empty
           Seed = 0
+          LowCountAbsoluteLowerBound = 2
           LowCountThreshold = { Lower = 1; Upper = 1 }
           OutlierCount = { Lower = 1; Upper = 1 }
           TopCount = { Lower = 1; Upper = 1 }
