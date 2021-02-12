@@ -22,6 +22,7 @@ type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Seed: int
+    LowCountAbsoluteLowerBound: int
     LowCountThreshold: Threshold
 
     // Count params
@@ -34,6 +35,7 @@ type AnonymizationParams =
     {
       TableSettings = Map.empty
       Seed = 0
+      LowCountAbsoluteLowerBound = 2
       LowCountThreshold = Threshold.Default
       OutlierCount = Threshold.Default
       TopCount = Threshold.Default
