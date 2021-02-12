@@ -4,15 +4,14 @@ open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
 
-let ids =
-  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
-  |> List.collect (fun (id, count) -> List.replicate count id)
-  |> List.map (int64 >> Integer >> Array.singleton)
 
 let rows =
-  let defaultUserRows = ids |> List.map (fun idArray -> Array.append idArray [| String "value" |])
-  let extraUserRow = [ [| Integer 8L; Null |] ]
-  List.append defaultUserRows extraUserRow
+  [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
+  |> List.collect (fun (id, count) -> List.replicate count id)
+  |> List.map (int64 >> Integer)
+  |> List.append [ Null ]
+  |> List.map (fun id -> [| id; String "value" |])
+  |> List.append [ [| Integer 8L; Null |] ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let strColumn = ColumnReference(1, StringType)
@@ -37,8 +36,8 @@ let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Defa
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
-let ``anon count distinct aid 1`` () =
-  ids
+let ``anon count distinct aid`` () =
+  rows
   |> evaluateAggregator distinctDiffixCount [ aidColumn ]
   |> should equal (Integer 8L)
 
@@ -46,7 +45,7 @@ let ``anon count distinct aid 1`` () =
 let ``anon count()`` () =
   // - replacing outlier 6, with top 5
   // - 0 noise
-  ids
+  rows
   |> evaluateAggregator diffixCount [ aidColumn ]
   |> should equal (Integer 29L)
 
@@ -60,7 +59,7 @@ let ``anon count(col)`` () =
   |> should equal (Integer 29L)
 
 [<Fact>]
-let ``anon count returns Null if insufficient data`` () =
+let ``anon count returns Null if insufficient users`` () =
   let firstRow = rows |> List.take 1
 
   firstRow
@@ -68,3 +67,11 @@ let ``anon count returns Null if insufficient data`` () =
   |> should equal Null
 
   firstRow |> evaluateAggregator diffixCount [ aidColumn ] |> should equal Null
+
+[<Fact>]
+let ``anon count returns 0 for Null inputs`` () =
+  let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; Null |])
+
+  rows
+  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
+  |> should equal (Integer 0L)

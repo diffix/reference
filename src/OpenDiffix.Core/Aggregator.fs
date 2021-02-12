@@ -64,7 +64,9 @@ module Aggregator =
     interface IAggregator with
       member this.Transition values =
         match values with
-        | [ _aid; Null ] -> this
+        | [ Null ]
+        | [ Null; _ ] -> this
+        | [ aid; Null ] -> perAidCounts |> updateAidMap aid 0L id |> DiffixCount
         | [ aid ]
         | [ aid; _ ] -> perAidCounts |> updateAidMap aid 1L (fun count -> count + 1L) |> DiffixCount
         | _ -> invalidArgs values
