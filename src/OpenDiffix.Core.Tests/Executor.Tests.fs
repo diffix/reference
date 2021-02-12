@@ -49,7 +49,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute sort`` () =
     let idColumn = column products 0
-    let orderById = OrderBy (idColumn, Descending, NullsFirst)
+    let orderById = OrderBy(idColumn, Descending, NullsFirst)
     let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
     let expected = [ [| Integer 1001L |]; [| Integer 1000L |]; [| Integer 10L |] ]
     plan |> execute |> List.take 3 |> should equal expected
@@ -91,5 +91,27 @@ type Tests(db: DBFixture) =
 
     let expected = [ [| Integer 0L |] ]
     plan |> execute |> should equal expected
+
+  [<Fact>]
+  let ``execute inner join`` () =
+    let idColumn1 = column products 0
+    let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
+    let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
+    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), AnalyzerTypes.InnerJoin, condition)
+    let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
+
+    let expected = [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
+    plan |> execute |> List.rev |> List.take 3 |> should equal expected
+
+  [<Fact>]
+  let ``execute outer join`` () =
+    let idColumn1 = column products 0
+    let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
+    let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
+    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), AnalyzerTypes.LeftJoin, condition)
+    let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
+
+    let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
+    plan |> execute |> List.rev |> List.take 3 |> should equal expected
 
   interface IClassFixture<DBFixture>

@@ -53,14 +53,44 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
+let private executeJoin isOuterJoin leftStream rightStream context condition =
+  let rightRows = Seq.toList rightStream
+
+  leftStream
+  |> Seq.collect (fun leftRow ->
+    let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context condition
+
+    if isOuterJoin && Seq.isEmpty joinedRows then
+      // We don't know the size of the right row at this point, so we generate an incomplete row and
+      // rely on the fact that out-of-bounds column references return `Null` values.
+      seq { leftRow }
+    else
+      joinedRows
+  )
+
 let rec execute connection context plan =
   match plan with
   | Plan.Scan table -> executeScan connection table
   | Plan.Project (plan, expressions) -> plan |> execute connection context |> executeProject context expressions
   | Plan.Filter (plan, condition) -> plan |> execute connection context |> executeFilter context condition
   | Plan.Sort (plan, expressions) -> plan |> execute connection context |> executeSort context expressions
+
   | Plan.Aggregate (plan, labels, aggregators) ->
       plan
       |> execute connection context
       |> executeAggregate context labels aggregators
+
+  | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+      let leftStream = execute connection context leftPlan
+      let rightStream = execute connection context rightPlan
+
+      let joinExecutor =
+        match joinType with
+        | AnalyzerTypes.InnerJoin -> executeJoin false leftStream rightStream
+        | AnalyzerTypes.LeftJoin -> executeJoin true leftStream rightStream
+        | AnalyzerTypes.RightJoin -> executeJoin true rightStream leftStream
+        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+
+      joinExecutor context condition
+
   | _ -> failwith "Plan execution not implemented"

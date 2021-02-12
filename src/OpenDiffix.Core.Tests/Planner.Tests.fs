@@ -60,7 +60,7 @@ let ``plan where`` () =
 
 [<Fact>]
 let ``plan order by`` () =
-  let orderBy = [ OrderBy (column 1, Ascending, NullsFirst) ]
+  let orderBy = [ OrderBy(column 1, Ascending, NullsFirst) ]
   let select = { emptySelect with OrderBy = orderBy }
 
   let expected = Plan.Project(Plan.Sort(Plan.Scan(table), orderBy), [])
@@ -71,7 +71,12 @@ let ``plan order by`` () =
 let ``plan aggregation`` () =
   let groupingSet = [ column 1 ]
   let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = "" } ]
-  let select = { emptySelect with Columns = selectedColumns; GroupingSets = [ GroupingSet groupingSet ] }
+
+  let select =
+    { emptySelect with
+        Columns = selectedColumns
+        GroupingSets = [ GroupingSet groupingSet ]
+    }
 
   let expected =
     Plan.Project(
@@ -122,10 +127,30 @@ let ``plan all`` () =
 [<Fact>]
 let ``sub-query plan`` () =
   let selectedColumns = [ selectColumn 1 ]
-  let subQuery = { emptySelect with Columns = selectedColumns}
+  let subQuery = { emptySelect with Columns = selectedColumns }
+
   let query =
-    { subQuery with Columns = [ selectColumn 0 ]; From = Query <| SelectQuery subQuery }
+    { subQuery with
+        Columns = [ selectColumn 0 ]
+        From = Query <| SelectQuery subQuery
+    }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
 
   SelectQuery query |> Planner.plan |> should equal expected
+
+[<Fact>]
+let ``plan join`` () =
+  let join =
+    {
+      Type = InnerJoin
+      Condition = constTrue
+      Left = Table table
+      Right = Table table
+    }
+
+  let select = { emptySelect with From = Join join }
+
+  let expected = Plan.Project(Plan.Join(Plan.Scan(table), Plan.Scan(table), InnerJoin, condition = constTrue), [])
+
+  SelectQuery select |> Planner.plan |> should equal expected
