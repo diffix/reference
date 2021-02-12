@@ -68,3 +68,11 @@ let ``anon count returns Null if insufficient data`` () =
   |> should equal Null
 
   firstRow |> evaluateAggregator diffixCount [ aidColumn ] |> should equal Null
+
+[<Fact>]
+let ``anon count returns 0 for Null inputs`` () =
+  let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; Null |])
+
+  rows
+  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
+  |> should equal (Integer 0L)
