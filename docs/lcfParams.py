@@ -39,7 +39,7 @@ def do_basic_probs(lower,mean_sd,counts,trials):
     df = pd.DataFrame.from_dict(results)
 
     print(f'''
-Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) (`lower=0`):
+Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed). In producing these numbers, we set `lower=0` so that we can see how often the lower limit would have been hit. In practice we would never set `lower=0`.
         ''')
     print(df.to_markdown(index=False))
 

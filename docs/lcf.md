@@ -60,10 +60,11 @@ Following is an example of how a noisy threshold works with strong privacy. Here
 
 With this setting, if we were to set `lower=2.5`, then the hard threshold would almost never be invoked, roughly once in every 30K buckets. What this means from a practical perspective is that if an analyst knows that a bucket has either 2 or 3 users in it, it would be very rare that the bucket is reported, thus revealing with 100% certainty that there are in fact 3 AIDs in the bucket.
 
-We can see this in the table below. This represents the case where the attacker knows that there are either N or N+1 AIDs in a given bucket, each with 50% probability. Here `lower=2.5`. If there are 2 or 3 AIDs (N=2), then if the bucket is reported, the attacker knows with 100% certainty that there are 3 AIDs in the bucket. However, this happens once in every 4500 or so buckets. As N grows, the likelihood of a bucket being reported grows, but the confidence in the guess shrinks.
+We can see this certainty in the table below. This table represents the case where the attacker knows that there are either N or N+1 AIDs in a given bucket, each with 50% probability. Here `lower=2.5`. If there are 2 or 3 AIDs (N=2), then if the bucket is reported, the attacker knows with 100% certainty that there are 3 AIDs in the bucket. However, this happens once in every 4500 or so buckets. As N grows, the likelihood of a bucket being reported grows, but the confidence in the guess shrinks. (The 1/1000000++ notation simply means that the bucket was never reported in 1000000 trials, so the true probability is unknown.)
+
 | (mean,sd)   | N   | Prob N AIDs (sup)   | Prob N+1 AIDs (rep)   | Prob reported   |
 |:------------|:----|:--------------------|:----------------------|:----------------|
-| (8.0,1.5)   | 1   | 0.499               | 1                     | 1000000++       |
+| (8.0,1.5)   | 1   | 0.499               | 1                     | 1/1000000++     |
 | (8.0,1.5)   | 2   | 0.500               | 1.00                  | 1/4504          |
 | (8.0,1.5)   | 3   | 0.500               | 0.90                  | 1/470           |
 | (8.0,1.5)   | 4   | 0.505               | 0.85                  | 1/75            |
@@ -71,7 +72,7 @@ We can see this in the table below. This represents the case where the attacker 
 | (8.0,1.5)   | 6   | 0.549               | 0.73                  | 1/5             |
 | (8.0,1.5)   | 7   | 0.600               | 0.66                  | 1/2             |
 
-So in my mind, `mean=8`, `sd=1.5`, and `lower=2.5` represents strong LCF. On the other hand, there is lots of suppression in this case. Furthermore, we can ask if it is really necessary to have such strong LCF. There are two mitigating circumstances in particular. First, it is relatively rare that an attacker knows that there is only N or N+1 AIDs in a given bucket, and more rare as N increases. (Why would an attacker happen to know about all but one AID in a bucket? It could happen, but kindof strange.)
+So in my mind, `mean=8`, `sd=1.5`, and `lower=2.5` represents strong LCF. On the other hand, there is lots of suppression in this case. Furthermore, we can ask if it is really necessary to have such strong LCF. There are two mitigating circumstances in particular. First, it is relatively rare that an attacker knows that there is only N or N+1 AIDs in a given bucket, and more rare as N increases. (Why would an attacker happen to know about all but one AID in a bucket? It could happen, but is kindof strange.)
 
 Second, if a column has a lot of buckets with only 2 AIDs (say for instance where `lower=1.5`), then of course there is a danger that many values can simply be read out with `SELECT col, count(*)`. However, one could disable selection for that column. Or the column itself could be declared an AID (for instance say the column is `account_number` for a bank with many joint accounts). Therefore in many cases a less private setting may be perfectly adequate.
 
@@ -102,7 +103,7 @@ This all suggests to me that a good setting for Knox would indeed be `mean=8`, `
 ## Data from lcfParams.py
 
 
-Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) (`lower=0`):
+Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed). In producing these numbers, we set `lower=0` so that we can see how often the lower limit would have been hit. In practice we would never set `lower=0`.
         
 | (mean,sd)   |       1 |       2 |       3 |       4 |       5 |       6 |       7 |       8 |       9 |
 |:------------|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|
@@ -253,7 +254,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (9.0,2.0)   | 7   | 0.548               | 0.66                  | 1/4             |
 | (9.0,2.0)   | 8   | 0.581               | 0.62                  | 1/2             |
 |             |     |                     |                       |                 |
-| (9.0,1.6)   | 1   | 0.500               | 1.00                  | 1/1000000       |
+| (9.0,1.6)   | 1   | 0.500               | 1.00                  | 1/1000000++     |
 | (9.0,1.6)   | 2   | 0.500               | 0.91                  | 1/22222         |
 | (9.0,1.6)   | 3   | 0.500               | 0.89                  | 1/2105          |
 | (9.0,1.6)   | 4   | 0.501               | 0.88                  | 1/273           |
@@ -263,7 +264,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (9.0,1.6)   | 8   | 0.594               | 0.65                  | 1/2             |
 |             |     |                     |                       |                 |
 
-Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) (`lower=0`):
+Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) In producing these numbers, we set `lower=0` so that we can see how often the lower limit would have been hit. In practice we would never set `lower=0`.
         
 | (mean,sd)   |       2 |       3 |       4 |       5 |       6 |       7 |       8 |       9 |      10 |
 |:------------|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|
@@ -299,83 +300,83 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
         
 | (mean,sd)   | N   | Prob N AIDs (sup)   | Prob N+1 AIDs (rep)   | Prob reported   |
 |:------------|:----|:--------------------|:----------------------|:----------------|
-| (4.0,1.0)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.0,1.0)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.0,1.0)   | 2   | 0.543               | 1.00                  | 1/12            |
 | (4.0,1.0)   | 3   | 0.627               | 0.76                  | 1/3             |
 |             |     |                     |                       |                 |
-| (4.0,0.7)   | 1   | 0.501               | 1                     | 1000000++       |
+| (4.0,0.7)   | 1   | 0.501               | 1                     | 1/1000000++     |
 | (4.0,0.7)   | 2   | 0.519               | 1.00                  | 1/26            |
 | (4.0,0.7)   | 3   | 0.650               | 0.87                  | 1/3             |
 |             |     |                     |                       |                 |
-| (4.0,0.5)   | 1   | 0.501               | 1                     | 1000000++       |
+| (4.0,0.5)   | 1   | 0.501               | 1                     | 1/1000000++     |
 | (4.0,0.5)   | 2   | 0.506               | 1.00                  | 1/88            |
 | (4.0,0.5)   | 3   | 0.662               | 0.96                  | 1/3             |
 |             |     |                     |                       |                 |
-| (4.0,0.4)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.0,0.4)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.0,0.4)   | 2   | 0.502               | 1.00                  | 1/318           |
 | (4.0,0.4)   | 3   | 0.665               | 0.99                  | 1/3             |
 |             |     |                     |                       |                 |
-| (4.5,1.2)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.5,1.2)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.5,1.2)   | 2   | 0.528               | 1.00                  | 1/18            |
 | (4.5,1.2)   | 3   | 0.575               | 0.76                  | 1/4             |
 |             |     |                     |                       |                 |
-| (4.5,0.8)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.5,0.8)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.5,0.8)   | 2   | 0.508               | 1.00                  | 1/66            |
 | (4.5,0.8)   | 3   | 0.569               | 0.90                  | 1/6             |
 |             |     |                     |                       |                 |
-| (4.5,0.6)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.5,0.6)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.5,0.6)   | 2   | 0.501               | 1.00                  | 1/330           |
 | (4.5,0.6)   | 3   | 0.555               | 0.97                  | 1/9             |
 |             |     |                     |                       |                 |
-| (4.5,0.5)   | 1   | 0.500               | 1                     | 1000000++       |
+| (4.5,0.5)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (4.5,0.5)   | 2   | 0.500               | 1.00                  | 1/1398          |
 | (4.5,0.5)   | 3   | 0.543               | 0.99                  | 1/12            |
 |             |     |                     |                       |                 |
-| (5.0,1.5)   | 1   | 0.500               | 1                     | 1000000++       |
+| (5.0,1.5)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (5.0,1.5)   | 2   | 0.524               | 1.00                  | 1/21            |
 | (5.0,1.5)   | 3   | 0.547               | 0.73                  | 1/5             |
 | (5.0,1.5)   | 4   | 0.599               | 0.66                  | 1/2             |
 |             |     |                     |                       |                 |
-| (5.0,1.0)   | 1   | 0.500               | 1                     | 1000000++       |
+| (5.0,1.0)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (5.0,1.0)   | 2   | 0.506               | 1.00                  | 1/86            |
 | (5.0,1.0)   | 3   | 0.537               | 0.88                  | 1/11            |
 | (5.0,1.0)   | 4   | 0.627               | 0.76                  | 1/3             |
 |             |     |                     |                       |                 |
-| (5.0,0.8)   | 1   | 0.499               | 1                     | 1000000++       |
+| (5.0,0.8)   | 1   | 0.499               | 1                     | 1/1000000++     |
 | (5.0,0.8)   | 2   | 0.502               | 1.00                  | 1/315           |
 | (5.0,0.8)   | 3   | 0.527               | 0.94                  | 1/17            |
 | (5.0,0.8)   | 4   | 0.641               | 0.82                  | 1/3             |
 |             |     |                     |                       |                 |
-| (5.0,0.6)   | 1   | 0.500               | 1                     | 1000000++       |
+| (5.0,0.6)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (5.0,0.6)   | 2   | 0.501               | 1.00                  | 1/4950          |
 | (5.0,0.6)   | 3   | 0.513               | 0.99                  | 1/41            |
 | (5.0,0.6)   | 4   | 0.656               | 0.91                  | 1/3             |
 |             |     |                     |                       |                 |
-| (6.0,2.0)   | 1   | 0.500               | 1                     | 1000000++       |
+| (6.0,2.0)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (6.0,2.0)   | 2   | 0.517               | 1.00                  | 1/29            |
 | (6.0,2.0)   | 3   | 0.526               | 0.70                  | 1/8             |
 | (6.0,2.0)   | 4   | 0.548               | 0.66                  | 1/4             |
 | (6.0,2.0)   | 5   | 0.581               | 0.62                  | 1/2             |
 |             |     |                     |                       |                 |
-| (6.0,1.3)   | 1   | 0.500               | 1                     | 1000000++       |
+| (6.0,1.3)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (6.0,1.3)   | 2   | 0.502               | 1.00                  | 1/188           |
 | (6.0,1.3)   | 3   | 0.514               | 0.86                  | 1/27            |
 | (6.0,1.3)   | 4   | 0.545               | 0.78                  | 1/7             |
 | (6.0,1.3)   | 5   | 0.609               | 0.69                  | 1/2             |
 |             |     |                     |                       |                 |
-| (6.0,1.0)   | 1   | 0.501               | 1                     | 1000000++       |
+| (6.0,1.0)   | 1   | 0.501               | 1                     | 1/1000000++     |
 | (6.0,1.0)   | 2   | 0.500               | 1.00                  | 1/1522          |
 | (6.0,1.0)   | 3   | 0.507               | 0.94                  | 1/82            |
 | (6.0,1.0)   | 4   | 0.537               | 0.87                  | 1/11            |
 | (6.0,1.0)   | 5   | 0.627               | 0.76                  | 1/3             |
 |             |     |                     |                       |                 |
-| (6.0,0.8)   | 1   | 0.499               | 1                     | 1000000++       |
+| (6.0,0.8)   | 1   | 0.499               | 1                     | 1/1000000++     |
 | (6.0,0.8)   | 2   | 0.500               | 1.00                  | 1/20833         |
 | (6.0,0.8)   | 3   | 0.502               | 0.99                  | 1/316           |
 | (6.0,0.8)   | 4   | 0.526               | 0.95                  | 1/17            |
 | (6.0,0.8)   | 5   | 0.642               | 0.82                  | 1/3             |
 |             |     |                     |                       |                 |
-| (8.0,3.0)   | 1   | 0.500               | 1                     | 1000000++       |
+| (8.0,3.0)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (8.0,3.0)   | 2   | 0.512               | 1.00                  | 1/42            |
 | (8.0,3.0)   | 3   | 0.511               | 0.65                  | 1/14            |
 | (8.0,3.0)   | 4   | 0.519               | 0.64                  | 1/7             |
@@ -383,7 +384,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (8.0,3.0)   | 6   | 0.543               | 0.60                  | 1/3             |
 | (8.0,3.0)   | 7   | 0.557               | 0.58                  | 1/2             |
 |             |     |                     |                       |                 |
-| (8.0,2.0)   | 1   | 0.501               | 1                     | 1000000++       |
+| (8.0,2.0)   | 1   | 0.501               | 1                     | 1/1000000++     |
 | (8.0,2.0)   | 2   | 0.501               | 1.00                  | 1/324           |
 | (8.0,2.0)   | 3   | 0.503               | 0.79                  | 1/71            |
 | (8.0,2.0)   | 4   | 0.511               | 0.75                  | 1/22            |
@@ -391,7 +392,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (8.0,2.0)   | 6   | 0.549               | 0.66                  | 1/4             |
 | (8.0,2.0)   | 7   | 0.581               | 0.62                  | 1/2             |
 |             |     |                     |                       |                 |
-| (8.0,1.5)   | 1   | 0.499               | 1                     | 1000000++       |
+| (8.0,1.5)   | 1   | 0.499               | 1                     | 1/1000000++     |
 | (8.0,1.5)   | 2   | 0.500               | 1.00                  | 1/4504          |
 | (8.0,1.5)   | 3   | 0.500               | 0.90                  | 1/470           |
 | (8.0,1.5)   | 4   | 0.505               | 0.85                  | 1/75            |
@@ -399,7 +400,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (8.0,1.5)   | 6   | 0.549               | 0.73                  | 1/5             |
 | (8.0,1.5)   | 7   | 0.600               | 0.66                  | 1/2             |
 |             |     |                     |                       |                 |
-| (8.0,1.2)   | 1   | 0.500               | 1                     | 1000000++       |
+| (8.0,1.2)   | 1   | 0.500               | 1                     | 1/1000000++     |
 | (8.0,1.2)   | 2   | 0.499               | 1.00                  | 1/142857        |
 | (8.0,1.2)   | 3   | 0.500               | 0.98                  | 1/4405          |
 | (8.0,1.2)   | 4   | 0.500               | 0.94                  | 1/297           |
@@ -407,7 +408,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (8.0,1.2)   | 6   | 0.545               | 0.81                  | 1/7             |
 | (8.0,1.2)   | 7   | 0.615               | 0.71                  | 1/2             |
 |             |     |                     |                       |                 |
-| (10.0,4.0)  | 1   | 0.500               | 1                     | 1000000++       |
+| (10.0,4.0)  | 1   | 0.500               | 1                     | 1/1000000++     |
 | (10.0,4.0)  | 2   | 0.511               | 1.00                  | 1/49            |
 | (10.0,4.0)  | 3   | 0.507               | 0.62                  | 1/18            |
 | (10.0,4.0)  | 4   | 0.511               | 0.61                  | 1/11            |
@@ -417,7 +418,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (10.0,4.0)  | 8   | 0.535               | 0.57                  | 1/2             |
 | (10.0,4.0)  | 9   | 0.545               | 0.56                  | 1/2             |
 |             |     |                     |                       |                 |
-| (10.0,2.7)  | 1   | 0.500               | 1                     | 1000000++       |
+| (10.0,2.7)  | 1   | 0.500               | 1                     | 1/1000000++     |
 | (10.0,2.7)  | 2   | 0.501               | 1.00                  | 1/418           |
 | (10.0,2.7)  | 3   | 0.501               | 0.73                  | 1/109           |
 | (10.0,2.7)  | 4   | 0.504               | 0.71                  | 1/44            |
@@ -427,7 +428,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (10.0,2.7)  | 8   | 0.543               | 0.61                  | 1/3             |
 | (10.0,2.7)  | 9   | 0.564               | 0.58                  | 1/2             |
 |             |     |                     |                       |                 |
-| (10.0,2.0)  | 1   | 0.499               | 1                     | 1000000++       |
+| (10.0,2.0)  | 1   | 0.499               | 1                     | 1/1000000++     |
 | (10.0,2.0)  | 2   | 0.501               | 1.00                  | 1/9174          |
 | (10.0,2.0)  | 3   | 0.500               | 0.83                  | 1/1310          |
 | (10.0,2.0)  | 4   | 0.501               | 0.83                  | 1/264           |
@@ -437,7 +438,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (10.0,2.0)  | 8   | 0.549               | 0.66                  | 1/4             |
 | (10.0,2.0)  | 9   | 0.579               | 0.62                  | 1/2             |
 |             |     |                     |                       |                 |
-| (10.0,1.6)  | 1   | 0.499               | 1                     | 1000000++       |
+| (10.0,1.6)  | 1   | 0.499               | 1                     | 1/1000000++     |
 | (10.0,1.6)  | 2   | 0.500               | 1.00                  | 1/500000        |
 | (10.0,1.6)  | 3   | 0.499               | 0.96                  | 1/21739         |
 | (10.0,1.6)  | 4   | 0.501               | 0.91                  | 1/2070          |
