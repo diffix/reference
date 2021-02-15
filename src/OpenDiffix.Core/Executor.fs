@@ -12,7 +12,7 @@ let private executeProject context expressions rowsStream =
 
 let private executeFilter context condition rowsStream =
   rowsStream
-  |> Seq.filter (fun row -> condition |> Expression.evaluate context row |> Value.isTruthy)
+  |> Seq.filter (fun row -> condition |> Expression.evaluate context row |> Value.unwrapBoolean)
 
 let private executeSort context orderings rowsStream = rowsStream |> Expression.sortRows context orderings
 
