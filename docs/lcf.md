@@ -26,6 +26,8 @@ The `working_aid` is selected as the AID with the smallest number of distinct AI
 
 The `seed` for an AID is some function of the set of distinct AIDs (i.e. the XOR of the hashes of the AIDs or something). (Note we should only work with hashes of the AIDs, where the hash is salted with the system secret.)
 
+> Note: The reason for a `working_aid`, rather than for instance jumbling up all the AIDs into one seed, is to prevent attacks where one AID is coarser than the other (say `aid_user` and `aid_branch`), and the coarser AID (i.e. `aid_branch`) is attacked by generating different sets of `aid_user` while keeping `aid_branch` consistent, thus eliminating the effect of the seed through averaging. Not sure this is a legitimate attack, but in any event selecting a `working_aid` takes care of it with no negative effect so far as I can see.
+
 Once we have the `working_aid`, then from this we produce two values:
 
 1. `seed`: The seed from the `working_aid`.
