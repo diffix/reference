@@ -130,6 +130,7 @@ module Expression =
     | Or, [ Boolean true; _ ] -> Boolean true
     | Or, [ _; Boolean true ] -> Boolean true
 
+    // From now on, if the unary or binary function gets a `Null` argument, we return `Null` directly.
     | _, [ Null ] -> Null
     | _, [ Null; _ ] -> Null
     | _, [ _; Null ] -> Null
