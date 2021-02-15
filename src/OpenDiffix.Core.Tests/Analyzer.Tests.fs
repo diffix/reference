@@ -172,11 +172,6 @@ type Tests(db: DBFixture) =
     | SelectQuery s -> s
     | _other -> failwith "Expected a top-level SELECT query"
 
-  let unwrapSelectQuery =
-    function
-    | Query (SelectQuery q) -> q
-    | _ -> failwith "Expected a select query"
-
   [<Fact>]
   let ``Analyze count transforms`` () =
     let result =
