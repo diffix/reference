@@ -125,15 +125,6 @@ type AggregateArgs = seq<Value list>
 module ExpressionUtils =
   let invalidOverload name = failwith $"Invalid overload called for function '{name}'."
 
-  let mapSingleArg name (args: AggregateArgs) =
-    args
-    |> Seq.map
-         (function
-         | [ arg ] -> arg
-         | _ -> invalidOverload name)
-
-  let filterNulls args = args |> Seq.filter (fun v -> v <> Null)
-
   let binaryFunction fn =
     fun _ctx args ->
       match args with
