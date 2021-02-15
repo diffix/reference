@@ -1,13 +1,14 @@
-module OpenDiffix.Core.SQLite
+module OpenDiffix.CLI.SQLite
 
-open System.Data.SQLite
-open Dapper
+open System
 open FsToolkit.ErrorHandling
 open OpenDiffix.Core
+open System.Data.SQLite
+open Dapper
 
 type DbConnection = SQLiteConnection
 
-let dbConnection path =
+let private dbConnection path =
   try
     Ok(new SQLiteConnection(sprintf "Data Source=%s; Version=3; Read Only=true;" path))
   with ex -> Error("Connect error: " + ex.Message)
@@ -15,7 +16,7 @@ let dbConnection path =
 [<CLIMutable>]
 type private DbSchemaQueryRow = { TableName: string; ColumnName: string; ColumnType: string }
 
-let dbSchema (connection: SQLiteConnection) =
+let private dbSchema (connection: SQLiteConnection) =
   asyncResult {
     // Note: somewhat counterintuitively the order in which the columns are selected matter here.
     // The reason is that we are using an anonymous record to deserialize the rows from the database.
@@ -66,7 +67,7 @@ let private readValue (reader: SQLiteDataReader) index =
     | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
     | _unknownType -> Null
 
-let executeQuery (connection: SQLiteConnection) (query: string) =
+let private executeQuery (connection: SQLiteConnection) (query: string) =
   asyncResult {
     use command = new SQLiteCommand(query, connection)
 
@@ -80,3 +81,54 @@ let executeQuery (connection: SQLiteConnection) (query: string) =
         }
     with ex -> return! Error("Execution error: " + ex.Message)
   }
+
+let private columnTypeFromString =
+  function
+  | "integer" -> IntegerType
+  | "text" -> StringType
+  | "boolean" -> BooleanType
+  | "real" -> RealType
+  | other -> UnknownType other
+
+let columnTypeToString =
+  function
+  | IntegerType -> "integer"
+  | StringType -> "string"
+  | BooleanType -> "boolean"
+  | RealType -> "real"
+  | UnknownType typeName -> $"unknown ({typeName})"
+
+type DataProvider (dbPath: string) =
+  let connection =
+    let connection = dbPath |> dbConnection |> Utils.unwrap
+    connection.Open()
+    connection
+
+  interface IDisposable with
+    member this.Dispose() = connection.Close()
+
+  interface IDataProvider with
+    member this.GetSchema() =
+      asyncResult {
+        let! schema = dbSchema connection
+
+        return
+          schema
+          |> List.map (fun table ->
+            let columns =
+              table.Columns
+              |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString (column.Type) })
+
+            { Name = table.Name; Columns = columns }
+          )
+      }
+    member this.LoadData(table) =
+      let columns =
+        table.Columns
+        |> List.map (fun column -> $"\"%s{column.Name}\"")
+        |> List.reduce (sprintf "%s, %s")
+
+      let loadQuery = $"SELECT {columns} FROM {table.Name}"
+
+      executeQuery connection loadQuery
+

@@ -6,17 +6,7 @@ open System
 open OpenDiffix.Core
 
 type DBFixture() =
-  [<Literal>]
-  static let DatabasePath = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let connection = DatabasePath |> SQLite.dbConnection |> Utils.unwrap
-
-  do connection.Open()
-
-  member this.Connection = connection
-
-  interface IDisposable with
-    member this.Dispose() = connection.Close()
+  member this.DataProvider = new OpenDiffix.CLI.SQLite.DataProvider (__SOURCE_DIRECTORY__ + "/../../data/data.sqlite")
 
 let assertOk (result: Result<'a, 'b>) =
   Assert.True(

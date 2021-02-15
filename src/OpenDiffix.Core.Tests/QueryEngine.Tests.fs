@@ -22,7 +22,7 @@ type Tests(db: DBFixture) =
     }
 
   let runQueryWithCustomAnonParams anonymizationParams query =
-    QueryEngine.run db.Connection query anonymizationParams
+    QueryEngine.run db.DataProvider query anonymizationParams
     |> Async.RunSynchronously
 
   let runQuery = runQueryWithCustomAnonParams anonParams

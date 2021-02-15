@@ -25,6 +25,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\OpenDiffix.CLI\OpenDiffix.CLI.fsproj" />
     <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
   </ItemGroup>
 </Project>

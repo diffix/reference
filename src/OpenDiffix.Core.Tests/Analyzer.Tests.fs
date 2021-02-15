@@ -166,7 +166,7 @@ type Tests(db: DBFixture) =
   let analyzeQuery query =
     query
     |> Parser.parse
-    |> Result.bind (fun parseTree -> Analyzer.analyze db.Connection anonParams parseTree |> Async.RunSynchronously)
+    |> Result.bind (fun parseTree -> Analyzer.analyze db.DataProvider anonParams parseTree |> Async.RunSynchronously)
     |> Utils.unwrap
     |> function
     | SelectQuery s -> s
