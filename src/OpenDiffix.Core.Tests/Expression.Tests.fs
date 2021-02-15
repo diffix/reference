@@ -137,7 +137,7 @@ let evaluateAggregator fn args = evaluateAggregator ctx fn args testRows
 [<Fact>]
 let ``evaluate scalar expressions`` () =
   // select val_int + 3
-  evaluate (FunctionExpr(ScalarFunction Plus, [ colRef1; Constant(Integer 3L) ]))
+  evaluate (FunctionExpr(ScalarFunction Add, [ colRef1; Constant(Integer 3L) ]))
   |> should equal (Integer 10L)
 
   // select val_str
@@ -150,7 +150,7 @@ let ``evaluate standard aggregators`` () =
   let countDistinct = AggregateFunction(Count, { AggregateOptions.Default with Distinct = true })
 
   // select sum(val_float - val_int)
-  evaluateAggregator sum [ FunctionExpr(ScalarFunction Minus, [ colRef2; colRef1 ]) ]
+  evaluateAggregator sum [ FunctionExpr(ScalarFunction Subtract, [ colRef2; colRef1 ]) ]
   |> should equal (Real 2.0)
 
   // select count(*)

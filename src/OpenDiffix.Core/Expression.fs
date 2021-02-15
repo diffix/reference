@@ -21,8 +21,8 @@ type AggregateFunction =
         |> Result.bind Expression.GetType
 
 and ScalarFunction =
-  | Plus
-  | Minus
+  | Add
+  | Subtract
   | Equals
   | Not
   | And
@@ -35,8 +35,8 @@ and ScalarFunction =
 
   static member ReturnType fn (args: Expression list) =
     match fn with
-    | Plus
-    | Minus ->
+    | Add
+    | Subtract ->
         args
         |> List.tryFind (fun arg ->
           match (Expression.GetType arg) with
@@ -65,8 +65,8 @@ and Function =
     | "count" -> Ok(AggregateFunction(Count, AggregateOptions.Default))
     | "sum" -> Ok(AggregateFunction(Sum, AggregateOptions.Default))
     | "diffix_count" -> Ok(AggregateFunction(DiffixCount, AggregateOptions.Default))
-    | "+" -> Ok(ScalarFunction Plus)
-    | "-" -> Ok(ScalarFunction Minus)
+    | "+" -> Ok(ScalarFunction Add)
+    | "-" -> Ok(ScalarFunction Subtract)
     | "=" -> Ok(ScalarFunction Equals)
     | "length" -> Ok(ScalarFunction Length)
     | other -> Error $"Unknown function %A{other}"
