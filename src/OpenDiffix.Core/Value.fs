@@ -47,11 +47,8 @@ module Value =
           | x, y -> directionCoefficient * Operators.compare x y
     }
 
-  let isTruthy =
+  let unwrapBoolean =
     function
     | Null -> false
     | Boolean value -> value
-    | Integer n -> n <> 0L
-    | Real n -> n <> 0.
-    | String "" -> false
-    | String value -> value.ToLower() = "true"
+    | _ -> failwith "Expecting boolean value or null."

@@ -107,7 +107,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
             {
               Expression =
-                FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+                FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               Alias = "+"
             }
             {
@@ -129,7 +129,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           [
             GroupingSet [
               ColumnReference(1, IntegerType)
-              FunctionExpr(ScalarFunction Plus, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+              FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
             ]
           ]

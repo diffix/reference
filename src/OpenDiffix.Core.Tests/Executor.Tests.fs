@@ -15,7 +15,7 @@ type Tests(db: DBFixture) =
     let column = table.Columns |> List.item index
     ColumnReference(index, column.Type)
 
-  let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1L) ])
+  let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
   let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
   let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])

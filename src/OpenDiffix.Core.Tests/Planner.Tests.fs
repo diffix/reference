@@ -38,7 +38,7 @@ let selectColumn index =
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
-let plus1 expression = FunctionExpr(ScalarFunction Plus, [ expression; Constant(Integer 1L) ])
+let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
 [<Fact>]
 let ``plan select`` () =
