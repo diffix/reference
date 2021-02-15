@@ -8,13 +8,11 @@ This document describes the operation of low count filtering.
 
 LCF is defined by three parameters:
 
-1. `lower`: The absolute lower bound of the noisy threshold
+1. `always_suppress_upper_bound`: The upper bound of distinct AIDs at which buckets will always be suppressed
 2. `mean`: The mean value of the normal distribution used to set the noisy threshold
 3. `sd`: The standard deviation of the normal distribution
 
-I suggest that `lower` always be a real number like 1.5, not an integer. This way we avoid the question of whether it is 'less than', 'greater than', 'less than or equal', etc. I for one can never remember which it is...
-
-It must not be possible to configure a value of `lower` such that a bucket with one distinct AID is not suppressed.
+It must not be possible to configure a value of `always_suppress_upper_bound` such that a bucket with one distinct AID is not suppressed.
 
 ### Algorithm
 
@@ -36,8 +34,8 @@ Once we have the `working_aid`, then from this we produce two values:
 The algorithm then works like this:
 
 1. Generate a normal sticky noise sample `threshold` using `mean` and `sd`. The PRNG is seeded by `seed`.
-2. If `threshold` is less than `lower`, set `threshold = lower`.
-3. Set a value `upper = mean + (mean - lower)`.  If `threshold` is greater than `upper`, set `threshold = upper`.
+2. If `threshold` is less than `always_suppress_upper_bound`, set `threshold = always_suppress_upper_bound`.
+3. Set a value `upper = mean + (mean - always_suppress_upper_bound)`.  If `threshold` is greater than `upper`, set `threshold = upper`.
 4. If `num_distinct` is less than `threshold`, then suppress. Otherwise don't suppress.
 
 ## Rationale and Config Settings
@@ -48,9 +46,9 @@ To get a sense of how to set the LCF config parameters, the program lcfParams.py
 
 *mean*: Different `mean` values from 3 to 9. Higher `mean` is more private.
 
-*lower*: `lower` values of 1.5 and 2.5. Higher `lower` is more private.
+*always_suppress_upper_bound*: `always_suppress_upper_bound` values of 1 and 2. Higher `always_suppress_upper_bound` is more private.
 
-*sd*: SDs set as the distance from `mean` to `int(lower)` divided by 2, 3, and 4. Effect of `sd` will be shown in the results.
+*sd*: SDs set as the distance from `mean` to `int(always_suppress_upper_bound)` divided by 2, 3, and 4. Effect of `sd` will be shown in the results.
 
 The main purpose of LCF is to prevent an attacker from simply displaying private data with `SELECT *`. The reason we make the threshold noisy, however, is to avoid situations where an attacker is able to deduce something about a single user depending on whether a bucket was suppressed or reported. If there is a hard threshold, then in cases where an analyst knows that there are N or N+1 AIDs in a bucket (where the hard threshold is N), then the analyst knows with certainty whether the N+1th AID is included based on whether the bucket was reported or suppressed.
 
@@ -60,9 +58,9 @@ Following is an example of how a noisy threshold works with strong privacy. Here
 |:------------|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|
 | (8.0,1.5)   | 3e-05   | 0.00044 | 0.00383 | 0.02286 | 0.0912  | 0.25181 | 0.49994 | 0.7468  | 0.90866 |
 
-With this setting, if we were to set `lower=2.5`, then the hard threshold would almost never be invoked, roughly once in every 30K buckets. What this means from a practical perspective is that if an analyst knows that a bucket has either 2 or 3 users in it, it would be very rare that the bucket is reported, thus revealing with 100% certainty that there are in fact 3 AIDs in the bucket.
+With this setting, if we were to set `always_suppress_upper_bound=2.5`, then the hard threshold would almost never be invoked, roughly once in every 30K buckets. What this means from a practical perspective is that if an analyst knows that a bucket has either 2 or 3 users in it, it would be very rare that the bucket is reported, thus revealing with 100% certainty that there are in fact 3 AIDs in the bucket.
 
-We can see this certainty in the table below. This table represents the case where the attacker knows that there are either N or N+1 AIDs in a given bucket, each with 50% probability. Here `lower=2.5`. If there are 2 or 3 AIDs (N=2), then if the bucket is reported, the attacker knows with 100% certainty that there are 3 AIDs in the bucket. However, this happens once in every 4500 or so buckets. As N grows, the likelihood of a bucket being reported grows, but the confidence in the guess shrinks. (The 1/1000000++ notation simply means that the bucket was never reported in 1000000 trials, so the true probability is unknown.)
+We can see this certainty in the table below. This table represents the case where the attacker knows that there are either N or N+1 AIDs in a given bucket, each with 50% probability. Here `always_suppress_upper_bound=2.5`. If there are 2 or 3 AIDs (N=2), then if the bucket is reported, the attacker knows with 100% certainty that there are 3 AIDs in the bucket. However, this happens once in every 4500 or so buckets. As N grows, the likelihood of a bucket being reported grows, but the confidence in the guess shrinks. (The 1/1000000++ notation simply means that the bucket was never reported in 1000000 trials, so the true probability is unknown.)
 
 | (mean,sd)   | N   | Prob N AIDs (sup)   | Prob N+1 AIDs (rep)   | Prob reported   |
 |:------------|:----|:--------------------|:----------------------|:----------------|
@@ -74,11 +72,11 @@ We can see this certainty in the table below. This table represents the case whe
 | (8.0,1.5)   | 6   | 0.549               | 0.73                  | 1/5             |
 | (8.0,1.5)   | 7   | 0.600               | 0.66                  | 1/2             |
 
-So in my mind, `mean=8`, `sd=1.5`, and `lower=2.5` represents strong LCF. On the other hand, there is lots of suppression in this case. Furthermore, we can ask if it is really necessary to have such strong LCF. There are two mitigating circumstances in particular. First, it is relatively rare that an attacker knows that there is only N or N+1 AIDs in a given bucket, and more rare as N increases. (Why would an attacker happen to know about all but one AID in a bucket? It could happen, but is kindof strange.)
+So in my mind, `mean=8`, `sd=1.5`, and `always_suppress_upper_bound=2.5` represents strong LCF. On the other hand, there is lots of suppression in this case. Furthermore, we can ask if it is really necessary to have such strong LCF. There are two mitigating circumstances in particular. First, it is relatively rare that an attacker knows that there is only N or N+1 AIDs in a given bucket, and more rare as N increases. (Why would an attacker happen to know about all but one AID in a bucket? It could happen, but is kindof strange.)
 
-Second, if a column has a lot of buckets with only 2 AIDs (say for instance where `lower=1.5`), then of course there is a danger that many values can simply be read out with `SELECT col, count(*)`. However, one could disable selection for that column. Or the column itself could be declared an AID (for instance say the column is `account_number` for a bank with many joint accounts). Therefore in many cases a less private setting may be perfectly adequate.
+Second, if a column has a lot of buckets with only 2 AIDs (say for instance where `always_suppress_upper_bound=1.5`), then of course there is a danger that many values can simply be read out with `SELECT col, count(*)`. However, one could disable selection for that column. Or the column itself could be declared an AID (for instance say the column is `account_number` for a bank with many joint accounts). Therefore in many cases a less private setting may be perfectly adequate.
 
-Following is the data for (3.5,0.6) and (4.0,0.8) (`lower=1.5`).
+Following is the data for (3.5,0.6) and (4.0,0.8) (`always_suppress_upper_bound=1.5`).
 
 Again we see that very few buckets would be rejected because of the hard lower bound.
 
@@ -98,14 +96,14 @@ From the data below, we see that, if the attacker knows that there are either 1 
 | (4.0,0.8)   | 2   | 0.526               | 0.94                  | 1/17            |
 | (4.0,0.8)   | 3   | 0.642               | 0.83                  | 1/3             |
 
-This all suggests to me that a good setting for Knox would indeed be `mean=8`, `sd=1.5`, and `lower=2.5`. This setting could also be used for Publish *in the case where the output is made public* to be very safe. For use with Public by the trusted analyst, or for Cloak, a setting of `mean=4`, `sd=0.8`, and `lower=1.5` or `mean=3.5`, `sd=0.6`, and `lower=1.5` should be fine.
+This all suggests to me that a good setting for Knox would indeed be `mean=8`, `sd=1.5`, and `always_suppress_upper_bound=2.5`. This setting could also be used for Publish *in the case where the output is made public* to be very safe. For use with Public by the trusted analyst, or for Cloak, a setting of `mean=4`, `sd=0.8`, and `always_suppress_upper_bound=1.5` or `mean=3.5`, `sd=0.6`, and `always_suppress_upper_bound=1.5` should be fine.
 
 
 
 ## Data from lcfParams.py
 
 
-Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed). In producing these numbers, we set `lower=0` so that we can see how often the lower limit would have been hit. In practice we would never set `lower=0`.
+Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed). In producing these numbers, we set `always_suppress_upper_bound=0` so that we can see how often the lower limit would have been hit. In practice we would never set `always_suppress_upper_bound=0`.
         
 | (mean,sd)   |       1 |       2 |       3 |       4 |       5 |       6 |       7 |       8 |       9 |
 |:------------|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|
@@ -134,7 +132,7 @@ Given the count of distinct AIDs in a bucket, what is the probability that the b
 | (9.0,2.0)   | 4e-05   | 0.00023 | 0.0013  | 0.00631 | 0.02263 | 0.06676 | 0.15864 | 0.30828 | 0.49994 |
 | (9.0,1.6)   | 0       | 1e-05   | 9e-05   | 0.00094 | 0.0062  | 0.03026 | 0.1055  | 0.26564 | 0.50035 |
 
-Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (lower=1.5):
+Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (`always_suppress_upper_bound=1.5`):
 1. The probability that there is in fact N AIDs given that the bucket is suppressed.
 2. The probability that there are in fact N+1 AIDs given that the bucket is reported.
 3. The likelihood that the bucket is reported.
@@ -266,7 +264,7 @@ Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket. 
 | (9.0,1.6)   | 8   | 0.594               | 0.65                  | 1/2             |
 |             |     |                     |                       |                 |
 
-Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) In producing these numbers, we set `lower=0` so that we can see how often the lower limit would have been hit. In practice we would never set `lower=0`.
+Given the count of distinct AIDs in a bucket, what is the probability that the bucket will be reported (not suppressed) In producing these numbers, we set `always_suppress_upper_bound=0` so that we can see how often the lower limit would have been hit. In practice we would never set `always_suppress_upper_bound=0`.
         
 | (mean,sd)   |       2 |       3 |       4 |       5 |       6 |       7 |       8 |       9 |      10 |
 |:------------|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|--------:|
@@ -295,7 +293,7 @@ Given the count of distinct AIDs in a bucket, what is the probability that the b
 | (10.0,2.0)  | 3e-05   | 0.00025 | 0.00139 | 0.00623 | 0.02267 | 0.06643 | 0.15885 | 0.30746 | 0.50091 |
 | (10.0,1.6)  | 0       | 0       | 9e-05   | 0.00096 | 0.00626 | 0.03047 | 0.10549 | 0.26672 | 0.50044 |
 
-Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (lower=2.5):
+Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (`always_suppress_upper_bound=2.5`):
 1. The probability that there is in fact N AIDs given that the bucket is suppressed.
 2. The probability that there are in fact N+1 AIDs given that the bucket is reported.
 3. The likelihood that the bucket is reported.
