@@ -122,86 +122,44 @@ type EvaluationContext =
 type ScalarArgs = Value list
 type AggregateArgs = seq<Value list>
 
-module ExpressionUtils =
-  let invalidOverload name = failwith $"Invalid overload called for function '{name}'."
-
-  let binaryFunction fn =
-    fun _ctx args ->
-      match args with
-      | [ a; b ] -> fn (a, b)
-      | _ -> failwith "Expected 2 arguments in function."
-
-  let nullableBinaryFunction fn =
-    binaryFunction
-      (function
-      | Null, _ -> Null
-      | _, Null -> Null
-      | a, b -> fn (a, b))
-
-module DefaultFunctions =
-  open ExpressionUtils
-
-  let add =
-    nullableBinaryFunction
-      (function
-      | Integer a, Integer b -> Integer(a + b)
-      | Real a, Real b -> Real(a + b)
-      | Real a, Integer b -> Real(a + double b)
-      | Integer a, Real b -> Real(double a + b)
-      | _ -> invalidOverload "+")
-
-  let sub =
-    nullableBinaryFunction
-      (function
-      | Integer a, Integer b -> Integer(a - b)
-      | Real a, Real b -> Real(a - b)
-      | Real a, Integer b -> Real(a - double b)
-      | Integer a, Real b -> Real(double a - b)
-      | _ -> invalidOverload "-")
-
-  let equals =
-    nullableBinaryFunction
-      (function
-      | a, b when a = b -> Boolean true
-      | Integer a, Real b -> Boolean(float a = b)
-      | Real a, Integer b -> Boolean(a = float b)
-      | _ -> Boolean false)
-
-  let not _ctx args =
-    match args with
-    | [ Boolean b ] -> Boolean(not b)
-    | [ Null ] -> Null
-    | _ -> invalidOverload "not"
-
-  let length _ctx args =
-    match args with
-    | [ String s ] -> Integer(int64 s.Length)
-    | [ Null ] -> Null
-    | _ -> invalidOverload "length"
-
-  let binaryBooleanCheck check _ctx =
-    function
-    | [ _a; _b ] as values -> values |> List.map Value.isTruthy |> List.reduce check |> Value.Boolean
-    | _ -> failwith "Expected two arguments for binary condition"
-
 module Expression =
-  let invokeScalarFunction ctx fn args =
-    match fn with
-    | Plus -> DefaultFunctions.add ctx args
-    | Minus -> DefaultFunctions.sub ctx args
-    | Equals -> DefaultFunctions.equals ctx args
-    | Not -> DefaultFunctions.not ctx args
-    | And -> DefaultFunctions.binaryBooleanCheck (&&) ctx args
-    | Or -> DefaultFunctions.binaryBooleanCheck (||) ctx args
-    | Lt -> DefaultFunctions.binaryBooleanCheck (<) ctx args
-    | LtE -> DefaultFunctions.binaryBooleanCheck (<=) ctx args
-    | Gt -> DefaultFunctions.binaryBooleanCheck (>) ctx args
-    | GtE -> DefaultFunctions.binaryBooleanCheck (>=) ctx args
-    | Length -> DefaultFunctions.length ctx args
+  let rec evaluateScalarFunction fn args =
+    match fn, args with
+    | And, [ Boolean false; _ ] -> Boolean false
+    | And, [ _; Boolean false ] -> Boolean false
+    | Or, [ Boolean true; _ ] -> Boolean true
+    | Or, [ _; Boolean true ] -> Boolean true
+
+    | _, [ Null ] -> Null
+    | _, [ Null; _ ] -> Null
+    | _, [ _; Null ] -> Null
+
+    | Not, [ Boolean b ] -> Boolean(not b)
+    | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
+    | Or, [ Boolean b1; Boolean b2 ] -> Boolean(b1 || b2)
+
+    | _, [ Integer i; Real r ] -> evaluateScalarFunction fn [ Real(double i); Real r ]
+    | _, [ Real r; Integer i ] -> evaluateScalarFunction fn [ Real r; Real(double i) ]
+
+    | Add, [ Integer i1; Integer i2 ] -> Integer(i1 + i2)
+    | Add, [ Real r1; Real r2 ] -> Real(r1 + r2)
+    | Subtract, [ Integer i1; Integer i2 ] -> Integer(i1 - i2)
+    | Subtract, [ Real r1; Real r2 ] -> Real(r1 - r2)
+
+    | Equals, [ v1; v2 ] -> Boolean(v1 = v2)
+
+    | Lt, [ v1; v2 ] -> Boolean(v1 < v2)
+    | LtE, [ v1; v2 ] -> Boolean(v1 <= v2)
+    | Gt, [ v1; v2 ] -> Boolean(v1 > v2)
+    | GtE, [ v1; v2 ] -> Boolean(v1 >= v2)
+
+    | Length, [ String s ] -> Integer(int64 s.Length)
+
+    | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
-    | FunctionExpr (ScalarFunction fn, args) -> invokeScalarFunction ctx fn (args |> List.map (evaluate ctx row))
+    | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
     | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate '%A{fn}'."
     | ColumnReference (index, _) -> if index >= row.Length then Null else row.[index]
     | Constant value -> value

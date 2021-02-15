@@ -7,24 +7,22 @@ open OpenDiffix.Core
 let ctx = EvaluationContext.Default
 
 module DefaultFunctionsTests =
-  let runs fn expectations =
+  let runsBinary fn expectations =
     expectations
-    |> List.iter (fun (a, b, result) -> fn ctx [ a; b ] |> should equal result)
+    |> List.iter (fun (a, b, result) -> Expression.evaluateScalarFunction fn [ a; b ] |> should equal result)
 
-  let runsWithArg fn arg expectations =
+  let runsUnary fn expectations =
     expectations
-    |> List.iter (fun (a, result) -> fn ctx arg [ a ] |> should equal result)
+    |> List.iter (fun (a, result) -> Expression.evaluateScalarFunction fn [ a ] |> should equal result)
 
-  let runs1 fn expectations =
-    expectations
-    |> List.iter (fun (a, result) -> fn ctx [ a ] |> should equal result)
-
-  let fails fn cases = cases |> List.iter (fun args -> (fun () -> fn ctx args |> ignore) |> shouldFail)
+  let fails fn cases =
+    cases
+    |> List.iter (fun args -> (fun () -> Expression.evaluateScalarFunction fn args |> ignore) |> shouldFail)
 
   [<Fact>]
-  let add () =
-    runs
-      DefaultFunctions.add
+  let Add () =
+    runsBinary
+      Add
       [
         Integer 5L, Integer 3L, Integer 8L
         Real 2.5, Integer 3L, Real 5.5
@@ -34,7 +32,7 @@ module DefaultFunctionsTests =
       ]
 
     fails
-      DefaultFunctions.add
+      Add
       [ //
         [ Integer 5L; String "a" ]
         [ Boolean true; Integer 1L ]
@@ -42,9 +40,9 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
-  let sub () =
-    runs
-      DefaultFunctions.sub
+  let Subtract () =
+    runsBinary
+      Subtract
       [
         Integer 5L, Integer 3L, Integer 2L
         Real 2.5, Integer 3L, Real -0.5
@@ -54,7 +52,7 @@ module DefaultFunctionsTests =
       ]
 
     fails
-      DefaultFunctions.sub
+      Subtract
       [ //
         [ Integer 5L; String "a" ]
         [ Boolean true; Integer 1L ]
@@ -62,22 +60,27 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
-  let equals () =
-    runs
-      DefaultFunctions.equals
+  let Equals () =
+    runsBinary
+      Equals
       [
         Integer 3L, Integer 3L, Boolean true
+        Integer 3L, Integer 4L, Boolean false
         Real 3., Integer 3L, Boolean true
+        Real 3., Integer 2L, Boolean false
         Null, Null, Null
         Null, Integer 3L, Null
-        Integer 3L, Null, Null
+        Real 3., Null, Null
         String "a", String "a", Boolean true
+        String "a", String "abc", Boolean false
+        Null, String "abc", Null
+        Boolean false, Boolean false, Boolean true
       ]
 
   [<Fact>]
-  let not () =
-    runs1
-      DefaultFunctions.not
+  let Not () =
+    runsUnary
+      Not
       [ //
         Boolean true, Boolean false
         Boolean false, Boolean true
@@ -85,28 +88,110 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
-  let length () =
-    runs1
-      DefaultFunctions.length
+  let Length () =
+    runsUnary
+      Length
       [ //
         String "abc", Integer 3L
         Null, Null
       ]
 
   [<Fact>]
-  let binaryChecks () =
-    runs
-      (DefaultFunctions.binaryBooleanCheck (&&))
+  let And () =
+    runsBinary
+      And
       [ //
         Boolean true, Boolean true, Boolean true
         Boolean true, Boolean false, Boolean false
         Boolean false, Boolean false, Boolean false
-        Integer 0L, Boolean true, Boolean false
-        Real 0., Boolean true, Boolean false
-        String "", Boolean true, Boolean false
-        String "bar", Boolean true, Boolean false
-        String "true", Boolean true, Boolean true
-        Null, Boolean true, Boolean false
+        Null, Boolean true, Null
+        Null, Boolean false, Boolean false
+        Null, Null, Null
+      ]
+
+  [<Fact>]
+  let Or () =
+    runsBinary
+      Or
+      [ //
+        Boolean true, Boolean true, Boolean true
+        Boolean true, Boolean false, Boolean true
+        Boolean false, Boolean false, Boolean false
+        Boolean true, Null, Boolean true
+        Boolean false, Null, Null
+        Null, Null, Null
+      ]
+
+  [<Fact>]
+  let Lt () =
+    runsBinary
+      Lt
+      [
+        Integer 3L, Integer 3L, Boolean false
+        Integer 3L, Integer 4L, Boolean true
+        Real 3., Integer 3L, Boolean false
+        Real 3., Integer 2L, Boolean false
+        Null, Null, Null
+        Null, Integer 3L, Null
+        Real 3., Null, Null
+        String "a", String "a", Boolean false
+        String "a", String "abc", Boolean true
+        Null, String "abc", Null
+        Boolean false, Boolean false, Boolean false
+      ]
+
+  [<Fact>]
+  let LtE () =
+    runsBinary
+      LtE
+      [
+        Integer 3L, Integer 3L, Boolean true
+        Integer 3L, Integer 4L, Boolean true
+        Real 3., Integer 3L, Boolean true
+        Real 3., Integer 2L, Boolean false
+        Null, Null, Null
+        Null, Integer 3L, Null
+        Real 3., Null, Null
+        String "a", String "a", Boolean true
+        String "a", String "abc", Boolean true
+        Null, String "abc", Null
+        Boolean false, Boolean false, Boolean true
+      ]
+
+  [<Fact>]
+  let Gt () =
+    runsBinary
+      Gt
+      [
+        Integer 3L, Integer 3L, Boolean false
+        Integer 3L, Integer 4L, Boolean false
+        Real 3., Integer 3L, Boolean false
+        Real 3., Integer 2L, Boolean true
+        Null, Null, Null
+        Null, Integer 3L, Null
+        Real 3., Null, Null
+        String "a", String "a", Boolean false
+        String "a", String "abc", Boolean false
+        Null, String "abc", Null
+        Boolean false, Boolean false, Boolean false
+      ]
+
+  [<Fact>]
+  let GtE () =
+    runsBinary
+      GtE
+      [
+        Integer 3L, Integer 3L, Boolean true
+        Integer 3L, Integer 4L, Boolean false
+        Real 3., Integer 3L, Boolean true
+        Real 3., Integer 2L, Boolean true
+        Null, Null, Null
+        Null, Integer 3L, Null
+        Real 3., Null, Null
+        String "a", String "a", Boolean true
+        String "a", String "abc", Boolean false
+        Null, String "abc", Null
+        Boolean false, Boolean false, Boolean true
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
