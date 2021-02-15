@@ -1,5 +1,14 @@
 namespace OpenDiffix.Core.AnonymizerTypes
 
+type LowCountParams =
+  {
+    Lower: float
+    Mean: float
+    StandardDev: float
+  }
+
+  static member Default = { Lower = 2.; Mean = 4.; StandardDev = 1.8 }
+
 type Threshold =
   {
     Lower: int
@@ -22,8 +31,7 @@ type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Seed: int
-    LowCountAbsoluteLowerBound: int
-    LowCountThreshold: Threshold
+    LowCountParams: LowCountParams
 
     // Count params
     OutlierCount: Threshold
@@ -35,8 +43,7 @@ type AnonymizationParams =
     {
       TableSettings = Map.empty
       Seed = 0
-      LowCountAbsoluteLowerBound = 2
-      LowCountThreshold = Threshold.Default
+      LowCountParams = LowCountParams.Default
       OutlierCount = Threshold.Default
       TopCount = Threshold.Default
       Noise = NoiseParam.Default

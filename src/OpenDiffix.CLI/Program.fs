@@ -18,7 +18,7 @@ type CliArguments =
   // Threshold values
   | [<Unique>] Threshold_Outlier_Count of lower: int * upper: int
   | [<Unique>] Threshold_Top_Count of lower: int * upper: int
-  | [<Unique>] Low_Count of absolute_lower_bound: int * threshold_low: int * threshold_high: int
+  | [<Unique>] Low_Count of lower: float * mean: float * standard_dev: float
 
   // General anonymization parameters
   | [<Unique>] Noise of std_dev: float * limit: float
@@ -46,10 +46,11 @@ type CliArguments =
           + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
       | Low_Count _ ->
           "Parameters used to determine whether a bucket is low count or not. It consists of three distinct "
-          + "configuration values. The first value is an absolute lower bound. No bucket with less than this many "
+          + "configuration values. The first value is an lower bound. No bucket with less than this many "
           + "distinct AIDs will be considered for further processing. The second and third configuration values "
-          + "constitute the lower (inclusive) and upper (not inclusive) bounds of a uniformly distributed threshold "
-          + "value. Only buckets with an AID count exceeding this threshold are allowed."
+          + "constitute the mean and standard deviation used to produce a noisy threshold value for the low bound "
+          + "comparison. The noisy threshold value is forced to be within the range `lower` and `mean + mean - lower`. "
+          + "Only buckets with an AID count exceeding this threshold are allowed."
       | Noise _ ->
           "Specifies the standard deviation used when calculating the noise throughout the system. "
           + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
@@ -67,8 +68,8 @@ let toThreshold =
 
 let toLowCount =
   function
-  | Some (absoluteLowBound, lower, upper) -> absoluteLowBound, { Lower = lower; Upper = upper }
-  | _ -> AnonymizationParams.Default.LowCountAbsoluteLowerBound, toThreshold None
+  | Some (lower, mean, standard_dev) -> { Lower = lower; Mean = mean; StandardDev = standard_dev }
+  | _ -> LowCountParams.Default
 
 let toNoise =
   function
@@ -87,12 +88,10 @@ let private toTableSettings (aidColumns: string list) =
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
-  let lowCountAbsoluteLowerBound, lowCountThreshold = parsedArgs.TryGetResult Low_Count |> toLowCount
   {
     TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
-    LowCountAbsoluteLowerBound = lowCountAbsoluteLowerBound
-    LowCountThreshold = lowCountThreshold
+    LowCountParams = parsedArgs.TryGetResult Low_Count |> toLowCount
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
     Noise = parsedArgs.TryGetResult Noise |> toNoise

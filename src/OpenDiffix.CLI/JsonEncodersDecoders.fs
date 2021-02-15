@@ -3,11 +3,7 @@ module OpenDiffix.CLI.JsonEncodersDecoders
 open Thoth.Json.Net
 open OpenDiffix.Core.AnonymizerTypes
 
-type QueryRequest = {
-  Query: string
-  DbPath: string
-  AnonymizationParameters: AnonymizationParams
-}
+type QueryRequest = { Query: string; DbPath: string; AnonymizationParameters: AnonymizationParams }
 
 let encodeValue =
   function
@@ -17,12 +13,7 @@ let encodeValue =
   | OpenDiffix.Core.Value.Real float -> Encode.float float
   | OpenDiffix.Core.Value.String string -> Encode.string string
 
-let encodeRow values =
-  Encode.list (
-    values
-    |> Array.toList
-    |> List.map encodeValue
-  )
+let encodeRow values = Encode.list (values |> Array.toList |> List.map encodeValue)
 
 let encodeQueryResult (queryResult: OpenDiffix.Core.QueryResult) =
   Encode.object [
@@ -48,7 +39,12 @@ let encodeAnonParams (ap: AnonymizationParams) =
         Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
       )
     )
-    "low_count_threshold", encodeThreshold ap.LowCountThreshold
+    "low_count_params",
+    Encode.object [
+      "lower", Encode.float ap.LowCountParams.Lower
+      "standard_dev", Encode.float ap.LowCountParams.StandardDev
+      "mean", Encode.float ap.LowCountParams.Mean
+    ]
     "outlier_count", encodeThreshold ap.OutlierCount
     "top_count", encodeThreshold ap.TopCount
     "noise", encodeNoiseParam ap.Noise
@@ -61,22 +57,17 @@ let encodeRequestParams query dbPath anonParams =
     "database_path", Encode.string dbPath
   ]
 
-let encodeErrorMsg errorMsg =
-  Encode.object [
-    "success", Encode.bool false
-    "error", Encode.string errorMsg
-  ]
+let encodeErrorMsg errorMsg = Encode.object [ "success", Encode.bool false; "error", Encode.string errorMsg ]
 
 let encodeIndividualQueryResponse (queryRequest: QueryRequest) =
   function
   | Ok queryResult ->
-    Encode.object [
-      "success", Encode.bool true
-      "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
-      "result", encodeQueryResult queryResult
-    ]
-  | Error parseError ->
-    encodeErrorMsg (parseError.ToString())
+      Encode.object [
+        "success", Encode.bool true
+        "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
+        "result", encodeQueryResult queryResult
+      ]
+  | Error parseError -> encodeErrorMsg (parseError.ToString())
 
 let encodeBatchRunResult (time: System.DateTime) version queryResults =
   Encode.object [
@@ -85,5 +76,4 @@ let encodeBatchRunResult (time: System.DateTime) version queryResults =
     "query_results", Encode.list queryResults
   ]
 
-let decodeRequestParams content =
-  Decode.Auto.fromString<QueryRequest list>(content, caseStrategy=SnakeCase)
+let decodeRequestParams content = Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase)

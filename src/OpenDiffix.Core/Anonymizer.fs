@@ -24,20 +24,26 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> max -noiseParam.Cutoff
   |> min noiseParam.Cutoff
   |> round
-  |> int32
 
 let countAids (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
   let noise = noiseValue rnd anonymizationParams.Noise
-  max (aidSet.Count + noise) 0
+  max (aidSet.Count + (int noise)) 0
 
 let isLowCount (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
+  // Paul's algorithm specifies that the noisy threshold should be a gaussian
+  // random variable between `lower` and `mean + (mean - lower)`.
+  // This should match our internal noise calculations of `mean + noisyValue`
+  // where the noisy value uses a cutoff of `mean - lower`.
   let rnd = newRandom aidSet anonymizationParams
-  let noise = noiseValue rnd anonymizationParams.Noise
-  let threshold = randomUniform rnd anonymizationParams.LowCountThreshold
+  let lowCountParams = anonymizationParams.LowCountParams
+  let cutoff = lowCountParams.Mean - lowCountParams.Lower
 
-  aidSet.Count < anonymizationParams.LowCountAbsoluteLowerBound
-  || aidSet.Count + noise <= threshold
+  let threshold =
+    lowCountParams.Mean
+    + (noiseValue rnd { StandardDev = lowCountParams.StandardDev; Cutoff = cutoff })
+
+  (float aidSet.Count) < threshold
 
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
