@@ -91,7 +91,7 @@ def do_conditional_probs(always_suppress_upper_bound,mean_sd,counts,trials):
         res['Prob reported'].append(' ')
     
     print(f'''
-Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (always_suppress_upper_bound={always_suppress_upper_bound}):
+Suppose that an attacker knows that there are either N or N+1 AIDs in a bucket.  Suppose that the probability of either outcome is 50%. The following table shows three things (`always_suppress_upper_bound={always_suppress_upper_bound}`):
 1. The probability that there is in fact N AIDs given that the bucket is suppressed.
 2. The probability that there are in fact N+1 AIDs given that the bucket is reported.
 3. The likelihood that the bucket is reported.
@@ -106,7 +106,7 @@ base_means = [2,2.5,3,4,6,8]
 # Let's measure a factor of this many SDs between always_suppress_upper_bound and mean
 sd_factors = [2,3,4,5]
 # Let's measure these values for always_suppress_upper_bound
-lowers = [1.5,2.5]
+lowers = [1,2]
 # Let's look at buckets with this many distinct AIDs (plus lower)
 base_counts = [0,1,2,3,4,5,6,7,8]
 trials = 1000000
