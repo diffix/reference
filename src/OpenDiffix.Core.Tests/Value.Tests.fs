@@ -5,10 +5,8 @@ open FsUnit.Xunit
 open OpenDiffix.Core
 
 module ComparerTests =
-  open System.Linq
-
   let sort direction nulls (values: seq<Value>) =
-    values.OrderBy((fun x -> x), Value.comparer direction nulls) |> List.ofSeq
+    values |> Seq.sortWith(Value.comparer direction nulls) |> Seq.toList
 
   [<Fact>]
   let ``Sorts in ascending direction`` () =

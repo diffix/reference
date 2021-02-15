@@ -2,7 +2,6 @@
 module OpenDiffix.Core.TestHelpers
 
 open Xunit
-open System
 open OpenDiffix.Core
 
 type DBFixture() =
