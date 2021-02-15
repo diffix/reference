@@ -49,13 +49,10 @@ module Table =
         |> Result.requireSome "Execution error: Table not found"
     }
 
-  let tryFindColumn table columnName =
+  let getColumn table columnName =
     table.Columns
     |> List.indexed
     |> List.tryFind (fun (_index, column) -> equalsI column.Name columnName)
-
-  let getColumn table columnName =
-    tryFindColumn table columnName
     |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
 
   let load connection table =
