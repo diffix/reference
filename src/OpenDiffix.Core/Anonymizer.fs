@@ -33,11 +33,16 @@ let countAids (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) 
 
 let isLowCount (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
-  let noise = noiseValue rnd anonymizationParams.Noise
-  let threshold = randomUniform rnd anonymizationParams.LowCountThreshold
 
-  aidSet.Count < anonymizationParams.LowCountAbsoluteLowerBound
-  || aidSet.Count + noise <= threshold
+  let threshold =
+    randomUniform
+      rnd
+      {
+        Lower = anonymizationParams.MinimumAllowedAids
+        Upper = anonymizationParams.MinimumAllowedAids + 2
+      }
+
+  aidSet.Count < threshold
 
 let count (anonymizationParams: AnonymizationParams) (perUserContribution: Map<AidHash, int64>) =
   let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
