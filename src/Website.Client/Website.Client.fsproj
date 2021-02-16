@@ -5,6 +5,7 @@
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DataProvider.fs" />
     <Compile Include="Main.fs" />
     <Compile Include="Startup.fs" />
   </ItemGroup>
@@ -16,5 +17,8 @@
   </ItemGroup>
   <ItemGroup>
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
   </ItemGroup>
 </Project>
