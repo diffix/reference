@@ -7,3 +7,11 @@ release-macos:
 release-linux:
 	dotnet publish -r linux-x64 -o build -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true --self-contained true /p:IncludeNativeLibrariesForSelfExtract=true src/OpenDiffix.CLI/
 
+dev-css:
+	yarn dev-css
+
+prod-css:
+	yarn prod-css
+
+publish: prod-css
+	dotnet publish -c Release -o release -p src/Website.Client
