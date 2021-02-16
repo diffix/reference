@@ -114,13 +114,8 @@ let dryRun query dbPath anonParams =
   Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
 let runQuery query dbPath anonParams =
-  let connection = dbPath |> SQLite.dbConnection |> Utils.unwrap
-
-  connection.Open()
-  let queryResult = QueryEngine.run connection query anonParams |> Async.RunSynchronously
-  connection.Close()
-
-  queryResult
+  use dataProvider = new SQLite.DataProvider(dbPath)
+  QueryEngine.run dataProvider query anonParams |> Async.RunSynchronously
 
 let valueToString =
   function

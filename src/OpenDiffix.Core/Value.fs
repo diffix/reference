@@ -38,14 +38,12 @@ module Value =
       | NullsFirst -> -1
       | NullsLast -> 1
 
-    { new System.Collections.Generic.IComparer<Value> with
-        member __.Compare(x, y) =
-          match x, y with
-          | Null, Null -> 0
-          | Null, _ -> nullsValue
-          | _, Null -> -nullsValue
-          | x, y -> directionCoefficient * Operators.compare x y
-    }
+    fun a b ->
+      match a, b with
+      | Null, Null -> 0
+      | Null, _ -> nullsValue
+      | _, Null -> -nullsValue
+      | x, y -> directionCoefficient * Operators.compare x y
 
   let unwrapBoolean =
     function

@@ -166,16 +166,11 @@ type Tests(db: DBFixture) =
   let analyzeQuery query =
     query
     |> Parser.parse
-    |> Result.bind (fun parseTree -> Analyzer.analyze db.Connection anonParams parseTree |> Async.RunSynchronously)
+    |> Result.bind (fun parseTree -> Analyzer.analyze db.DataProvider anonParams parseTree |> Async.RunSynchronously)
     |> Utils.unwrap
     |> function
     | SelectQuery s -> s
     | _other -> failwith "Expected a top-level SELECT query"
-
-  let unwrapSelectQuery =
-    function
-    | Query (SelectQuery q) -> q
-    | _ -> failwith "Expected a select query"
 
   [<Fact>]
   let ``Analyze count transforms`` () =

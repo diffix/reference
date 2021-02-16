@@ -7,7 +7,7 @@ open OpenDiffix.Core.PlannerTypes
 
 type Tests(db: DBFixture) =
 
-  let getTable name = name |> Table.getI db.Connection |> Async.RunSynchronously |> Utils.unwrap
+  let getTable name = name |> Table.getI db.DataProvider |> Async.RunSynchronously |> Utils.unwrap
 
   let products = getTable "products"
 
@@ -25,7 +25,7 @@ type Tests(db: DBFixture) =
 
   let context = EvaluationContext.Default
 
-  let execute plan = plan |> Executor.execute db.Connection context |> Seq.toList
+  let execute plan = plan |> Executor.execute db.DataProvider context |> Seq.toList
 
   [<Fact>]
   let ``execute scan`` () =

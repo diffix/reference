@@ -165,18 +165,16 @@ module Expression =
     | ColumnReference (index, _) -> if index >= row.Length then Null else row.[index]
     | Constant value -> value
 
-  open System.Linq
-
-  let rec private thenSort ctx orderings (rows: IOrderedEnumerable<Row>) =
-    match orderings with
-    | [] -> rows
-    | (OrderBy (expr, direction, nulls)) :: tail ->
-        let sorted = rows.ThenBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
-        thenSort ctx tail sorted
-
-  let sortRows ctx orderings (rows: seq<Row>) =
-    match orderings with
-    | [] -> rows
-    | (OrderBy (expr, direction, nulls)) :: tail ->
-        let firstSort = rows.OrderBy((fun row -> evaluate ctx row expr), Value.comparer direction nulls)
-        thenSort ctx tail firstSort :> seq<Row>
+  let sortRows ctx orderings (rows: Row seq) =
+    let rec performSort orderings rows =
+      match orderings with
+      | [] -> rows
+      | (OrderBy (expr, direction, nulls)) :: tail ->
+          rows
+          |> Seq.sortWith(fun rowA rowB ->
+            let expressionA = evaluate ctx rowA expr
+            let expressionB = evaluate ctx rowB expr
+            Value.comparer direction nulls expressionA expressionB
+          )
+          |> performSort tail
+    performSort (List.rev orderings) rows

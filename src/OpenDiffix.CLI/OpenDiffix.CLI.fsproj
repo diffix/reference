@@ -9,6 +9,7 @@
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="JsonEncodersDecoders.fs" />
+        <Compile Include="SQLiteDataProvider.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
@@ -18,6 +19,7 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="System.Data.SQLite.Core" Version="1.0.113.7" />
         <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />
     </ItemGroup>
 

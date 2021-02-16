@@ -1,6 +1,5 @@
 namespace OpenDiffix.Core.AnalyzerTypes
 
-open FSharpPlus
 open OpenDiffix.Core
 
 type JoinType =
@@ -14,14 +13,14 @@ type SelectExpression =
     Expression: Expression
     Alias: string
   }
-  static member Map(se: SelectExpression, f: Expression -> Expression) = { se with Expression = map f se.Expression }
+  static member Map(se: SelectExpression, f: Expression -> Expression) = { se with Expression = Expression.Map(se.Expression, f) }
 
 type GroupingSet =
   | GroupingSet of Expression list
 
   static member Map(groupingSet: GroupingSet, f: Expression -> Expression) =
     match groupingSet with
-    | GroupingSet expressions -> GroupingSet(map f expressions)
+    | GroupingSet expressions -> GroupingSet(expressions |> List.map (fun expression -> Expression.Map(expression, f)))
 
   static member Unwrap =
     function
@@ -56,12 +55,12 @@ and SelectQuery =
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     { query with
-        Columns = map (map f) query.Columns
+        Columns = List.map (fun column -> SelectExpression.Map(column, f)) query.Columns
         From = SelectFrom.Map(query.From, f)
-        Where = map f query.Where
-        GroupingSets = map (map f) query.GroupingSets
-        OrderBy = map (map f) query.OrderBy
-        Having = map f query.Having
+        Where = Expression.Map(query.Where, f)
+        GroupingSets = List.map (fun groupingSet -> GroupingSet.Map(groupingSet, f)) query.GroupingSets
+        OrderBy = OrderByExpression.Map(query.OrderBy, f)
+        Having = Expression.Map(query.Having, f)
     }
 
 and SelectFrom =
