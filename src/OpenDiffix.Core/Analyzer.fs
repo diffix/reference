@@ -206,14 +206,14 @@ let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
   | Some { AidColumns = [ column ] } -> Ok(Some column)
   | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
 
-let analyze connection
+let analyze dataProvider
             (anonParams: AnonymizationParams)
             (parseTree: ParserTypes.SelectQuery)
             : Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
     let! tableName = selectedTableName parseTree.From
     let! aidColumn = aidColumn anonParams tableName
-    let! table = Table.getI connection tableName
+    let! table = Table.getI dataProvider tableName
     let! analyzerQuery = parseTree |> transformQuery table
 
     return!

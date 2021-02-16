@@ -2,7 +2,7 @@ module OpenDiffix.Core.Executor
 
 open OpenDiffix.Core.PlannerTypes
 
-let private executeScan connection table = table |> Table.load connection |> Async.RunSynchronously |> Utils.unwrap
+let private executeScan dataProvider table = table |> Table.load dataProvider |> Async.RunSynchronously |> Utils.unwrap
 
 let private executeProject context expressions rowsStream =
   let expressions = Array.ofList expressions
@@ -68,21 +68,21 @@ let private executeJoin isOuterJoin leftStream rightStream context condition =
       joinedRows
   )
 
-let rec execute connection context plan =
+let rec execute dataProvider context plan =
   match plan with
-  | Plan.Scan table -> executeScan connection table
-  | Plan.Project (plan, expressions) -> plan |> execute connection context |> executeProject context expressions
-  | Plan.Filter (plan, condition) -> plan |> execute connection context |> executeFilter context condition
-  | Plan.Sort (plan, expressions) -> plan |> execute connection context |> executeSort context expressions
+  | Plan.Scan table -> executeScan dataProvider table
+  | Plan.Project (plan, expressions) -> plan |> execute dataProvider context |> executeProject context expressions
+  | Plan.Filter (plan, condition) -> plan |> execute dataProvider context |> executeFilter context condition
+  | Plan.Sort (plan, expressions) -> plan |> execute dataProvider context |> executeSort context expressions
 
   | Plan.Aggregate (plan, labels, aggregators) ->
       plan
-      |> execute connection context
+      |> execute dataProvider context
       |> executeAggregate context labels aggregators
 
   | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
-      let leftStream = execute connection context leftPlan
-      let rightStream = execute connection context rightPlan
+      let leftStream = execute dataProvider context leftPlan
+      let rightStream = execute dataProvider context rightPlan
 
       let joinExecutor =
         match joinType with
