@@ -171,10 +171,11 @@ module Expression =
       | [] -> rows
       | (OrderBy (expr, direction, nulls)) :: tail ->
           rows
-          |> Seq.sortWith(fun rowA rowB ->
+          |> Seq.sortWith (fun rowA rowB ->
             let expressionA = evaluate ctx rowA expr
             let expressionB = evaluate ctx rowB expr
             Value.comparer direction nulls expressionA expressionB
           )
           |> performSort tail
+
     performSort (List.rev orderings) rows
