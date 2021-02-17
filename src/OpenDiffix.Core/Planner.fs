@@ -81,4 +81,4 @@ let private planSelect query =
 let plan =
   function
   | SelectQuery query -> planSelect query
-  | UnionQuery _ -> failwith "union planning not yet supported"
+  | UnionQuery _ -> failwith "Union planning not yet supported"
