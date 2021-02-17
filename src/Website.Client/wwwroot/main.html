@@ -1,0 +1,90 @@
+<div class="w-screen h-screen bg-gray-50">
+  <div class="h-full">
+    ${Body}
+  </div>
+
+  <template id="Home">
+    <div class="md:flex">
+      <textarea bind="${Query}" class="p-2 font-mono text-2xl md:h-96 md:w-1/2 lg:w-2/3 2xl:w-3/4">
+SELECT age, count(*)
+FROM customers
+GROUP BY age
+      </textarea>
+
+      <div class="flex-grow-0 p-2 md:w-1/2 lg:w-1/3 2xl:w-1/4">
+        <h2 class="text-lg font-semibold">Anonymization parameters</h2>
+        <p class="text-xs text-gray-600">
+          Not all anonymization parameters are exposed in this interface,
+          but those that are, are dynamic. That is to say, changing them
+          should result in an immediate change to the results shown for
+          a given query.
+        </p>
+
+        <h3 class="mt-4 text-sm font-bold">Low count filter</h3>
+        <label class="flex items-baseline block text-sm">
+          <span class="flex-grow">Minimum required number of AIDs</span>
+          <input type="number" class="
+              flex-grow-0
+              w-20 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${MinimumNumberAIDs}">
+        </label>
+
+        <h3 class="mt-4 text-sm font-bold">Count aggregate</h3>
+        <label class="flex items-baseline block text-sm">
+          <span class="flex-grow">Outliers threshold (min/max)</span>
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${OutlierMin}">
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${OutlierMax}">
+        </label>
+        <label class="flex items-baseline block mt-1 text-sm">
+          <span class="flex-grow">Top threshold (min/max)</span>
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${TopMin}">
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${TopMax}">
+        </label>
+
+        <h3 class="mt-4 text-sm font-bold">Noise</h3>
+        <label class="flex items-baseline block text-sm">
+          <span class="flex-grow">Standard deviation and cutoff</span>
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${NoiseStdDev}">
+          <input type="number" class="
+              flex-grow-0
+              w-12 text-sm border rounded px-2 py-0.5 ml-2
+              focus:outline-none focus:ring-2 focus:ring-offset-1
+            " bind="${NoiseCutoff}">
+        </label>
+
+      </div>
+    </div>
+    ${Error}
+    ${Result}
+  </template>
+
+  <template id="Error">
+    <div class="px-2 py-4 text-base bg-red-400">
+      <h2 class="text-2xl font-semibold tracking-tight">An error occurred</h2>
+      <div class="mt-2 leading-relaxed break-normal">
+        ${ErrorDescription}
+      </div>
+    </div>
+  </template>
+</div>

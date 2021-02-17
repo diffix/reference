@@ -106,20 +106,12 @@ let runQuery query dbPath anonParams =
   use dataProvider = new SQLite.DataProvider(dbPath)
   QueryEngine.run dataProvider query anonParams |> Async.RunSynchronously
 
-let valueToString =
-  function
-  | Null -> "NULL"
-  | Boolean b -> b.ToString()
-  | Integer i -> i.ToString()
-  | Real r -> r.ToString()
-  | String s -> s
-
 let anonymize query dbPath anonParams =
   match runQuery query dbPath anonParams with
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun row -> row |> Array.map valueToString |> Array.reduce (sprintf "%s;%s"))
+        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
         |> List.fold (sprintf "%s\n%s") ""
 
       resultSet, 0
