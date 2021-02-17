@@ -154,8 +154,7 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ "cid" ] }
         ]
       Seed = 1
-      LowCountAbsoluteLowerBound = 2
-      LowCountThreshold = { Threshold.Default with Lower = 5; Upper = 7 }
+      MinimumAllowedAids = 2
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       Noise = { StandardDev = 1.; Cutoff = 0. }
