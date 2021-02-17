@@ -13,5 +13,5 @@ dev-css:
 prod-css:
 	yarn prod-css
 
-publish: prod-css
-	dotnet publish -c Release -o release -p src/Website.Client
+playground: prod-css
+	dotnet publish -c Release -o release src/Website.Client

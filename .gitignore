@@ -12,6 +12,7 @@ dbs/*
 .ionide
 
 build
+release
 
 node_modules
 src/Website.Client/wwwroot/css/styles.css
