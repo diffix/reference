@@ -111,7 +111,10 @@ let initModel =
   {
     Page = Home
     AnonParams = {AnonymizationParams.Default with TableSettings = tableSettings}
-    Query = ""
+    Query =
+      "SELECT age, count(*)\n"
+      + "FROM customers\n"
+      + "GROUP BY age"
     Result = None
     Error = None
   }
@@ -218,7 +221,7 @@ type MyApp() =
   inherit ProgramComponent<Model, Message>()
 
   override this.Program =
-    Program.mkProgram (fun _ -> initModel, Cmd.none) update view
+    Program.mkProgram (fun _ -> initModel, Cmd.ofMsg RunQuery) update view
     |> Program.withRouter router
 #if DEBUG
     |> Program.withHotReload
