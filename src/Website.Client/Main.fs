@@ -179,15 +179,8 @@ let homePage model dispatch =
   Main
     .Home()
     .Query(model.Query, (fun query -> dispatch (SetQuery query)))
-    .MinimumNumberAIDs(model.AnonParams.LowCountAbsoluteLowerBound,
-                       fun v ->
-                         dispatch
-                         <| AdjustAnonParam(fun a ->
-                           { a with
-                               LowCountAbsoluteLowerBound = v
-                               LowCountThreshold = { Lower = v; Upper = v + 2 }
-                           }
-                         ))
+    .MinimumNumberAIDs(model.AnonParams.MinimumAllowedAids,
+                       fun v -> dispatch <| AdjustAnonParam(fun a -> { a with MinimumAllowedAids = v }))
     .OutlierMin(model.AnonParams.OutlierCount.Lower,
                 fun v ->
                   dispatch
