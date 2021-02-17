@@ -5,6 +5,9 @@ import pandas as pd
 # given the following parameters. Prints a markdown table with the
 # results.
 
+# This is for the old-style LCF (wide-spread LCF), where mean and sd
+# were used. It doesn't apply to thin-spread LCF.
+
 def do_suppress(count,always_suppress_upper_bound,mean,sd):
     upper = mean + (mean - always_suppress_upper_bound)
     threshold = random.gauss(mean,sd)
