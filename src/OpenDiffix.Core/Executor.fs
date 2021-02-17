@@ -53,7 +53,7 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
-let private executeJoin isOuterJoin leftStream rightStream context condition =
+let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context condition =
   let rightRows = Seq.toList rightStream
 
   leftStream
@@ -61,9 +61,8 @@ let private executeJoin isOuterJoin leftStream rightStream context condition =
     let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context condition
 
     if isOuterJoin && Seq.isEmpty joinedRows then
-      // We don't know the size of the right row at this point, so we generate an incomplete row and
-      // rely on the fact that out-of-bounds column references return `Null` values.
-      seq { leftRow }
+      let nullRightRow = Array.create rightColumnsCount Null
+      seq { Array.append leftRow nullRightRow }
     else
       joinedRows
   )
@@ -86,9 +85,9 @@ let rec execute connection context plan =
 
       let joinExecutor =
         match joinType with
-        | AnalyzerTypes.InnerJoin -> executeJoin false leftStream rightStream
-        | AnalyzerTypes.LeftJoin -> executeJoin true leftStream rightStream
-        | AnalyzerTypes.RightJoin -> executeJoin true rightStream leftStream
+        | AnalyzerTypes.InnerJoin -> executeJoin false leftStream rightStream 0
+        | AnalyzerTypes.LeftJoin -> executeJoin true leftStream rightStream (rightPlan.ColumnsCount())
+        | AnalyzerTypes.RightJoin -> executeJoin true rightStream leftStream (leftPlan.ColumnsCount())
         | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
       joinExecutor context condition
