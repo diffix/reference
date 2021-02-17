@@ -92,6 +92,16 @@ and Expression =
     | FunctionExpr (fn, args) -> f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.Map(arg, f)) args))
     | expr -> f expr
 
+  static member Collect<'T> expression (f: Expression -> 'T option) =
+    let innerItems =
+      match expression with
+      | FunctionExpr (_, args) -> List.collect (fun arg -> Expression.Collect arg f) args
+      | _ -> []
+
+    match f expression with
+    | Some t -> t :: innerItems
+    | None -> innerItems
+
 and FunctionType =
   | Scalar
   | Aggregate of options: AggregateOptions

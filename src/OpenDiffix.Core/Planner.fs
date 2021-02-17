@@ -24,10 +24,10 @@ let private planSort sortExpressions plan =
   | _ -> Plan.Sort(plan, sortExpressions)
 
 let rec private extractAggregators expression =
-  match expression with
-  | FunctionExpr (ScalarFunction _, args) -> args |> List.collect extractAggregators
-  | FunctionExpr (AggregateFunction _, _) as aggregator -> [ aggregator ]
-  | _ -> []
+  function
+  | FunctionExpr (AggregateFunction _, _) as aggregator -> Some aggregator
+  | _ -> None
+  |> Expression.Collect expression
 
 let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) plan =
   if groupingLabels.IsEmpty && aggregators.IsEmpty then plan else Plan.Aggregate(plan, groupingLabels, aggregators)
