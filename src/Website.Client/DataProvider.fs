@@ -2,24 +2,26 @@ module Website.Client.DataProvider
 
 open OpenDiffix.Core
 
-type PlaygroundDataProvider () =
+type PlaygroundDataProvider() =
   interface IDataProvider with
     member this.GetSchema() =
-      let tables = [
-        {
-          Name = "customers"
-          Columns = [
-            {Name = "aid"; Type = IntegerType}
-            {Name = "age"; Type = IntegerType}
-            {Name = "name"; Type = StringType}
-          ]
-        }
-      ]
-      async {return Ok tables}
+      let tables =
+        [
+          {
+            Name = "customers"
+            Columns =
+              [
+                { Name = "aid"; Type = IntegerType }
+                { Name = "age"; Type = IntegerType }
+                { Name = "name"; Type = StringType }
+              ]
+          }
+        ]
+
+      async { return Ok tables }
 
     member this.LoadData(table) =
-      if table.Name = "customers"
-      then
+      if table.Name = "customers" then
         let data =
           [
             [| Integer 1L; Integer 30L; String "Alice" |]
@@ -31,8 +33,14 @@ type PlaygroundDataProvider () =
             [| Integer 7L; Integer 33L; String "Genevieve" |]
             [| Integer 8L; Integer 34L; String "Hannah" |]
             [| Integer 9L; Integer 34L; String "Isolde" |]
+            [| Integer 10L; Integer 34L; String "Josephine" |]
+            [| Integer 11L; Integer 34L; String "Keisha" |]
+            [| Integer 12L; Integer 34L; String "Linda" |]
+            [| Integer 13L; Integer 34L; String "Marwin" |]
+            [| Integer 14L; Integer 34L; String "Nelson" |]
           ]
           |> Seq.ofList
-        async {return Ok data}
+
+        async { return Ok data }
       else
-        async {return Error $"Table '%s{table.Name}' was not found"}
+        async { return Error $"Table '%s{table.Name}' was not found" }
