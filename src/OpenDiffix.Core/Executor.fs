@@ -90,16 +90,16 @@ let rec execute dataProvider context plan =
       |> executeAggregate context labels aggregators
 
   | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+      let outerJoin, leftPlan, rightPlan =
+        match joinType with
+        | AnalyzerTypes.InnerJoin -> false, leftPlan, rightPlan
+        | AnalyzerTypes.LeftJoin -> true, leftPlan, rightPlan
+        | AnalyzerTypes.RightJoin -> true, rightPlan, leftPlan
+        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
 
-      let joinExecutor =
-        match joinType with
-        | AnalyzerTypes.InnerJoin -> executeJoin false leftStream rightStream 0
-        | AnalyzerTypes.LeftJoin -> executeJoin true leftStream rightStream (rightPlan.ColumnsCount())
-        | AnalyzerTypes.RightJoin -> executeJoin true rightStream leftStream (leftPlan.ColumnsCount())
-        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
-
-      joinExecutor context condition
+      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context condition
 
   | _ -> failwith "Plan execution not implemented"
