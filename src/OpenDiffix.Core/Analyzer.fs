@@ -164,10 +164,10 @@ let rewriteToDiffixAggregate aidColumnExpression query =
     | expression -> expression)
   )
 
-let rec notAggregate =
+let rec scalarExpression =
   function
-  | FunctionExpr (ScalarFunction _, args) -> List.forall notAggregate args
   | FunctionExpr (AggregateFunction _, _) -> false
+  | FunctionExpr (_, args) -> List.forall scalarExpression args
   | _ -> true
 
 let addLowCountFilter aidColumnExpression query =
@@ -180,21 +180,22 @@ let addLowCountFilter aidColumnExpression query =
       let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
 
       let selectQuery =
-        { selectQuery with
-            Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
-        }
-
-      let selectQuery =
         if selectQuery.GroupingSets = [ GroupingSet [] ] then
-          let nonAggregateSelectedExpressions =
+          let selectedExpressions =
             selectQuery.Columns
             |> List.map (fun selectedColumn -> selectedColumn.Expression)
-            |> List.filter notAggregate
-            |> GroupingSet
 
-          { selectQuery with GroupingSets = [ nonAggregateSelectedExpressions ] }
+          if selectedExpressions |> List.forall scalarExpression then
+            { selectQuery with
+                GroupingSets = [ GroupingSet selectedExpressions ]
+                Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+            }
+          else
+            selectQuery
         else
-          selectQuery
+          { selectQuery with
+              Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+          }
 
       selectQuery)
   )
