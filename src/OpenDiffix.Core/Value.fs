@@ -9,6 +9,14 @@ type Value =
   | Real of float
   | String of string
 
+  static member ToString =
+    function
+    | Null -> "NULL"
+    | Boolean b -> b.ToString()
+    | Integer i -> i.ToString()
+    | Real r -> r.ToString()
+    | String s -> s
+
 type Row = Value array
 
 type ValueType =

@@ -17,16 +17,16 @@ module QueryEngine =
     | UnionQuery (_, query1, _query2) -> extractColumnNames query1
     | SelectQuery query -> query.Columns |> List.map (fun column -> column.Alias)
 
-  let run connection statement anonParams =
+  let run dataProvider statement anonParams =
     asyncResult {
       let! parsedQuery = Parser.parse statement
 
-      let! query = Analyzer.analyze connection anonParams parsedQuery
+      let! query = Analyzer.analyze dataProvider anonParams parsedQuery
 
       let plan = Planner.plan query
 
       let context = { AnonymizationParams = anonParams }
-      let rows = plan |> Executor.execute connection context |> Seq.toList
+      let rows = plan |> Executor.execute dataProvider context |> Seq.toList
 
       let columns = extractColumnNames query
 
