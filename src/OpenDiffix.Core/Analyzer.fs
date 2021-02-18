@@ -105,7 +105,7 @@ let selectedTableName =
   | ParserTypes.Expression.Identifier tableName -> Ok tableName
   | _ -> Error "Only selecting from a single table is supported"
 
-let booleanTrueExpression = Value.Boolean true |> Expression.Constant
+let booleanTrueExpression = Boolean true |> Constant
 
 let transformExpressionOptionWithDefaultTrue table optionalExpression =
   optionalExpression
@@ -170,6 +170,24 @@ let rec scalarExpression =
   | FunctionExpr (_, args) -> List.forall scalarExpression args
   | _ -> true
 
+let selectColumnsFromQuery columnIndices innerQuery =
+  let selectedColumns =
+    columnIndices
+    |> List.map (fun index ->
+      let column = innerQuery.Columns |> List.item index
+      let columnType = column.Expression |> Expression.GetType |> Utils.unwrap
+      { column with Expression = ColumnReference(index, columnType) }
+    )
+
+  {
+    Columns = selectedColumns
+    From = Query(SelectQuery innerQuery)
+    Where = booleanTrueExpression
+    GroupingSets = []
+    OrderBy = []
+    Having = booleanTrueExpression
+  }
+
 let addLowCountFilter aidColumnExpression query =
   Query.Map(
     query,
@@ -186,10 +204,17 @@ let addLowCountFilter aidColumnExpression query =
             |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
           if selectedExpressions |> List.forall scalarExpression then
+            let bucketCount =
+              FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnExpression ])
+
+            let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
+
             { selectQuery with
+                Columns = selectQuery.Columns @ [ { Expression = bucketExpand; Alias = "" } ]
                 GroupingSets = [ GroupingSet selectedExpressions ]
                 Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
             }
+            |> selectColumnsFromQuery [ 0 .. selectedExpressions.Length - 1 ]
           else
             selectQuery
         else

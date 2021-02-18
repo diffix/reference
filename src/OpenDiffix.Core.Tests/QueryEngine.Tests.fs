@@ -67,4 +67,14 @@ type Tests(db: DBFixture) =
     let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 7 - bucket expansion`` () =
+    let queryResult = runQuery "SELECT city FROM customers_small"
+
+    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
+
+    let expected = { Columns = [ "city" ]; Rows = expectedRows }
+
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>
