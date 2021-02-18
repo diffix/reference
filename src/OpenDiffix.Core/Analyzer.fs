@@ -210,11 +210,11 @@ let addLowCountFilter aidColumnExpression query =
             let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
 
             { selectQuery with
-                Columns = selectQuery.Columns @ [ { Expression = bucketExpand; Alias = "" } ]
+                Columns = { Expression = bucketExpand; Alias = "" } :: selectQuery.Columns
                 GroupingSets = [ GroupingSet selectedExpressions ]
                 Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
             }
-            |> selectColumnsFromQuery [ 0 .. selectedExpressions.Length - 1 ]
+            |> selectColumnsFromQuery [ 1 .. selectedExpressions.Length ]
           else
             selectQuery
         else
