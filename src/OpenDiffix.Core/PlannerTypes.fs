@@ -7,6 +7,7 @@ open OpenDiffix.Core.AnalyzerTypes
 type Plan =
   | Scan of Table
   | Project of Plan * expressions: Expression list
+  | ProjectSet of Plan * setGenerator: SetFunction * args: Expression list
   | Filter of Plan * condition: Expression
   | Sort of Plan * OrderByExpression list
   | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list
@@ -18,6 +19,7 @@ type Plan =
     match this with
     | Scan table -> table.Columns.Length
     | Project (_, expressions) -> expressions.Length
+    | ProjectSet (plan, _, _) -> plan.ColumnsCount() + 1
     | Filter (plan, _) -> plan.ColumnsCount()
     | Sort (plan, _) -> plan.ColumnsCount()
     | Aggregate (_, groupingLabels, aggregators) -> groupingLabels.Length + aggregators.Length

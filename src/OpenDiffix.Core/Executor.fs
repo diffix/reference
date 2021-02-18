@@ -10,6 +10,15 @@ let private executeProject context expressions rowsStream =
   rowsStream
   |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row))
 
+let private executeProjectSet context setFn args rowsStream =
+  rowsStream
+  |> Seq.collect (fun row ->
+    let args = args |> List.map (Expression.evaluate context row)
+
+    Expression.evaluateSetFunction setFn args
+    |> Seq.map (fun value -> Array.append row [| value |])
+  )
+
 let private executeFilter context condition rowsStream =
   rowsStream
   |> Seq.filter (fun row -> condition |> Expression.evaluate context row |> Value.unwrapBoolean)
@@ -71,6 +80,7 @@ let rec execute connection context plan =
   match plan with
   | Plan.Scan table -> executeScan connection table
   | Plan.Project (plan, expressions) -> plan |> execute connection context |> executeProject context expressions
+  | Plan.ProjectSet (plan, fn, args) -> plan |> execute connection context |> executeProjectSet context fn args
   | Plan.Filter (plan, condition) -> plan |> execute connection context |> executeFilter context condition
   | Plan.Sort (plan, expressions) -> plan |> execute connection context |> executeSort context expressions
 

@@ -114,4 +114,19 @@ type Tests(db: DBFixture) =
     let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
     plan |> execute |> List.rev |> List.take 3 |> should equal expected
 
+  [<Fact>]
+  let ``execute project set`` () =
+    let fromPlan = Plan.Project(Plan.Scan(products), [ column products 0 ])
+    let plan = Plan.ProjectSet(fromPlan, GenerateSeries, [ Constant(Integer 2L) ])
+
+    let expected =
+      [
+        [| Integer 1L; Integer 1L |]
+        [| Integer 1L; Integer 2L |]
+        [| Integer 2L; Integer 1L |]
+        [| Integer 2L; Integer 2L |]
+      ]
+
+    plan |> execute |> List.take 4 |> should equal expected
+
   interface IClassFixture<DBFixture>

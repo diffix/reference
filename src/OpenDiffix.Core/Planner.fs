@@ -11,7 +11,28 @@ let private planFrom =
   | Join join -> planJoin join
   | Query query -> plan query
 
-let private planProject expressions plan = Plan.Project(plan, expressions)
+let rec private extractSetFunctions expression =
+  function
+  | FunctionExpr (SetFunction fn, args) -> Some(fn, args)
+  | _ -> None
+  |> Expression.Collect expression
+
+let private projectSetFunctions setColumn expression =
+  Expression.Map(
+    expression,
+    function
+    | FunctionExpr (SetFunction _, _) -> setColumn
+    | expression -> expression
+  )
+
+let private planProject expressions plan =
+  match expressions |> List.collect extractSetFunctions |> List.distinct with
+  | [] -> Plan.Project(plan, expressions)
+  | [ setFn, args ] ->
+      let setColumn = ColumnReference(plan.ColumnsCount(), SetFunction.ReturnType setFn args |> Utils.unwrap)
+      let expressions = expressions |> List.map (projectSetFunctions setColumn)
+      Plan.Project(Plan.ProjectSet(plan, setFn, args), expressions)
+  | _ -> failwith "Using multiple set functions in the same query is not supported"
 
 let private planFilter condition plan =
   match condition with
