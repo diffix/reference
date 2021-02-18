@@ -173,34 +173,19 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Analyze count transforms`` () =
-    let result =
-      analyzeQuery
-        "
-    SELECT count(*), count(distinct id)
-    FROM customers_small
-    HAVING count(*) > 1
-    "
+    let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
 
     let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ idColumn ])
 
     let countDistinct =
       FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
 
-    let diffixLowCount = FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ idColumn ])
-
     let expectedInTopQuery =
       [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
 
     result.Columns |> should equal expectedInTopQuery
 
-    let expected =
-      FunctionExpr(
-        ScalarFunction And,
-        [
-          FunctionExpr(ScalarFunction Not, [ diffixLowCount ])
-          FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
-        ]
-      )
+    let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
 
     result.Having |> should equal expected
 
