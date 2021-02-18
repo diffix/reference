@@ -56,9 +56,17 @@ and ScalarFunction =
     | GtE -> Ok BooleanType
     | Length -> Ok IntegerType
 
+and SetFunction =
+  | GenerateSeries
+
+  static member ReturnType fn (args: Expression list) =
+    match fn with
+    | GenerateSeries -> Ok IntegerType
+
 and Function =
   | ScalarFunction of fn: ScalarFunction
   | AggregateFunction of fn: AggregateFunction * options: AggregateOptions
+  | SetFunction of fn: SetFunction
 
   static member FromString =
     function
@@ -80,6 +88,7 @@ and Expression =
     function
     | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
     | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
+    | FunctionExpr (SetFunction fn, args) -> SetFunction.ReturnType fn args
     | ColumnReference (_, exprType) -> Ok exprType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
@@ -91,6 +100,16 @@ and Expression =
     match expression with
     | FunctionExpr (fn, args) -> f (FunctionExpr(fn, List.map (fun (arg: Expression) -> Expression.Map(arg, f)) args))
     | expr -> f expr
+
+  static member Collect<'T> expression (f: Expression -> 'T option) =
+    let innerItems =
+      match expression with
+      | FunctionExpr (_, args) -> List.collect (fun arg -> Expression.Collect arg f) args
+      | _ -> []
+
+    match f expression with
+    | Some t -> t :: innerItems
+    | None -> innerItems
 
 and FunctionType =
   | Scalar
@@ -158,11 +177,17 @@ module Expression =
 
     | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 
+  let evaluateSetFunction fn args =
+    match fn, args with
+    | GenerateSeries, [ Integer count ] -> seq { for i in 1L .. count -> Integer i }
+    | _ -> failwith $"Invalid usage of set function '%A{fn}'."
+
   let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
     match expr with
     | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
-    | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate '%A{fn}'."
-    | ColumnReference (index, _) -> if index >= row.Length then Null else row.[index]
+    | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
+    | FunctionExpr (SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
+    | ColumnReference (index, _) -> row.[index]
     | Constant value -> value
 
   let sortRows ctx orderings (rows: Row seq) =
@@ -171,10 +196,11 @@ module Expression =
       | [] -> rows
       | (OrderBy (expr, direction, nulls)) :: tail ->
           rows
-          |> Seq.sortWith(fun rowA rowB ->
+          |> Seq.sortWith (fun rowA rowB ->
             let expressionA = evaluate ctx rowA expr
             let expressionB = evaluate ctx rowB expr
             Value.comparer direction nulls expressionA expressionB
           )
           |> performSort tail
+
     performSort (List.rev orderings) rows

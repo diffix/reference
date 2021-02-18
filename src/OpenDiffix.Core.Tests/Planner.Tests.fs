@@ -154,3 +154,18 @@ let ``plan join`` () =
   let expected = Plan.Project(Plan.Join(Plan.Scan(table), Plan.Scan(table), InnerJoin, condition = constTrue), [])
 
   SelectQuery select |> Planner.plan |> should equal expected
+
+[<Fact>]
+let ``plan set select`` () =
+  let setExpression = FunctionExpr((SetFunction GenerateSeries), [ column 0 ])
+  let setSelect = { Expression = setExpression; Alias = "set" }
+
+  let select = { emptySelect with Columns = [ selectColumn 1; setSelect ] }
+
+  let expected =
+    Plan.Project(
+      Plan.ProjectSet(Plan.Scan(table), GenerateSeries, [ column 0 ]),
+      [ column 1; ColumnReference(2, IntegerType) ]
+    )
+
+  SelectQuery select |> Planner.plan |> should equal expected

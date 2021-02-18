@@ -11,7 +11,28 @@ let private planFrom =
   | Join join -> planJoin join
   | Query query -> plan query
 
-let private planProject expressions plan = Plan.Project(plan, expressions)
+let rec private extractSetFunctions expression =
+  function
+  | FunctionExpr (SetFunction fn, args) -> Some(fn, args)
+  | _ -> None
+  |> Expression.Collect expression
+
+let private projectSetFunctions setColumn expression =
+  Expression.Map(
+    expression,
+    function
+    | FunctionExpr (SetFunction _, _) -> setColumn
+    | expression -> expression
+  )
+
+let private planProject expressions plan =
+  match expressions |> List.collect extractSetFunctions |> List.distinct with
+  | [] -> Plan.Project(plan, expressions)
+  | [ setFn, args ] ->
+      let setColumn = ColumnReference(plan.ColumnsCount(), SetFunction.ReturnType setFn args |> Utils.unwrap)
+      let expressions = expressions |> List.map (projectSetFunctions setColumn)
+      Plan.Project(Plan.ProjectSet(plan, setFn, args), expressions)
+  | _ -> failwith "Using multiple set functions in the same query is not supported"
 
 let private planFilter condition plan =
   match condition with
@@ -24,10 +45,10 @@ let private planSort sortExpressions plan =
   | _ -> Plan.Sort(plan, sortExpressions)
 
 let rec private extractAggregators expression =
-  match expression with
-  | FunctionExpr (ScalarFunction _, args) -> args |> List.collect extractAggregators
-  | FunctionExpr (AggregateFunction _, _) as aggregator -> [ aggregator ]
-  | _ -> []
+  function
+  | FunctionExpr (AggregateFunction _, _) as aggregator -> Some aggregator
+  | _ -> None
+  |> Expression.Collect expression
 
 let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) plan =
   if groupingLabels.IsEmpty && aggregators.IsEmpty then plan else Plan.Aggregate(plan, groupingLabels, aggregators)
@@ -81,4 +102,4 @@ let private planSelect query =
 let plan =
   function
   | SelectQuery query -> planSelect query
-  | UnionQuery _ -> failwith "union planning not yet supported"
+  | UnionQuery _ -> failwith "Union planning not yet supported"

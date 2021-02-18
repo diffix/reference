@@ -10,6 +10,15 @@ let private executeProject context expressions rowsStream =
   rowsStream
   |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row))
 
+let private executeProjectSet context setFn args rowsStream =
+  rowsStream
+  |> Seq.collect (fun row ->
+    let args = args |> List.map (Expression.evaluate context row)
+
+    Expression.evaluateSetFunction setFn args
+    |> Seq.map (fun value -> Array.append row [| value |])
+  )
+
 let private executeFilter context condition rowsStream =
   rowsStream
   |> Seq.filter (fun row -> condition |> Expression.evaluate context row |> Value.unwrapBoolean)
@@ -53,7 +62,7 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
-let private executeJoin isOuterJoin leftStream rightStream context condition =
+let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context condition =
   let rightRows = Seq.toList rightStream
 
   leftStream
@@ -61,9 +70,8 @@ let private executeJoin isOuterJoin leftStream rightStream context condition =
     let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context condition
 
     if isOuterJoin && Seq.isEmpty joinedRows then
-      // We don't know the size of the right row at this point, so we generate an incomplete row and
-      // rely on the fact that out-of-bounds column references return `Null` values.
-      seq { leftRow }
+      let nullRightRow = Array.create rightColumnsCount Null
+      seq { Array.append leftRow nullRightRow }
     else
       joinedRows
   )
@@ -72,6 +80,7 @@ let rec execute dataProvider context plan =
   match plan with
   | Plan.Scan table -> executeScan dataProvider table
   | Plan.Project (plan, expressions) -> plan |> execute dataProvider context |> executeProject context expressions
+  | Plan.ProjectSet (plan, fn, args) -> plan |> execute dataProvider context |> executeProjectSet context fn args
   | Plan.Filter (plan, condition) -> plan |> execute dataProvider context |> executeFilter context condition
   | Plan.Sort (plan, expressions) -> plan |> execute dataProvider context |> executeSort context expressions
 
@@ -81,16 +90,16 @@ let rec execute dataProvider context plan =
       |> executeAggregate context labels aggregators
 
   | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+      let outerJoin, leftPlan, rightPlan =
+        match joinType with
+        | AnalyzerTypes.InnerJoin -> false, leftPlan, rightPlan
+        | AnalyzerTypes.LeftJoin -> true, leftPlan, rightPlan
+        | AnalyzerTypes.RightJoin -> true, rightPlan, leftPlan
+        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
 
-      let joinExecutor =
-        match joinType with
-        | AnalyzerTypes.InnerJoin -> executeJoin false leftStream rightStream
-        | AnalyzerTypes.LeftJoin -> executeJoin true leftStream rightStream
-        | AnalyzerTypes.RightJoin -> executeJoin true rightStream leftStream
-        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
-
-      joinExecutor context condition
+      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context condition
 
   | _ -> failwith "Plan execution not implemented"
