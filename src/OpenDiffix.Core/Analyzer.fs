@@ -191,38 +191,35 @@ let selectColumnsFromQuery columnIndices innerQuery =
 let addLowCountFilter aidColumnExpression query =
   Query.Map(
     query,
-    (fun selectQuery ->
+    fun selectQuery ->
       let lowCountAggregate =
         FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
 
       let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
 
-      let selectQuery =
-        if selectQuery.GroupingSets = [ GroupingSet [] ] then
-          let selectedExpressions =
-            selectQuery.Columns
-            |> List.map (fun selectedColumn -> selectedColumn.Expression)
+      if selectQuery.GroupingSets = [ GroupingSet [] ] then
+        let selectedExpressions =
+          selectQuery.Columns
+          |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-          if selectedExpressions |> List.forall scalarExpression then
-            let bucketCount =
-              FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnExpression ])
+        if selectedExpressions |> List.forall scalarExpression then
+          let bucketCount =
+            FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnExpression ])
 
-            let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
+          let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
 
-            { selectQuery with
-                Columns = { Expression = bucketExpand; Alias = "" } :: selectQuery.Columns
-                GroupingSets = [ GroupingSet selectedExpressions ]
-                Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
-            }
-            |> selectColumnsFromQuery [ 1 .. selectedExpressions.Length ]
-          else
-            selectQuery
-        else
           { selectQuery with
+              Columns = { Expression = bucketExpand; Alias = "" } :: selectQuery.Columns
+              GroupingSets = [ GroupingSet selectedExpressions ]
               Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
           }
-
-      selectQuery)
+          |> selectColumnsFromQuery [ 1 .. selectedExpressions.Length ]
+        else
+          selectQuery
+      else
+        { selectQuery with
+            Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+        }
   )
 
 let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
