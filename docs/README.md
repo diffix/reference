@@ -18,6 +18,3 @@ This folder contains the design documents and supporting materials.
 
 [led.md](./led.md) Design notes for LED.
 
-### Aggregates
-
-[aggregates.md](./aggregates.md) How to compute various aggregate functions (sum, min, max, etc.).
