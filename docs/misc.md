@@ -1,17 +1,17 @@
 # Initial design notes of tight DB integration
 
-This document contains the initial design notes from issue #15.
+This document contains the initial design notes from [issue #15](https://github.com/diffix/reference/issues/15).
 
 These notes will be moved to individual documents as we go.
 
 
 # Dynamic noise layers
 
-In previous designs, the dynamic noise layers are based on AIDs (UIDs). The purpose of the dynamic noise layer is to defend against the first derivative difference attack. This is needed because the static noise layers constitute a predictable difference between the "left" and "right" queries in the attack pair. The dynamic layer is not predictable, because each bucket in the attack has a different set of AIDs, and therefore a different dynamic noise layer.
+In previous designs, the dynamic noise layers were based on AIDs (UIDs). The purpose of the dynamic noise layer is to defend against the first derivative difference attack. This is needed because the static noise layers constitute a predictable difference between the "left" and "right" queries in the attack pair. The dynamic layer is not predictable, because each bucket in the attack has a different set of AIDs, and therefore a different dynamic noise layer.
 
 One tricky point about the dynamic layer is that it must not be possible to generate many different dynamic noise layers for what is semantically the same query, thus averaging out the dynamic noise. To avoid this, we use the AIDs themselves in part to seed the dynamic noise layer. Queries with the same semantics will always produce the same set of AIDs.
 
-One of the difficulties with using AIDs with proxy Diffix is the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE). 
+One of the difficulties with using AIDs with proxy Diffix was the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE). 
 
 With DB Diffix it appears that we can use the conditions themselves as the basis of dynamic noise layers instead of AIDs. There are two reasons. First, if we are doing Low Effect Detection (LED), then an attacker would not be able to use chaff conditions to average away dynamic noise layers. Second, with tight DB integration, we can do a good job of determining the semantics of each condition, and therefore prevent conditions with different syntax but same semantics.
 
@@ -29,9 +29,9 @@ In principle, LED can be used to defend against difference attacks by removing t
 
 Second, it seems unlikely to me that we'll be able to perfectly eliminate the effect of a condition in all cases. Counts we can probably do alright, but there might be small errors do to machine precision or something for non-integer aggregates. Therefore we'll probably still need some kind of dynamic noise to protect against first derivative difference attacks. There may also be cases where we can't adjust aggregate outputs at all.
 
+> TODO: Note: Sebastian doesn't necessarily agree. We'll find out as we try things out.
+
 Given this, the basic idea now is to detect LE conditions using a noisy threshold, build dynamic layers as described above (use condition semantics of NLE conditions), and adjust aggregate outputs based on LE conditions.
-
-
 
 > TODO: Determine whether adjusting the aggregate output allows us to eliminate the need for the AID noise layers, or reduce noise. This might be a good noise reduction technique for common cases.
 
@@ -57,7 +57,11 @@ This corresponds to the logic `A and (B or C)` evaluated in the order  `A-->B-->
 
 At the end of query engine processing, we know if any combinations are LE for the given bucket. For instance, in the above example, the combination C3 is LE for AID1.
 
+> TODO: Note: Seb points out that we might know earlier, for instance after the sub-query in a `JOIN`, and there may be advantages to removing the effect earlier in the query. Something to keep in mind.
+
 If any combination is LE, then it may be that we need to adjust the aggregate output. We only want to do that, however, if the analyst could in fact generate an attack pair by removing one or more conditions. This is the case when dropping or negating the condition 1) changes the logical outcome of the LE combination, and 2) does not change the logical outcome for NLE combinations.
+
+> Note: The reason this assumes adjusting the aggregate output (versus adding or removing rows prior to aggregate computation) is that I'm presuming that the query engine may compute aggregates on the fly as it processes rows. For instance, the query engine may add a given row to a `count(*)` aggregate when it encounters the row, and only later might we decide that the row should be removed due to LE. In this case, we'd need to adjust the (already computed) aggregate rather than somehow compute the aggregate all over again.
 
 In the above example, C3 is LE. Suppose the analyst were to drop or negate A. This would effectively result in A being set to true, which would (probably) change the outcome of many combination C1 rows to true, causing those rows to be added to the answer. In other words, the change would have a large effect and so can't be used by an attacker in a difference attack or a chaff attack. Therefore we can safely leave the C1 rows as is and keep the dynamic seeding material from A.
 
@@ -95,17 +99,16 @@ A basic approach to LED, then is:
 
 Note that not only does this description assume that the query engine optimization doesn't evaluate conditions unnecessarily, it depends on it. If the query engine doesn't do this, then the LE logic has to be sophisticated enough to recognize when evaluated conditions in fact have no effect.
 
-
 > TODO: Reverse noise exploitation attack needs more thought.
 > TODO: Think how to seed noise layer when a condition has zero effect.
-
 
 ## Adjusting aggregate values
 
 We call changing a row from included to excluded, or vice versa, as *flipping* the row. A flipped row can lead to an adjustment in the query's aggregate outputs. 
 
-
 > TODO: Work through the details of this. Not straightforward in many cases. May not even be possible in some cases?
+
+> TODO: Seb suggests we might be able to compute per-combination aggregates, and then compute the final aggregate based on which combinations remain.
 
 
 ## Seeding materials
@@ -134,7 +137,7 @@ As an efficiency measure, we can still determine the column value of a clear con
 
 Strictly speaking, we would want to remove column values from the bloom filters when rows are flipped (from included to excluded, or from excluded to included). To avoid having to use counting bloom filters for this, perhaps what we can do is hold off on inserting column values into bloom filters until it is determined that a given condition won't be dropped.
 
-zzzz flesh this out with example ... Unlike the case with prior Diffix versions, we can now always have layers seeded by the column values, including for instance for ranges. This will allow us for instance to automatically prevent extra noise samples the case where a range is equivalent to an equality, i.e. `col BETWEEN 1 and 2` where `col` is an integer type.
+> TODO: flesh this out with example ... Unlike the case with prior Diffix versions, we can now always have layers seeded by the column values, including for instance for ranges. This will allow us for instance to automatically prevent extra noise samples the case where a range is equivalent to an equality, i.e. `col BETWEEN 1 and 2` where `col` is an integer type. Note however that if we were to do this, then in the process we'd want to recognize that the operator is effective `=` and not `BETWEEN`, and generate the seed materials accordingly. Or perhaps not even use operator as part of the seed material.
 
 **Seeding materials implementation**
 
@@ -181,7 +184,7 @@ Case 4:
 
 Case 5:
 
-- (This represents the case where B is a subset of A. In other words, whenever A is true, B is also true.)
+- (This represents the case where the rows matching B are a subset of the rows matching A. In other words, whenever A is true, B is also true.)
 - This similar to Case 4, with the exception that there is nothing to flip for C3. This means we include (flip) the rows associated with `C1` and consider neither `A` nor `B` for dynamic noise layer seeding.
 
 
@@ -209,7 +212,7 @@ Case 3:
 
 Case 4:
 
-- (This represents a case where B and A mostly overlap, but neither is a subset of the other.)
+- (This represents a case where B and A mostly overlap, but neither is a subset of the other. Note that it is possible that the combined rows from C1 and C3 are enough to pass LCF, even though each combination individually is LE.)
 - Both A and B are droppable. Note that by flipping (excluding) their rows, the bucket in any event becomes LCF and is suppressed.
 
 Case 5:
@@ -410,26 +413,104 @@ Let's suppose that `trans_date` is an isolating column, so most of the `trans_da
 
 What we need to do here is, during query processing of the inner `SELECT`, for each `trans_date`, record the combinations truth table with associated AIDs and rows. Then during query processing of the outer `SELECT`, we merge the combinations, AIDs, and rows into the `cnt` buckets.
 
-For example, after query processing of the inner `SELECT`, we might have this (where here `A` represents the condition `gender = 'M'`):
+Following is an example from Seb that demonstrates that the above idea may not be so simple:
 
-| trans_date = 194800 | cnt = 5 | A=false: AIDs = [1], rows = [R1, R2]<br>A=true:  AIDs=[1,3], rows = [R4, R5, R6] |
+
+| trans_date | cnt | combinations  state |
 | ------------------- | ------- | -------------------------------------------------------------------------------- |
-| trans_date = 193898 | cnt = 5 | A=false: AIDs = [1], rows = [R7]<br>A=true:  AIDs=[2,4], rows = [R8, R9]         |
+| trans_date = 194800 | cnt = 5 | A=false: AIDs = [0], rows = [R1, R2]<br>A=true:  AIDs=[1, 3], rows = [R3, R4, R5, R6, R7] |
+| trans_date = 193898 | cnt = 5 | A=false: AIDs = [0], rows = [R8]<br>A=true:  AIDs=[2, 4], rows = [R9, R10, R11, R12, R13]         |
 | ...                   | ...       | ...                                                                                |
 
-The first two rows both have `cnt=5` and so would be combined in the outer select. The combined data would be:
+In this new table, we are in fact excluding a low count number of AIDs (i.e. `AID = 0`).
+We would therefore have to adjust for the effect of dropping the `A`-condition here, and would end up with
 
-| cnt = 5 | count(*) = 2 | A=false: AIDs = [1], rows = [R1, R2, R7]<br>A=true:  AIDs=[1, 3, 2, 4], rows = [R4, R5, R6, R8, R9] |
+| cnt | count | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt = 7 | count(*) = 1 | AIDs=[0, 1, 3, 2, 4], rows = [R1, R2, R8, R3, R4, R5, R6, R7, R9, R10, R11, R12, R13] |
+| cnt = 6 | count(*) = 1 | AIDs=[0, 1, 3, 2, 4], rows = [R1, R2, R8, R3, R4, R5, R6, R7, R9, R10, R11, R12, R13] |
+| ...                   | ...       | ...                                                                                |
 
-Here we see that the combination `A=true` is NLE, while `A=false` is LE. For this bucket, then, we would drop the condition, and include rows R1, R2, and R7. Doing so, however would cause the `trans_date = 194800` bucket to go from `cnt=5` ot `cnt=7` (because R1 and R2 are now included), and would cause the `trans_date = 193898` bucket to go from `cnt=5` ot `cnt=6` (because R7 is now included). As a result, the `count()` value for the `cnt=5` bucket would be reduced by two, and the `count()` **values for both the `cnt=6` and `cnt=7` buckets would be increased by one each.
+However I am not sure if this works either!
+The reason is that we somehow need to account for the per-AID contributions too. Otherwise we cannot suppress extreme outlier users!
 
+In what follows I'll model user contributions as `(AID, number of rows)`.
+
+For example, take the following scenario (where I simplify things dramatically by not considering LED, only the handling of multi-level aggregations. LED can be added in later, but first we need to understand the basecase):
+
+| trans_date | cnt | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| trans_date = 194800 | cnt = 1015 | Contributions = [(0, 1000); (1, 2); (2, 2); (3, 1)]] |
+| trans_date = 193898 | cnt = 1004 | Contributions = [(1, 1000); (2, 2); (3, 1); (4, 1); (5, 1)]] |
+| ...                   | ...       | ...                                                                                |
+
+
+We need to account for the fact that the distribution of contributions is all skewed!
+
+Basically we could think of it as follows (where something akin to how we suppress outliers in regular aggregates is applied):
+
+| trans_date | cnt | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| trans_date = 194800 | cnt = **{1015 -> 7}** | Contributions = [(0, **{1000 -> 2}**); (1, 2); (2, 2); (3, 1)]] |
+| trans_date = 193898 | cnt = **{1004 -> 7}** | Contributions = [(1, **{1000 -> 2}**); (2, 2); (3, 1); (4, 1); (5, 1)]] |
+| ...                   | ...       | ...                                                                                |
+
+which means we could combine these rows during the final aggregation as follows:
+
+
+| cnt  | count(*) | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt = 7 | count(*) = 2 | Contributions = [(0, [**{1000 -> 2}**]); (1, [1; **{1000 -> 2}**]); (2, [2; 2]); (3, [1; 1]); (4, [1]); (5, [1])] |
+| ...                   | ...       | ...                                                                                |
+
+which I guess can be interpreted as:
+- 4 AIDs with 2 occurrences of `cnt = 7`
+- 2 AIDs with 1 occurrence of `cnt = 7`
+- Assuming 4 AIDs passes LCF then we can claim,  `count(*) = 2` for `cnt = 7`... 
+
+Expanding this for low count, count then maybe look like this?
+
+A=false: AIDs = [0]<br>A=true:
+
+| trans_date | cnt | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| trans_date = 194800 | cnt = 5 | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
+| trans_date = 193898 | cnt = 23 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
+| ...                   | ...       | ...                                                                                |
+
+which then in the second phase becomes
+
+| cnt | count(*) | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt = 5 | count(*) = 1 | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
+| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
+| ...                   | ...       | ...                                                                                |
+
+But here we see that `A = false` for `cnt = 5` is a low effect property, and hence it needs to be flipped which results in the contribution of user 1 no longer needing to be interpreted as 2 rather than 10 leading to the row becoming `cnt = 23`:
+
+| cnt | count(*) | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true: Contributions = [**(0, 10)**, (1, 10); (2, 2); (3, 1)] |
+| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
+| ...                   | ...       | ...                                                                                |
+
+which we can then merge with the other `cnt = 23` row:
+
+| cnt | count(*) | combinations  state |
+| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt = 23 | count(*) = 2 | A=false: Contributions = []<br>A= true: Contributions = [{(0, [10]), (1, [10]); (2, [2]); (3, [1])}; {(4, [10]); (5, [10]); (6, [3])}] |
+| ...                   | ...       | ...                                                                                |
+
+which indeed now is showing us that there are two instances of `cnt = 23` where each instance has more than LCF users (assuming that is the criteria to go by).
+
+> TODO: Work through the above cases more carefully
 
 > TODO: Think about whether an attack is actually possible with an inner select like this
 
 
 # Seed Materials (equalities)
 
-Seeding will follow pretty much the same approach as we have today with the non-integrated cloak. Effectively we want to know what column values are included (for pands and pors) or excluded (for nands and nors) by the condition. 
+Seeding follows pretty much the same approach as with the non-integrated cloak. Effectively we want to know what column values are included (for pands and pors) or excluded (for nands and nors) by the condition. 
 
 What we want to do is record every value for every row that led to a row being included (for positive conditions) or excluded (for negative conditions). We can do this as a bloom filter for equalities. (We discuss how to seed for inequalities and regex elsewhere.)
 
@@ -445,7 +526,7 @@ One good point of using a bloom filter is that they join together nicely with a 
 ----------
 # Computing Per-AID Contributions
 
-With an integrated cloak, we can go back to the original style of computing noise, where we have information about individual AIDs. This is needed to compute noise about the various aggregates, including future aggregates and even user-defined aggregates. There are at least two types of aggregates:
+With an integrated cloak, we go back to the original style of computing noise, where we have information about individual AIDs. This is needed to compute noise about the various aggregates, including future aggregates and even user-defined aggregates. There are at least two types of aggregates:
 
 1. Combined: An aggregate that is derived from multiple values. `sum()` is an example.
 2. Individual: An aggregate that is derived from a single value. `median()` is an example.
@@ -462,7 +543,7 @@ We use the following nomenclature. AIDX.Y refers to an AID for entity Y from col
 
 When computing LCF, the number of distinct AIDs in the bucket is taken to be the minimum of all AID columns. For example, suppose the tables used in a query have two AID columns, AID1 and AI2. Suppose a bucket from that query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3). Then the bucket is treated as having the minimum of these, two distinct AIDs.
 
-When computing noise, the noise amount is computed separately for each AID column, and the largest such noise value is used. (Note that for `sum()`, for instance, the noise value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
+When computing noise, the noise amount (standard deviation) is computed separately for each AID column, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the noise value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
 
 When computing flattening (for `sum()`), a flattening value for each distinct AID column is computed separately, and the output is adjusted (flattened) by whichever value is greater. Note that it is possible for the AID columns used for noise and for flattening to be different.
 
@@ -486,9 +567,11 @@ Some accounts have two users, and some users have multiple accounts. `accounts` 
 
 Suppose that the administrator tags the following as being AID columns: `atm.account`, `accounts.ssn`, and `users.ssn`. (Strictly speaking the admin should tag `accounts.account` as well, but let's suppose that he or she doesn't.)
 
-If the analyst queries just the `atm` table, then `atm.account` is protected. In some theoretical sense user is not protected, but it would be very hard for an attacker to exploit this. It might be that one user has four accounts, and that user has very high withdrawls in all those accounts, and so that user isn't adequately flattened, but this is a corner case that I wouldn't worry about in practice.
+If the analyst queries just the `atm` table, then `atm.account` is protected. In some theoretical sense user is not protected, but it would be very hard for an attacker to exploit this. It might be that one user has four accounts, and that user has very high withdrawals in all those accounts, and so that user isn't adequately flattened, but this is a corner case that I wouldn't worry about in practice.
 
 In any event, if the attacker wants to somehow exploit information about that user, then he has to JOIN with `users` and `accounts`, at which point `ssn` is also brought in as an AID, and so now the user is protected.
+
+> Note that the noise depends on what gets JOINed. Not sure we can or need to do anything about this.
 
 Suppose now that the attacker does a query with `atm JOIN users on amount = age`. Such a query would totally mix up `ssn` and `account` in that individual rows would contain `ssn` and `account` that have nothing to do with each other. Nevertheless, both `ssn` and `account` would be protected by virtue of the two AIDs. 
 
@@ -532,6 +615,16 @@ The clinic database had a problem whereby a person would have multiple `patient_
 
 Perhaps the better alternative is just to continue to have non-selectable columns.
 
+Or, this might then be better solved by specifying multiple columns as separate AID columns instead.
+
+Say you could have:
+- `SSN`
+- `patient_id`
+- `insurance_id`
+- `phone_number`
+
+all being classified as AIDs. The hope would then be that at least one of them is the same for a patient that was given multiple `patient_id`s in a system. Thereby at least low count filtering will work.
+
 ### Configuration
 
 From the admin point of view, I think the steps to configuration is something like this:
@@ -539,17 +632,19 @@ From the admin point of view, I think the steps to configuration is something li
 1. Decide what entities will be protected (individual humans, devices, companies, etc.)
 2. For each entity, try to find the single best column in each table that identifies that entity.
 3. Take care to note that multiple different people can appear in different columns (sender/receiver).
-4. Consider whether the identified columns are 100% effective in identifying the entity, or rather have some flaws (sometimes the same person has multiple AID values, sometime the same AID value has multiple persons). In these cases it may be necessary to use multiple columns for the same entity.
+4. Consider whether the identified columns are 100% effective in identifying the entity, or rather have some flaws (sometimes the same person has multiple AID values, sometime the same AID value has multiple persons). In these cases it may be necessary to use multiple columns for the same entity, or to assign multiple more-or-less redundant AIDs.
 5. Take care not to tag redundant columns as AID (i.e. two columns that effectively identify the same entities). Doing so just slows down execution time.
 6. Tag each column as AID (note not necessary to configure what entity is being protected, or how AIDs relate to each other).
 
-
+> TODO: Make sure we include different AIDs having different LCF parameters.
 
 ## sum()
 
 If the aggregate is `sum()`, we need to determine which AIDs contribute the most, both for flattening and for determining the amount of noise. I'm assuming that, in the DB, aggregates are often computed on the fly. So for instance, `sum()` is computed by adding the column value to the aggregate as rows are determined to be included.
 
-Since we don't know how much each AID contributes until after query execution, we need to keep a data structure for all AIDs, and compute the contribution for each AID on the fly. (We may also want to keep a data structure that efficiently retains the top contributors, but in principle we could determine this after we have computed all AID contributions.)
+> TODO: Sebastian doesn't think we'll be computing aggregates on the fly.
+
+Since we don't know how much each AID contributes until after query execution, we need to keep a data structure for all AIDs, and compute the contribution for each AID on the fly.
 
 I'm envisioning a hash structure for maintaining AID contributions. There must be good support for this in the DB. For `sum()`, we can add the column value in each row to the AID entry in the hash structure.
 
@@ -583,13 +678,17 @@ For `max()`, we need to know several AIDs of top values (and bottom values for `
 
 zzzz
 
+----------
+# Histograms
+
+For histograms (i.e. bucket functions) I think we should still enforce snapping like we currently do, with the exception that we can allow finer granularity and more options (powers of 2, money style, etc). This way we can avoid the inaccuracies inherent in the solution for inequalities given above.
 
 ----------
 # Inequalities
 
 I believe we can do away with the range and snapping requirements, at least from the point of view of the analyst. Under the hood we'll still have snapping. For the sake of the following discussion, let's assume that we snap ranges and offsets by powers of 2 (1/4, 1/2, 1, 2, 4...), and that we allow shifting of an offset by 1/2 or the range. Note that the choice of snapping increments is hidden from the analyst, so these don't have to be user friendly per se.
 
-Basic idea is this. When an inequality is specified, we want to find a snapped range inside the inequality that includes a noisy-threshold number of distinct users (say between 2 and 4 distinct users). 
+Basic idea is this. When an inequality is specified, we want to find a snapped range inside the inequality that includes a noisy-threshold number of distinct users (say between 2 and 4 distinct users). The box can align with the edge of the inequality (i.e. the box for `col <= 10` can have 10 as it's right edge). The reason the box is inside the inequality is because the rows inside the inequality will be included in the query execution, and therefore are more likely to be accessible to our logic.
 
 The drawing here illustrates that. Here the analyst has specified a `<=` condition (the red line, which we'll call the edge). The x's represent the data points, and for the sake of simplicity we'll assume one data point per distinct AID. The drawing shows two scenarios, one where the data points are relatively more densely populated, and one where they are relatively more sparsely populated.
 
@@ -602,7 +701,9 @@ A critical point is that if the edge is moved left or right slightly, this would
 
 As the edge is moved further, it would get to the point where a new box would be chosen, possibly bigger or smaller than the previous box, probably but not necessarily including or excluding different AIDs, but in any event the choice of the new box would not be triggered by crossing a given data point, but rather by moving far enough that a new box is a better fit. This is not to say that the box isn't data driven, it is. However, typically the choice of box is based on the contributions of multiple AIDs, not a single AID.
 
-If the edge matches a snapped value, then it may well be the case that no data points are excluded. If the analyst specifies a range, and the range itself matches a snapped range, then we can use the traditional seeding approach which would in turn match the seeds of histograms.
+If the edge matches a snapped value, then it may well be the case that no data points are excluded. If the analyst specifies a range, and the range itself matches a snapped range that is allowed for histograms, then we can use the traditional seeding approach which would in turn match the seeds of histograms.
+
+For instance, if the range is `WHERE age BETWEEN 10 and 20`, then we can seed the same as a corresponding bucket generated with `SELECT bucket(age BY 10)`.
 
 There are still some details to be worked out regarding which box to use when there are several choices. Probably we want to minimize the number of dropped data points. This in turn can (normally) best be done when the box itself is small, because this allows for finer-grained offsets. 
 
@@ -615,26 +716,39 @@ Sebastian mentions this case:
 
 which could in principle display a value for `age = 10`. Sebastian points out that this is probably a non-issue since the `age=10` bucket would almost certainly be suppressed. Nevertheless we might need an explicit check to prevent it.
 
+For instance we could perhaps ensure the boxes are always strictly greater or equal to the range. I.e. `age > 10` means the lower bound of the range has to be greater than 10 too... In that case the value for `age = 10` would not be part of the result set at all. If the dataset allows it, we might get values from 11 onwards (assuming the range `[11,11]` passes the low count filter).
+
 In the case where there are no values to the right (left) of a less-than (greater-than) condition, we don't need the box to encompass the value. Rather we can treat it as though the analyst edge were identical to the right-most (left-most) data point. This prevents an averaging attack where the analyst just selects edges further and further to the right (left) of the max (min) value.
 
+For instance, suppose the condition is `WHERE age < 1001`. Suppose the highest age in the system is 102. Then the bounding box might well be `[98,100]` (if there are enough users in that box).
+
 No doubt other missing details here, but this is the basic idea and it looks solid to me.
+
+> TODO: Need to code a simulation of this approach and try a variety of attacks
 
 ## Unclean inequalities
 
 It occurs to me that the above discussion implicitly assumes that inequalities are clean (i.e. we know the value of the edge. If not clean, though, this begs the question of how the DB knows what to access from an index. They must have some way of knowing what in the index is included and excluded, and if they know this, then we could leverage it to allow unclean inequalities.
 
+For instance, if the condition is `WHERE sqrt(age) < 5`, we would somehow know that this really means `age < 25` (based on knowledge we borrow from postgres) and proceed accordingly.
 
 > TODO: We need to think about cases where changing an edge from one query to the next can isolate a single user. To the extent that such cases exist, we may need to detect them.
+
 ## Time-based attacks ('now()' as inequality)
 
 One of the attacks that we've never addressed is that of repeating a query and detecting the difference between the two queries. If it is somehow known that only one user changed in the query context between the two queries then this can be detected.
 
 If the DB records a timestamp for when rows are added, we can leverage this by implicitly treating each query as having `WHERE ts <= now()` attached to it, and treating this inequality as described above.
 
-----------
-# Histograms
+From Sebastian:
 
-For histograms I think we should still enforce snapping like we currently do, with the exception that we can allow finer granularity and more options (powers of 2, money style, etc). This way we can avoid the inaccuracies inherent in the solution for inequalities given above.
+This is mostly a problem for datasets that continuously evolve. In those instances, we need some way of knowing when a row was inserted or changed. A very hairy solution would be to implement our own "index type" (or other ability to record metadata) which is such that inserts/writes to the database triggers an update. This way we can record metadata when rows are inserted/changed and use that information as a way of determining what data to include and what to exclude.
+
+For datasets that have a known update frequency, we could do something akin to what I described in this issue: https://github.com/diffix/strategy/issues/7
+
+Namely, we could:
+- have a "dataset version id" and an accompanying noise layer. Hence each new version of a dataset (whether or not the data has changed), will produce a different result
+- use a noise layer based on a pre-determined update frequency. I.e. if the dataset is updating once per month, then we could add a noise layer seeded by `bucket(current time by update frequency)`. Of course this value must align with the update frequency! Otherwise, you would get a new noise value both when data has changed and when the update interval changes...
 
 
 ----------
@@ -721,8 +835,28 @@ We've always disallowed full OUTER JOIN in essence because the joined table has 
 
 In principle we could fix this with support for multiple AIDs. We would have to recognize that each row has multiple AIDs associated with it because of the JOIN, and act accordingly. I'm not sure to what extent we need full OUTER JOIN, so we may not need to do anything other than continue to restrict it.
 
+Sebastian mentions this case from https://github.com/Aircloak/aircloak/issues/1240:
+
+```sql
+SELECT count(*) FROM (
+   SELECT distinct uid FROM t WHERE beverage = 'tea'
+) tea FULL OUTER JOIN (
+   SELECT distinct uid FROM t WHERE beverage = 'coffee'
+) coffee ON tea.uid = coffee.uid
+```
+
+as being equivalent to counting people who have had tea OR coffee.
+
+> TODO: Look more at full `OUTER JOIN` and see what we need to do to apply LED to it (just as we would for an OR statement).
+
 
 # TODOs
 
 Look into whether there is leakage from EXPLAIN.
+
+From Sebastian:
+
+There is likely to be leakage through EXPLAIN. The EXPLAIN results have cost estimates. The cost estimates are based on the number of rows a query processes, or how many rows a condition is likely to exclude etc.
+
+Consider the case of an extreme outlier AID that represents 50% of all rows. This would have a very noticeable impact on the cost estimates that are returned, particularly compared with the actual values we return post anonymization
 
