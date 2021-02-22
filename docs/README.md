@@ -18,6 +18,6 @@ This folder contains the design documents and supporting materials.
 
 [led.md](./led.md) Design notes for LED.
 
-### Aggregates
+### AIDS
 
-[aggregates.md](./aggregates.md) How to compute various aggregate functions (sum, min, max, etc.).
+[aids.md](./aids.md) Discussion of how to manage AIDs, especially multiple AIDs and how that effect aggregation functions.
