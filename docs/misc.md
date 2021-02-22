@@ -25,7 +25,7 @@ This opens the possibility of using the seed material from the non-LE (NLE) cond
 
 Low-Effect Detection is where we find conditions or groups of conditions that have very little effect on the AIDs that comprise the result of a query. 
 
-In principle, LED can be used to defend against difference attacks by removing the effect of LE conditions on the answer. This would have the same effect as dropping the condition from the query. There are however two difficulties here. First, one can't simply drop the condition, because a given condition or condition combination can be LE for some answer buckets, and not LE (NLE) for others. This suggests that the mechanism for LED can't be dropping conditions per se, but rather adjusting answers to nullify the condition effect.
+In principle, LED can be used to defend against difference attacks by removing the effect of LE conditions on the answer. This would have the same effect as dropping the condition from the query. There are however two difficulties here. First, one can't entirely drop the condition from a query, because a given condition or condition combination can be LE for some answer buckets, and not LE (NLE) for others. This suggests that the mechanism for LED can't be dropping conditions per se, but rather adjusting answers to nullify the condition effect.
 
 Second, it seems unlikely to me that we'll be able to perfectly eliminate the effect of a condition in all cases. Counts we can probably do alright, but there might be small errors do to machine precision or something for non-integer aggregates. Therefore we'll probably still need some kind of dynamic noise to protect against first derivative difference attacks. There may also be cases where we can't adjust aggregate outputs at all.
 
@@ -38,7 +38,7 @@ Given this, the basic idea now is to detect LE conditions using a noisy threshol
 
 ## Identifying LE conditions (combinations)
 
-As of this writing, I'm assuming that the identification of LE conditions takes place in the query engine itself. I'm assuming that the query engine processes conditions in some order, and stops when a given row is determined to be true (include in the answer) or false. In other words, not all conditions are examined, and it could even be that some conditions are never examined.
+As of this writing, I'm assuming that the identification of LE conditions takes place in the query engine itself. I'm assuming that the query engine processes conditions in some order that the analyst cannot influence, and stops when a given row is determined to be true (include in the answer) or false. In other words, not all conditions are examined, and it could even be that some conditions are never examined.
 
 The basic idea to identifying LE combinations is to build a truth table for each bucket, where by *bucket* I mean the output rows of the query. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false. Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
 
@@ -163,8 +163,8 @@ Case 1:
 
 Case 2: 
 
-- (This represents attack where A is `dept=``'``CS``'` and B is `gender=``'``M``'` and there is one woman in the CS dept.)
-- C3 is LE. Dropping B (setting it to true) only changes C3, so the C3 rows can be flipped, and B is dropped from dynamic seed material.
+- (This represents attack where A is `dept='CS'` and B is `gender='M'` and there is one woman in the CS dept.)
+- C3 is LE. Dropping B (setting it to true) only changes C3, so the C3 rows can be included (flipped), and B is dropped from dynamic seed material.
 
 Case 3:
 
@@ -176,13 +176,13 @@ Case 4:
 
 - (This represents a case where B and A mostly overlap, but neither is a subset of the other. Note this is extremely rare.)
 - Both C1 and C3 are LE. Dropping A would only change C1, and dropping B would only change C3. An attacker could make an attack with either. Note in particular that flipping the rows associated with C1 or C3 would cause those rows to fall under C2. Since C2 is already NLE, it would remain so after flipping, so we flip the rows for both C1 and C3. 
-    - Note here that effectively we are evaluating what would happen if we drop A but not B, and separately evaluating what would happen if we drop but not A. In other words, we don't evaluate what would happen if we were to drop both A and B together, which would in fact only produce the logic (`true AND true)`.
+    - Note here that effectively we are evaluating what would happen if we drop A but not B, and separately evaluating what would happen if we drop B but not A. In other words, we don't evaluate what would happen if we were to drop both A and B together, which would in fact only produce the logic (`true AND true)`.
 - We drop both A and B from dynamic seeding. In this case, the dynamic seeding material is some default value.
 
 Case 5:
 
 - (This represents the case where B is a subset of A. In other words, whenever A is true, B is also true.)
-- This similar to Case 4, with the exception that there is nothing to flip for C3.
+- This similar to Case 4, with the exception that there is nothing to flip for C3. This means we include (flip) the rows associated with `C1` and consider neither `A` nor `B` for dynamic noise layer seeding.
 
 
 **Example 2**: `A or B`, evaluation order A-->B
@@ -205,7 +205,7 @@ Case 2:
 Case 3: 
 
 - (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is.)
-- Dropping B only effect the C3 rows (LE), so we flip the C3 rows and drop B from dynamic seeding.
+- Dropping B only effect the C3 rows (of which there are none), so drop B from dynamic seeding.
 
 Case 4:
 
@@ -237,9 +237,9 @@ Case 2:
 
 Case 3:
 
-- Here both C1 and C2 are LE, but one with an outcome of false, and one with an outcome of true. Let's suppose that A is `gender =` `'``M``'`, and that there is one female which is why C1 is LE. Let's suppose that B is `race =` `'``Eskimo``'`, and that there is only one Eskimo, which is why C2 is LE. Suppose that C is `party =` `'``Dem``'`. The attacker could drop either A or B in an attack. Note that the woman cannot also be the Eskimo, because then condition C2 would not have occurred at all.
+- Here both C1 and C2 are LE, but one with an outcome of false, and one with an outcome of true. Let's suppose that A is `gender = 'M'`, and that there is one female which is why C1 is LE. Let's suppose that B is `race = 'Eskimo'`, and that there is only one Eskimo, which is why C2 is LE. Suppose that C is `party = 'Dem'`. The attacker could drop either A or B in an attack. Note that the woman cannot also be the Eskimo, because then condition C2 would not have occurred at all.
 - Suppose that the attacker drops A. Then the woman's row flips to included, and contributes to either C3 or C4, depending on whether the woman is democrat or not. Either way, the row won't go to C2 (because the woman isn't an Eskimo), so there is no chance that dropping A causes C2 to become NLE.
-- Suppose that the attacker drops B. Then B is set to false, in which case the row will either match C3 (and still be included) or c4 (and be excluded). Either way, the row will not change C1, and so there is no way that C1 can go from LE to NLE.
+- Suppose that the attacker drops B. Then B is set to false, in which case the row will either match C3 (and still be included) or C4 (and be excluded). Either way, the row will not change C1, and so there is no way that C1 can go from LE to NLE.
 - Therefore both A and B are dropped, the corresponding rows are re-evaluated accordingly, and neither A nor B are included in the dynamic noise seeding.
 
 Case 4:
@@ -263,7 +263,7 @@ Case 4:
 
 Case 1:
 
-- A can't be used in an attack because it would change the NLE C1 rows. Be can't be used in an attack because it would change C1 or C2 rows (probably both). C can't be used in an attack because it would change the NLE C5 rows.
+- A can't be used in an attack because it would change the NLE C1 rows. B can't be used in an attack because it would change C1 or C2 rows (probably both). C can't be used in an attack because it would change the NLE C5 rows.
 
 Case 2:
 
@@ -286,7 +286,7 @@ Case 4:
 - If C is dropped (set to false), it affects only C5, which is LE, so could be used in an attack.
 -  Note that dropping B and C would make the outcome LCF.
 
-**Example 5:** `(A and B) or (A``'` `and C)`, evaluation `A-->B-->A``'``-->C`
+**Example 5:** `(A and B) or (A' and C)`, evaluation `A-->B-->A'-->C`
 Note that in this example A and A' are fully redundant (semantically identical). It is equivalent to `A and (B or C)`. The cases correspond to those of Example 3.
 
 |    | A | B          | A'         | C          | out  | case 1     | case 2   | case 3              | case 4                |
@@ -372,6 +372,7 @@ Case 1:
 
 - There is no droppable condition or expression that leads to an attack so far as I can tell. 
 - (Note equivalent to `(A and C) or (A and D) or (B and C) or (B and D)`. Each condition appears in two expressions, so hard to eliminate any given expression without messing up the others. This, I think, is why we don't find droppable conditions here.)
+
 ## LE Implementation
 
 LE Implementation requires two types of metadata information per combination:
@@ -384,7 +385,7 @@ Regarding the per-combination AID metadata, it is probably most efficient just t
 
 > TODO: still not 100% sure that a combination can't go from NLE to LE...
 
-When all possible combinations are NLE, or when there are no conditions sets that lead to an attack (affect an LE number of rows), then no more low-effect processing is necessary. 
+When all possible combinations are NLE, or when there are no conditions sets that lead to an attack (affect a LE number of rows), then no more low-effect processing is necessary. 
 
 Until either of these things happen, however, it is necessary to record row information in case re-evaluation is needed. As long as a combination is LE and at least one condition set is droppable, the rows associated with those conditions must be retained for possible re-evaluation. If a combination becomes NLE, then rows for that combination no longer need to be retained, and earlier retained rows can be forgotten. (Note that this presumes that an aggregate can be adjusted incrementally through added or removed rows, in contrast to an aggregate that has to be recomputed from scratch if rows change.)
 
@@ -393,7 +394,7 @@ If there are LE combinations and droppable condition sets, re-evaluation may be 
 
 ## GROUP BY aggregates
 
-When there is a GROUP BY (GB) aggregate in a query, the LE metadata is maintained separately for each group. In the case of an intermediate GB (i.e. in a sub-query), LE adjustment is not made on the intermediate group buckets. Rather, the metadata is passed on downstream to the next SELECT. The decision to actually drop conditions for any given group bucket is made only for the outermost GB aggregates. Doing it this way avoids the problem of too much suppression at an intermediate GB.
+When there is a GROUP BY aggregate in a query, the LE metadata is maintained separately for each group. In the case of an intermediate GROUP BY (i.e. in a sub-query), LE adjustment is not made on the intermediate group buckets. Rather, the metadata is passed on downstream to the next SELECT. The decision to actually drop conditions for any given group bucket is made only for the outermost GROUP BY aggregates. Doing it this way avoids the problem of too much suppression at an intermediate GROUP BY.
 
 By way of example, consider the following query:
 
@@ -405,11 +406,11 @@ By way of example, consider the following query:
         GROUP BY 1 ) t
     GROUP BY 1
 
-Let's suppose that `trans_date` is an isolating column, so most of the `trans_date` buckets in the sub-query would by themselves be low count. Many low-count buckets would naturally also be LE. We don't want to start dropping buckets, or for that matter drop the gender condition, until we have computed the `cnt` buckets in the outer SELECT. This is because many of the `trans_date` buckets from the inner GB will be re-combined in the outer GB, and will therefore be no longer low-count or LE. In other words, we don't want to treat the inner GB as an anonymizing query.
+Let's suppose that `trans_date` is an isolating column, so most of the `trans_date` buckets in the sub-query would by themselves be low count. Many low-count buckets would naturally also be LE. We don't want to start dropping buckets, or for that matter drop the gender condition, until we have computed the `cnt` buckets in the outer SELECT. This is because many of the `trans_date` buckets from the inner GROUP BY will be re-combined in the outer GROUP BY, and will therefore be no longer low-count or LE. In other words, we don't want to treat the inner GROUP BY as an anonymizing query.
 
 What we need to do here is, during query processing of the inner `SELECT`, for each `trans_date`, record the combinations truth table with associated AIDs and rows. Then during query processing of the outer `SELECT`, we merge the combinations, AIDs, and rows into the `cnt` buckets.
 
-For example, after query processing of the inner `SELECT`, we might have this (where here `A` represents the condition `gender =` `'``M``'`):
+For example, after query processing of the inner `SELECT`, we might have this (where here `A` represents the condition `gender = 'M'`):
 
 | trans_date = 194800 | cnt = 5 | A=false: AIDs = [1], rows = [R1, R2]<br>A=true:  AIDs=[1,3], rows = [R4, R5, R6] |
 | ------------------- | ------- | -------------------------------------------------------------------------------- |
@@ -418,7 +419,7 @@ For example, after query processing of the inner `SELECT`, we might have this (w
 
 The first two rows both have `cnt=5` and so would be combined in the outer select. The combined data would be:
 
-| cnt = 5 | count(*) = 2 | A=false: AIDs = [1], rows = [R1, R2, R7]<br>A=true:  AIDs=[1,3, 2, 4], rows = [R4, R5, R6, R8, R9] |
+| cnt = 5 | count(*) = 2 | A=false: AIDs = [1], rows = [R1, R2, R7]<br>A=true:  AIDs=[1, 3, 2, 4], rows = [R4, R5, R6, R8, R9] |
 
 Here we see that the combination `A=true` is NLE, while `A=false` is LE. For this bucket, then, we would drop the condition, and include rows R1, R2, and R7. Doing so, however would cause the `trans_date = 194800` bucket to go from `cnt=5` ot `cnt=7` (because R1 and R2 are now included), and would cause the `trans_date = 193898` bucket to go from `cnt=5` ot `cnt=6` (because R7 is now included). As a result, the `count()` value for the `cnt=5` bucket would be reduced by two, and the `count()` **values for both the `cnt=6` and `cnt=7` buckets would be increased by one each.
 
@@ -430,7 +431,7 @@ Here we see that the combination `A=true` is NLE, while `A=false` is LE. For thi
 
 Seeding will follow pretty much the same approach as we have today with the non-integrated cloak. Effectively we want to know what column values are included (for pands and pors) or excluded (for nands and nors) by the condition. 
 
-What we want to do is record every value for every row for positive conditions that lead to an included row, and for negative conditions that lead to an excluded row. We can do this as a bloom filter for equalities. (We discuss how to seed for inequalities and regex elsewhere.)
+What we want to do is record every value for every row that led to a row being included (for positive conditions) or excluded (for negative conditions). We can do this as a bloom filter for equalities. (We discuss how to seed for inequalities and regex elsewhere.)
 
 So basic idea is to add each value to the bloom filter when the row is first evaluated. In principle we have the problem of how to remove a value from the bloom filter if a row is removed during re-evaluation, but my guess is that we won't need to worry about it. 
 
@@ -467,7 +468,7 @@ When computing flattening (for `sum()`), a flattening value for each distinct AI
 
 For each new aggregate function, we'll need to take into account multiple AID columns when determining how to perturb the output.
 
-Note that if two AID columns are identical (have the same values and refer to the same entities), then even if they are treated as distinct the right thing happens from an anonymity point of view. For instance, regarding LCF, a bucket might have AID1.1, AID1.2, AID 2.1, and AID 2.2. It so happens that `AID1.1=AID2.1` and `AID1.2=AID2.2`, but the mechanism doesn't care. The number of distinct AIDs to be used for LCF is two.
+Note that if two AID columns are identical (have the same values and refer to the same entities), then even if they are treated as distinct the right thing happens from an anonymity point of view. For instance, regarding LCF, a bucket might have AID1.1, AID1.2, AID2.1, and AID2.2. It so happens that `AID1.1=AID2.1` and `AID1.2=AID2.2`, but the mechanism doesn't care. The number of distinct AIDs to be used for LCF is two.
 
 The same is the case for noise or flattening. If two AID columns are identical, then the same rows will be used for the top group for both AIDs or for computing the contribution of the AIDs.
 
@@ -477,11 +478,9 @@ In any event, the fact that the mechanism doesn't care if two AIDs are identical
 
 Let's look at some examples of this. Suppose we have three tables, `users`, `accounts`, and `atm`.
 
-`users` has columns: `ssn`, `age`, `gender`, `zip`, where `ssn` is the social security number.
-
-`accounts` has columns: `ssn`, `account`.
-
-`atm` has columns `amount`, `account`, where `amount` is the amount withdrawn from the atm.
+- `users` has columns: `ssn`, `age`, `gender`, `zip`, where `ssn` is the social security number.
+- `accounts` has columns: `ssn`, `account`.
+- `atm` has columns `amount`, `account`, where `amount` is the amount withdrawn from the atm.
 
 Some accounts have two users, and some users have multiple accounts. `accounts` has one row per user per account.
 
@@ -499,9 +498,9 @@ A difficult case is where a column that is not protected (and cannot be tagged a
 
 Three tables, `paychecks`, `users`, and `companies`. We want to protect both users and companies.
 
-`paychecks`: `user_id`, `amount`, `date`
-`users`: `user_id`, `age`, `zip`
-`companies`: `user_id`, `company`
+- `paychecks`: `user_id`, `amount`, `date`
+- `users`: `user_id`, `age`, `zip`
+- `companies`: `user_id`, `company`
 
 Since `company` only appears in one place, it is tagged there. However, suppose that there are some zips with only one company (but other zips that have multiple companies).
 
@@ -643,9 +642,9 @@ For histograms I think we should still enforce snapping like we currently do, wi
 
 I'm cautiously optimistic that we'll be able to remove all of our LIKE restrictions. There are two issues to consider, 1) using wildcards to launch a difference attack, and 2) using wildcards to average away noise (de-noise). Both issues require that we gather certain information *during regex processing*. My uncertainty comes from the fact that I don't understand how regex processing happens in any detail.
 
-The difference attack exploits cases where a victim can be included with or excluded from a set of other AIDs with wildcards. An old example of this is where there are many 'paul' but only one 'paula'. Then `LIKE` `'``paul``'` and `LIKE` `'``paul_``'` differ by one user.
+The difference attack exploits cases where a victim can be included with or excluded from a set of other AIDs with wildcards. An old example of this is where there are many 'paul' but only one 'paula'. Then `LIKE 'paul'` and `LIKE 'paul_'` differ by one user.
 
-The de-noise attack of course depends on how we make noise, but if we assume that we seed noise based on column values, then we have the following attack. Suppose that the attacker wants to de-noise one noise layer for the condition where all rows match `LIKE` `'``%LIDL%``'`. Suppose the column values have a variety of strings before and after 'LIDL'. The attacker could then do the [split averaging attack](https://demo.aircloak.com/docs/attacks.html#split-averaging-attack), which generates pairs of queries where each pair when, summed together, has all rows with `%LIDL%`. Since each answer will have different rows, then the static noise for each answer will differ so long as there are enough different substrings before or after 'LIDL'. 
+The de-noise attack of course depends on how we make noise, but if we assume that we seed noise based on column values, then we have the following attack. Suppose that the attacker wants to de-noise one noise layer for the condition where all rows match `LIKE '%LIDL%'`. Suppose the column values have a variety of strings before and after 'LIDL'. The attacker could then do the [split averaging attack](https://demo.aircloak.com/docs/attacks.html#split-averaging-attack), which generates pairs of queries where each pair when, summed together, has all rows with `%LIDL%`. Since each answer will have different rows, then the static noise for each answer will differ so long as there are enough different substrings before or after 'LIDL'. 
 
 **Difference Attack**
 
@@ -670,7 +669,7 @@ There are two cases that may result in dropping rows:
 1. All of the wildcard matches are for the same substring except for a small number of substrings associated with an LE number of AIDs. In this case an attacker could replace the wildcard with that substring, and the LE rows would be excluded. This can be the case for both '%' and '_' wildcards.
 2. All of the wildcard matches are for some length substring N1 or longer except for a small number of shorter substrings of length N associated with an LE number of AIDs. In this case an attacker could replace the N-or-more wildcard with an N1-or-more wildcard, and the LE rows would be excluded.
 
-For example, suppose that in some query, 10 users have card_type 'gold card', and potentially 1 user has card_type 'platinum card'. A analyst wants to attack the platinum card holder using a pair of queries using `WHERE card_type LIKE` `'``%card``'` and `WHERE card_type LIKE` `'``%d card``'`. The wild card of the first query would have the substring 'gold ' associated with 10 AIDs, and the substring 'platinum ' associated with a single AID. These latter rows are LE and would be silently dropped. As a result, the two queries would have the same underlying count whether or not the victim was included in the first query.
+For example, suppose that in some query, 10 users have card_type 'gold card', and potentially 1 user has card_type 'platinum card'. A analyst wants to attack the platinum card holder using a pair of queries using `WHERE card_type LIKE '%card'` and `WHERE card_type LIKE '%d card'`. The wild card of the first query would have the substring 'gold ' associated with 10 AIDs, and the substring 'platinum ' associated with a single AID. These latter rows are LE and would be silently dropped. As a result, the two queries would have the same underlying count whether or not the victim was included in the first query.
 
 As a second example, suppose that in some query, there are 10 'bronze card' holders, 10 'silver card' holders, 10 'platinum card' holder, and potentially 1 'gold card' holder. The attacker makes two queries, one with `WHERE card_type LIKE '%____ card'%` and `WHERE card_type LIKE '%----- card'`. The first condition includes the single gold card holding victim, and the second condition excludes the victim. The following table shows the metadata for each symbol:
 
@@ -685,9 +684,9 @@ As a second example, suppose that in some query, there are 10 'bronze card' hold
 We see that none of the '_' wildcards lead to any dropped rows, because there are no LE characters. By contrast, the '%' wildcard has 30 substrings with length 2 or more, and only one substring with a smaller length (zero). We would therefore drop the 'gold card' rows.
 
 **De-noise attack**
-If a LIKE condition is `'``%LIDL%``'`, then one approach to defending against the split-averaging version of the de-noise attack would be to seed the noise layer with the substring 'LIDL' (in addition to the seed for the complete string). A strawman design would be to add a noise layer for every string constant in the regex expression. For instance, the expression '%foo%bar' would have a noise layer for 'foo' and another noise layer for 'bar'.
+If a LIKE condition is `'%LIDL%'`, then one approach to defending against the split-averaging version of the de-noise attack would be to seed the noise layer with the substring 'LIDL' (in addition to the seed for the complete string). A strawman design would be to add a noise layer for every string constant in the regex expression. For instance, the expression '%foo%bar' would have a noise layer for 'foo' and another noise layer for 'bar'.
 
-The problem here is that it leads to another form of de-noise attack, where low-effect (or zero-effect) wildcards are used to generate different noise layers. So for instance, `'``%L_DL%``'`, `'``%IDL%``'`, `'``%LI_L%``'`, and so on. As long as the same rows are included, the analyst can get different noise layers.
+The problem here is that it leads to another form of de-noise attack, where low-effect (or zero-effect) wildcards are used to generate different noise layers. So for instance, `'%L_DL%'`, `'%IDL%'`, `'%LI_L%'`, and so on. As long as the same rows are included, the analyst can get different noise layers.
 
 The solution approach would be to recognize when wildcards can be replaced with substring constants, and then do so before determining the seed for the noise layers. In essence, we identify LE wildcard conditions using the mechanism above, and if after dropping rows we find that the wildcard can be replaced with a substring constant (including zero-length substring), then we do so for the purpose of determining the seed material.
 
@@ -726,5 +725,4 @@ In principle we could fix this with support for multiple AIDs. We would have to 
 # TODOs
 
 Look into whether there is leakage from EXPLAIN.
-
 
