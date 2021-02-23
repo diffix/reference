@@ -24,4 +24,4 @@ This folder contains the design documents and supporting materials.
 
 ### Miscelaneous
 
-[misc.md](./misc.md) Odds and ends
+[misc.md](./misc.md) Odds and ends, such as LIKE regex and Full OUTER JOIN
