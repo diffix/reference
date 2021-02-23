@@ -63,6 +63,21 @@ If any combination is LE, then it may be that we need to adjust the aggregate ou
 
 > Note: The reason this assumes adjusting the aggregate output (versus adding or removing rows prior to aggregate computation) is that I'm presuming that the query engine may compute aggregates on the fly as it processes rows. For instance, the query engine may add a given row to a `count(*)` aggregate when it encounters the row, and only later might we decide that the row should be removed due to LE. In this case, we'd need to adjust the (already computed) aggregate rather than somehow compute the aggregate all over again.
 
+> Edon says this:
+
+> We can do whatever we want on the transition ("on the fly") phase and final phase. Also the data we store as intermediate state can be anything.
+
+> One idea would be to store a per-combination aggregation. Will we always include or exclude complete "combination groups"? For example:
+
+combination_id | outcome | count
+-|-|-
+1 | true | 10
+2 | true | 2
+3 | false | 7
+4 | false | 1
+
+> We can hold the partially aggregated count for each combination, and calculate the final at the last step of an aggregate after we know what is flipped and what is not. Say we want to include combination 4, the count would be `10 + 2 + 1 = 13`.
+
 In the above example, C3 is LE. Suppose the analyst were to drop or negate A. This would effectively result in A being set to true, which would (probably) change the outcome of many combination C1 rows to true, causing those rows to be added to the answer. In other words, the change would have a large effect and so can't be used by an attacker in a difference attack or a chaff attack. Therefore we can safely leave the C1 rows as is and keep the dynamic seeding material from A.
 
 If however the analyst were to drop C, then the only logic effect this would have would be to change the rows associated with C3 from true (included in the answer) to false (excluded from the answer). Since therefore a difference attack is possible, we want to adjust for the C3 rows by 1) adjust the aggregate outputs to what they would be if the rows are excluded, and 2) remove C from the seed materials for dynamic noise layers. 
@@ -505,6 +520,8 @@ which indeed now is showing us that there are two instances of `cnt = 23` where 
 
 > TODO: Work through the above cases more carefully
 
+> From Sebastian: I implemented a playground for experimenting with this idea. It can be found here: https://github.com/diffix/experiments/blob/master/Multi-level-aggregation.ipynb
+
 > TODO: Think about whether an attack is actually possible with an inner select like this
 
 
@@ -543,7 +560,7 @@ We use the following nomenclature. AIDX.Y refers to an AID for entity Y from col
 
 When computing LCF, the number of distinct AIDs in the bucket is taken to be the minimum of all AID columns. For example, suppose the tables used in a query have two AID columns, AID1 and AI2. Suppose a bucket from that query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3). Then the bucket is treated as having the minimum of these, two distinct AIDs.
 
-When computing noise, the noise amount (standard deviation) is computed separately for each AID column, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the noise value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
+When computing noise, the noise amount (standard deviation) is computed separately for each AID column, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
 
 When computing flattening (for `sum()`), a flattening value for each distinct AID column is computed separately, and the output is adjusted (flattened) by whichever value is greater. Note that it is possible for the AID columns used for noise and for flattening to be different.
 
@@ -642,8 +659,6 @@ From the admin point of view, I think the steps to configuration is something li
 
 If the aggregate is `sum()`, we need to determine which AIDs contribute the most, both for flattening and for determining the amount of noise. I'm assuming that, in the DB, aggregates are often computed on the fly. So for instance, `sum()` is computed by adding the column value to the aggregate as rows are determined to be included.
 
-> TODO: Sebastian doesn't think we'll be computing aggregates on the fly.
-
 Since we don't know how much each AID contributes until after query execution, we need to keep a data structure for all AIDs, and compute the contribution for each AID on the fly.
 
 I'm envisioning a hash structure for maintaining AID contributions. There must be good support for this in the DB. For `sum()`, we can add the column value in each row to the AID entry in the hash structure.
@@ -730,7 +745,7 @@ No doubt other missing details here, but this is the basic idea and it looks sol
 
 It occurs to me that the above discussion implicitly assumes that inequalities are clean (i.e. we know the value of the edge. If not clean, though, this begs the question of how the DB knows what to access from an index. They must have some way of knowing what in the index is included and excluded, and if they know this, then we could leverage it to allow unclean inequalities.
 
-For instance, if the condition is `WHERE sqrt(age) < 5`, we would somehow know that this really means `age < 25` (based on knowledge we borrow from postgres) and proceed accordingly.
+For instance, if the condition is `WHERE sqrt(age) < 5`, we would somehow know that this really means `age < 25` (based on knowledge we borrow from Postgres) and proceed accordingly.
 
 > TODO: We need to think about cases where changing an edge from one query to the next can isolate a single user. To the extent that such cases exist, we may need to detect them.
 
@@ -744,7 +759,7 @@ From Sebastian:
 
 This is mostly a problem for datasets that continuously evolve. In those instances, we need some way of knowing when a row was inserted or changed. A very hairy solution would be to implement our own "index type" (or other ability to record metadata) which is such that inserts/writes to the database triggers an update. This way we can record metadata when rows are inserted/changed and use that information as a way of determining what data to include and what to exclude.
 
-For datasets that have a known update frequency, we could do something akin to what I described in this issue: https://github.com/diffix/strategy/issues/7
+For datasets that have a known update frequency, we could do something akin to what I described in [this issue](https://github.com/diffix/strategy/issues/7):
 
 Namely, we could:
 - have a "dataset version id" and an accompanying noise layer. Hence each new version of a dataset (whether or not the data has changed), will produce a different result
