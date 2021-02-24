@@ -14,6 +14,15 @@ This opens the possibility of using the seed material from the non-LE (NLE) cond
 
 ----------
 
+# Glossary
+
+In the following discussion of low effect detection we will be using the following terms:
+
+- **Bucket**: a single aggregate row in the output (or multiple rows in the case of implicit aggregation). [The definition can be found here](https://github.com/diffix/strategy/issues/6).
+- **Combination**: is a set of truth values associated with both conditions and a bucket. Condition `A` has two combinations: `A = true` and `A = false`. Either or both might exist for a bucket.
+- **Low effect**: the number of distinct AIDs associated with a bucket or combination is below a threshold.
+
+
 # LED
 
 Low-Effect Detection is where we find conditions or groups of conditions that have very little effect on the AIDs that comprise the result of a query.
