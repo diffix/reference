@@ -38,15 +38,13 @@ Given this, the basic idea now is to detect LE conditions using a noisy threshol
 > TODO: Determine whether adjusting the aggregate output allows us to eliminate the need for the AID noise layers, or reduce noise. This might be a good noise reduction technique for common cases.
 
 
-## Identifying LE conditions (combinations)
+## Identifying LE conditions using combinations
 
-As of this writing, I'm assuming that the identification of LE conditions takes place in the query engine itself. I'm assuming that the query engine processes conditions in some order that the analyst cannot influence, and stops when a given row is determined to be true (include in the answer) or false. In other words, not all conditions are examined, and it could even be that some conditions are never examined.
+It is assumed that the identification of LE conditions takes place in the query engine itself. Furthermore it is assumed that the query engine processes conditions in some order that the analyst cannot influence, and stops when a given row is determined to be true (include in the answer) or false. In other words, not all conditions are necessarily examined, in fact some conditions might never be examined.
 
-The basic idea to identifying LE combinations is to build a truth table for each bucket, where by *bucket* I mean the output rows of the query. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false. Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
+The basic idea to identifying LE combinations is to build a truth table for each bucket, where by *bucket* I mean the output rows of the query. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false (true means the associated rows will be included in the bucket, and false that they will be excluded). Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
 
-A *combination* is a set of one or more conditions. A combination is LE when the number of distinct AIDs associated with the combination is below a noisy threshold.
-
-Here is an example of such a truth table with four combinations (C1, C2, C3, and C4):
+Here is an example of such a truth table with the four combinations (C1, C2, C3, and C4) corresponding to the logic `A and (B or C)` evaluated in the order `A-->B-->C` (where `A` represents a condition like `age <> 0`):
 
 |    | A     | B          | C          | outcome | AID1 | AID2 |
 | -- | ----- | ---------- | ---------- | ------- | ---- | ---- |
@@ -54,8 +52,6 @@ Here is an example of such a truth table with four combinations (C1, C2, C3, and
 | C2 | true  | true       | ---------- | true    | NLE  | NLE  |
 | C3 | true  | false      | true       | true    | LE   | NLE  |
 | C4 | true  | false      | false      | false   | NLE  | NLE  |
-
-This corresponds to the logic `A and (B or C)` evaluated in the order  `A-->B-->C` (where `A` represents a condition like `age <> 0`).
 
 At the end of query engine processing, we know if any combinations are LE for the given bucket. For instance, in the above example, the combination C3 is LE for AID1.
 
