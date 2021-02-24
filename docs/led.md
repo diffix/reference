@@ -1,11 +1,10 @@
-
 # Dynamic noise layers
 
 In previous designs, the dynamic noise layers were based on AIDs (UIDs). The purpose of the dynamic noise layer is to defend against the first derivative difference attack. This is needed because the static noise layers constitute a predictable difference between the "left" and "right" queries in the attack pair. The dynamic layer is not predictable, because each bucket in the attack has a different set of AIDs, and therefore a different dynamic noise layer.
 
 One tricky point about the dynamic layer is that it must not be possible to generate many different dynamic noise layers for what is semantically the same query, thus averaging out the dynamic noise. To avoid this, we use the AIDs themselves in part to seed the dynamic noise layer. Queries with the same semantics will always produce the same set of AIDs.
 
-One of the difficulties with using AIDs with proxy Diffix was the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE). 
+One of the difficulties with using AIDs with proxy Diffix was the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE).
 
 With DB Diffix it appears that we can use the conditions themselves as the basis of dynamic noise layers instead of AIDs. There are two reasons. First, if we are doing Low Effect Detection (LED), then an attacker would not be able to use chaff conditions to average away dynamic noise layers. Second, with tight DB integration, we can do a good job of determining the semantics of each condition, and therefore prevent conditions with different syntax but same semantics.
 
@@ -13,11 +12,11 @@ This opens the possibility of using the seed material from the non-LE (NLE) cond
 
 (Note that we still need per-condition dynamic noise layers. This is because in a difference attack, the condition that isolates the victim will always end up being LE, and so is ignored for the purpose of seeding dynamic noise layers. This would lead to the dynamic noise layer being identical on the left and right.)
 
-
 ----------
+
 # LED
 
-Low-Effect Detection is where we find conditions or groups of conditions that have very little effect on the AIDs that comprise the result of a query. 
+Low-Effect Detection is where we find conditions or groups of conditions that have very little effect on the AIDs that comprise the result of a query.
 
 In principle, LED can be used to defend against difference attacks by removing the effect of LE conditions on the answer. This would have the same effect as dropping the condition from the query. There are however two difficulties here. First, one can't entirely drop the condition from a query, because a given condition or condition combination can be LE for some answer buckets, and not LE (NLE) for others. This suggests that the mechanism for LED can't be dropping conditions per se, but rather adjusting answers to nullify the condition effect.
 
@@ -74,7 +73,7 @@ combination_id | outcome | count
 
 In the above example, C3 is LE. Suppose the analyst were to drop or negate A. This would effectively result in A being set to true, which would (probably) change the outcome of many combination C1 rows to true, causing those rows to be added to the answer. In other words, the change would have a large effect and so can't be used by an attacker in a difference attack or a chaff attack. Therefore we can safely leave the C1 rows as is and keep the dynamic seeding material from A.
 
-If however the analyst were to drop C, then the only logic effect this would have would be to change the rows associated with C3 from true (included in the answer) to false (excluded from the answer). Since therefore a difference attack is possible, we want to adjust for the C3 rows by 1) adjust the aggregate outputs to what they would be if the rows are excluded, and 2) remove C from the seed materials for dynamic noise layers. 
+If however the analyst were to drop C, then the only logic effect this would have would be to change the rows associated with C3 from true (included in the answer) to false (excluded from the answer). Since therefore a difference attack is possible, we want to adjust for the C3 rows by 1) adjust the aggregate outputs to what they would be if the rows are excluded, and 2) remove C from the seed materials for dynamic noise layers.
 
 Here is another example of a truth table, this time with five combinations:
 
@@ -113,7 +112,7 @@ Note that not only does this description assume that the query engine optimizati
 
 ## Adjusting aggregate values
 
-We call changing a row from included to excluded, or vice versa, as *flipping* the row. A flipped row can lead to an adjustment in the query's aggregate outputs. 
+We call changing a row from included to excluded, or vice versa, as *flipping* the row. A flipped row can lead to an adjustment in the query's aggregate outputs.
 
 > TODO: Work through the details of this. Not straightforward in many cases. May not even be possible in some cases?
 
@@ -173,7 +172,7 @@ Case 1:
 
 - No LE combinations, so no flipped rows. All seed material for A and B come from C2 rows.
 
-Case 2: 
+Case 2:
 
 - (This represents attack where A is `dept='CS'` and B is `gender='M'` and there is one woman in the CS dept.)
 - C3 is LE. Dropping B (setting it to true) only changes C3, so the C3 rows can be included (flipped), and B is dropped from dynamic seed material.
@@ -187,7 +186,7 @@ Case 3:
 Case 4:
 
 - (This represents a case where B and A mostly overlap, but neither is a subset of the other. Note this is extremely rare.)
-- Both C1 and C3 are LE. Dropping A would only change C1, and dropping B would only change C3. An attacker could make an attack with either. Note in particular that flipping the rows associated with C1 or C3 would cause those rows to fall under C2. Since C2 is already NLE, it would remain so after flipping, so we flip the rows for both C1 and C3. 
+- Both C1 and C3 are LE. Dropping A would only change C1, and dropping B would only change C3. An attacker could make an attack with either. Note in particular that flipping the rows associated with C1 or C3 would cause those rows to fall under C2. Since C2 is already NLE, it would remain so after flipping, so we flip the rows for both C1 and C3.
     - Note here that effectively we are evaluating what would happen if we drop A but not B, and separately evaluating what would happen if we drop B but not A. In other words, we don't evaluate what would happen if we were to drop both A and B together, which would in fact only produce the logic (`true AND true)`.
 - We drop both A and B from dynamic seeding. In this case, the dynamic seeding material is some default value.
 
@@ -210,11 +209,11 @@ Case 1:
 
 - No LE conditions, so nothing is done.
 
-Case 2: 
+Case 2:
 
 - C3 is LE. Dropping B (setting it to false) only changes C3, so the C3 rows can be flipped, and B is dropped from dynamic seed material.
 
-Case 3: 
+Case 3:
 
 - (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is.)
 - Dropping B only effect the C3 rows (of which there are none), so drop B from dynamic seeding.
@@ -293,7 +292,7 @@ Case 3:
 Case 4:
 
 - Many females (A), both Eskimo and other races (B). Few males. The females are excluded, so this case might be LCF (but might not).
-- If we drop A (set to true), then both C1 and C4 are affected, so A (gender) can't be used for an attack. 
+- If we drop A (set to true), then both C1 and C4 are affected, so A (gender) can't be used for an attack.
 - If we drop B (set to false), only C2 is affected (the outcome of C1 remains false regardless).  So B could be used in an attack.
 - If C is dropped (set to false), it affects only C5, which is LE, so could be used in an attack.
 -  Note that dropping B and C would make the outcome LCF.
@@ -323,7 +322,7 @@ Case 3:
 
 - Many male (A) non-Eskimos (B), both democrats and republicans. Few women or Eskimos.
 - As with case 2, dropping A or A' alone doesn't change the outcome. Dropping both affects only C1, and so *can be used in an attack*.
-- Dropping B alone affects C4 (NLE), so can't be an attack. Changing C likewise affects C4 and can't be an attack. 
+- Dropping B alone affects C4 (NLE), so can't be an attack. Changing C likewise affects C4 and can't be an attack.
 - Dropping both A and B may cause a change in the outcome of C2 (LE), and *can therefore be an attack*.
 - We re-evaluate the rows of C1 by changing both A and A' to true. We re-evaluate the rows of C2 by changing the expression `(A and B)` to false.
 - The only condition used as part of the dynamic seeding then is C.
@@ -349,7 +348,7 @@ Case 4:
 | C7 | 0 | ---------- | 0          | ---------- | 0    | NLE        | LE         | NLE       |
 |    |   |            |            |            | DROP | ---------- | ---------- | (A and B) |
 
-Case 1: 
+Case 1:
 
 - All combinations are NLE so no possible attack.
 
@@ -380,9 +379,9 @@ Case 3:
 | C7 | 0 | 0          | ---------- | ---------- | 0    | NLE        |
 |    |   |            |            |            | DROP | ---------- |
 
-Case 1: 
+Case 1:
 
-- There is no droppable condition or expression that leads to an attack so far as I can tell. 
+- There is no droppable condition or expression that leads to an attack so far as I can tell.
 - (Note equivalent to `(A and C) or (A and D) or (B and C) or (B and D)`. Each condition appears in two expressions, so hard to eliminate any given expression without messing up the others. This, I think, is why we don't find droppable conditions here.)
 
 ## LE Implementation
@@ -397,7 +396,7 @@ Regarding the per-combination AID metadata, it is probably most efficient just t
 
 > TODO: still not 100% sure that a combination can't go from NLE to LE...
 
-When all possible combinations are NLE, or when there are no conditions sets that lead to an attack (affect a LE number of rows), then no more low-effect processing is necessary. 
+When all possible combinations are NLE, or when there are no conditions sets that lead to an attack (affect a LE number of rows), then no more low-effect processing is necessary.
 
 Until either of these things happen, however, it is necessary to record row information in case re-evaluation is needed. As long as a combination is LE and at least one condition set is droppable, the rows associated with those conditions must be retained for possible re-evaluation. If a combination becomes NLE, then rows for that combination no longer need to be retained, and earlier retained rows can be forgotten. (Note that this presumes that an aggregate can be adjusted incrementally through added or removed rows, in contrast to an aggregate that has to be recomputed from scratch if rows change.)
 
@@ -475,7 +474,7 @@ which means we could combine these rows during the final aggregation as follows:
 which I guess can be interpreted as:
 - 4 AIDs with 2 occurrences of `cnt = 7`
 - 2 AIDs with 1 occurrence of `cnt = 7`
-- Assuming 4 AIDs passes LCF then we can claim,  `count(*) = 2` for `cnt = 7`... 
+- Assuming 4 AIDs passes LCF then we can claim,  `count(*) = 2` for `cnt = 7`...
 
 Expanding this for low count, count then maybe look like this?
 
@@ -521,11 +520,11 @@ which indeed now is showing us that there are two instances of `cnt = 23` where 
 
 # Seed Materials (equalities)
 
-Seeding follows pretty much the same approach as with the non-integrated cloak. Effectively we want to know what column values are included (for pands and pors) or excluded (for nands and nors) by the condition. 
+Seeding follows pretty much the same approach as with the non-integrated cloak. Effectively we want to know what column values are included (for pands and pors) or excluded (for nands and nors) by the condition.
 
 What we want to do is record every value for every row that led to a row being included (for positive conditions) or excluded (for negative conditions). We can do this as a bloom filter for equalities. (We discuss how to seed for inequalities and regex elsewhere.)
 
-So basic idea is to add each value to the bloom filter when the row is first evaluated. In principle we have the problem of how to remove a value from the bloom filter if a row is removed during re-evaluation, but my guess is that we won't need to worry about it. 
+So basic idea is to add each value to the bloom filter when the row is first evaluated. In principle we have the problem of how to remove a value from the bloom filter if a row is removed during re-evaluation, but my guess is that we won't need to worry about it.
 
 
 > TODO: Think about whether an attack is enabled if we don't update the column value bloom filter with row removal.
@@ -534,4 +533,3 @@ One good point of using a bloom filter is that they join together nicely with a 
 
 
 > TODO: An open question is how to deal with column indexes. We can address this when we see what information is associated with indexes.
-
