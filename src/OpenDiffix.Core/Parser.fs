@@ -65,7 +65,27 @@ module QueryParser =
 
   let distinct = opt (word "distinct") |>> Option.isSome
 
-  let from = word "FROM" >>. identifier
+  let table = simpleIdentifier |>> Expression.Table
+
+  let joinType =
+    choice [
+      word "JOIN" >>. preturn InnerJoin
+      words [ "INNER"; "JOIN" ] >>. preturn InnerJoin
+      words [ "LEFT"; "JOIN" ] >>. preturn LeftJoin
+      words [ "RIGHT"; "JOIN" ] >>. preturn RightJoin
+      words [ "FULL"; "JOIN" ] >>. preturn FullJoin
+    ]
+
+  let regular_join = joinType .>>. table .>> word "on" .>>. expr
+
+  let cross_join = word "," >>. table |>> fun table -> (InnerJoin, table), Boolean true
+
+  let join = cross_join <|> regular_join
+
+  let from =
+    word "FROM" >>. table .>>. many join
+    |>> fun (first_table, joined_tables) ->
+          List.fold (fun left ((joinType, right), on) -> Join(joinType, left, right, on)) first_table joined_tables
 
   let selectQuery =
     word "SELECT"
@@ -75,7 +95,7 @@ module QueryParser =
             commaSepExpressions
             >>= fun columns ->
                   from
-                  >>= fun table ->
+                  >>= fun from ->
                         opt whereClause
                         >>= fun whereClause ->
                               opt groupBy
@@ -86,7 +106,7 @@ module QueryParser =
                                             {
                                               SelectDistinct = distinct
                                               Expressions = columns
-                                              From = table
+                                              From = from
                                               Where = whereClause
                                               GroupBy = groupBy |> Option.defaultValue []
                                               Having = havingClause

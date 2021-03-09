@@ -10,7 +10,7 @@ let defaultSelect =
   {
     SelectDistinct = false
     Expressions = []
-    From = Identifier "table"
+    From = Table "table"
     Where = None
     GroupBy = []
     Having = None
@@ -184,6 +184,38 @@ let ``Parse complex aggregate query`` () =
     }
 
 [<Fact>]
+let ``Parses simple JOINs`` () =
+  assertOkEqual (parse from "from t1, t2") (Join(InnerJoin, Table "t1", Table "t2", Boolean true))
+
+  assertOkEqual (parse from "from t1 inner join t2 on true") (Join(InnerJoin, Table "t1", Table "t2", Boolean true))
+  assertOkEqual (parse from "from t1 left join t2 on true") (Join(LeftJoin, Table "t1", Table "t2", Boolean true))
+  assertOkEqual (parse from "from t1 right join t2 on true") (Join(RightJoin, Table "t1", Table "t2", Boolean true))
+  assertOkEqual (parse from "from t1 full join t2 on true") (Join(FullJoin, Table "t1", Table "t2", Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 JOIN t2 ON a = b")
+    (Join(InnerJoin, Table "t1", Table "t2", Equals(Identifier "a", Identifier "b")))
+
+[<Fact>]
+let ``Parses multiple JOINs`` () =
+  assertOkEqual
+    (parse from "from t1, t2, t3")
+    (Join(InnerJoin, Join(InnerJoin, Table "t1", Table "t2", Boolean true), Table "t3", Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 join t2 on true join t3 on true")
+    (Join(InnerJoin, Join(InnerJoin, Table "t1", Table "t2", Boolean true), Table "t3", Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 left join t2 on a right join t3 on b")
+    (Join(RightJoin, Join(LeftJoin, Table "t1", Table "t2", Identifier "a"), Table "t3", Identifier "b"))
+
+[<Fact>]
+let ``Rejects invalid JOINs`` () =
+  assertError (parse from "from t1 join t2")
+  assertError (parse from "from t1 join t2 where a = b")
+
+[<Fact>]
 let ``Failed Paul attack query 1`` () =
   assertOkEqual
     (Parser.parse
@@ -193,7 +225,7 @@ let ``Failed Paul attack query 1`` () =
          """)
     { defaultSelect with
         Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
-        From = Identifier "tab"
+        From = Table "tab"
         Where = Some(And(Equals(Identifier "t1", String "y"), Equals(Identifier "t2", String "m")))
     }
 
@@ -207,7 +239,7 @@ let ``Failed Paul attack query 2`` () =
          """)
     { defaultSelect with
         Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
-        From = Identifier "tab"
+        From = Table "tab"
         Where =
           Some(
             And(

@@ -97,7 +97,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), AnalyzerTypes.InnerJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), ParserTypes.InnerJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
@@ -108,7 +108,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), AnalyzerTypes.LeftJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), ParserTypes.LeftJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]

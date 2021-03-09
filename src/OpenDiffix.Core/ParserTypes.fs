@@ -5,7 +5,11 @@ type Constant =
   | String of string
   | Boolean of bool
 
-type From = Table of tableName: string
+type JoinType =
+  | InnerJoin
+  | LeftJoin
+  | RightJoin
+  | FullJoin
 
 type SelectQuery =
   {
@@ -35,6 +39,8 @@ and Expression =
   | Equals of left: Expression * right: Expression
   | As of left: Expression * right: Expression
   | Identifier of identifierName: string
+  | Table of name: string
+  | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
   | Function of functionName: string * Expression list
   | SelectQuery of SelectQuery
 // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/

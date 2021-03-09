@@ -2,11 +2,7 @@ namespace OpenDiffix.Core.AnalyzerTypes
 
 open OpenDiffix.Core
 
-type JoinType =
-  | InnerJoin
-  | LeftJoin
-  | RightJoin
-  | FullJoin
+type JoinType = ParserTypes.JoinType
 
 type SelectExpression =
   {
@@ -90,7 +86,7 @@ and SelectFrom =
 and Join =
   {
     //
-    Type: JoinType
+    Type: ParserTypes.JoinType
     Condition: Expression
     Left: SelectFrom
     Right: SelectFrom
