@@ -126,10 +126,28 @@ The interesting things to note are:
 
 ## Low count filtering
 
+As AID sets are a property of a column value, rather than a bucket as a whole, low count filtering
+has to be done per column value rather than bucket.
 
-When computing LCF, the number of distinct AIDs in the bucket is taken to be the minimum of all AID columns. For example, suppose the tables used in a query have two AID columns, AID1 and AI2. Suppose a bucket from that query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3). Then the bucket is treated as having the minimum of these, two distinct AIDs.
+Low count filtering is done for each AID set for a column value individually.
+If any of them fail low count filtering the column value as a whole is considered low count.
+For example, suppose the tables used in a query have two AID columns, AID1 and AID2. Suppose a column value from that
+query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3).
+Assuming the minimum number of distinct AIDs has been set to 3 AID1 fails low count filtering, and AID2 passes, but
+the column value as a whole therefore fails low count filtering.
 
-When computing noise, the noise amount (standard deviation) is computed separately for each AID column, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
+Low count filtering per column value will at times result in a bucket where some column values are low count
+while others are not. At present we filter out buckets in their entirety if any of the column values it contains are low count.
+
+Note (future work):
+This approach can be refined to allowing the subset of non low count column values through while replacing the
+low count values with synthetic data.
+
+--------
+Original content on noise below. To be reworked separately.
+--------
+
+When computing noise, the noise amount (standard deviation) is computed separately for each AID set, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
 
 When computing flattening (for `sum()`), a flattening value for each distinct AID column is computed separately, and the output is adjusted (flattened) by whichever value is greater. Note that it is possible for the AID columns used for noise and for flattening to be different.
 
