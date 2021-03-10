@@ -86,7 +86,7 @@ and SelectFrom =
 and Join =
   {
     //
-    Type: ParserTypes.JoinType
+    Type: JoinType
     Condition: Expression
     Left: SelectFrom
     Right: SelectFrom
