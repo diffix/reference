@@ -102,7 +102,7 @@ let transformSelectedExpressions (table: Table) selectedExpressions =
 
 let selectedTableName =
   function
-  | ParserTypes.Expression.Identifier tableName -> Ok tableName
+  | ParserTypes.Expression.Table name -> Ok name
   | _ -> Error "Only selecting from a single table is supported"
 
 let booleanTrueExpression = Boolean true |> Constant

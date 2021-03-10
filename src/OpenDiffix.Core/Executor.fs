@@ -92,10 +92,10 @@ let rec execute dataProvider context plan =
   | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
       let outerJoin, leftPlan, rightPlan =
         match joinType with
-        | AnalyzerTypes.InnerJoin -> false, leftPlan, rightPlan
-        | AnalyzerTypes.LeftJoin -> true, leftPlan, rightPlan
-        | AnalyzerTypes.RightJoin -> true, rightPlan, leftPlan
-        | AnalyzerTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+        | ParserTypes.InnerJoin -> false, leftPlan, rightPlan
+        | ParserTypes.LeftJoin -> true, leftPlan, rightPlan
+        | ParserTypes.RightJoin -> true, rightPlan, leftPlan
+        | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
