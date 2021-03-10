@@ -1,12 +1,9 @@
-
-----------
 # Computing Per-AID Contributions
 
 With an integrated cloak, we go back to the original style of computing noise, where we have information about individual AIDs. This is needed to compute noise about the various aggregates, including future aggregates and even user-defined aggregates. There are at least two types of aggregates:
 
 1. Combined: An aggregate that is derived from multiple values. `sum()` is an example.
 2. Individual: An aggregate that is derived from a single value. `median()` is an example.
-
 
 > TODO: there may be other types. Maybe should have a look at a bunch of aggregates and see.
 
@@ -16,6 +13,119 @@ With an integrated cloak, we go back to the original style of computing noise, w
 A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID in a query (either because there are multiple AIDs in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly, and also is robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
 
 We use the following nomenclature. AIDX.Y refers to an AID for entity Y from column AIDX. For example, `AID1 = send_email` and `AID1.1 = sue1@gmail.com` and `AID1.2 = bob6@yahoo.com`.
+
+## AID per column value rather than bucket
+
+A bucket might contain the data of one or more AIDs. It is useful to think of these AIDs in terms of sets.
+The set of AIDs associated with a bucket can grow in one of two ways:
+
+- we aggregate rows of distinct AIDs
+- we join two or more relations (tables, views or subqueries)
+
+In the case of aggregation, the resulting buckets might all belong to the same set of AIDs.
+This is however often not the case when joining relations. The following query illustrates the point:
+
+```sql
+SELECT age, maxSalary, avg(numTransactions)
+FROM (
+  SELECT aid, age, max(salary) as maxSalary
+  FROM customers
+  GROUP BY aid, age
+) t INNER JOIN (
+  SELECT age, count(*) as numTransactions
+  FROM transactions
+  GROUP BY age
+) s ON t.age = s.age
+GROUP BY age, maxSalary
+```
+
+In the query above we have:
+- per-AID rows from subquery `t` (by nature of the grouping by the AID column): `aid`, `maxSalary`
+- aggregates that represent one or more AIDs from subquery `s`: `numTransactions`
+- column values that represent both the AIDs from subquery `t` _and_ subquery `s` by nature of having been a join-condition: `age`
+
+This mix will result in a final bucket where some _column values_ might be low count (for example `maxSalary`) while others are not (for example `numTransactions`).
+
+### Rules for propagating AIDs
+
+The following rules apply:
+
+#### Aggregating
+
+**Each GROUP BY column ends up with an AID set that is the union of the AID sets of the
+column values being grouped. The union is taken of each AID type individually.**
+
+Example table:
+
+| age | age aid sets | name    | name aid sets         |
+| --- | ------------ | ------- | --------------------- |
+| 12  | AID1 [1]     | Bob     | AID1 [1]              |
+| 12  | AID1 [1]     | Bob     | AID1 [1]              |
+| 12  | AID1 [2]     | Bob     | AID1 [2]              |
+| 12  | AID1 [3]     | Alice   | AID1 [3], AID2 [1]    |
+| 12  | AID1 [3]     | Cynthia | AID1 [3, 4], AID2 [1] |
+| 12  | AID1 [5]     | Cynthia | AID1 [5]              |
+
+The query:
+
+```sql
+SELECT age, name
+FROM table
+GROUP BY age, name
+```
+
+would result in the following table:
+
+| age | age aid sets | name    | name aid sets            |
+| --- | ------------ | ------- | ------------------------ |
+| 12  | AID1 [1, 2]  | Bob     | AID1 [1, 2]              |
+| 12  | AID1 [3]     | Alice   | AID1 [3], AID2 [1]       |
+| 12  | AID1 [3, 5]  | Cynthia | AID1 [3, 4, 5], AID2 [1] |
+
+In other words, we take the union of AID sets on a column by column basis.
+
+Concretely, please note how for the `(age, name)` tuple:
+- `12, Bob` multiple single AID rows ends with a single multi AID row
+- `12, Alice` starts out being a row unique to an AID and remains so
+- `12, Cynthia` has uneven contributions for the `age` and `name` columns, and this remains true
+  after aggregation as well
+
+
+#### JOINing relations
+
+- **A column used as a JOIN condition gets a AID set that is the union of AID sets of the column in the joined relations**
+- **Other columns retain their previous AID sets**
+
+Example relations:
+
+Relation `t`:
+
+|  age | age aid sets | maxSalary | maxSalary aid sets |
+| ---: | ------------ | --------: | ------------------ |
+|   20 | AID1 [1]     |     10000 | AID1 [1]           |
+
+Relation `s`:
+
+|  age | age aid sets          | numTransactions | numTransactions aid sets |
+| ---: | --------------------- | --------------: | ------------------------ |
+|   20 | AID1 [1, 2], AID2 [3] |              10 | AID1 [1, 2]              |
+|   20 | AID1 [2, 3], AID2 [4] |              20 | AID1 [2, 3, 4]           |
+
+after joining these relations on `t.age = s.age` we end up with the following composite table
+
+| t.age | t.age aid sets               | t.maxSalary | t.maxSalary aid sets | s.age | s.age aid sets | s.numTransactions | s.numTransactions aid sets   |
+| ----: | ---------------------------- | ----------: | -------------------- | ----: | -------------- | ----------------: | ---------------------------- |
+|    20 | **AID1 [1, 2], AID2 [3]**    |       10000 | AID1 [1]             |    20 | AID1 [1, 2]    |                10 | **AID1 [1, 2], AID2 [3]**    |
+|    20 | **AID1 [1, 2, 3], AID2 [4]** |       10000 | AID1 [1]             |    20 | AID1 [1, 2, 3] |                20 | **AID1 [2, 3, 4], AID2 [4]** |
+
+The interesting things to note are:
+- The `t.maxSalary` and `s.numTransaction` values retain their AID sets
+- The `t.age` and `s.age` values have an AID set that is `union(t.age aid set, s.age aid set)` because of
+  the join condition which ensures they match
+
+
+## Low count filtering
+
 
 When computing LCF, the number of distinct AIDs in the bucket is taken to be the minimum of all AID columns. For example, suppose the tables used in a query have two AID columns, AID1 and AI2. Suppose a bucket from that query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3). Then the bucket is treated as having the minimum of these, two distinct AIDs.
 
@@ -49,7 +159,7 @@ In any event, if the attacker wants to somehow exploit information about that us
 
 > Note that the noise depends on what gets JOINed. Not sure we can or need to do anything about this.
 
-Suppose now that the attacker does a query with `atm JOIN users on amount = age`. Such a query would totally mix up `ssn` and `account` in that individual rows would contain `ssn` and `account` that have nothing to do with each other. Nevertheless, both `ssn` and `account` would be protected by virtue of the two AIDs. 
+Suppose now that the attacker does a query with `atm JOIN users on amount = age`. Such a query would totally mix up `ssn` and `account` in that individual rows would contain `ssn` and `account` that have nothing to do with each other. Nevertheless, both `ssn` and `account` would be protected by virtue of the two AIDs.
 
 ### Problem Case: Proxy AIDs
 
@@ -67,7 +177,7 @@ In this case, an attack on a company could be like
 
 ```
 SELECT sum(p.amount)
-FROM user u JOIN paychecks p 
+FROM user u JOIN paychecks p
 ON u.user_id = p.user_id
 WHERE u.zip = 12345
 ```
@@ -87,7 +197,7 @@ I'm not sure how big of a problem this will be in practice. Even this example is
 
 ### Pseudo-AIDs (or multi-column AIDs)
 
-The clinic database had a problem whereby a person would have multiple `patient_id`. It appeared just to be sloppy registration practice. This would for instance allow someone to view individual names in the database. One way to deal with this might be to allow some kind of multi-column AID, where several columns serve as a pseudo-identifier and Diffix concats them into a single AID. This is risky though, because if the admin uses too many columns, it could have the effect of making one person look like multiple people in the system and then they become attackable in other ways. 
+The clinic database had a problem whereby a person would have multiple `patient_id`. It appeared just to be sloppy registration practice. This would for instance allow someone to view individual names in the database. One way to deal with this might be to allow some kind of multi-column AID, where several columns serve as a pseudo-identifier and Diffix concats them into a single AID. This is risky though, because if the admin uses too many columns, it could have the effect of making one person look like multiple people in the system and then they become attackable in other ways.
 
 Perhaps the better alternative is just to continue to have non-selectable columns.
 
@@ -148,7 +258,7 @@ One way to compute median efficiently is with a pair of heaps, where the left he
 
 For `max()`, we need to know several AIDs of top values (and bottom values for `min()`).
 
-## 
+##
 
 zzzz
 
