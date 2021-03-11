@@ -76,11 +76,11 @@ module QueryParser =
       words [ "FULL"; "JOIN" ] >>. preturn FullJoin
     ]
 
-  let regular_join = joinType .>>. table .>> word "on" .>>. expr
+  let regularJoin = joinType .>>. table .>> word "on" .>>. expr
 
-  let cross_join = word "," >>. table |>> fun table -> (InnerJoin, table), Boolean true
+  let crossJoin = word "," >>. table |>> fun table -> (InnerJoin, table), Boolean true
 
-  let join = cross_join <|> regular_join
+  let join = crossJoin <|> regularJoin
 
   let from =
     word "FROM" >>. table .>>. many join
