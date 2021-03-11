@@ -63,16 +63,16 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
-let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context on =
+let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context on rowJoiner =
   let rightRows = Seq.toList rightStream
 
   leftStream
   |> Seq.collect (fun leftRow ->
-    let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context on
+    let joinedRows = rightRows |> List.map (rowJoiner leftRow) |> executeFilter context on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullRightRow = Array.create rightColumnsCount Null
-      seq { Array.append leftRow nullRightRow }
+      seq { rowJoiner leftRow nullRightRow }
     else
       joinedRows
   )
@@ -91,16 +91,16 @@ let rec execute dataProvider context plan =
       |> executeAggregate context labels aggregators
 
   | Plan.Join (leftPlan, rightPlan, joinType, on) ->
-      let outerJoin, leftPlan, rightPlan =
+      let outerJoin, leftPlan, rightPlan, rowJoiner =
         match joinType with
-        | ParserTypes.InnerJoin -> false, leftPlan, rightPlan
-        | ParserTypes.LeftJoin -> true, leftPlan, rightPlan
-        | ParserTypes.RightJoin -> true, rightPlan, leftPlan
+        | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
+        | ParserTypes.LeftJoin -> true, leftPlan, rightPlan, Array.append
+        | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
         | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
 
-      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context on
+      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context on rowJoiner
 
   | _ -> failwith "Plan execution not implemented"
