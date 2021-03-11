@@ -42,6 +42,7 @@ and SelectQuery =
   {
     Columns: SelectExpression list
     From: SelectFrom
+    TargetTables: Table list
     Where: Expression
     GroupingSets: GroupingSet list
     OrderBy: OrderByExpression list
