@@ -2,7 +2,8 @@ module OpenDiffix.Core.Executor
 
 open OpenDiffix.Core.PlannerTypes
 
-let private executeScan dataProvider table = table |> Table.load dataProvider |> Async.RunSynchronously |> Utils.unwrap
+let private executeScan (dataProvider: IDataProvider) table =
+  table |> dataProvider.LoadData |> Async.RunSynchronously |> Utils.unwrap
 
 let private executeProject context expressions rowsStream =
   let expressions = Array.ofList expressions
