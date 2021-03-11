@@ -188,4 +188,25 @@ type Tests(db: DBFixture) =
 
     result.Having |> should equal expected
 
+  [<Fact>]
+  let ``Analyze JOINs`` () =
+    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = cid"
+
+    let condition =
+      FunctionExpr(ScalarFunction Equals, [ ColumnReference(3, IntegerType); ColumnReference(6, IntegerType) ])
+
+    let customers = getTable "customers_small"
+    let purchases = getTable "purchases"
+
+    let expectedFrom =
+      Join
+        {
+          Type = JoinType.InnerJoin
+          Left = Table customers
+          Right = Table purchases
+          On = condition
+        }
+
+    result.From |> should equal expectedFrom
+
   interface IClassFixture<DBFixture>
