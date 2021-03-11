@@ -145,9 +145,9 @@ let ``plan join`` () =
   let join =
     {
       Type = JoinType.InnerJoin
-      Condition = constTrue
       Left = Table table
       Right = Table table
+      On = constTrue
     }
 
   let select = { emptySelect with From = Join join }

@@ -88,7 +88,7 @@ and Join =
   {
     //
     Type: JoinType
-    Condition: Expression
     Left: SelectFrom
     Right: SelectFrom
+    On: Expression
   }

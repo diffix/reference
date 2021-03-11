@@ -144,7 +144,7 @@ let rec private transformFrom schema from =
         let targetTables = (collectFromTables left) @ (collectFromTables right)
         let! condition = transformExpressionOptionWithDefaultTrue targetTables (Some on)
 
-        return Join { Type = joinType; Left = left; Right = right; Condition = condition }
+        return Join { Type = joinType; Left = left; Right = right; On = condition }
       }
   | _ -> Error "Invalid `FROM` clause"
 
