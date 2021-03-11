@@ -12,7 +12,7 @@ With an integrated cloak, we go back to the original style of computing noise, w
 
 A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID in a query (either because there are multiple AIDs in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly, and also is robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
 
-We use the following nomenclature. AIDX.Y refers to an AID for entity Y from column AIDX. For example, `AID1 = send_email` and `AID1.1 = sue1@gmail.com` and `AID1.2 = bob6@yahoo.com`.
+We use the following nomenclature. AIDX[Y1, Y2, ...] refers to an AID for a set of entities Y1, Y2, etc, from column AIDX. For example, `AID1 = send_email` and `AID1[1] = sue1@gmail.com` and `AID1[2] = bob6@yahoo.com`.
 
 ## AID per column value rather than bucket
 
@@ -59,12 +59,12 @@ Example table:
 
 | age | age aid sets | name    | name aid sets         |
 | --- | ------------ | ------- | --------------------- |
-| 12  | AID1 [1]     | Bob     | AID1 [1]              |
-| 12  | AID1 [1]     | Bob     | AID1 [1]              |
-| 12  | AID1 [2]     | Bob     | AID1 [2]              |
-| 12  | AID1 [3]     | Alice   | AID1 [3], AID2 [1]    |
-| 12  | AID1 [3]     | Cynthia | AID1 [3, 4], AID2 [1] |
-| 12  | AID1 [5]     | Cynthia | AID1 [5]              |
+| 12  | AID1[1]     | Bob     | AID1[1]              |
+| 12  | AID1[1]     | Bob     | AID1[1]              |
+| 12  | AID1[2]     | Bob     | AID1[2]              |
+| 12  | AID1[3]     | Alice   | AID1[3], AID2[1]    |
+| 12  | AID1[3]     | Cynthia | AID1[3, 4], AID2[1] |
+| 12  | AID1[5]     | Cynthia | AID1[5]              |
 
 The query:
 
@@ -78,9 +78,9 @@ would result in the following table:
 
 | age | age aid sets | name    | name aid sets            |
 | --- | ------------ | ------- | ------------------------ |
-| 12  | AID1 [1, 2]  | Bob     | AID1 [1, 2]              |
-| 12  | AID1 [3]     | Alice   | AID1 [3], AID2 [1]       |
-| 12  | AID1 [3, 5]  | Cynthia | AID1 [3, 4, 5], AID2 [1] |
+| 12  | AID1[1, 2]  | Bob     | AID1[1, 2]              |
+| 12  | AID1[3]     | Alice   | AID1[3], AID2[1]       |
+| 12  | AID1[3, 5]  | Cynthia | AID1[3, 4, 5], AID2[1] |
 
 In other words, we take the union of AID sets on a column by column basis.
 
@@ -102,21 +102,21 @@ Relation `t`:
 
 |  age | age aid sets | maxSalary | maxSalary aid sets |
 | ---: | ------------ | --------: | ------------------ |
-|   20 | AID1 [1]     |     10000 | AID1 [1]           |
+|   20 | AID1[1]     |     10000 | AID1[1]           |
 
 Relation `s`:
 
 |  age | age aid sets          | numTransactions | numTransactions aid sets |
 | ---: | --------------------- | --------------: | ------------------------ |
-|   20 | AID1 [1, 2], AID2 [3] |              10 | AID1 [1, 2]              |
-|   20 | AID1 [2, 3], AID2 [4] |              20 | AID1 [2, 3, 4]           |
+|   20 | AID1[1, 2], AID2[3] |              10 | AID1[1, 2]              |
+|   20 | AID1[2, 3], AID2[4] |              20 | AID1[2, 3, 4]           |
 
 after joining these relations on `t.age = s.age` we end up with the following composite table
 
 | t.age | t.age aid sets               | t.maxSalary | t.maxSalary aid sets | s.age | s.age aid sets | s.numTransactions | s.numTransactions aid sets   |
 | ----: | ---------------------------- | ----------: | -------------------- | ----: | -------------- | ----------------: | ---------------------------- |
-|    20 | **AID1 [1, 2], AID2 [3]**    |       10000 | AID1 [1]             |    20 | AID1 [1, 2]    |                10 | **AID1 [1, 2], AID2 [3]**    |
-|    20 | **AID1 [1, 2, 3], AID2 [4]** |       10000 | AID1 [1]             |    20 | AID1 [1, 2, 3] |                20 | **AID1 [2, 3, 4], AID2 [4]** |
+|    20 | **AID1[1, 2], AID2[3]**    |       10000 | AID1[1]             |    20 | AID1[1, 2]    |                10 | **AID1[1, 2], AID2[3]**    |
+|    20 | **AID1[1, 2, 3], AID2[4]** |       10000 | AID1[1]             |    20 | AID1[1, 2, 3] |                20 | **AID1[2, 3, 4], AID2[4]** |
 
 The interesting things to note are:
 - The `t.maxSalary` and `s.numTransaction` values retain their AID sets
@@ -132,7 +132,7 @@ has to be done per column value rather than bucket.
 Low count filtering is done for each AID set for a column value individually.
 If any of them fail low count filtering the column value as a whole is considered low count.
 For example, suppose the tables used in a query have two AID columns, AID1 and AID2. Suppose a column value from that
-query has two distinct AIDs from AID1 (AID1.1 and AID1.2), and three distinct AIDs from AID2 (AID2.1, AID2.2, and AID2.3).
+query has two distinct AIDs from AID1 (AID1[1, 2]), and three distinct AIDs from AID2 (AID2[1, 2, 3]).
 Assuming the minimum number of distinct AIDs has been set to 3 AID1 fails low count filtering, and AID2 passes, but
 the column value as a whole therefore fails low count filtering.
 
