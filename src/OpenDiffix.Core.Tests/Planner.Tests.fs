@@ -152,8 +152,7 @@ let ``plan join`` () =
 
   let select = { emptySelect with From = Join join }
 
-  let expected =
-    Plan.Project(Plan.Join(Plan.Scan(table), Plan.Scan(table), JoinType.InnerJoin, condition = constTrue), [])
+  let expected = Plan.Project(Plan.Join(Plan.Scan(table), Plan.Scan(table), JoinType.InnerJoin, on = constTrue), [])
 
   SelectQuery select |> Planner.plan |> should equal expected
 

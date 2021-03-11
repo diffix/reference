@@ -12,7 +12,7 @@ type Plan =
   | Sort of Plan * OrderByExpression list
   | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list
   | Unique of Plan
-  | Join of left: Plan * right: Plan * JoinType * condition: Expression
+  | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
 
   member this.ColumnsCount() =

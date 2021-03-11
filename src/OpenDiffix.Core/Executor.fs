@@ -63,12 +63,12 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
-let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context condition =
+let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context on =
   let rightRows = Seq.toList rightStream
 
   leftStream
   |> Seq.collect (fun leftRow ->
-    let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context condition
+    let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullRightRow = Array.create rightColumnsCount Null
@@ -90,7 +90,7 @@ let rec execute dataProvider context plan =
       |> execute dataProvider context
       |> executeAggregate context labels aggregators
 
-  | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+  | Plan.Join (leftPlan, rightPlan, joinType, on) ->
       let outerJoin, leftPlan, rightPlan =
         match joinType with
         | ParserTypes.InnerJoin -> false, leftPlan, rightPlan
@@ -101,6 +101,6 @@ let rec execute dataProvider context plan =
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
 
-      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context condition
+      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context on
 
   | _ -> failwith "Plan execution not implemented"
