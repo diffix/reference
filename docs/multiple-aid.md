@@ -57,14 +57,14 @@ column values being grouped. The union is taken of each AID type individually.**
 
 Example table:
 
-| age | age aid sets | name    | name aid sets         |
-| --- | ------------ | ------- | --------------------- |
-| 12  | AID1[1]     | Bob     | AID1[1]              |
-| 12  | AID1[1]     | Bob     | AID1[1]              |
-| 12  | AID1[2]     | Bob     | AID1[2]              |
-| 12  | AID1[3]     | Alice   | AID1[3], AID2[1]    |
-| 12  | AID1[3]     | Cynthia | AID1[3, 4], AID2[1] |
-| 12  | AID1[5]     | Cynthia | AID1[5]              |
+| age | age aid sets | name    | name aid sets       |
+| --- | ------------ | ------- | ------------------- |
+| 12  | AID1[1]      | Bob     | AID1[1]             |
+| 12  | AID1[1]      | Bob     | AID1[1]             |
+| 12  | AID1[2]      | Bob     | AID1[2]             |
+| 12  | AID1[3]      | Alice   | AID1[3], AID2[1]    |
+| 12  | AID1[3]      | Cynthia | AID1[3, 4], AID2[1] |
+| 12  | AID1[5]      | Cynthia | AID1[5]             |
 
 The query:
 
@@ -76,11 +76,11 @@ GROUP BY age, name
 
 would result in the following table:
 
-| age | age aid sets | name    | name aid sets            |
-| --- | ------------ | ------- | ------------------------ |
-| 12  | AID1[1, 2]  | Bob     | AID1[1, 2]              |
-| 12  | AID1[3]     | Alice   | AID1[3], AID2[1]       |
-| 12  | AID1[3, 5]  | Cynthia | AID1[3, 4, 5], AID2[1] |
+| age | age aid sets | name    | name aid sets          |
+| --- | ------------ | ------- | ---------------------- |
+| 12  | AID1[1, 2]   | Bob     | AID1[1, 2]             |
+| 12  | AID1[3]      | Alice   | AID1[3], AID2[1]       |
+| 12  | AID1[3, 5]   | Cynthia | AID1[3, 4, 5], AID2[1] |
 
 In other words, we take the union of AID sets on a column by column basis.
 
@@ -102,21 +102,21 @@ Relation `t`:
 
 |  age | age aid sets | maxSalary | maxSalary aid sets |
 | ---: | ------------ | --------: | ------------------ |
-|   20 | AID1[1]     |     10000 | AID1[1]           |
+|   20 | AID1[1]      |     10000 | AID1[1]            |
 
 Relation `s`:
 
-|  age | age aid sets          | numTransactions | numTransactions aid sets |
-| ---: | --------------------- | --------------: | ------------------------ |
-|   20 | AID1[1, 2], AID2[3] |              10 | AID1[1, 2]              |
-|   20 | AID1[2, 3], AID2[4] |              20 | AID1[2, 3, 4]           |
+|  age | age aid sets        | numTransactions | numTransactions aid sets |
+| ---: | ------------------- | --------------: | ------------------------ |
+|   20 | AID1[1, 2], AID2[3] |              10 | AID1[1, 2]               |
+|   20 | AID1[2, 3], AID2[4] |              20 | AID1[2, 3, 4]            |
 
 after joining these relations on `t.age = s.age` we end up with the following composite table
 
-| t.age | t.age aid sets               | t.maxSalary | t.maxSalary aid sets | s.age | s.age aid sets | s.numTransactions | s.numTransactions aid sets   |
-| ----: | ---------------------------- | ----------: | -------------------- | ----: | -------------- | ----------------: | ---------------------------- |
-|    20 | **AID1[1, 2], AID2[3]**    |       10000 | AID1[1]             |    20 | AID1[1, 2]    |                10 | **AID1[1, 2], AID2[3]**    |
-|    20 | **AID1[1, 2, 3], AID2[4]** |       10000 | AID1[1]             |    20 | AID1[1, 2, 3] |                20 | **AID1[2, 3, 4], AID2[4]** |
+| t.age | t.age aid sets             | t.maxSalary | t.maxSalary aid sets | s.age | s.age aid sets | s.numTransactions | s.numTransactions aid sets |
+| ----: | -------------------------- | ----------: | -------------------- | ----: | -------------- | ----------------: | -------------------------- |
+|    20 | **AID1[1, 2], AID2[3]**    |       10000 | AID1[1]              |    20 | AID1[1, 2]     |                10 | **AID1[1, 2], AID2[3]**    |
+|    20 | **AID1[1, 2, 3], AID2[4]** |       10000 | AID1[1]              |    20 | AID1[1, 2, 3]  |                20 | **AID1[2, 3, 4], AID2[4]** |
 
 The interesting things to note are:
 - The `t.maxSalary` and `s.numTransaction` values retain their AID sets
