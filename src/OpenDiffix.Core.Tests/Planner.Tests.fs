@@ -23,6 +23,7 @@ let emptySelect =
     Columns = []
     Where = constTrue
     From = Table table
+    TargetTables = [ table ]
     GroupingSets = []
     Having = constTrue
     OrderBy = []

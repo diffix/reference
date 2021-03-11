@@ -5,7 +5,8 @@ open Xunit
 open OpenDiffix.Core
 
 type DBFixture() =
-  member this.DataProvider = new OpenDiffix.CLI.SQLite.DataProvider (__SOURCE_DIRECTORY__ + "/../../data/data.sqlite")
+  member this.DataProvider =
+    new OpenDiffix.CLI.SQLite.DataProvider(__SOURCE_DIRECTORY__ + "/../../data/data.sqlite") :> IDataProvider
 
 let assertOk (result: Result<'a, 'b>) =
   Assert.True(

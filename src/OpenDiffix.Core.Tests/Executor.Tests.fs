@@ -7,7 +7,8 @@ open OpenDiffix.Core.PlannerTypes
 
 type Tests(db: DBFixture) =
 
-  let getTable name = name |> Table.getI db.DataProvider |> Async.RunSynchronously |> Utils.unwrap
+  let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
+  let getTable name = name |> Table.getI schema |> Utils.unwrap
 
   let products = getTable "products"
 

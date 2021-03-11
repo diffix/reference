@@ -15,13 +15,18 @@ let testTable: Table =
       ]
   }
 
-let aidColIndex = Table.getColumn testTable "int_col" |> Utils.unwrap |> fst
+let schema = [ testTable ]
+
+let aidColIndex = Table.getColumnI testTable "int_col" |> Utils.unwrap |> fst
 
 let analyzeQuery queryString =
   Parser.parse queryString
   |> Result.mapError (fun e -> $"Failed to parse: %A{e}")
-  |> Result.bind (Analyzer.transformQuery testTable)
-  |> Result.bind (Analysis.QueryValidity.validateQuery aidColIndex)
+  |> Result.bind (Analyzer.transformQuery schema)
+  |> Result.bind (fun query ->
+    AnalyzerTypes.SelectQuery query
+    |> Analysis.QueryValidity.validateQuery aidColIndex
+  )
 
 let ensureFailParsedQuery queryString (errorFragment: string) =
   match analyzeQuery queryString with
