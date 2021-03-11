@@ -77,4 +77,36 @@ type Tests(db: DBFixture) =
 
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 8 - cross join`` () =
+    let queryResult = runQuery "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
+
+    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
+
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 9 - inner join`` () =
+    let queryResult = runQuery "SELECT count(*) FROM purchases join customers_small ON id = cid"
+
+    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
+
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 10 - left join`` () =
+    let queryResult = runQuery "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
+
+    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
+
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 11 - right join`` () =
+    let queryResult = runQuery "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
+
+    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
+
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>
