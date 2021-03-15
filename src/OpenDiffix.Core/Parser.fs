@@ -55,7 +55,9 @@ module QueryParser =
     simpleIdentifier .>>. inParenthesis expr .>> spaces
     |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
 
-  let commaSepExpressions = commaSeparated expr .>> spaces
+  let selectedExpression = expr .>>. opt (word "AS" >>. simpleIdentifier) |>> As
+
+  let commaSepExpressions = commaSeparated selectedExpression .>> spaces
 
   let whereClause = word "WHERE" >>. expr
 
@@ -143,7 +145,6 @@ module QueryParser =
   let addPostfixOperator = addOperator PostfixOperator
 
   addPrefixOperator "distinct" spaces 1 false Expression.Distinct
-  addInfixOperator "as" spaces 1 Associativity.Left (fun left right -> Expression.As(left, right))
   addInfixOperator "and" spaces 1 Associativity.Left (fun left right -> Expression.And(left, right))
 
   addInfixOperator "or" (notFollowedBy (word "der by") .>> spaces) 2 Associativity.Left

@@ -54,44 +54,23 @@ and mapFunctionExpression table fn args =
       |> List.sequenceResultM
       |> Result.map (fun childArgs -> fn, childArgs)
 
-let extractAlias =
-  function
-  | ParserTypes.Expression.Identifier aliasName -> Ok aliasName
-  | other -> Error $"Expected an alias, but got an expression: %A{other}"
-
 let expressionName =
   function
   | ParserTypes.Identifier identifierName -> identifierName
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 
-let wrapExpressionAsSelected table parserExpr =
-  result {
-    let! expr = mapExpression table parserExpr
-    let name = expressionName parserExpr
-
-    return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
-  }
-
 let rec mapSelectedExpression tables selectedExpression: Result<SelectExpression, string> =
   match selectedExpression with
-  | ParserTypes.As (expr, exprAlias) ->
-      result {
-        let! childExpr = mapExpression tables expr
-        let! alias = extractAlias exprAlias
-        return { Expression = childExpr; Alias = alias }
-      }
-  | ParserTypes.Identifier identifierName ->
-      result {
-        let! column = mapColumn tables 0 identifierName
-        return { Expression = column; Alias = identifierName }
-      }
-  | ParserTypes.Expression.Function (fn, args) ->
-      wrapExpressionAsSelected tables (ParserTypes.Expression.Function(fn, args))
-  | ParserTypes.Expression.Integer value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Integer value)
-  | ParserTypes.Expression.Float value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Float value)
-  | ParserTypes.Expression.String value -> wrapExpressionAsSelected tables (ParserTypes.Expression.String value)
-  | ParserTypes.Expression.Boolean value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Boolean value)
+  | ParserTypes.As (parsedExpression, parsedAlias) ->
+      let alias =
+        match parsedAlias with
+        | None -> expressionName parsedExpression
+        | Some alias -> alias
+
+      parsedExpression
+      |> mapExpression tables
+      |> Result.bind (fun expression -> { Expression = expression; Alias = alias } |> Ok)
   | other -> Error $"Unexpected expression selected '%A{other}'"
 
 let transformSelectedExpressions tables selectedExpressions =
