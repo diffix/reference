@@ -18,70 +18,67 @@ let testTable: Table =
       ]
   }
 
+let schema = [ testTable ]
+
 let defaultQuery =
   {
     Columns = []
     Where = Boolean true |> Constant
     From = Table testTable
+    TargetTables = [ testTable ]
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
   }
 
-let testParsedQuery queryString callback (expected: Query) =
-  let testResult = queryString |> Parser.parse |> Result.bind callback
+let testParsedQuery queryString expected =
+  let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
   assertOkEqual testResult expected
 
 [<Fact>]
 let ``Analyze count(*)`` () =
   testParsedQuery
     "SELECT count(*) from table"
-    (Analyzer.transformQuery testTable)
-    (SelectQuery
-      { defaultQuery with
-          Columns =
-            [
-              {
-                Expression =
-                  FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
-                Alias = "count"
-              }
-            ]
-      })
+    { defaultQuery with
+        Columns =
+          [
+            {
+              Expression =
+                FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
+              Alias = "count"
+            }
+          ]
+    }
 
 [<Fact>]
 let ``Analyze count(distinct col)`` () =
   testParsedQuery
     "SELECT count(distinct int_col) from table"
-    (Analyzer.transformQuery testTable)
-    (SelectQuery
-      { defaultQuery with
-          Columns =
-            [
-              {
-                Expression =
-                  FunctionExpr(
-                    AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
-                    [ ColumnReference(1, IntegerType) ]
-                  )
-                Alias = "count"
-              }
-            ]
-      })
+    { defaultQuery with
+        Columns =
+          [
+            {
+              Expression =
+                FunctionExpr(
+                  AggregateFunction(Count, { AggregateOptions.Default with Distinct = true }),
+                  [ ColumnReference(1, IntegerType) ]
+                )
+              Alias = "count"
+            }
+          ]
+    }
 
 [<Fact>]
 let ``Selecting columns from a table`` () =
   testParsedQuery
     "SELECT str_col, bool_col FROM table"
-    (Analyzer.transformQuery testTable)
-    (SelectQuery
-      { defaultQuery with
-          Columns =
-            [
-              { Expression = ColumnReference(0, StringType); Alias = "str_col" }
-              { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
-            ]
-      })
+    { defaultQuery with
+        Columns =
+          [
+            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+          ]
+    }
 
 [<Fact>]
 let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
@@ -99,52 +96,54 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
 
   testParsedQuery
     query
-    (Analyzer.transformQuery testTable)
-    (SelectQuery
-      {
-        Columns =
-          [
-            { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
-            {
-              Expression =
-                FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
-              Alias = "+"
-            }
-            {
-              Expression =
-                FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-              Alias = "count"
-            }
-          ]
-        Where =
-          FunctionExpr(
-            ScalarFunction And,
-            [
-              FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0L) ])
-              FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
-            ]
-          )
-        From = Table testTable
-        GroupingSets =
-          [
-            GroupingSet [
-              ColumnReference(1, IntegerType)
+    {
+      TargetTables = [ testTable ]
+      Columns =
+        [
+          { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
+          {
+            Expression =
               FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+            Alias = "+"
+          }
+          {
+            Expression =
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-            ]
+            Alias = "count"
+          }
+        ]
+      Where =
+        FunctionExpr(
+          ScalarFunction And,
+          [
+            FunctionExpr(ScalarFunction Gt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 0L) ])
+            FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
           ]
-        Having =
-          FunctionExpr(
-            ScalarFunction Gt,
-            [
-              FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-              Constant(Value.Integer 1L)
-            ]
-          )
-        OrderBy = []
-      })
+        )
+      From = Table testTable
+      GroupingSets =
+        [
+          GroupingSet [
+            ColumnReference(1, IntegerType)
+            FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+            FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+          ]
+        ]
+      Having =
+        FunctionExpr(
+          ScalarFunction Gt,
+          [
+            FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
+            Constant(Value.Integer 1L)
+          ]
+        )
+      OrderBy = []
+    }
 
 type Tests(db: DBFixture) =
+  let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
+  let getTable name = name |> Table.getI schema |> Utils.unwrap
+
   let anonParams =
     {
       TableSettings =
@@ -188,5 +187,26 @@ type Tests(db: DBFixture) =
     let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
 
     result.Having |> should equal expected
+
+  [<Fact>]
+  let ``Analyze JOINs`` () =
+    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = cid"
+
+    let condition =
+      FunctionExpr(ScalarFunction Equals, [ ColumnReference(3, IntegerType); ColumnReference(6, IntegerType) ])
+
+    let customers = getTable "customers_small"
+    let purchases = getTable "purchases"
+
+    let expectedFrom =
+      Join
+        {
+          Type = JoinType.InnerJoin
+          Left = Table customers
+          Right = Table purchases
+          On = condition
+        }
+
+    result.From |> should equal expectedFrom
 
   interface IClassFixture<DBFixture>

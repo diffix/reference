@@ -5,35 +5,39 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let rec functionExpression table fn children =
+let rec private mapColumn tables indexOffset name =
+  match tables with
+  | [] -> Error $"Column `{name}` not found in the list of target tables"
+  | firstTable :: nextTables ->
+      match Table.tryGetColumnI firstTable name with
+      | None -> mapColumn nextTables (indexOffset + firstTable.Columns.Length) name
+      | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
+
+let rec functionExpression tables fn children =
   children
-  |> List.map (mapExpression table)
+  |> List.map (mapExpression tables)
   |> List.sequenceResultM
   |> Result.map (fun children -> FunctionExpr(fn, children))
 
-and mapExpression table parsedExpression =
+and mapExpression tables parsedExpression =
   match parsedExpression with
-  | ParserTypes.Identifier identifierName ->
-      result {
-        let! (index, column) = Table.getColumn table identifierName
-        return Expression.ColumnReference(index, column.Type)
-      }
+  | ParserTypes.Identifier identifierName -> mapColumn tables 0 identifierName
   | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Real value |> Constant |> Ok
   | ParserTypes.Expression.String value -> Value.String value |> Constant |> Ok
   | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant |> Ok
-  | ParserTypes.Not expr -> functionExpression table (ScalarFunction Not) [ expr ]
-  | ParserTypes.Lt (left, right) -> functionExpression table (ScalarFunction Lt) [ left; right ]
-  | ParserTypes.LtE (left, right) -> functionExpression table (ScalarFunction LtE) [ left; right ]
-  | ParserTypes.Gt (left, right) -> functionExpression table (ScalarFunction Gt) [ left; right ]
-  | ParserTypes.GtE (left, right) -> functionExpression table (ScalarFunction GtE) [ left; right ]
-  | ParserTypes.And (left, right) -> functionExpression table (ScalarFunction And) [ left; right ]
-  | ParserTypes.Or (left, right) -> functionExpression table (ScalarFunction Or) [ left; right ]
-  | ParserTypes.Equals (left, right) -> functionExpression table (ScalarFunction Equals) [ left; right ]
+  | ParserTypes.Not expr -> functionExpression tables (ScalarFunction Not) [ expr ]
+  | ParserTypes.Lt (left, right) -> functionExpression tables (ScalarFunction Lt) [ left; right ]
+  | ParserTypes.LtE (left, right) -> functionExpression tables (ScalarFunction LtE) [ left; right ]
+  | ParserTypes.Gt (left, right) -> functionExpression tables (ScalarFunction Gt) [ left; right ]
+  | ParserTypes.GtE (left, right) -> functionExpression tables (ScalarFunction GtE) [ left; right ]
+  | ParserTypes.And (left, right) -> functionExpression tables (ScalarFunction And) [ left; right ]
+  | ParserTypes.Or (left, right) -> functionExpression tables (ScalarFunction Or) [ left; right ]
+  | ParserTypes.Equals (left, right) -> functionExpression tables (ScalarFunction Equals) [ left; right ]
   | ParserTypes.Function (name, args) ->
       result {
         let! fn = Function.FromString name
-        let! fn, childExpressions = mapFunctionExpression table fn args
+        let! fn, childExpressions = mapFunctionExpression tables fn args
         return FunctionExpr(fn, childExpressions)
       }
   | other -> Error $"The expression is not permitted in this context: %A{other}"
@@ -69,35 +73,30 @@ let wrapExpressionAsSelected table parserExpr =
     return { AnalyzerTypes.Expression = expr; AnalyzerTypes.Alias = name }
   }
 
-let rec mapSelectedExpression table selectedExpression: Result<SelectExpression, string> =
+let rec mapSelectedExpression tables selectedExpression: Result<SelectExpression, string> =
   match selectedExpression with
   | ParserTypes.As (expr, exprAlias) ->
       result {
-        let! childExpr = mapExpression table expr
+        let! childExpr = mapExpression tables expr
         let! alias = extractAlias exprAlias
         return { Expression = childExpr; Alias = alias }
       }
   | ParserTypes.Identifier identifierName ->
       result {
-        let! (index, column) = Table.getColumn table identifierName
-
-        return
-          {
-            Expression = Expression.ColumnReference(index, column.Type)
-            Alias = identifierName
-          }
+        let! column = mapColumn tables 0 identifierName
+        return { Expression = column; Alias = identifierName }
       }
   | ParserTypes.Expression.Function (fn, args) ->
-      wrapExpressionAsSelected table (ParserTypes.Expression.Function(fn, args))
-  | ParserTypes.Expression.Integer value -> wrapExpressionAsSelected table (ParserTypes.Expression.Integer value)
-  | ParserTypes.Expression.Float value -> wrapExpressionAsSelected table (ParserTypes.Expression.Float value)
-  | ParserTypes.Expression.String value -> wrapExpressionAsSelected table (ParserTypes.Expression.String value)
-  | ParserTypes.Expression.Boolean value -> wrapExpressionAsSelected table (ParserTypes.Expression.Boolean value)
+      wrapExpressionAsSelected tables (ParserTypes.Expression.Function(fn, args))
+  | ParserTypes.Expression.Integer value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Integer value)
+  | ParserTypes.Expression.Float value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Float value)
+  | ParserTypes.Expression.String value -> wrapExpressionAsSelected tables (ParserTypes.Expression.String value)
+  | ParserTypes.Expression.Boolean value -> wrapExpressionAsSelected tables (ParserTypes.Expression.Boolean value)
   | other -> Error $"Unexpected expression selected '%A{other}'"
 
-let transformSelectedExpressions (table: Table) selectedExpressions =
+let transformSelectedExpressions tables selectedExpressions =
   selectedExpressions
-  |> List.map (mapSelectedExpression table)
+  |> List.map (mapSelectedExpression tables)
   |> List.sequenceResultM
 
 let selectedTableName =
@@ -107,9 +106,9 @@ let selectedTableName =
 
 let booleanTrueExpression = Boolean true |> Constant
 
-let transformExpressionOptionWithDefaultTrue table optionalExpression =
+let transformExpressionOptionWithDefaultTrue targetTables optionalExpression =
   optionalExpression
-  |> Option.map (mapExpression table)
+  |> Option.map (mapExpression targetTables)
   |> Option.defaultValue (Ok booleanTrueExpression)
 
 let transformGroupByIndex (expressions: Expression list) groupByExpression =
@@ -128,25 +127,52 @@ let transformGroupByIndices (selectedExpressions: SelectExpression list) groupBy
 
   groupByExpressions |> List.map (transformGroupByIndex selectedExpressions)
 
-let transformQuery table (selectQuery: ParserTypes.SelectQuery) =
-  result {
-    let! selectedExpressions = transformSelectedExpressions table selectQuery.Expressions
-    let! whereClause = transformExpressionOptionWithDefaultTrue table selectQuery.Where
-    let! havingClause = transformExpressionOptionWithDefaultTrue table selectQuery.Having
+let rec private collectTargetTables =
+  function
+  | Table table -> [ table ]
+  | Join join -> (collectTargetTables join.Left) @ (collectTargetTables join.Right)
+  | Query _ -> failwith "Unexpected subquery encountered while collecting tables"
 
-    let! groupBy = selectQuery.GroupBy |> List.map (mapExpression table) |> List.sequenceResultM
+let rec private transformFrom schema from =
+  match from with
+  | ParserTypes.Table name -> name |> Table.getI schema |> Result.map Table
+  | ParserTypes.Join (joinType, left, right, on) ->
+      result {
+        let! left = transformFrom schema left
+        let! right = transformFrom schema right
+
+        let targetTables = (collectTargetTables left) @ (collectTargetTables right)
+        let! condition = transformExpressionOptionWithDefaultTrue targetTables (Some on)
+
+        return Join { Type = joinType; Left = left; Right = right; On = condition }
+      }
+  | _ -> Error "Invalid `FROM` clause"
+
+let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
+  result {
+    let! from = transformFrom schema selectQuery.From
+    let targetTables = collectTargetTables from
+    let! selectedExpressions = transformSelectedExpressions targetTables selectQuery.Expressions
+    let! whereClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Where
+    let! havingClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Having
+
+    let! groupBy =
+      selectQuery.GroupBy
+      |> List.map (mapExpression targetTables)
+      |> List.sequenceResultM
+
     let! groupBy = groupBy |> transformGroupByIndices selectedExpressions |> List.sequenceResultM
 
     return
-      SelectQuery
-        {
-          Columns = selectedExpressions
-          Where = whereClause
-          From = SelectFrom.Table table
-          GroupingSets = [ GroupingSet groupBy ]
-          Having = havingClause
-          OrderBy = []
-        }
+      {
+        Columns = selectedExpressions
+        Where = whereClause
+        From = from
+        TargetTables = targetTables
+        GroupingSets = [ GroupingSet groupBy ]
+        Having = havingClause
+        OrderBy = []
+      }
   }
 
 let rewriteToDiffixAggregate aidColumnExpression query =
@@ -170,6 +196,12 @@ let rec scalarExpression =
   | FunctionExpr (_, args) -> List.forall scalarExpression args
   | _ -> true
 
+let selectExpressionToColumn selectExpression =
+  {
+    Name = selectExpression.Alias
+    Type = selectExpression.Expression |> Expression.GetType |> Utils.unwrap
+  }
+
 let selectColumnsFromQuery columnIndices innerQuery =
   let selectedColumns =
     columnIndices
@@ -179,9 +211,16 @@ let selectColumnsFromQuery columnIndices innerQuery =
       { column with Expression = ColumnReference(index, columnType) }
     )
 
+  let queryTable =
+    {
+      Name = "dfx_virtual_query"
+      Columns = List.map selectExpressionToColumn innerQuery.Columns
+    }
+
   {
     Columns = selectedColumns
     From = Query(SelectQuery innerQuery)
+    TargetTables = [ queryTable ]
     Where = booleanTrueExpression
     GroupingSets = []
     OrderBy = []
@@ -222,35 +261,36 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let private aidColumn (anonParams: AnonymizationParams) (tableName: string) =
-  match anonParams.TableSettings.TryFind(tableName) with
-  | None
-  | Some { AidColumns = [] } -> Ok(None)
-  | Some { AidColumns = [ column ] } -> Ok(Some column)
-  | Some _ -> Error("Analyze error: Multiple AID columns aren't supported yet")
+let rec private tryfindAid (anonParams: AnonymizationParams) tables =
+  match tables with
+  | [] -> None
+  | firstTable :: nextTables ->
+      match anonParams.TableSettings.TryFind(firstTable.Name) with
+      | None
+      | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
+      | Some { AidColumns = column :: _ } -> Some(firstTable, column)
 
-let analyze dataProvider
+let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)
             (parseTree: ParserTypes.SelectQuery)
             : Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
-    let! tableName = selectedTableName parseTree.From
-    let! aidColumn = aidColumn anonParams tableName
-    let! table = Table.getI dataProvider tableName
-    let! analyzerQuery = parseTree |> transformQuery table
+    let! schema = dataProvider.GetSchema()
+    let! query = transformQuery schema parseTree
 
     return!
-      match aidColumn with
-      | None -> Ok analyzerQuery
-      | Some aidColumn ->
+      match tryfindAid anonParams query.TargetTables with
+      | None -> query |> SelectQuery |> Ok
+      | Some (table, aidColumn) ->
           result {
-            let! (aidColumnIndex, aidColumn) = Table.getColumn table aidColumn
-            do! Analysis.QueryValidity.validateQuery aidColumnIndex analyzerQuery
+            let! (aidColumnIndex, aidColumn) = Table.getColumnI table aidColumn
+            do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery aidColumnIndex
 
             let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
 
             return
-              analyzerQuery
+              query
+              |> SelectQuery
               |> rewriteToDiffixAggregate aidColumnExpression
               |> addLowCountFilter aidColumnExpression
           }

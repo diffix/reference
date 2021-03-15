@@ -3,7 +3,7 @@ module rec OpenDiffix.Core.Planner
 open OpenDiffix.Core.PlannerTypes
 open OpenDiffix.Core.AnalyzerTypes
 
-let private planJoin join = Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.Condition)
+let private planJoin join = Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.On)
 
 let private planFrom =
   function

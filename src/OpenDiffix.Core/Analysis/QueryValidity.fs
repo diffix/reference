@@ -35,20 +35,20 @@ let private allowedCountUsage aidColIdx query =
            | _ -> failwith "Only count(*) and count(distinct aid-column) are supported"
        | _ -> ())
 
-let rec private validateSingleTableSelect query =
+let rec private validateSelectTarget query =
   Query.Map(
     query,
-    (function
-    | Query _
-    | Join _ -> failwith "JOIN queries and sub queries are not supported at present"
-    | Table _ as t -> t)
+    function
+    | Query _ -> failwith "Subqueries are not supported at present"
+    | Join _ as j -> j
+    | Table _ as t -> t
   )
   |> ignore
 
 let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query) =
   validateOnlyCount query
   allowedCountUsage aidColIdx query
-  validateSingleTableSelect query
+  validateSelectTarget query
 
 let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
   try

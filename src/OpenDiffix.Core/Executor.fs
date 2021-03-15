@@ -2,7 +2,8 @@ module OpenDiffix.Core.Executor
 
 open OpenDiffix.Core.PlannerTypes
 
-let private executeScan dataProvider table = table |> Table.load dataProvider |> Async.RunSynchronously |> Utils.unwrap
+let private executeScan (dataProvider: IDataProvider) table =
+  table |> dataProvider.LoadData |> Async.RunSynchronously |> Utils.unwrap
 
 let private executeProject context expressions rowsStream =
   let expressions = Array.ofList expressions
@@ -62,16 +63,16 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
     Array.append group values
   )
 
-let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context condition =
+let private executeJoin isOuterJoin leftStream rightStream rightColumnsCount context on rowJoiner =
   let rightRows = Seq.toList rightStream
 
   leftStream
   |> Seq.collect (fun leftRow ->
-    let joinedRows = rightRows |> List.map (Array.append leftRow) |> executeFilter context condition
+    let joinedRows = rightRows |> List.map (rowJoiner leftRow) |> executeFilter context on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullRightRow = Array.create rightColumnsCount Null
-      seq { Array.append leftRow nullRightRow }
+      seq { rowJoiner leftRow nullRightRow }
     else
       joinedRows
   )
@@ -89,17 +90,17 @@ let rec execute dataProvider context plan =
       |> execute dataProvider context
       |> executeAggregate context labels aggregators
 
-  | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
-      let outerJoin, leftPlan, rightPlan =
+  | Plan.Join (leftPlan, rightPlan, joinType, on) ->
+      let outerJoin, leftPlan, rightPlan, rowJoiner =
         match joinType with
-        | ParserTypes.InnerJoin -> false, leftPlan, rightPlan
-        | ParserTypes.LeftJoin -> true, leftPlan, rightPlan
-        | ParserTypes.RightJoin -> true, rightPlan, leftPlan
+        | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
+        | ParserTypes.LeftJoin -> true, leftPlan, rightPlan, Array.append
+        | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
         | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
       let leftStream = execute dataProvider context leftPlan
       let rightStream = execute dataProvider context rightPlan
 
-      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context condition
+      executeJoin outerJoin leftStream rightStream (rightPlan.ColumnsCount()) context on rowJoiner
 
   | _ -> failwith "Plan execution not implemented"

@@ -4,28 +4,27 @@ type Column = { Name: string; Type: ValueType }
 
 type Table = { Name: string; Columns: Column list }
 
+type Schema = Table list
+
 type IDataProvider =
   abstract LoadData: table:Table -> Async<Result<Row seq, string>>
-  abstract GetSchema: unit -> Async<Result<Table list, string>>
+  abstract GetSchema: unit -> Async<Result<Schema, string>>
 
 module Table =
   open FsToolkit.ErrorHandling
   open OpenDiffix.Core.Utils
 
-  let getI (dataProvider: IDataProvider) tableName =
-    asyncResult {
-      let! tables = dataProvider.GetSchema()
+  let getI schema tableName =
+    schema
+    |> List.tryFind (fun table -> equalsI table.Name tableName)
+    |> Result.requireSome "Execution error: Table not found"
 
-      return!
-        tables
-        |> List.tryFind (fun table -> equalsI table.Name tableName)
-        |> Result.requireSome "Execution error: Table not found"
-    }
-
-  let getColumn table columnName =
+  let tryGetColumnI table columnName =
     table.Columns
     |> List.indexed
     |> List.tryFind (fun (_index, column) -> equalsI column.Name columnName)
-    |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
 
-  let load (dataProvider: IDataProvider) table = dataProvider.LoadData table
+  let getColumnI table columnName =
+    columnName
+    |> tryGetColumnI table
+    |> Result.requireSome $"Unknown column %s{columnName} in table %s{table.Name}"
