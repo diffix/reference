@@ -13,15 +13,15 @@ let rec private mapUnqualifiedColumn tables indexOffset name =
       | None -> mapUnqualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) name
       | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
 
-let rec private mapQualifiedColumn (tables: Table list) index_offset tableName columnName =
+let rec private mapQualifiedColumn (tables: Table list) indexOffset tableName columnName =
   match tables with
   | [] -> Error $"Table `{tableName}` not found in the list of target tables"
   | firstTable :: _ when firstTable.Name = tableName ->
       columnName
       |> Table.getColumnI firstTable
-      |> Result.bind (fun (index, column) -> ColumnReference(index + index_offset, column.Type) |> Ok)
+      |> Result.bind (fun (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok)
   | firstTable :: nextTables ->
-      mapQualifiedColumn nextTables (index_offset + firstTable.Columns.Length) tableName columnName
+      mapQualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) tableName columnName
 
 let private mapColumn tables tableName columnName =
   match tableName with
