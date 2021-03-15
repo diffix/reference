@@ -127,10 +127,10 @@ let transformGroupByIndices (selectedExpressions: SelectExpression list) groupBy
 
   groupByExpressions |> List.map (transformGroupByIndex selectedExpressions)
 
-let rec private collectFromTables =
+let rec private collectTargetTables =
   function
   | Table table -> [ table ]
-  | Join join -> (collectFromTables join.Left) @ (collectFromTables join.Right)
+  | Join join -> (collectTargetTables join.Left) @ (collectTargetTables join.Right)
   | Query _ -> failwith "Unexpected subquery encountered while collecting tables"
 
 let rec private transformFrom schema from =
@@ -141,7 +141,7 @@ let rec private transformFrom schema from =
         let! left = transformFrom schema left
         let! right = transformFrom schema right
 
-        let targetTables = (collectFromTables left) @ (collectFromTables right)
+        let targetTables = (collectTargetTables left) @ (collectTargetTables right)
         let! condition = transformExpressionOptionWithDefaultTrue targetTables (Some on)
 
         return Join { Type = joinType; Left = left; Right = right; On = condition }
@@ -151,7 +151,7 @@ let rec private transformFrom schema from =
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! from = transformFrom schema selectQuery.From
-    let targetTables = collectFromTables from
+    let targetTables = collectTargetTables from
     let! selectedExpressions = transformSelectedExpressions targetTables selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Where
     let! havingClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Having
@@ -261,13 +261,13 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private findAid (anonParams: AnonymizationParams) tables =
+let rec private tryfindAid (anonParams: AnonymizationParams) tables =
   match tables with
   | [] -> None
   | firstTable :: nextTables ->
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
-      | Some { AidColumns = [] } -> findAid anonParams nextTables
+      | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
       | Some { AidColumns = column :: _ } -> Some(firstTable, column)
 
 let analyze (dataProvider: IDataProvider)
@@ -279,7 +279,7 @@ let analyze (dataProvider: IDataProvider)
     let! query = transformQuery schema parseTree
 
     return!
-      match findAid anonParams query.TargetTables with
+      match tryfindAid anonParams query.TargetTables with
       | None -> query |> SelectQuery |> Ok
       | Some (table, aidColumn) ->
           result {
