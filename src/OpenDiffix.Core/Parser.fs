@@ -12,10 +12,14 @@ module QueryParser =
 
   let simpleIdentifier =
     let isIdentifierFirstChar token = isLetter token
-    let isIdentifierChar token = isLetter token || isDigit token || token = '.' || token = '_'
+    let isIdentifierChar token = isLetter token || isDigit token || token = '_'
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> spaces
 
-  let identifier = simpleIdentifier |>> Expression.Identifier
+  let identifier =
+    simpleIdentifier .>>. opt (pchar '.' >>. simpleIdentifier)
+    |>> function
+    | name, None -> Expression.Identifier(None, name)
+    | name1, Some name2 -> Expression.Identifier(Some name1, name2)
 
   let word word = pstringCI word >>. spaces
 

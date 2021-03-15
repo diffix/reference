@@ -5,13 +5,28 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let rec private mapColumn tables indexOffset name =
+let rec private mapUnqualifiedColumn tables indexOffset name =
   match tables with
   | [] -> Error $"Column `{name}` not found in the list of target tables"
   | firstTable :: nextTables ->
       match Table.tryGetColumnI firstTable name with
-      | None -> mapColumn nextTables (indexOffset + firstTable.Columns.Length) name
+      | None -> mapUnqualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) name
       | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
+
+let rec private mapQualifiedColumn (tables: Table list) index_offset tableName columnName =
+  match tables with
+  | [] -> Error $"Table `{tableName}` not found in the list of target tables"
+  | firstTable :: _ when firstTable.Name = tableName ->
+      columnName
+      |> Table.getColumnI firstTable
+      |> Result.bind (fun (index, column) -> ColumnReference(index + index_offset, column.Type) |> Ok)
+  | firstTable :: nextTables ->
+      mapQualifiedColumn nextTables (index_offset + firstTable.Columns.Length) tableName columnName
+
+let private mapColumn tables tableName columnName =
+  match tableName with
+  | None -> mapUnqualifiedColumn tables 0 columnName
+  | Some tableName -> mapQualifiedColumn tables 0 tableName columnName
 
 let rec functionExpression tables fn children =
   children
@@ -21,7 +36,7 @@ let rec functionExpression tables fn children =
 
 and mapExpression tables parsedExpression =
   match parsedExpression with
-  | ParserTypes.Identifier identifierName -> mapColumn tables 0 identifierName
+  | ParserTypes.Identifier (tableName, columnName) -> mapColumn tables tableName columnName
   | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant |> Ok
   | ParserTypes.Expression.Float value -> Value.Real value |> Constant |> Ok
   | ParserTypes.Expression.String value -> Value.String value |> Constant |> Ok
@@ -56,7 +71,7 @@ and mapFunctionExpression table fn args =
 
 let expressionName =
   function
-  | ParserTypes.Identifier identifierName -> identifierName
+  | ParserTypes.Identifier (_, columnName) -> columnName
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 
