@@ -23,11 +23,10 @@ let parse p string =
 
 [<Fact>]
 let ``Parses simple identifiers`` () =
-  assertOkEqual (parse commaSepExpressions "hello") [ Identifier "hello" ]
-  assertOkEqual (parse commaSepExpressions "hello, world") [ Identifier "hello"; Identifier "world" ]
-  assertOkEqual (parse commaSepExpressions "hello12") [ Identifier "hello12" ]
-  assertOkEqual (parse commaSepExpressions "hello_12") [ Identifier "hello_12" ] // Allows underscores
-  assertOkEqual (parse commaSepExpressions "hello.bar12") [ Identifier "hello.bar12" ] // Allows punctuated names
+  assertOkEqual (parse expr "hello") (Identifier(None, "hello"))
+  assertOkEqual (parse expr "hello12") (Identifier(None, "hello12"))
+  assertOkEqual (parse expr "hello_12") (Identifier(None, "hello_12")) // Allows underscores
+  assertOkEqual (parse expr "hello.bar12") (Identifier(Some "hello", "bar12")) // Allows qualified names
 
 [<Fact>]
 let ``Parses expressions`` () =
@@ -49,26 +48,38 @@ let ``Parses expressions`` () =
   |> List.iter (fun (op, expected) -> assertOkEqual (parse expr $"1 %s{op} 1") (expected (Integer 1, Integer 1)))
 
   assertOkEqual (parse expr "not 1") (Expression.Not(Integer 1))
-  assertOkEqual (parse expr "value is null") (Equals(Identifier "value", Null))
-  assertOkEqual (parse expr "value is not null") (Not(Equals(Identifier "value", Null)))
-  assertOkEqual (parse expr "value as alias") (As(Identifier "value", Identifier "alias"))
+  assertOkEqual (parse expr "value is null") (Equals(Identifier(None, "value"), Null))
+  assertOkEqual (parse expr "value is not null") (Not(Equals(Identifier(None, "value"), Null)))
 
 
 [<Fact>]
 let ``Parses columns`` () =
-  assertOkEqual (parse commaSepExpressions "hello") [ Identifier "hello" ]
-  assertOkEqual (parse commaSepExpressions "hello, world") [ Identifier "hello"; Identifier "world" ]
-  assertOkEqual (parse commaSepExpressions "hello,world") [ Identifier "hello"; Identifier "world" ]
-  assertOkEqual (parse commaSepExpressions "hello ,world") [ Identifier "hello"; Identifier "world" ]
+  assertOkEqual (parse commaSepExpressions "hello") [ As(Identifier(None, "hello"), None) ]
+  assertOkEqual (parse commaSepExpressions "hello as alias") [ As(Identifier(None, "hello"), Some "alias") ]
+
+  assertOkEqual
+    (parse commaSepExpressions "hello, world")
+    [ As(Identifier(None, "hello"), None); As(Identifier(None, "world"), None) ]
+
+  assertOkEqual
+    (parse commaSepExpressions "hello,world")
+    [ As(Identifier(None, "hello"), None); As(Identifier(None, "world"), None) ]
+
+  assertOkEqual
+    (parse commaSepExpressions "hello ,world")
+    [ As(Identifier(None, "hello"), None); As(Identifier(None, "world"), None) ]
 
 [<Fact>]
 let ``Parses functions`` () =
-  assertOkEqual (parse commaSepExpressions "hello(world)") [ Function("hello", [ Identifier "world" ]) ]
-  assertOkEqual (parse commaSepExpressions "hello ( world )") [ Function("hello", [ Identifier "world" ]) ]
+  assertOkEqual (parse expr "hello(world)") (Function("hello", [ Identifier(None, "world") ]))
+  assertOkEqual (parse expr "hello ( world )") (Function("hello", [ Identifier(None, "world") ]))
 
   assertOkEqual
     (parse commaSepExpressions "hello(world), hello(moon)")
-    [ Function("hello", [ Identifier "world" ]); Function("hello", [ Identifier "moon" ]) ]
+    [
+      As(Function("hello", [ Identifier(None, "world") ]), None)
+      As(Function("hello", [ Identifier(None, "moon") ]), None)
+    ]
 
 [<Fact>]
 let ``Precedence is as expected`` () =
@@ -76,48 +87,57 @@ let ``Precedence is as expected`` () =
     (parse expr "1 + 2 * 3^2 < 1 AND a or not b IS NULL")
     (And(
       Lt(Function("+", [ Integer 1; Function("*", [ Integer 2; Function("^", [ Integer 3; Integer 2 ]) ]) ]), Integer 1),
-      Or(Identifier "a", Not(Equals(Identifier "b", Null)))
+      Or(Identifier(None, "a"), Not(Equals(Identifier(None, "b"), Null)))
     ))
 
 [<Fact>]
 let ``Parses count(*)`` () =
   let expected = Function("count", [ Star ])
-  assertOkEqual (parse commaSepExpressions "count(*)") [ expected ]
-  assertOkEqual (parse commaSepExpressions "count( *     )") [ expected ]
+  assertOkEqual (parse expr "count(*)") expected
+  assertOkEqual (parse expr "count( *     )") expected
 
 [<Fact>]
 let ``Parses count(distinct col)`` () =
-  let expected = Function("count", [ Distinct(Identifier "col") ])
-  assertOkEqual (parse commaSepExpressions "count(distinct col)") [ expected ]
-  assertOkEqual (parse commaSepExpressions "count ( distinct     col )") [ expected ]
+  let expected = Function("count", [ Distinct(Identifier(None, "col")) ])
+  assertOkEqual (parse expr "count(distinct col)") expected
+  assertOkEqual (parse expr "count ( distinct     col )") expected
 
 [<Fact>]
 let ``Parses complex functions`` () =
-  let expected = Function("length", [ Function("sum", [ Function("+", [ Identifier "rain"; Identifier "sun" ]) ]) ])
+  let expected =
+    Function("length", [ Function("sum", [ Function("+", [ Identifier(None, "rain"); Identifier(None, "sun") ]) ]) ])
+
   assertOkEqual (parse expr "length(sum(rain + sun))") expected
 
 [<Fact>]
 let ``Parses WHERE clause conditions`` () =
-  assertOkEqual (parse whereClause "WHERE a = 1") (Equals(Identifier "a", Integer 1))
-  assertOkEqual (parse whereClause "WHERE a = '1'") (Equals(Identifier "a", String "1"))
+  assertOkEqual (parse whereClause "WHERE a = 1") (Equals(Identifier(None, "a"), Integer 1))
+  assertOkEqual (parse whereClause "WHERE a = '1'") (Equals(Identifier(None, "a"), String "1"))
 
 [<Fact>]
 let ``Parses GROUP BY statement`` () =
-  assertOkEqual (parse groupBy "GROUP BY a, b, c") [ Identifier "a"; Identifier "b"; Identifier "c" ]
-  assertOkEqual (parse groupBy "GROUP BY a") [ Identifier "a" ]
+  assertOkEqual
+    (parse groupBy "GROUP BY a, b, c")
+    [ Identifier(None, "a"); Identifier(None, "b"); Identifier(None, "c") ]
+
+  assertOkEqual (parse groupBy "GROUP BY a") [ Identifier(None, "a") ]
   assertError (parse groupBy "GROUP BY")
 
 [<Fact>]
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse selectQuery "SELECT col FROM table")
-    (SelectQuery { defaultSelect with Expressions = [ Identifier "col" ] })
+    (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] })
 
 [<Fact>]
 let ``Parses SELECT DISTINCT`` () =
   assertOkEqual
     (parse selectQuery "SELECT DISTINCT col FROM table")
-    (SelectQuery { defaultSelect with SelectDistinct = true; Expressions = [ Identifier "col" ] })
+    (SelectQuery
+      { defaultSelect with
+          SelectDistinct = true
+          Expressions = [ As(Identifier(None, "col"), None) ]
+      })
 
 [<Fact>]
 let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
@@ -126,11 +146,15 @@ let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
 let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table")
-    { defaultSelect with Expressions = [ Identifier "col1"; Identifier "col2" ] }
+    { defaultSelect with
+        Expressions = [ As(Identifier(None, "col1"), None); As(Identifier(None, "col2"), None) ]
+    }
 
   assertOkEqual
     (Parser.parse "SELECT col1, col2 FROM table ;")
-    { defaultSelect with Expressions = [ Identifier "col1"; Identifier "col2" ] }
+    { defaultSelect with
+        Expressions = [ As(Identifier(None, "col1"), None); As(Identifier(None, "col2"), None) ]
+    }
 
 [<Fact>]
 let ``Multiline select`` () =
@@ -142,7 +166,7 @@ let ``Multiline select`` () =
          FROM
            table
          """)
-    { defaultSelect with Expressions = [ Identifier "col1" ] }
+    { defaultSelect with Expressions = [ As(Identifier(None, "col1"), None) ] }
 
 [<Fact>]
 let ``Parse aggregate query`` () =
@@ -154,8 +178,12 @@ let ``Parse aggregate query`` () =
          GROUP BY col1
          """)
     { defaultSelect with
-        Expressions = [ Identifier "col1"; Function("count", [ Distinct(Identifier "aid") ]) ]
-        GroupBy = [ Identifier "col1" ]
+        Expressions =
+          [
+            As(Identifier(None, "col1"), None)
+            As(Function("count", [ Distinct(Identifier(None, "aid")) ]), None)
+          ]
+        GroupBy = [ Identifier(None, "col1") ]
     }
 
 [<Fact>]
@@ -171,16 +199,19 @@ let ``Parse complex aggregate query`` () =
          """)
     { defaultSelect with
         Expressions =
-          [ As(Identifier "col1", Identifier "colAlias"); Function("count", [ Distinct(Identifier "aid") ]) ]
+          [
+            As(Identifier(None, "col1"), Some "colAlias")
+            As(Function("count", [ Distinct(Identifier(None, "aid")) ]), None)
+          ]
         Where =
           Some(
             And(
-              Equals(Identifier "col1", Integer 1),
-              (Or(Equals(Identifier "col2", Integer 2), Equals(Identifier "col2", Integer 3)))
+              Equals(Identifier(None, "col1"), Integer 1),
+              (Or(Equals(Identifier(None, "col2"), Integer 2), Equals(Identifier(None, "col2"), Integer 3)))
             )
           )
-        GroupBy = [ Identifier "col1" ]
-        Having = Some <| Gt(Function("count", [ Distinct(Identifier "aid") ]), Integer 1)
+        GroupBy = [ Identifier(None, "col1") ]
+        Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1)
     }
 
 [<Fact>]
@@ -193,8 +224,8 @@ let ``Parses simple JOINs`` () =
   assertOkEqual (parse from "from t1 full join t2 on true") (Join(FullJoin, Table "t1", Table "t2", Boolean true))
 
   assertOkEqual
-    (parse from "from t1 JOIN t2 ON a = b")
-    (Join(InnerJoin, Table "t1", Table "t2", Equals(Identifier "a", Identifier "b")))
+    (parse from "from t1 JOIN t2 ON t1.a = t2.b")
+    (Join(InnerJoin, Table "t1", Table "t2", Equals(Identifier(Some "t1", "a"), Identifier(Some "t2", "b"))))
 
 [<Fact>]
 let ``Parses multiple JOINs`` () =
@@ -208,7 +239,7 @@ let ``Parses multiple JOINs`` () =
 
   assertOkEqual
     (parse from "from t1 left join t2 on a right join t3 on b")
-    (Join(RightJoin, Join(LeftJoin, Table "t1", Table "t2", Identifier "a"), Table "t3", Identifier "b"))
+    (Join(RightJoin, Join(LeftJoin, Table "t1", Table "t2", Identifier(None, "a")), Table "t3", Identifier(None, "b")))
 
 [<Fact>]
 let ``Rejects invalid JOINs`` () =
@@ -224,9 +255,9 @@ let ``Failed Paul attack query 1`` () =
         from tab where t1='y' and t2 = 'm'
          """)
     { defaultSelect with
-        Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
+        Expressions = [ As(Function("count", [ Distinct(Identifier(None, "aid1")) ]), None) ]
         From = Table "tab"
-        Where = Some(And(Equals(Identifier "t1", String "y"), Equals(Identifier "t2", String "m")))
+        Where = Some(And(Equals(Identifier(None, "t1"), String "y"), Equals(Identifier(None, "t2"), String "m")))
     }
 
 [<Fact>]
@@ -238,13 +269,13 @@ let ``Failed Paul attack query 2`` () =
         from tab where t1 = 'y' and not (i1 = 100 and t2 = 'x')
          """)
     { defaultSelect with
-        Expressions = [ Function("count", [ Distinct(Identifier "aid1") ]) ]
+        Expressions = [ As(Function("count", [ Distinct(Identifier(None, "aid1")) ]), None) ]
         From = Table "tab"
         Where =
           Some(
             And(
-              Equals(Identifier "t1", String "y"),
-              Not(And(Equals(Identifier "i1", Integer 100), Equals(Identifier "t2", String "x")))
+              Equals(Identifier(None, "t1"), String "y"),
+              Not(And(Equals(Identifier(None, "i1"), Integer 100), Equals(Identifier(None, "t2"), String "x")))
             )
           )
     }
