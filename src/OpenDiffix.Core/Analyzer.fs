@@ -5,13 +5,13 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let rec private mapColumn tables index_offset name =
+let rec private mapColumn tables indexOffset name =
   match tables with
   | [] -> Error $"Column `{name}` not found in the list of target tables"
   | firstTable :: nextTables ->
       match Table.tryGetColumnI firstTable name with
-      | None -> mapColumn nextTables (index_offset + firstTable.Columns.Length) name
-      | Some (index, column) -> ColumnReference(index + index_offset, column.Type) |> Ok
+      | None -> mapColumn nextTables (indexOffset + firstTable.Columns.Length) name
+      | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
 
 let rec functionExpression tables fn children =
   children
