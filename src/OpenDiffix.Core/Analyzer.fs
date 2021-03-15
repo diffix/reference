@@ -78,10 +78,7 @@ let expressionName =
 let rec mapSelectedExpression tables selectedExpression: Result<SelectExpression, string> =
   match selectedExpression with
   | ParserTypes.As (parsedExpression, parsedAlias) ->
-      let alias =
-        match parsedAlias with
-        | None -> expressionName parsedExpression
-        | Some alias -> alias
+      let alias = parsedAlias |> Option.defaultWith (fun () -> expressionName parsedExpression)
 
       parsedExpression
       |> mapExpression tables
