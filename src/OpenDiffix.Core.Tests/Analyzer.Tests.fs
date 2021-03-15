@@ -190,7 +190,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Analyze JOINs`` () =
-    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = cid"
+    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
 
     let condition =
       FunctionExpr(ScalarFunction Equals, [ ColumnReference(3, IntegerType); ColumnReference(6, IntegerType) ])

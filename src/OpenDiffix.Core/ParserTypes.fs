@@ -37,8 +37,8 @@ and Expression =
   | Gt of left: Expression * right: Expression
   | GtE of left: Expression * right: Expression
   | Equals of left: Expression * right: Expression
-  | As of left: Expression * right: Expression
-  | Identifier of identifierName: string
+  | As of expr: Expression * alias: string option
+  | Identifier of tableName: string option * columnName: string
   | Table of name: string
   | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
   | Function of functionName: string * Expression list
