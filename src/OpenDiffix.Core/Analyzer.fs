@@ -137,7 +137,7 @@ let rec private transformFrom schema from =
   | _ -> Error "Invalid `FROM` clause"
 
 let private validateTargetTables (tables: TargetTables) =
-  let aliases = tables |> List.map (fun (table, alias) -> alias.ToLower())
+  let aliases = tables |> List.map (fun (_table, alias) -> alias.ToLower())
   if aliases.Length <> (List.distinct aliases).Length then Error "Ambiguous target names in `FROM` clause." else Ok()
 
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
