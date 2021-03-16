@@ -147,7 +147,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
 [<Fact>]
 let ``Selecting columns from an aliased table`` () =
   testParsedQuery
-    "SELECT t.str_col, t.bool_col FROM table as t"
+    "SELECT t.str_col, T.bool_col FROM table AS t"
     { defaultQuery with
         Columns =
           [
@@ -162,7 +162,7 @@ let ``Selecting columns from an aliased table`` () =
 let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
 
 [<Fact>]
-let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table"
+let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap

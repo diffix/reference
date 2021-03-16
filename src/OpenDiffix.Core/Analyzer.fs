@@ -16,7 +16,7 @@ let rec private mapUnqualifiedColumn (tables: TargetTables) indexOffset name =
 let rec private mapQualifiedColumn (tables: TargetTables) indexOffset tableName columnName =
   match tables with
   | [] -> Error $"Table `{tableName}` not found in the list of target tables"
-  | (alias, firstTable) :: _ when alias = tableName ->
+  | (alias, firstTable) :: _ when Utils.equalsI alias tableName ->
       columnName
       |> Table.getColumnI firstTable
       |> Result.bind (fun (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok)
@@ -137,7 +137,7 @@ let rec private transformFrom schema from =
   | _ -> Error "Invalid `FROM` clause"
 
 let private validateTargetTables (tables: TargetTables) =
-  let aliases = tables |> List.map (fun (alias, _table) -> alias)
+  let aliases = tables |> List.map (fun (alias, _table) -> alias.ToLower())
   if aliases.Length <> (List.distinct aliases).Length then Error "Ambiguous target names in `FROM` clause." else Ok()
 
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
