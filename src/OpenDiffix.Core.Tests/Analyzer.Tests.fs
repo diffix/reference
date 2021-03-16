@@ -24,8 +24,8 @@ let defaultQuery =
   {
     Columns = []
     Where = Boolean true |> Constant
-    From = Table testTable
-    TargetTables = [ testTable ]
+    From = Table(testTable, testTable.Name)
+    TargetTables = [ testTable, testTable.Name ]
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
@@ -34,6 +34,12 @@ let defaultQuery =
 let testParsedQuery queryString expected =
   let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
   assertOkEqual testResult expected
+
+let testQueryError queryString =
+  queryString
+  |> Parser.parse
+  |> Result.bind (Analyzer.transformQuery schema)
+  |> assertError
 
 [<Fact>]
 let ``Analyze count(*)`` () =
@@ -97,7 +103,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
   testParsedQuery
     query
     {
-      TargetTables = [ testTable ]
+      TargetTables = [ testTable, testTable.Name ]
       Columns =
         [
           { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
@@ -120,7 +126,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
           ]
         )
-      From = Table testTable
+      From = Table(testTable, testTable.Name)
       GroupingSets =
         [
           GroupingSet [
@@ -139,6 +145,26 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
         )
       OrderBy = []
     }
+
+[<Fact>]
+let ``Selecting columns from an aliased table`` () =
+  testParsedQuery
+    "SELECT t.str_col, T.bool_col FROM table AS t"
+    { defaultQuery with
+        Columns =
+          [
+            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+          ]
+        From = Table(testTable, "t")
+        TargetTables = [ testTable, "t" ]
+    }
+
+[<Fact>]
+let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
+
+[<Fact>]
+let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
@@ -202,8 +228,8 @@ type Tests(db: DBFixture) =
       Join
         {
           Type = JoinType.InnerJoin
-          Left = Table customers
-          Right = Table purchases
+          Left = Table(customers, customers.Name)
+          Right = Table(purchases, purchases.Name)
           On = condition
         }
 

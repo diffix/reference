@@ -7,7 +7,7 @@ let private planJoin join = Plan.Join(planFrom join.Left, planFrom join.Right, j
 
 let private planFrom =
   function
-  | Table table -> Plan.Scan table
+  | Table (table, alias) -> Plan.Scan table
   | Join join -> planJoin join
   | Query query -> plan query
 

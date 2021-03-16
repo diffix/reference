@@ -39,7 +39,7 @@ and Expression =
   | Equals of left: Expression * right: Expression
   | As of expr: Expression * alias: string option
   | Identifier of tableName: string option * columnName: string
-  | Table of name: string
+  | Table of name: string * alias: string option
   | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
   | Function of functionName: string * Expression list
   | SelectQuery of SelectQuery

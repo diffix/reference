@@ -71,7 +71,7 @@ module QueryParser =
 
   let distinct = opt (word "distinct") |>> Option.isSome
 
-  let table = simpleIdentifier |>> Expression.Table
+  let table = simpleIdentifier .>>. opt (word "AS" >>. simpleIdentifier) |>> Expression.Table
 
   let joinType =
     choice [

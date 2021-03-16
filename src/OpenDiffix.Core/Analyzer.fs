@@ -5,22 +5,22 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let rec private mapUnqualifiedColumn tables indexOffset name =
+let rec private mapUnqualifiedColumn (tables: TargetTables) indexOffset name =
   match tables with
   | [] -> Error $"Column `{name}` not found in the list of target tables"
-  | firstTable :: nextTables ->
+  | (firstTable, _alias) :: nextTables ->
       match Table.tryGetColumnI firstTable name with
       | None -> mapUnqualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) name
       | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
 
-let rec private mapQualifiedColumn (tables: Table list) indexOffset tableName columnName =
+let rec private mapQualifiedColumn (tables: TargetTables) indexOffset tableName columnName =
   match tables with
   | [] -> Error $"Table `{tableName}` not found in the list of target tables"
-  | firstTable :: _ when firstTable.Name = tableName ->
+  | (firstTable, alias) :: _ when Utils.equalsI alias tableName ->
       columnName
       |> Table.getColumnI firstTable
       |> Result.bind (fun (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok)
-  | firstTable :: nextTables ->
+  | (firstTable, _alias) :: nextTables ->
       mapQualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) tableName columnName
 
 let private mapColumn tables tableName columnName =
@@ -90,11 +90,6 @@ let transformSelectedExpressions tables selectedExpressions =
   |> List.map (mapSelectedExpression tables)
   |> List.sequenceResultM
 
-let selectedTableName =
-  function
-  | ParserTypes.Expression.Table name -> Ok name
-  | _ -> Error "Only selecting from a single table is supported"
-
 let booleanTrueExpression = Boolean true |> Constant
 
 let transformExpressionOptionWithDefaultTrue targetTables optionalExpression =
@@ -120,13 +115,15 @@ let transformGroupByIndices (selectedExpressions: SelectExpression list) groupBy
 
 let rec private collectTargetTables =
   function
-  | Table table -> [ table ]
+  | Table (alias, table) -> [ alias, table ]
   | Join join -> (collectTargetTables join.Left) @ (collectTargetTables join.Right)
   | Query _ -> failwith "Unexpected subquery encountered while collecting tables"
 
 let rec private transformFrom schema from =
   match from with
-  | ParserTypes.Table name -> name |> Table.getI schema |> Result.map Table
+  | ParserTypes.Table (name, alias) ->
+      let alias = alias |> Option.defaultWith (fun () -> name)
+      name |> Table.getI schema |> Result.map (fun table -> Table(table, alias))
   | ParserTypes.Join (joinType, left, right, on) ->
       result {
         let! left = transformFrom schema left
@@ -139,10 +136,17 @@ let rec private transformFrom schema from =
       }
   | _ -> Error "Invalid `FROM` clause"
 
+let private validateTargetTables (tables: TargetTables) =
+  let aliases = tables |> List.map (fun (_table, alias) -> alias.ToLower())
+  if aliases.Length <> (List.distinct aliases).Length then Error "Ambiguous target names in `FROM` clause." else Ok()
+
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! from = transformFrom schema selectQuery.From
+
     let targetTables = collectTargetTables from
+    do! validateTargetTables targetTables
+
     let! selectedExpressions = transformSelectedExpressions targetTables selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Where
     let! havingClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Having
@@ -202,16 +206,12 @@ let selectColumnsFromQuery columnIndices innerQuery =
       { column with Expression = ColumnReference(index, columnType) }
     )
 
-  let queryTable =
-    {
-      Name = "dfx_virtual_query"
-      Columns = List.map selectExpressionToColumn innerQuery.Columns
-    }
+  let queryTable = { Name = ""; Columns = List.map selectExpressionToColumn innerQuery.Columns }
 
   {
     Columns = selectedColumns
     From = Query(SelectQuery innerQuery)
-    TargetTables = [ queryTable ]
+    TargetTables = [ queryTable, "dfx_virtual_query" ]
     Where = booleanTrueExpression
     GroupingSets = []
     OrderBy = []
@@ -252,10 +252,10 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private tryfindAid (anonParams: AnonymizationParams) tables =
+let rec private tryfindAid (anonParams: AnonymizationParams) (tables: TargetTables) =
   match tables with
   | [] -> None
-  | firstTable :: nextTables ->
+  | (firstTable, _alias) :: nextTables ->
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
       | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
