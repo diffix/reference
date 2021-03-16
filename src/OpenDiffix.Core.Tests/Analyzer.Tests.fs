@@ -36,8 +36,10 @@ let testParsedQuery queryString expected =
   assertOkEqual testResult expected
 
 let testQueryError queryString =
-  let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
-  assertError testResult
+  queryString
+  |> Parser.parse
+  |> Result.bind (Analyzer.transformQuery schema)
+  |> assertError
 
 [<Fact>]
 let ``Analyze count(*)`` () =
