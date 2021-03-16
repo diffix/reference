@@ -23,6 +23,9 @@ type GroupingSet =
     function
     | GroupingSet expressions -> expressions
 
+type TargetTable = string * Table
+type TargetTables = TargetTable list
+
 type Query =
   | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
@@ -42,7 +45,7 @@ and SelectQuery =
   {
     Columns: SelectExpression list
     From: SelectFrom
-    TargetTables: Table list
+    TargetTables: TargetTables
     Where: Expression
     GroupingSets: GroupingSet list
     OrderBy: OrderByExpression list
@@ -65,7 +68,7 @@ and SelectQuery =
 and SelectFrom =
   | Query of query: Query
   | Join of Join
-  | Table of table: Table
+  | Table of TargetTable
 
   static member Map(selectFrom: SelectFrom, f: Query -> Query) =
     match selectFrom with
@@ -74,7 +77,7 @@ and SelectFrom =
 
   static member Map(selectFrom: SelectFrom, f: Table -> Table) =
     match selectFrom with
-    | Table t -> Table(f t)
+    | Table (alias, table) -> Table(alias, f table)
     | other -> other
 
   static member Map(selectFrom: SelectFrom, f: SelectFrom -> SelectFrom) = f selectFrom

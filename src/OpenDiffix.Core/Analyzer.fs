@@ -5,22 +5,22 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let rec private mapUnqualifiedColumn tables indexOffset name =
+let rec private mapUnqualifiedColumn (tables: TargetTables) indexOffset name =
   match tables with
   | [] -> Error $"Column `{name}` not found in the list of target tables"
-  | firstTable :: nextTables ->
+  | (alias, firstTable) :: nextTables ->
       match Table.tryGetColumnI firstTable name with
       | None -> mapUnqualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) name
       | Some (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok
 
-let rec private mapQualifiedColumn (tables: Table list) indexOffset tableName columnName =
+let rec private mapQualifiedColumn (tables: TargetTables) indexOffset tableName columnName =
   match tables with
   | [] -> Error $"Table `{tableName}` not found in the list of target tables"
-  | firstTable :: _ when firstTable.Name = tableName ->
+  | (alias, firstTable) :: _ when alias = tableName ->
       columnName
       |> Table.getColumnI firstTable
       |> Result.bind (fun (index, column) -> ColumnReference(index + indexOffset, column.Type) |> Ok)
-  | firstTable :: nextTables ->
+  | (_alias, firstTable) :: nextTables ->
       mapQualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) tableName columnName
 
 let private mapColumn tables tableName columnName =
@@ -115,13 +115,15 @@ let transformGroupByIndices (selectedExpressions: SelectExpression list) groupBy
 
 let rec private collectTargetTables =
   function
-  | Table table -> [ table ]
+  | Table (alias, table) -> [ alias, table ]
   | Join join -> (collectTargetTables join.Left) @ (collectTargetTables join.Right)
   | Query _ -> failwith "Unexpected subquery encountered while collecting tables"
 
 let rec private transformFrom schema from =
   match from with
-  | ParserTypes.Table name -> name |> Table.getI schema |> Result.map Table
+  | ParserTypes.Table (name, alias) ->
+      let alias = alias |> Option.defaultWith (fun () -> name)
+      name |> Table.getI schema |> Result.map (fun table -> Table(alias, table))
   | ParserTypes.Join (joinType, left, right, on) ->
       result {
         let! left = transformFrom schema left
@@ -197,11 +199,7 @@ let selectColumnsFromQuery columnIndices innerQuery =
       { column with Expression = ColumnReference(index, columnType) }
     )
 
-  let queryTable =
-    {
-      Name = "dfx_virtual_query"
-      Columns = List.map selectExpressionToColumn innerQuery.Columns
-    }
+  let queryTable = "dfx_virtual_query", { Name = ""; Columns = List.map selectExpressionToColumn innerQuery.Columns }
 
   {
     Columns = selectedColumns
@@ -247,10 +245,10 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private tryfindAid (anonParams: AnonymizationParams) tables =
+let rec private tryfindAid (anonParams: AnonymizationParams) (tables: TargetTables) =
   match tables with
   | [] -> None
-  | firstTable :: nextTables ->
+  | (_, firstTable) :: nextTables ->
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
       | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
