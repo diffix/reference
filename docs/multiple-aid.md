@@ -124,6 +124,53 @@ The interesting things to note are:
   the join condition which ensures they match
 
 
+#### JOINing with non-sensitive relations
+
+It is allowed to JOIN a sensitive relation with a non-sensitive one (for example a lookup table). In these instances the AIDs of the
+columns used as keys in the JOIN bleed over to all columns in the non-sensitive relation.
+That is to say if you have the relations:
+
+`users`:
+
+|  age | age aid sets        |
+| ---: | ------------------- |
+|   20 | AID1[1], AID2[2, 3] |
+|   21 | AID1[2], AID2[3, 4] |
+
+`products`:
+
+| quantity | name          |
+| -------: | ------------- |
+|       20 | Running shoes |
+|       21 | Hair dryer    |
+
+and JOIN them on `users.age = products.quantity` then the resulting combined relation becomes:
+
+|  age | age aid sets        | quantity | quantity aid sets   | name          | name aid sets       |
+| ---: | ------------------- | -------: | ------------------- | ------------- | ------------------- |
+|   20 | AID1[1], AID2[2, 3] |       20 | AID1[1], AID2[2, 3] | Running shoes | AID1[1], AID2[2, 3] |
+|   21 | AID1[2], AID3[3, 4] |       21 | AID1[2], AID2[3, 4] | Hair dryer    | AID1[2], AID2[3, 4] |
+
+Note here that unlike when joining two sensitive relations, where the JOIN keys end up with AID sets that are the union
+of their respective AID sets we here have the case that _all columns_ in the non-sensitive relation get the full AID sets
+of the JOIN key or keys from the sensitive relation.
+
+The reason this is necessary is that the non-sensitive relation must be assumed to be known to an attacker in its entirety
+and can therefore be used as a proxy for the sensitive relation. This is the case due to the fact that we only apply the
+anonymization at the top-most query, and not also in intermediate queries.
+
+An attack query to could look like this:
+
+```sql
+SELECT products.name, count(*)
+FROM users INNER JOIN products ON users.age = products.quantity
+GROUP BY products.name
+```
+
+Where the product name (unless the AID sets of the `users` relation bleed over) would be considered non-sensitive
+and would therefore give an exact count of the individuals in the `users` relation.
+
+
 ## Low count filtering
 
 As AID sets are a property of a column value, rather than a bucket as a whole, low count filtering
