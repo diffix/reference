@@ -136,10 +136,17 @@ let rec private transformFrom schema from =
       }
   | _ -> Error "Invalid `FROM` clause"
 
+let private validateTargetTables (tables: TargetTables) =
+  let aliases = tables |> List.map (fun (alias, _table) -> alias)
+  if aliases.Length <> (List.distinct aliases).Length then Error "Ambiguous target names in `FROM` clause." else Ok()
+
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
   result {
     let! from = transformFrom schema selectQuery.From
+
     let targetTables = collectTargetTables from
+    do! validateTargetTables targetTables
+
     let! selectedExpressions = transformSelectedExpressions targetTables selectQuery.Expressions
     let! whereClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Where
     let! havingClause = transformExpressionOptionWithDefaultTrue targetTables selectQuery.Having

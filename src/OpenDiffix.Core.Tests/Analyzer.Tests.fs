@@ -35,6 +35,10 @@ let testParsedQuery queryString expected =
   let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
   assertOkEqual testResult expected
 
+let testQueryError queryString =
+  let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
+  assertError testResult
+
 [<Fact>]
 let ``Analyze count(*)`` () =
   testParsedQuery
@@ -153,6 +157,12 @@ let ``Selecting columns from an aliased table`` () =
         From = Table("t", testTable)
         TargetTables = [ "t", testTable ]
     }
+
+[<Fact>]
+let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
+
+[<Fact>]
+let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table"
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
