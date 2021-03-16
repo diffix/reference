@@ -90,11 +90,6 @@ let transformSelectedExpressions tables selectedExpressions =
   |> List.map (mapSelectedExpression tables)
   |> List.sequenceResultM
 
-let selectedTableName =
-  function
-  | ParserTypes.Expression.Table name -> Ok name
-  | _ -> Error "Only selecting from a single table is supported"
-
 let booleanTrueExpression = Boolean true |> Constant
 
 let transformExpressionOptionWithDefaultTrue targetTables optionalExpression =
