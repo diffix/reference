@@ -23,9 +23,9 @@ let negativeExpression = Boolean false |> Constant
 let selectQuery =
   {
     Columns = [ { Expression = expression; Alias = "col" } ]
-    TargetTables = [ testTable ]
+    TargetTables = [ testTable.Name, testTable ]
     Where = expression
-    From = Table testTable
+    From = Table(testTable.Name, testTable)
     GroupingSets = [ GroupingSet [ expression ] ]
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
@@ -34,9 +34,9 @@ let selectQuery =
 let selectQueryNegative =
   {
     Columns = [ { Expression = negativeExpression; Alias = "col" } ]
-    TargetTables = [ testTable ]
+    TargetTables = [ testTable.Name, testTable ]
     Where = negativeExpression
-    From = Table testTable
+    From = Table(testTable.Name, testTable)
     GroupingSets = [ GroupingSet [ negativeExpression ] ]
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]

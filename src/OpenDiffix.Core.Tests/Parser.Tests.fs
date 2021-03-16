@@ -10,7 +10,7 @@ let defaultSelect =
   {
     SelectDistinct = false
     Expressions = []
-    From = Table "table"
+    From = Table("table", None)
     Where = None
     GroupBy = []
     Having = None
@@ -216,30 +216,61 @@ let ``Parse complex aggregate query`` () =
 
 [<Fact>]
 let ``Parses simple JOINs`` () =
-  assertOkEqual (parse from "from t1, t2") (Join(InnerJoin, Table "t1", Table "t2", Boolean true))
+  assertOkEqual (parse from "from t1, t2") (Join(InnerJoin, Table("t1", None), Table("t2", None), Boolean true))
 
-  assertOkEqual (parse from "from t1 inner join t2 on true") (Join(InnerJoin, Table "t1", Table "t2", Boolean true))
-  assertOkEqual (parse from "from t1 left join t2 on true") (Join(LeftJoin, Table "t1", Table "t2", Boolean true))
-  assertOkEqual (parse from "from t1 right join t2 on true") (Join(RightJoin, Table "t1", Table "t2", Boolean true))
-  assertOkEqual (parse from "from t1 full join t2 on true") (Join(FullJoin, Table "t1", Table "t2", Boolean true))
+  assertOkEqual
+    (parse from "from t1 inner join t2 on true")
+    (Join(InnerJoin, Table("t1", None), Table("t2", None), Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 left join t2 on true")
+    (Join(LeftJoin, Table("t1", None), Table("t2", None), Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 right join t2 on true")
+    (Join(RightJoin, Table("t1", None), Table("t2", None), Boolean true))
+
+  assertOkEqual
+    (parse from "from t1 full join t2 on true")
+    (Join(FullJoin, Table("t1", None), Table("t2", None), Boolean true))
 
   assertOkEqual
     (parse from "from t1 JOIN t2 ON t1.a = t2.b")
-    (Join(InnerJoin, Table "t1", Table "t2", Equals(Identifier(Some "t1", "a"), Identifier(Some "t2", "b"))))
+    (Join(
+      InnerJoin,
+      Table("t1", None),
+      Table("t2", None),
+      Equals(Identifier(Some "t1", "a"), Identifier(Some "t2", "b"))
+    ))
 
 [<Fact>]
 let ``Parses multiple JOINs`` () =
   assertOkEqual
     (parse from "from t1, t2, t3")
-    (Join(InnerJoin, Join(InnerJoin, Table "t1", Table "t2", Boolean true), Table "t3", Boolean true))
+    (Join(
+      InnerJoin,
+      Join(InnerJoin, Table("t1", None), Table("t2", None), Boolean true),
+      Table("t3", None),
+      Boolean true
+    ))
 
   assertOkEqual
     (parse from "from t1 join t2 on true join t3 on true")
-    (Join(InnerJoin, Join(InnerJoin, Table "t1", Table "t2", Boolean true), Table "t3", Boolean true))
+    (Join(
+      InnerJoin,
+      Join(InnerJoin, Table("t1", None), Table("t2", None), Boolean true),
+      Table("t3", None),
+      Boolean true
+    ))
 
   assertOkEqual
     (parse from "from t1 left join t2 on a right join t3 on b")
-    (Join(RightJoin, Join(LeftJoin, Table "t1", Table "t2", Identifier(None, "a")), Table "t3", Identifier(None, "b")))
+    (Join(
+      RightJoin,
+      Join(LeftJoin, Table("t1", None), Table("t2", None), Identifier(None, "a")),
+      Table("t3", None),
+      Identifier(None, "b")
+    ))
 
 [<Fact>]
 let ``Rejects invalid JOINs`` () =
@@ -256,7 +287,7 @@ let ``Failed Paul attack query 1`` () =
          """)
     { defaultSelect with
         Expressions = [ As(Function("count", [ Distinct(Identifier(None, "aid1")) ]), None) ]
-        From = Table "tab"
+        From = Table("tab", None)
         Where = Some(And(Equals(Identifier(None, "t1"), String "y"), Equals(Identifier(None, "t2"), String "m")))
     }
 
@@ -270,7 +301,7 @@ let ``Failed Paul attack query 2`` () =
          """)
     { defaultSelect with
         Expressions = [ As(Function("count", [ Distinct(Identifier(None, "aid1")) ]), None) ]
-        From = Table "tab"
+        From = Table("tab", None)
         Where =
           Some(
             And(
