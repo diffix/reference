@@ -23,7 +23,7 @@ type GroupingSet =
     function
     | GroupingSet expressions -> expressions
 
-type TargetTable = string * Table
+type TargetTable = Table * string
 type TargetTables = TargetTable list
 
 type Query =
@@ -77,7 +77,7 @@ and SelectFrom =
 
   static member Map(selectFrom: SelectFrom, f: Table -> Table) =
     match selectFrom with
-    | Table (alias, table) -> Table(alias, f table)
+    | Table (table, alias) -> Table(f table, alias)
     | other -> other
 
   static member Map(selectFrom: SelectFrom, f: SelectFrom -> SelectFrom) = f selectFrom

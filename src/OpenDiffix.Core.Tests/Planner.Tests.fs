@@ -22,8 +22,8 @@ let emptySelect =
   {
     Columns = []
     Where = constTrue
-    From = Table(table.Name, table)
-    TargetTables = [ table.Name, table ]
+    From = Table(table, table.Name)
+    TargetTables = [ table, table.Name ]
     GroupingSets = []
     Having = constTrue
     OrderBy = []
@@ -145,8 +145,8 @@ let ``plan join`` () =
   let join =
     {
       Type = JoinType.InnerJoin
-      Left = Table(table.Name, table)
-      Right = Table(table.Name, table)
+      Left = Table(table, table.Name)
+      Right = Table(table, table.Name)
       On = constTrue
     }
 

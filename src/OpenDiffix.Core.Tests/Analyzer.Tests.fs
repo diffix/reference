@@ -24,8 +24,8 @@ let defaultQuery =
   {
     Columns = []
     Where = Boolean true |> Constant
-    From = Table(testTable.Name, testTable)
-    TargetTables = [ testTable.Name, testTable ]
+    From = Table(testTable, testTable.Name)
+    TargetTables = [ testTable, testTable.Name ]
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
@@ -101,7 +101,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
   testParsedQuery
     query
     {
-      TargetTables = [ testTable.Name, testTable ]
+      TargetTables = [ testTable, testTable.Name ]
       Columns =
         [
           { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
@@ -124,7 +124,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
           ]
         )
-      From = Table(testTable.Name, testTable)
+      From = Table(testTable, testTable.Name)
       GroupingSets =
         [
           GroupingSet [
@@ -154,8 +154,8 @@ let ``Selecting columns from an aliased table`` () =
             { Expression = ColumnReference(0, StringType); Alias = "str_col" }
             { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
           ]
-        From = Table("t", testTable)
-        TargetTables = [ "t", testTable ]
+        From = Table(testTable, "t")
+        TargetTables = [ testTable, "t" ]
     }
 
 [<Fact>]
@@ -226,8 +226,8 @@ type Tests(db: DBFixture) =
       Join
         {
           Type = JoinType.InnerJoin
-          Left = Table(customers.Name, customers)
-          Right = Table(purchases.Name, purchases)
+          Left = Table(customers, customers.Name)
+          Right = Table(purchases, purchases.Name)
           On = condition
         }
 
