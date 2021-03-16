@@ -109,4 +109,10 @@ type Tests(db: DBFixture) =
 
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 12`` () =
+    let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
+    let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>

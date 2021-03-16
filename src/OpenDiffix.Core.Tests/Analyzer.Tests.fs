@@ -140,6 +140,20 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
       OrderBy = []
     }
 
+[<Fact>]
+let ``Selecting columns from an aliased table`` () =
+  testParsedQuery
+    "SELECT t.str_col, t.bool_col FROM table as t"
+    { defaultQuery with
+        Columns =
+          [
+            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+          ]
+        From = Table("t", testTable)
+        TargetTables = [ "t", testTable ]
+    }
+
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
   let getTable name = name |> Table.getI schema |> Utils.unwrap
