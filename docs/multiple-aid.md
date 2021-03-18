@@ -26,8 +26,114 @@ This same rule applies when joining sensitive and non-sensitive data as well. Th
 
 The process is slightly more complex when rows are aggregated. This is a result of having to account for potential outlier behavior.
 
-NOTE: Expand on how this is done.
+When rows are aggregated the algorithm is as follows:
+1. for each row individually, create the unions of AID per AID type (this will become clearer shortly)
+2. derive the aggregate contribution across all AID sets for one of the AID types (the other AID types will invariably produce the same result) as the result to carry forward
+3. if this is the anonymizing top-level aggregate then do outlier suppression per the regular suppression rules, otherwise do nothing more
 
+Let's make this more concrete with an example. The query we want to handle
+is the following nested query with multiple levels of aggregation:
+
+```sql
+SELECT cnt2, count(*) as cnt3
+FROM (
+  SELECT cnt1, count(*) as cnt2
+  FROM (
+    SELECT card_type, count(amount) as cnt1
+    FROM transactions
+    GROUP BY card_type
+  )
+  GROUP BY cnt1
+) t
+GROUP BY cnt2
+```
+
+in this query:
+- `cnt1` is the number of non null amount entries from the transaction table per `card_type`
+- `cnt2` is how many card types have a certain count
+- `cnt3` is how many instances exist per `cnt2`
+
+In the worked example below I will use the syntax `[{AIDX[Y1, Y2, ...], contribution1}; {AIDX[Y1, Y3, ...], contribution2}; ...]` to describe that a particular value is an aggregate of two distinct AID sets (both for the same AID column) with distinct contributions. It can be thought of as the equivalent of `{users[Paul], 20 transactions}; {users[Paul, Edon, Cristian], 4 transactions collectively}; {users[Sebastian], 1 transaction}; ...]`
+
+The input rows to the innermost query might have looked like the following table
+
+| card type | contribution                    |
+| --------- | ------------------------------- |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
+| standard  | [{AID1[1], 1}; {AID2[1, 3], 1}] |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
+| standard  | [{AID1[2], 1}; {AID2[1], 1}]    |
+| standard  | [{AID1[2], 1}; {AID2[1], 1}]    |
+| standard  | [{AID1[3], 1}; {AID2[1], 1}]    |
+| platinum  | [{AID1[1], 1}; {AID2[1], 1}]    |
+| platinum  | [{AID1[4], 1}; {AID2[1], 1}]    |
+| platinum  | [{AID1[4], 1}; {AID2[1], 1}]    |
+...
+| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
+| platinum  | [{AID1[4], 1}; {AID2[2], 1}] |
+| diamond   | [{AID1[4], 1}; {AID2[1, 2], 1}] |
+...
+| diamond   | [{AID1[4], 1}; {AID2[4, 5], 1}] |
+| diamond   | [{AID1[5], 1}; {AID2[6], 1}] |
+
+Applying the aggregation algorithm described above:
+- Step 1 is a noop
+- Step 2 combines all the `standard` card type rows into a single row, the `platinum` card type rows into another row, etc. The `cnt1` value for each row is the summed contributions of each AID sets for one of the AID types (i.e. AID1 or AID2. The result would be the same whichever one is used)
+- Step 3 is omitted as we are not in the anonymizing top-level aggregate
+
+The resulting table becomes:
+
+| card_type | contributions                                                                     | cnt1 |
+| --------- | --------------------------------------------------------------------------------- | ---- |
+| standard  | [{AID1[1], 4}; {AID1[2], 2}; {AID1[3], 1}; {AID2[1], 6}; {AID2[1, 3], 1}]         | 7    |
+| platinum  | [{AID1[1], 1}; {AID1[4], 100}; {AID2[1], 100}; {AID2[2], 1}]                      | 101  |
+| diamond   | [{AID1[4], 1000}; {AID1[5], 1}; {AID2[1, 2], 1}; {AID2[4, 5], 999}; {AID2[6], 1}] | 1001 |
+
+To derive `cnt2` we repeat the same procedure:
+
+- In step 1 we combine the AID sets into a single AID set: `{AID1[1, 2, 3], 7}` for `standard`, etc.
+- Step 2 creates new aggregates based on occurrences of `cnt1`
+- Step 3 is omitted again
+
+The resulting table becomes:
+
+| cnt1 | contribution                                | cnt2 |
+| ---- | ------------------------------------------- | ---- |
+| 7    | [{AID1[1, 2, 3], 1}; {AID2[1, 3], 1}]       | 1    |
+| 101  | [{AID1[1, 4], 1}; {AID2[1, 2], 1}]          | 1    |
+| 1001 | [{AID1[4, 5], 1}; {AID2[1, 2, 4, 5, 6], 1}] | 1    |
+
+To derive `cnt3` we repeat the same procedure again:
+
+- Step 1 becomes a noop, all the AID sets have already been combined
+- Step 2 creates new buckets based on the `cnt2` values (in this example it returns a single composite row)
+- Step 3 looks for outlier contributions, of which there are none in this case
+
+The resulting table becomes
+
+| cnt2 | contribution                                                                                                       | cnt3 |
+| ---- | ------------------------------------------------------------------------------------------------------------------ | ---- |
+| 1    | [{AID1[1, 2, 3], 1}; {AID1[1, 4], 1}; {AID1[4, 5], 1}; {AID2[1, 3], 1}; {AID2[1, 2], 1}; {AID2[1, 2, 4, 5, 6], 1}] | 3    |
+
+Since no outliers exist there will also be no suppression in this instance.
+Noise is added as normal.
+
+Also note (for completeness), that if there was one more round of aggregation, the resulting table would be:
+
+| cnt3 | contribution                                            | cnt4 |
+| ---- | ------------------------------------------------------- | ---- |
+| 3    | [{AID1[1, 2, 3, 4, 5], 1}; {AID2[1, 2, 3, 4, 5, 6], 1}] | 1    |
+
+
+### Some elaboration on the safety of this approach
+
+It is not necessary to do outlier suppression in the intermediate non-anonymizing aggregations. Doing so could lead to more consistent results, but thanks to low effect detection the lack of intermediate outlier suppression does not pose a risk to privacy.
+
+Through experiments it has been validated that after ~4 rounds
+of aggregations the values tend to collapse down to a single value, and after 2 rounds of aggregation the difference between the maximum and minimum reported values
+tend to no longer exceeds 2. These results hold irrespective of if the dataset includes
+extreme outliers or not.
 
 ## Low count filtering
 
