@@ -63,9 +63,9 @@ that the low count filter threshold is 2 for all AID types.
 
 ### Early termination
 
-| Value | Value AID sets |
-| ----: | -------------- |
-|    10 | AID1[1, 2]     |
+| Value | AID sets   |
+| ----: | ---------- |
+|    10 | AID1[1, 2] |
 
 - The columns are sorted in descending order of `Value`
 - `No = 2`, `Nt = 2`
@@ -74,15 +74,15 @@ that the low count filter threshold is 2 for all AID types.
 
 ### Base case
 
-| Value | Value AID sets |
-| ----: | -------------- |
-|    10 | AID1[1]        |
-|     9 | AID1[2]        |
-|     8 | AID1[3]        |
-|     7 | AID1[4]        |
-|     6 | AID1[5]        |
-|     5 | AID1[6]        |
-|     4 | AID1[7]        |
+| Value | AID sets |
+| ----: | -------- |
+|    10 | AID1[1]  |
+|     9 | AID1[2]  |
+|     8 | AID1[3]  |
+|     7 | AID1[4]  |
+|     6 | AID1[5]  |
+|     5 | AID1[6]  |
+|     4 | AID1[7]  |
 
 - The columns are sorted in descending order of `Value`
 - `No = 2`, `Nt = 2`
@@ -92,14 +92,14 @@ that the low count filter threshold is 2 for all AID types.
 
 ### Expanded base case
 
-| Value | Value AID sets |
-| ----: | -------------- |
-|    10 | AID1[1]        |
-|     9 | AID1[1, 2]     |
-|     8 | AID1[2]        |
-|     7 | AID1[3]        |
-|     6 | AID1[4]        |
-|     5 | AID1[5]        |
+| Value | AID sets   |
+| ----: | ---------- |
+|    10 | AID1[1]    |
+|     9 | AID1[1, 2] |
+|     8 | AID1[2]    |
+|     7 | AID1[3]    |
+|     6 | AID1[4]    |
+|     5 | AID1[5]    |
 
 In this example we are using a low count threshold of 5 (just in order for it not to trigger, and make this example work).
 
@@ -112,7 +112,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 
 ### Multiple AID types
 
-| Value | Value AID sets      |
+| Value | AID sets            |
 | ----: | ------------------- |
 |    10 | AID1[1, 2], AID2[1] |
 |     9 | AID1[3], AID2[2]    |
