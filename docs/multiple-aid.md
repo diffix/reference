@@ -127,9 +127,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 - The weighted average becomes: `8 * 3/8 + 7 * 2/8 + 6 * 3/8 = 7` and is used to replace values 10 and 9
 
 
---------
-Original content on noise below. To be reworked separately.
---------
+## Computing noise
 
 When computing noise, the noise amount (standard deviation) is computed separately for each AID set, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
 
