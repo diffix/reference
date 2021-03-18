@@ -14,134 +14,27 @@ A table may have one or more AID columns (columns labeled as being AIDs). When t
 
 We use the following nomenclature. AIDX[Y1, Y2, ...] refers to an AID for a set of entities Y1, Y2, etc, from column AIDX. For example, `AID1 = send_email` and `AID1[1] = sue1@gmail.com` and `AID1[2] = bob6@yahoo.com`.
 
-## AID per column value rather than bucket
+## How AIDs spread
 
-A bucket might contain the data of one or more AIDs. It is useful to think of these AIDs in terms of sets.
-The set of AIDs associated with a bucket can grow in one of two ways:
+### JOINing rows
 
-- we aggregate rows of distinct AIDs
-- we join two or more relations (tables, views or subqueries)
+When joining rows from two relations, the combined row's AID sets is the union of the AID sets of the rows being joined. As an example, if joining two rows from relations `A` and `B`, where the first has AID sets `AID1[1, 2], AID2[3]` and the second has AID sets `AID1[1, 3], AID3[4]`, then the resulting row ends up with AID sets: `AID1[1, 2, 3], AID2[3], AID3[4]`.
 
-In the case of aggregation, the resulting buckets might all belong to the same set of AIDs.
-This is however often not the case when joining relations. The following query illustrates the point:
+This same rule applies when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
 
-```sql
-SELECT age, maxSalary, avg(numTransactions)
-FROM (
-  SELECT aid, age, max(salary) as maxSalary
-  FROM customers
-  GROUP BY aid, age
-) t INNER JOIN (
-  SELECT age, count(*) as numTransactions
-  FROM transactions
-  GROUP BY age
-) s ON t.age = s.age
-GROUP BY age, maxSalary
-```
+### Aggregating rows
 
-In the query above we have:
-- per-AID rows from subquery `t` (by nature of the grouping by the AID column): `aid`, `maxSalary`
-- aggregates that represent one or more AIDs from subquery `s`: `numTransactions`
-- column values that represent both the AIDs from subquery `t` _and_ subquery `s` by nature of having been a join-condition: `age`
+The process is slightly more complex when rows are aggregated. This is a result of having to account for potential outlier behavior.
 
-This mix will result in a final bucket where some _column values_ might be low count (for example `maxSalary`) while others are not (for example `numTransactions`).
-
-### Rules for propagating AIDs
-
-The following rules apply:
-
-#### Aggregating
-
-**Each GROUP BY column ends up with an AID set that is the union of the AID sets of the
-column values being grouped. The union is taken of each AID type individually.**
-
-Example table:
-
-| age | age aid sets | name    | name aid sets       |
-| --- | ------------ | ------- | ------------------- |
-| 12  | AID1[1]      | Bob     | AID1[1]             |
-| 12  | AID1[1]      | Bob     | AID1[1]             |
-| 12  | AID1[2]      | Bob     | AID1[2]             |
-| 12  | AID1[3]      | Alice   | AID1[3], AID2[1]    |
-| 12  | AID1[3]      | Cynthia | AID1[3, 4], AID2[1] |
-| 12  | AID1[5]      | Cynthia | AID1[5]             |
-
-The query:
-
-```sql
-SELECT age, name
-FROM table
-GROUP BY age, name
-```
-
-would result in the following table:
-
-| age | age aid sets | name    | name aid sets          |
-| --- | ------------ | ------- | ---------------------- |
-| 12  | AID1[1, 2]   | Bob     | AID1[1, 2]             |
-| 12  | AID1[3]      | Alice   | AID1[3], AID2[1]       |
-| 12  | AID1[3, 5]   | Cynthia | AID1[3, 4, 5], AID2[1] |
-
-In other words, we take the union of AID sets on a column by column basis.
-
-Concretely, please note how for the `(age, name)` tuple:
-- `12, Bob` multiple single AID rows ends with a single multi AID row
-- `12, Alice` starts out being a row unique to an AID and remains so
-- `12, Cynthia` has uneven contributions for the `age` and `name` columns, and this remains true
-  after aggregation as well
-
-
-#### JOINing relations
-
-- **A column used as a JOIN condition gets a AID set that is the union of AID sets of the column in the joined relations**
-- **Other columns retain their previous AID sets**
-
-Example relations:
-
-Relation `t`:
-
-|  age | age aid sets | maxSalary | maxSalary aid sets |
-| ---: | ------------ | --------: | ------------------ |
-|   20 | AID1[1]      |     10000 | AID1[1]            |
-
-Relation `s`:
-
-|  age | age aid sets        | numTransactions | numTransactions aid sets |
-| ---: | ------------------- | --------------: | ------------------------ |
-|   20 | AID1[1, 2], AID2[3] |              10 | AID1[1, 2]               |
-|   20 | AID1[2, 3], AID2[4] |              20 | AID1[2, 3, 4]            |
-
-after joining these relations on `t.age = s.age` we end up with the following composite table
-
-| t.age | t.age aid sets             | t.maxSalary | t.maxSalary aid sets | s.age | s.age aid sets | s.numTransactions | s.numTransactions aid sets |
-| ----: | -------------------------- | ----------: | -------------------- | ----: | -------------- | ----------------: | -------------------------- |
-|    20 | **AID1[1, 2], AID2[3]**    |       10000 | AID1[1]              |    20 | AID1[1, 2]     |                10 | **AID1[1, 2], AID2[3]**    |
-|    20 | **AID1[1, 2, 3], AID2[4]** |       10000 | AID1[1]              |    20 | AID1[1, 2, 3]  |                20 | **AID1[2, 3, 4], AID2[4]** |
-
-The interesting things to note are:
-- The `t.maxSalary` and `s.numTransaction` values retain their AID sets
-- The `t.age` and `s.age` values have an AID set that is `union(t.age aid set, s.age aid set)` because of
-  the join condition which ensures they match
-
+NOTE: Expand on how this is done.
 
 ## Low count filtering
 
-As AID sets are a property of a column value, rather than a bucket as a whole, low count filtering
-has to be done per column value rather than bucket.
-
-Low count filtering is done for each AID set for a column value individually.
-If any of them fail low count filtering the column value as a whole is considered low count.
-For example, suppose the tables used in a query have two AID columns, AID1 and AID2. Suppose a column value from that
-query has two distinct AIDs from AID1 (AID1[1, 2]), and three distinct AIDs from AID2 (AID2[1, 2, 3]).
-Assuming the minimum number of distinct AIDs has been set to 3 AID1 fails low count filtering, and AID2 passes, but
-the column value as a whole therefore fails low count filtering.
-
-Low count filtering per column value will at times result in a bucket where some column values are low count
-while others are not. At present we filter out buckets in their entirety if any of the column values it contains are low count.
-
-Note (future work):
-This approach can be refined to allowing the subset of non low count column values through while replacing the
-low count values with synthetic data.
+Low count filtering is done for each AID set individually.
+If any of them fails low count filtering then the bucket is considered low count.
+For example, suppose the table used in a query have two AID columns, AID1 and AID2.
+Suppose a bucket from a query over that table has two distinct AIDs from AID1 (AID1[1, 2]), and three distinct AIDs from AID2 (AID2[1, 2, 3]).
+Assuming the minimum number of distinct AIDs has been set to 3, then AID1 fails low count filtering while AID2 passes. Since the bucket as a whole is considered low count if any of the AID sets fail low count filtering, the bucket is therefore filtered away.
 
 
 ## Outliers and top values
@@ -161,11 +54,11 @@ The process for suppressing outliers is as follows:
    2. The cardinality of the combined AID set meets or exceeds `No` for each of the AID types
 4. Take top values according to the same rules as taking outlier values:
    1. Stop as soon as a value is found which individually passes low count filtering for all AID types
-   2. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt` for each of the AID types
-5. Replace each `No` value with an average of the `Nt` values weighted by their AID contributions.
+   1. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt` for each of the AID types
+6. Replace each `No` value with an average of the `Nt` values weighted by their AID contributions.
 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
-that the low count filter threshold is 2.
+that the low count filter threshold is 2 for all AID types.
 
 ### Early termination
 
@@ -207,7 +100,7 @@ that the low count filter threshold is 2.
 |     6 | AID1[4]        |
 |     5 | AID1[5]        |
 
-In this example we are using a low count threshold of 5 (just so it doesn't trigger).
+In this example we are using a low count threshold of 5 (just in order for it not to trigger, and make this example work).
 
 - The columns are sorted in descending order of `Value`
 - `No = 3`, `Nt = 2`
@@ -223,7 +116,7 @@ In this example we are using a low count threshold of 5 (just so it doesn't trig
 |    10 | AID1[1, 2], AID2[1] |
 |     9 | AID1[3], AID2[2]    |
 |     8 | AID1[1], AID2[1, 2] |
-|     7 | AID1[2], AID2[3]    |
+|     7 | AID1[1], AID2[3]    |
 |     6 | AID1[1,2], AID2[1]  |
 
 - The columns are sorted in descending order of `Value`
