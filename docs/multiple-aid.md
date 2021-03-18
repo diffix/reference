@@ -276,7 +276,7 @@ A difficult case is where a column that is not protected (and cannot be tagged a
 Three tables, `paychecks`, `users`, and `companies`. We want to protect both users and companies.
 
 - `paychecks`: `user_id`, `amount`, `date`
-- `users`: `user_id`, `age`, `zip`
+- `users`: **`user_id`**, `age`, `zip`
 - `companies`: `user_id`, `company`
 
 Since `company` only appears in one place, it is tagged there. However, suppose that there are some zips with only one company (but other zips that have multiple companies).
@@ -331,6 +331,8 @@ From the admin point of view, I think the steps to configuration is something li
 6. Tag each column as AID (note not necessary to configure what entity is being protected, or how AIDs relate to each other).
 
 > TODO: Make sure we include different AIDs having different LCF parameters.
+
+> NOTE(Sebastian): I don't think #5 (not tagging redundant AIDs) should be a goal. In fact tagging all possible AID columns could be the conservative safe thing to do. It certainly adds runtime overhead but helps protect against dirty data (same individual under multiple IDs). I think we should measure the performance impact before making a recommendation against tagging multiple AIDs.
 
 ## sum()
 
