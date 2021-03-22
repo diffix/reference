@@ -82,43 +82,53 @@ module QueryParser =
       words [ "FULL"; "JOIN" ] >>. preturn FullJoin
     ]
 
-  let regularJoin = joinType .>>. table .>> word "on" .>>. expr
+  let selectQuery, selectQueryRef = createParserForwardedToRef<Expression, unit>()
 
-  let crossJoin = word "," >>. table |>> fun table -> (InnerJoin, table), Boolean true
+  let subQuery =
+    inParenthesis selectQuery .>>. simpleIdentifier
+    >>= function
+      | SelectQuery subQuery, alias -> preturn <| SubQuery (subQuery, alias)
+      | _ -> fail "Expected sub-query"
+
+  let tableOrSubQuery = attempt subQuery <|> table
+
+  let regularJoin = joinType .>>. tableOrSubQuery .>> word "on" .>>. expr
+
+  let crossJoin = word "," >>. tableOrSubQuery |>> fun tableOrSubQuery -> (InnerJoin, tableOrSubQuery), Boolean true
 
   let join = crossJoin <|> regularJoin
 
   let from =
-    word "FROM" >>. table .>>. many join
+    word "FROM" >>. tableOrSubQuery .>>. many join
     |>> fun (first_table, joined_tables) ->
           List.fold (fun left ((joinType, right), on) -> Join(joinType, left, right, on)) first_table joined_tables
 
-  let selectQuery =
-    word "SELECT"
-    >>= fun _ ->
-      distinct
-      >>= fun distinct ->
-            commaSepExpressions
-            >>= fun columns ->
-                  from
-                  >>= fun from ->
-                        opt whereClause
-                        >>= fun whereClause ->
-                              opt groupBy
-                              >>= fun groupBy ->
-                                    opt havingClause
-                                    >>= fun havingClause ->
-                                          let query =
-                                            {
-                                              SelectDistinct = distinct
-                                              Expressions = columns
-                                              From = from
-                                              Where = whereClause
-                                              GroupBy = groupBy |> Option.defaultValue []
-                                              Having = havingClause
-                                            }
+  do selectQueryRef :=
+      word "SELECT"
+      >>= fun _ ->
+        distinct
+        >>= fun distinct ->
+              commaSepExpressions
+              >>= fun columns ->
+                    from
+                    >>= fun from ->
+                          opt whereClause
+                          >>= fun whereClause ->
+                                opt groupBy
+                                >>= fun groupBy ->
+                                      opt havingClause
+                                      >>= fun havingClause ->
+                                            let query =
+                                              {
+                                                SelectDistinct = distinct
+                                                Expressions = columns
+                                                From = from
+                                                Where = whereClause
+                                                GroupBy = groupBy |> Option.defaultValue []
+                                                Having = havingClause
+                                              }
 
-                                          preturn (Expression.SelectQuery query)
+                                            preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore

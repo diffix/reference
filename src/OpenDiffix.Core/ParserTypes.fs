@@ -41,6 +41,7 @@ and Expression =
   | Identifier of tableName: string option * columnName: string
   | Table of name: string * alias: string option
   | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
+  | SubQuery of subQuery: SelectQuery * alias: string
   | Function of functionName: string * Expression list
   | SelectQuery of SelectQuery
 // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
