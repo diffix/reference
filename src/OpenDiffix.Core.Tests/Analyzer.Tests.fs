@@ -185,7 +185,7 @@ type Tests(db: DBFixture) =
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
-  let idColumn = ColumnReference(3, IntegerType)
+  let idColumn = ColumnReference(4, IntegerType)
 
   let analyzeQuery query =
     query
@@ -219,7 +219,7 @@ type Tests(db: DBFixture) =
     let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
 
     let condition =
-      FunctionExpr(ScalarFunction Equals, [ ColumnReference(3, IntegerType); ColumnReference(6, IntegerType) ])
+      FunctionExpr(ScalarFunction Equals, [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ])
 
     let customers = getTable "customers_small"
     let purchases = getTable "purchases"
