@@ -99,6 +99,25 @@ let lastNames =
   ]
   |> List.map Field.Text
 
+let companyNames =
+  [
+    "Alpha Centauri Inc."
+    "Alpha Centauri Inc."
+    "Alpha Centauri Inc."
+    "Alpha Centauri Inc."
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Beta Centauri Ltd"
+    "Gamma Centauri GmbH"
+    "Gamma Centauri GmbH"
+    "Gamma Centauri GmbH"
+  ]
+  |> List.map Field.Text
+
 let customersSmall =
   {
     Name = "customers_small"
@@ -109,6 +128,7 @@ let customersSmall =
         { Name = "last_name"; Type = Type.Text }
         { Name = "age"; Type = Type.Integer }
         { Name = "city"; Type = Type.Text }
+        { Name = "company_name"; Type = Type.Text }
       ]
 
     GeneratedRowsCount = 20
@@ -119,23 +139,24 @@ let customersSmall =
         listGenerator [ Text "Regular" ]
         listGenerator [ Integer 25L; Integer 30L; Integer 35L ]
         listGenerator [ Text "Berlin"; Text "Rome" ]
+        listGenerator companyNames
       ]
 
     StaticRows =
       [
-        [ Integer 1000L; Null; Null; Null; Null ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina" ]
+        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
       ]
   }
 
@@ -149,6 +170,7 @@ let customers =
         { Name = "last_name"; Type = Type.Text }
         { Name = "age"; Type = Type.Integer }
         { Name = "city"; Type = Type.Text }
+        { Name = "company_name"; Type = Type.Text }
       ]
 
     GeneratedRowsCount = 200
@@ -159,15 +181,16 @@ let customers =
         listGenerator lastNames
         randomGenerator 18 80
         listGenerator cities
+        listGenerator companyNames
       ]
 
     StaticRows =
       [
-        [ Integer 1000L; Null; Null; Null; Null ]
-        [ Integer 1001L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo" ]
-        [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris" ]
-        [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin" ]
-        [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin" ]
+        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc." ]
+        [ Integer 1001L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo"; Text "Outlier Inc." ]
+        [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris"; Text "Outlier Inc." ]
+        [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin"; Text "Outlier Inc." ]
+        [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin"; Text "Outlier Inc." ]
       ]
   }
 
