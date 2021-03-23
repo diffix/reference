@@ -9,7 +9,7 @@ type CliArguments =
   | [<AltCommandLine("-v")>] Version
   | Dry_Run
   | [<Unique; AltCommandLine("-d")>] Database of db_path: string
-  | Aid_Columns of column_name: string list
+  | Aid_Column of column_name: string * minimum_allowed_aids: int
   | [<AltCommandLine("-q")>] Query of sql: string
   | Queries_Path of path: string
   | Query_Stdin
@@ -18,7 +18,6 @@ type CliArguments =
   // Threshold values
   | [<Unique>] Threshold_Outlier_Count of lower: int * upper: int
   | [<Unique>] Threshold_Top_Count of lower: int * upper: int
-  | [<Unique>] Minimum_Allowed_Aids of threshold: int
 
   // General anonymization parameters
   | [<Unique>] Noise of std_dev: float * limit: float
@@ -29,7 +28,10 @@ type CliArguments =
       | Version -> "Prints the version number of the program."
       | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
-      | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
+      | Aid_Column _ ->
+          "Specifies an AID column. Each AID should follow the format tableName.columnName."
+          + " Additionally the minimum number of allowed AID threshold must be set. Can be specified multiple times"
+          + " to add multiple AID columns"
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
           "Path to a file containing a list of query specifications. All queries will be executed in "
@@ -44,8 +46,6 @@ type CliArguments =
           "Threshold used in the count aggregate together with the outlier count threshold. It determines how many "
           + "of the next most contributing users' values should be used to calculate the replacement value for the "
           + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
-      | Minimum_Allowed_Aids _ ->
-          "Sets the bound for the minimum number of AIDs must be present in a bucket for it to pass the low count filter."
       | Noise _ ->
           "Specifies the standard deviation used when calculating the noise throughout the system. "
           + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
@@ -66,22 +66,20 @@ let toNoise =
   | Some (stdDev, cutoffLimit) -> { StandardDev = stdDev; Cutoff = cutoffLimit }
   | _ -> NoiseParam.Default
 
-let private toTableSettings (aidColumns: string list) =
+let private toTableSettings (aidColumns: (string * int) list) =
   aidColumns
-  |> List.map (fun aidColumn ->
+  |> List.map (fun (aidColumn, minimumAllowedAIDs) ->
     match aidColumn.Split '.' with
-    | [| tableName; columnName |] -> (tableName, columnName)
+    | [| tableName; columnName |] -> (tableName, { Name = columnName; MinimumAllowed = minimumAllowedAIDs })
     | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`"
   )
   |> List.groupBy (fst)
-  |> List.map (fun (tableName, fullAidColumnList) ->
-    let aidColumns = fullAidColumnList|> List.map(fun (_table, columnName) -> {Name = columnName; MinimumAllowed = 2})
-    tableName, { AidColumns = aidColumns })
+  |> List.map (fun (tableName, fullAidColumnSpec) -> tableName, { AidColumns = fullAidColumnSpec |> List.map snd })
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
   {
-    TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
+    TableSettings = parsedArgs.GetResults Aid_Column |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
