@@ -74,7 +74,9 @@ let private toTableSettings (aidColumns: string list) =
     | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`"
   )
   |> List.groupBy (fst)
-  |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
+  |> List.map (fun (tableName, fullAidColumnList) ->
+    let aidColumns = fullAidColumnList|> List.map(fun (_table, columnName) -> {Name = columnName; MinimumAllowed = 2})
+    tableName, { AidColumns = aidColumns })
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =

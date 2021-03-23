@@ -170,13 +170,15 @@ type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
   let getTable name = name |> Table.getI schema |> Utils.unwrap
 
+  let aidSetting name = {Name = name; MinimumAllowed = 2}
+
   let anonParams =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id"; "company_name" ] }
-          "customers_small", { AidColumns = [ "id"; "company_name" ] }
-          "purchases", { AidColumns = [ "cid" ] }
+          "customers", { AidColumns = [ aidSetting "id"; aidSetting "company_name" ] }
+          "customers_small", { AidColumns = [ aidSetting "id"; aidSetting "company_name" ] }
+          "purchases", { AidColumns = [ aidSetting "cid" ] }
         ]
       Seed = 1
       MinimumAllowedAids = 2

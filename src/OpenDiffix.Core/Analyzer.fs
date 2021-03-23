@@ -259,7 +259,7 @@ let rec private tryfindAid (anonParams: AnonymizationParams) (tables: TargetTabl
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
       | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
-      | Some { AidColumns = column :: _ } -> Some(firstTable, column)
+      | Some { AidColumns = columnAidSetting :: _ } -> Some(firstTable, columnAidSetting.Name)
 
 let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)

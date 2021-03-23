@@ -35,8 +35,14 @@ let encodeThreshold (t: Threshold) = Encode.object [ "lower", Encode.int t.Lower
 let encodeNoiseParam (np: NoiseParam) =
   Encode.object [ "standard_dev", Encode.float np.StandardDev; "cutoff", Encode.float np.Cutoff ]
 
+let encodeAidColumnSetting (aidSetting: AIDSetting) =
+  Encode.object [
+    "name", Encode.string aidSetting.Name
+    "minimum_allowed", Encode.int aidSetting.MinimumAllowed
+  ]
+
 let encodeTableSettings (ts: TableSettings) =
-  Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
+  Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map encodeAidColumnSetting) ]
 
 let encodeAnonParams (ap: AnonymizationParams) =
   Encode.object [

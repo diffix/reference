@@ -5,13 +5,15 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
 type Tests(db: DBFixture) =
+  let aidSetting name = {Name = name; MinimumAllowed = 2}
+
   let anonParams =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id" ] } //
-          "purchases", { AidColumns = [ "cid" ] } //
-          "customers_small", { AidColumns = [ "id" ] } //
+          "customers", { AidColumns = [ aidSetting "id"; aidSetting "company_name" ] } //
+          "purchases", { AidColumns = [ aidSetting "cid" ] } //
+          "customers_small", { AidColumns = [ aidSetting "id" ] } //
         ]
       Seed = 1
       MinimumAllowedAids = 2

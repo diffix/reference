@@ -16,7 +16,9 @@ type NoiseParam =
 
   static member Default = { StandardDev = 2.; Cutoff = 5. }
 
-type TableSettings = { AidColumns: string list }
+type AIDSetting = { Name: string; MinimumAllowed: int }
+
+type TableSettings = { AidColumns: AIDSetting list }
 
 type AnonymizationParams =
   {
