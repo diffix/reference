@@ -6,12 +6,11 @@
       "table_settings": {
         "customers": {
           "aid_columns": [
-            "id"
+            {"name": "id", "minimum_allowed": 2}
           ]
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -33,12 +32,11 @@
       "table_settings": {
         "customers": {
           "aid_columns": [
-            "id"
+            {"name": "id", "minimum_allowed": 2}
           ]
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -60,12 +58,11 @@
       "table_settings": {
         "customers": {
           "aid_columns": [
-            "id"
+            {"name": "id", "minimum_allowed": 2}
           ]
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2
