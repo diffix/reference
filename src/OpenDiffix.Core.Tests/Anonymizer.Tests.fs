@@ -15,6 +15,7 @@ let rows =
 
 let aidColumn = ColumnReference(0, IntegerType)
 let strColumn = ColumnReference(1, StringType)
+let minimumAllowed = ColumnReference(1, IntegerType)
 
 let context =
   { EvaluationContext.Default with
@@ -32,6 +33,7 @@ let evaluateAggregator = evaluateAggregator context
 
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
+let diffixLowCount = AggregateFunction(DiffixLowCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
 let ``anon count distinct aid`` () =
@@ -73,3 +75,21 @@ let ``anon count returns 0 for Null inputs`` () =
   rows
   |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
   |> should equal (Integer 0L)
+
+[<Fact>]
+let ``low count is true when distinct ids less than threshold`` () =
+  let minimumAllowedValue = Integer 11L
+  let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; minimumAllowedValue |])
+
+  rows
+  |> evaluateAggregator diffixLowCount [ minimumAllowed; aidColumn ]
+  |> should equal (Boolean true)
+
+[<Fact>]
+let ``low count is false when distinct ids meets threshold`` () =
+  let minimumAllowedValue = Integer 10L
+  let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; minimumAllowedValue |])
+
+  rows
+  |> evaluateAggregator diffixLowCount [ minimumAllowed; aidColumn ]
+  |> should equal (Boolean false)
