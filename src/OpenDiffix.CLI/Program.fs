@@ -83,7 +83,6 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): Anonymizat
   {
     TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
-    MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aids |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
     Noise = parsedArgs.TryGetResult Noise |> toNoise

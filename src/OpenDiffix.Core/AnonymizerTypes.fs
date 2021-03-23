@@ -24,7 +24,6 @@ type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Seed: int
-    MinimumAllowedAids: int
 
     // Count params
     OutlierCount: Threshold
@@ -36,7 +35,6 @@ type AnonymizationParams =
     {
       TableSettings = Map.empty
       Seed = 0
-      MinimumAllowedAids = 2
       OutlierCount = Threshold.Default
       TopCount = Threshold.Default
       Noise = NoiseParam.Default

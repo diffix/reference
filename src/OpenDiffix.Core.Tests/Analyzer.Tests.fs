@@ -181,7 +181,6 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ aidSetting "cid" ] }
         ]
       Seed = 1
-      MinimumAllowedAids = 2
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       Noise = { StandardDev = 1.; Cutoff = 0. }

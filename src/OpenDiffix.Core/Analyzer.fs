@@ -218,12 +218,12 @@ let selectColumnsFromQuery columnIndices innerQuery =
     Having = booleanTrueExpression
   }
 
-let addLowCountFilter aidColumnExpression query =
+let addLowCountFilter aidColumnMinimumAllowed aidColumnExpression query =
   Query.Map(
     query,
     fun selectQuery ->
       let lowCountAggregate =
-        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
+        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnMinimumAllowed; aidColumnExpression ])
 
       let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
 
@@ -252,14 +252,14 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private tryFindAid (anonParams: AnonymizationParams) (tables: TargetTables) =
+let rec private tryFindAidSettings (anonParams: AnonymizationParams) (tables: TargetTables) =
   match tables with
   | [] -> None
   | (firstTable, _alias) :: nextTables ->
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
-      | Some { AidColumns = [] } -> tryFindAid anonParams nextTables
-      | Some { AidColumns = columnAidSetting :: _ } -> Some(firstTable, columnAidSetting.Name)
+      | Some { AidColumns = [] } -> tryFindAidSettings anonParams nextTables
+      | Some { AidColumns = columnAidSetting :: _ } -> Some(firstTable, columnAidSetting)
 
 let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)
@@ -270,19 +270,20 @@ let analyze (dataProvider: IDataProvider)
     let! query = transformQuery schema parseTree
 
     return!
-      match tryFindAid anonParams query.TargetTables with
+      match tryFindAidSettings anonParams query.TargetTables with
       | None -> query |> SelectQuery |> Ok
-      | Some (table, aidColumn) ->
+      | Some (table, aidColumnSettings) ->
           result {
-            let! (aidColumnIndex, aidColumn) = Table.getColumnI table aidColumn
+            let! (aidColumnIndex, aidColumn) = Table.getColumnI table aidColumnSettings.Name
             do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery aidColumnIndex
 
             let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
+            let aidColumnMinimumAllowed = aidColumnSettings.MinimumAllowed |> int64 |> Integer |> Constant
 
             return
               query
               |> SelectQuery
               |> rewriteToDiffixAggregate aidColumnExpression
-              |> addLowCountFilter aidColumnExpression
+              |> addLowCountFilter aidColumnMinimumAllowed aidColumnExpression
           }
   }

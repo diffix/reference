@@ -31,16 +31,14 @@ let countAids (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) 
   let noise = noiseValue rnd anonymizationParams.Noise
   max (aidSet.Count + noise) 0
 
-let isLowCount (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
+let isLowCount (minimumAllowed: Value option, aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
   let rnd = newRandom aidSet anonymizationParams
+  let minimumAllowed =
+    match minimumAllowed with
+    | Some (Integer value) -> value |> int
+    | _ -> failwith "Expected integer minimum threshold value"
 
-  let threshold =
-    randomUniform
-      rnd
-      {
-        Lower = anonymizationParams.MinimumAllowedAids
-        Upper = anonymizationParams.MinimumAllowedAids + 2
-      }
+  let threshold = randomUniform rnd {Lower = minimumAllowed; Upper = minimumAllowed + 2}
 
   aidSet.Count < threshold
 

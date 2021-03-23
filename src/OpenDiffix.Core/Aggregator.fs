@@ -87,18 +87,18 @@ module Aggregator =
 
       member this.Final ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> int64 |> Integer
 
-  type private DiffixLowCount(aids: Set<AidHash>) =
-    new() = DiffixLowCount(Set.empty)
+  type private DiffixLowCount(minimumAllowed: Value option, aids: Set<AidHash>) =
+    new() = DiffixLowCount(None, Set.empty)
 
     interface IAggregator with
       member this.Transition values =
         match values with
-        | [ Null ] -> this
-        | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixLowCount
+        | [ _minimumAllowed; Null ] -> this
+        | [ minimumAllowed; aid ] -> DiffixLowCount(Some minimumAllowed, aids |> Set.add (aid.GetHashCode()))
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx = Anonymizer.isLowCount aids ctx.AnonymizationParams |> Boolean
+      member this.Final ctx = Anonymizer.isLowCount (minimumAllowed, aids) ctx.AnonymizationParams |> Boolean
 
   let create _ctx fn: IAggregator =
     match fn with
