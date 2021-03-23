@@ -116,4 +116,49 @@ type Tests(db: DBFixture) =
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected
 
+  [<Fact>]
+  let ``query 13 - low count id`` () =
+    let anonParams =
+      { anonParams with
+          TableSettings =
+            Map ["customers_small", { AidColumns = [
+              {Name = "id"; MinimumAllowed = 20}
+              {Name = "company_name"; MinimumAllowed = 2}
+            ] }]
+      }
+    let expected = { Columns = [ "first_name"; "count" ]; Rows = [ ] }
+    let queryResult =
+      runQueryWithCustomAnonParams anonParams "SELECT first_name, count(*) FROM customers_small WHERE first_name = 'Alice' GROUP BY 1"
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 14 - low count company_name`` () =
+    let anonParams =
+      { anonParams with
+          TableSettings =
+            Map ["customers_small", { AidColumns = [
+              {Name = "id"; MinimumAllowed = 2}
+              {Name = "company_name"; MinimumAllowed = 20}
+            ] }]
+      }
+    let expected = { Columns = [ "first_name"; "count" ]; Rows = [ ] }
+    let queryResult =
+      runQueryWithCustomAnonParams anonParams "SELECT first_name, count(*) FROM customers_small WHERE first_name = 'Alice' GROUP BY 1"
+    assertOkEqual queryResult expected
+
+  [<Fact>]
+  let ``query 15 - low count passes for multiple AIDs`` () =
+    let anonParams =
+      { anonParams with
+          TableSettings =
+            Map ["customers_small", { AidColumns = [
+              {Name = "id"; MinimumAllowed = 2}
+              {Name = "company_name"; MinimumAllowed = 2}
+            ] }]
+      }
+    let expected = { Columns = [ "first_name"; "count" ]; Rows = [ [| String "Alice"; Integer 11L |] ] }
+    let queryResult =
+      runQueryWithCustomAnonParams anonParams "SELECT first_name, count(*) FROM customers_small WHERE first_name = 'Alice' GROUP BY 1"
+    assertOkEqual queryResult expected
+
   interface IClassFixture<DBFixture>

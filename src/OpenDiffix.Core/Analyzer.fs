@@ -218,14 +218,31 @@ let selectColumnsFromQuery columnIndices innerQuery =
     Having = booleanTrueExpression
   }
 
-let addLowCountFilter aidColumnMinimumAllowed aidColumnExpression query =
+type private AidMetaData = { ColumnIndex: int; MinimumAllowedAIDs: int; Column: Column }
+
+let private addLowCountFilters (aidColumnsMeta: AidMetaData list) aidColumnExpression query =
   Query.Map(
     query,
     fun selectQuery ->
-      let lowCountAggregate =
-        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnMinimumAllowed; aidColumnExpression ])
+      let lowCountAggregates =
+        aidColumnsMeta
+        |> List.map (fun meta ->
+          let minimumAllowed = meta.MinimumAllowedAIDs |> int64 |> Integer |> Constant
+          let aidColumnReference = ColumnReference(meta.ColumnIndex, meta.Column.Type)
 
-      let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
+          FunctionExpr(
+            AggregateFunction(DiffixLowCount, AggregateOptions.Default),
+            [ minimumAllowed; aidColumnReference ]
+          )
+        )
+
+      let combinedLowCountFilter =
+        lowCountAggregates
+        |> List.reduce (fun lowCountFilter1 lowCountFilter2 ->
+          FunctionExpr(ScalarFunction Or, [ lowCountFilter1; lowCountFilter2 ])
+        )
+
+      let lowCountFilter = FunctionExpr(ScalarFunction Not, [ combinedLowCountFilter ])
 
       if selectQuery.GroupingSets = [ GroupingSet [] ] then
         let selectedExpressions =
@@ -259,7 +276,21 @@ let rec private tryFindAidSettings (anonParams: AnonymizationParams) (tables: Ta
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
       | Some { AidColumns = [] } -> tryFindAidSettings anonParams nextTables
-      | Some { AidColumns = columnAidSetting :: _ } -> Some(firstTable, columnAidSetting)
+      | Some { AidColumns = columnAidsSettings } ->
+          columnAidsSettings
+          |> List.map (fun aidColumnSettings ->
+            result {
+              let! (aidColumnIndex, aidColumn) = Table.getColumnI firstTable aidColumnSettings.Name
+
+              return
+                {
+                  ColumnIndex = aidColumnIndex
+                  Column = aidColumn
+                  MinimumAllowedAIDs = aidColumnSettings.MinimumAllowed
+                }
+            }
+          )
+          |> Some
 
 let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)
@@ -272,18 +303,27 @@ let analyze (dataProvider: IDataProvider)
     return!
       match tryFindAidSettings anonParams query.TargetTables with
       | None -> query |> SelectQuery |> Ok
-      | Some (table, aidColumnSettings) ->
+      | Some aidColumnsSettings ->
           result {
-            let! (aidColumnIndex, aidColumn) = Table.getColumnI table aidColumnSettings.Name
-            do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery aidColumnIndex
+            let! aidColumnsSettings = List.sequenceResultM aidColumnsSettings
 
-            let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
-            let aidColumnMinimumAllowed = aidColumnSettings.MinimumAllowed |> int64 |> Integer |> Constant
+            // Temporarily we are only, for arbitrary reasons, taking the first AID column specified
+            // as the one that is allowed to be used in `count(distinct aidColumn)`. This must be
+            // fixed once the design has matured. The focus of this pull is on adding low count
+            // filtering based on all aid columns
+            let firstAidColumn = List.head aidColumnsSettings
+
+            do!
+              query
+              |> SelectQuery
+              |> Analysis.QueryValidity.validateQuery firstAidColumn.ColumnIndex
+
+            let aidColumnExpression = ColumnReference(firstAidColumn.ColumnIndex, firstAidColumn.Column.Type)
 
             return
               query
               |> SelectQuery
               |> rewriteToDiffixAggregate aidColumnExpression
-              |> addLowCountFilter aidColumnMinimumAllowed aidColumnExpression
+              |> addLowCountFilters aidColumnsSettings aidColumnExpression
           }
   }
