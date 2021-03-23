@@ -174,8 +174,8 @@ type Tests(db: DBFixture) =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id" ] }
-          "customers_small", { AidColumns = [ "id" ] }
+          "customers", { AidColumns = [ "id"; "company_name" ] }
+          "customers_small", { AidColumns = [ "id"; "company_name" ] }
           "purchases", { AidColumns = [ "cid" ] }
         ]
       Seed = 1
