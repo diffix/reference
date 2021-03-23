@@ -164,7 +164,7 @@ let ``Selecting columns from an aliased table`` () =
 let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
 
 [<Fact>]
-let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
+let ``Selecting ambiguous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
