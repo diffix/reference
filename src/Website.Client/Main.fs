@@ -92,7 +92,9 @@ type Model =
   }
 
 let initModel =
-  let tableSettings = [ "customers", { AidColumns = [ "aid" ] } ] |> Map.ofList
+  let tableSettings =
+    [ "customers", { AidColumns = [ { Name = "aid"; MinimumAllowed = 2 } ] } ]
+    |> Map.ofList
 
   {
     Page = Home
@@ -175,12 +177,30 @@ let resultTable (result: ComparativeResult) =
 
 let errorTemplate (description: string) = Main.Error().ErrorDescription(description).Elt()
 
+let getMinimumAllowedAids table column (anonParams: AnonymizationParams) =
+  let customersSettings = Map.find table anonParams.TableSettings
+
+  customersSettings.AidColumns
+  |> List.find (fun aidSetting -> aidSetting.Name = column)
+  |> fun aidSetting -> aidSetting.MinimumAllowed
+
+let setMinimumAllowedAids table column newMinimum (anonParam: AnonymizationParams) =
+  Map.find table anonParam.TableSettings
+  |> fun tableSettings -> tableSettings.AidColumns
+  |> List.map (fun columnSettings ->
+    if columnSettings.Name = column then { columnSettings with MinimumAllowed = newMinimum } else columnSettings
+  )
+  |> fun columnsSettings ->
+       { anonParam with
+           TableSettings = Map.add table { AidColumns = columnsSettings } anonParam.TableSettings
+       }
+
 let homePage model dispatch =
   Main
     .Home()
     .Query(model.Query, (fun query -> dispatch (SetQuery query)))
-    .MinimumNumberAIDs(model.AnonParams.MinimumAllowedAids,
-                       fun v -> dispatch <| AdjustAnonParam(fun a -> { a with MinimumAllowedAids = v }))
+    .MinimumNumberAIDs(getMinimumAllowedAids "customers" "aid" model.AnonParams,
+                       fun v -> dispatch <| AdjustAnonParam(setMinimumAllowedAids "customers" "aid" v))
     .OutlierMin(model.AnonParams.OutlierCount.Lower,
                 fun v ->
                   dispatch
