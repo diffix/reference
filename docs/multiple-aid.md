@@ -14,7 +14,10 @@ With an integrated cloak, we go back to the original style of computing noise, w
 
 A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID in a query (either because there are multiple AIDs in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly, and also is robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
 
-We use the following nomenclature. AIDX[Y1, Y2, ...] refers to an AID for a set of entities Y1, Y2, etc, from column AIDX. For example, `AID1 = send_email` and `AID1[1] = sue1@gmail.com` and `AID1[2] = bob6@yahoo.com`.
+We use the nomenclature `AIDX[Y1]` to describe that a row has AID column `AIDX` and that it belongs to the entity identified by `Y1`. For example `AIDX` might be `send_email` and `Y1` might be `sue1@gmail.com`, in which case a row might have the AID `send_email[sue1@gmail.com]`.
+If the table additionally contains a second AID column `recipient_email` then the same row might be fully described through the pair of AIDs `[send_email[sue1@gmail.com]; recipient_email[bob6@yahoo.com]]`.
+
+Through aggregation a row might be associated with multiple AID values for a given AID column. For example sue might have sent an email to multiple recipients, which if aggregating by subject line (or something to that effect) might result in a database row with the following AIDs: `[send_email[sue1@gmail.com]; recipient_email[bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]]`
 
 ## How AIDs spread
 
