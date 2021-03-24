@@ -55,28 +55,28 @@ in this query:
 - `cnt2` is how many card types have a certain count
 - `cnt3` is how many instances exist per `cnt2`
 
-In the worked example below I will use the syntax `[{AIDX[Y1, Y2, ...], contribution1}; {AIDX[Y1, Y3, ...], contribution2}; ...]` to describe that a particular value is an aggregate of two distinct AID sets (both for the same AID column) with distinct contributions. It can be thought of as the equivalent of `{users[Paul], 20 transactions}; {users[Paul, Edon, Cristian], 4 transactions collectively}; {users[Sebastian], 1 transaction}; ...]`
+In the worked example below I will use the syntax `[{AIDX[Y1, Y2, ...], contribution1}; {AIDX[Y1, Y3, ...], contribution2}; ...]` to describe that a particular value is an aggregate of two distinct AID sets (both for the same AID column) with distinct contributions. It can be thought of as the equivalent of `[{users[Paul], 20 transactions}; {users[Paul, Edon, Cristian], 4 transactions collectively}; {users[Sebastian], 1 transaction}; ...]`. A situation like the previous where Paul is both present as a sole individual as well as part of a set of individuals could happen as a result of him having two `card_type`s (say an infrequently occurring `premium` card as well as a more common `silver` card that both Edon and Cristian also happen to transact with).
 
 The input rows to the innermost query might have looked like the following table
 
-| card type | contribution                    |
-| --------- | ------------------------------- |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
-| standard  | [{AID1[1], 1}; {AID2[1, 3], 1}] |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}]    |
-| standard  | [{AID1[2], 1}; {AID2[1], 1}]    |
-| standard  | [{AID1[2], 1}; {AID2[1], 1}]    |
-| standard  | [{AID1[3], 1}; {AID2[1], 1}]    |
-| platinum  | [{AID1[1], 1}; {AID2[1], 1}]    |
-| platinum  | [{AID1[4], 1}; {AID2[1], 1}]    |
-| platinum  | [{AID1[4], 1}; {AID2[1], 1}]    |
+| card type | contribution                 |
+| --------- | ---------------------------- |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
+| standard  | [{AID1[1], 1}; {AID2[3], 1}] |
+| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
+| standard  | [{AID1[2], 1}; {AID2[1], 1}] |
+| standard  | [{AID1[2], 1}; {AID2[1], 1}] |
+| standard  | [{AID1[3], 1}; {AID2[1], 1}] |
+| platinum  | [{AID1[1], 1}; {AID2[1], 1}] |
+| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
+| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
 ...
 | platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
 | platinum  | [{AID1[4], 1}; {AID2[2], 1}] |
-| diamond   | [{AID1[4], 1}; {AID2[1, 2], 1}] |
+| diamond   | [{AID1[4], 1}; {AID2[1], 1}] |
 ...
-| diamond   | [{AID1[4], 1}; {AID2[4, 5], 1}] |
+| diamond   | [{AID1[4], 1}; {AID2[4], 1}] |
 | diamond   | [{AID1[5], 1}; {AID2[6], 1}] |
 
 Applying the aggregation algorithm described above:
@@ -86,11 +86,11 @@ Applying the aggregation algorithm described above:
 
 The resulting table becomes:
 
-| card_type | contributions                                                                     | cnt1 |
-| --------- | --------------------------------------------------------------------------------- | ---- |
-| standard  | [{AID1[1], 4}; {AID1[2], 2}; {AID1[3], 1}; {AID2[1], 6}; {AID2[1, 3], 1}]         | 7    |
-| platinum  | [{AID1[1], 1}; {AID1[4], 100}; {AID2[1], 100}; {AID2[2], 1}]                      | 101  |
-| diamond   | [{AID1[4], 1000}; {AID1[5], 1}; {AID2[1, 2], 1}; {AID2[4, 5], 999}; {AID2[6], 1}] | 1001 |
+| card_type | contributions                                                               | cnt1 |
+| --------- | --------------------------------------------------------------------------- | ---- |
+| standard  | [{AID1[1], 4}; {AID1[2], 2}; {AID1[3], 1}; {AID2[1], 6}; {AID2[3], 1}]      | 7    |
+| platinum  | [{AID1[1], 1}; {AID1[4], 100}; {AID2[1], 100}; {AID2[2], 1}]                | 101  |
+| diamond   | [{AID1[4], 1000}; {AID1[5], 1}; {AID2[1], 1}; {AID2[4], 999}; {AID2[6], 1}] | 1001 |
 
 To derive `cnt2` we repeat the same procedure:
 
@@ -100,11 +100,11 @@ To derive `cnt2` we repeat the same procedure:
 
 The resulting table becomes:
 
-| cnt1 | contribution                                | cnt2 |
-| ---- | ------------------------------------------- | ---- |
-| 7    | [{AID1[1, 2, 3], 1}; {AID2[1, 3], 1}]       | 1    |
-| 101  | [{AID1[1, 4], 1}; {AID2[1, 2], 1}]          | 1    |
-| 1001 | [{AID1[4, 5], 1}; {AID2[1, 2, 4, 5, 6], 1}] | 1    |
+| cnt1 | contribution                          | cnt2 |
+| ---- | ------------------------------------- | ---- |
+| 7    | [{AID1[1, 2, 3], 1}; {AID2[1, 3], 1}] | 1    |
+| 101  | [{AID1[1, 4], 1}; {AID2[1, 2], 1}]    | 1    |
+| 1001 | [{AID1[4, 5], 1}; {AID2[1, 4, 6], 1}] | 1    |
 
 To derive `cnt3` we repeat the same procedure again:
 
@@ -114,18 +114,18 @@ To derive `cnt3` we repeat the same procedure again:
 
 The resulting table becomes
 
-| cnt2 | contribution                                                                                                       | cnt3 |
-| ---- | ------------------------------------------------------------------------------------------------------------------ | ---- |
-| 1    | [{AID1[1, 2, 3], 1}; {AID1[1, 4], 1}; {AID1[4, 5], 1}; {AID2[1, 3], 1}; {AID2[1, 2], 1}; {AID2[1, 2, 4, 5, 6], 1}] | 3    |
+| cnt2 | contribution                                                                                                      | cnt3 |
+| ---- | ----------------------------------------------------------------------------------------------------------------- | ---- |
+| 1    | [{AID1[1, 2, 3], 1}; {AID1[1, 4], 1}; {AID1[4, 5], 1}; </br>{AID2[1, 3], 1}; {AID2[1, 2], 1}; {AID2[1, 4, 6], 1}] | 3    |
 
 Since no outliers exist there will also be no suppression in this instance.
 Noise is added as normal.
 
 Also note (for completeness), that if there was one more round of aggregation, the resulting table would be:
 
-| cnt3 | contribution                                            | cnt4 |
-| ---- | ------------------------------------------------------- | ---- |
-| 3    | [{AID1[1, 2, 3, 4, 5], 1}; {AID2[1, 2, 3, 4, 5, 6], 1}] | 1    |
+| cnt3 | contribution                                         | cnt4 |
+| ---- | ---------------------------------------------------- | ---- |
+| 3    | [{AID1[1, 2, 3, 4, 5], 1}; {AID2[1, 2, 3, 4, 6], 1}] | 1    |
 
 
 ### Some elaboration on the safety of this approach
