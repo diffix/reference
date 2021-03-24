@@ -1,3 +1,5 @@
+Please consult the [glossary](glossary.md) for definitions of terms used in this document.
+
 # Computing Per-AID Contributions
 
 With an integrated cloak, we go back to the original style of computing noise, where we have information about individual AIDs. This is needed to compute noise about the various aggregates, including future aggregates and even user-defined aggregates. There are at least two types of aggregates:
