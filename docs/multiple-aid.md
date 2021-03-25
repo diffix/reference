@@ -17,24 +17,73 @@ A table may have one or more AID columns (columns labeled as being AIDs). When t
 We use the nomenclature `AIDX[Y1]` to describe that a row has AID column `AIDX` and that it belongs to the entity identified by `Y1`. For example `AIDX` might be `send_email` and `Y1` might be `sue1@gmail.com`, in which case a row might have the AID `send_email[sue1@gmail.com]`.
 If the table additionally contains a second AID column `recipient_email` then the same row might be fully described through the pair of AIDs `[send_email[sue1@gmail.com]; recipient_email[bob6@yahoo.com]]`.
 
-Through aggregation a row might be associated with multiple AID values for a given AID column. For example sue might have sent an email to multiple recipients, which if aggregating by subject line (or something to that effect) might result in a database row with the following AIDs: `[send_email[sue1@gmail.com]; recipient_email[bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]]`
+If a table is joined with itself, then the AIDs from the left and right side of the join are treated as distinct.
+You might therefore end up with `[send_emailL[sue1@gmail.com]; send_emailR[sue1@gmail.com]]` for the same row. While both refer to the same entity, our system still treats them as separate AIDs.
+
+Through aggregation a row might be associated with multiple AID values for a single type of AID. Should we aggregate the aforementioned email table by the day of the week, we might for example end up with a row for Mondays with an AID set such as `[send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
+
+
+### Low count filter
+
+Low count filtering is done per AID type individually. For a bucket with the AID sets `[email1; email2; email3; ssn1; ssn2]` all five AID sets individually need to pass the low count threshold. Each kind of AID set might have a distinct  `minimum_allowed_aids` parameter (i.e. the parameter for `email` might differ from that of `ssn`).
+
 
 ## How AIDs spread
 
 ### JOINing rows
 
-When joining rows from two relations, the combined row's AID sets is the union of the AID sets of the rows being joined. As an example, if joining two rows from relations `A` and `B`, where the first has AID sets `AID1[1, 2], AID2[3]` and the second has AID sets `AID1[1, 3], AID3[4]`, then the resulting row ends up with AID sets: `AID1[1, 2, 3], AID2[3], AID3[4]`.
+When joining rows from two relations (tables, views, etc, see the glossary for a definition), the combined row's AID sets is the union of the AID sets of the rows being joined. Crucially AID sets of the same kind (i.e. `email`) are treated as distinct AID sets! You might therefore end up with an AID set such as `[email-1[1]; email-2[1, 2]; email-3[1, 3]]` all referencing the same underlying `email` column, where each AID set might contain partially or fully overlapping AID values (`1` in the example).
 
-This same rule applies when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
+The same procedure is followed when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
+
+
+#### Why it is so
+
+The combined larger row resulting from the join must represent all the entities whose data is part of the row.
+
+Two alternatives to the process as described above would be to:
+
+1. let the AID set for a column be the union of the the AID sets for the particular column (`[email[1, 2, 3]]` when continuing the previous example), or
+2. letting each half of the JOIN retain their previous AID sets and treating them separately
+
+Each of these alternatives opens up a different variant of the "wide then narrow" attack.
+
+The first attack variant would look like this:
+
+```sql
+SELECT l.ssn
+FROM (
+  SELECT left.ssn -- victim
+  FROM left
+) l JOIN (
+  SELECT other, columns, ...
+  FROM right
+) r ON l.X = r.X
+GROUP BY l.ssn
+```
+
+In this attack case a low count social security number would pass the low count threshold through having been joined with other rows and thereby causing the AID set to be inflated.
+
+The other variant, where AID types are kept separate per half of a joined relation might look like this:
+
+```sql
+SELECT r.whateverProperty, count(r.*)
+FROM (
+  SELECT *
+  FROM left
+) l INNER JOIN (
+  SELECT other, columns, ...
+  FROM right
+) r ON l.X = r.X
+GROUP BY l.ssn
+```
+
+In this case the left table contains the victim and is, while not selected in the final query, used to influence which rows from the right table are included. The right table values might all pass low count filter, but still offer a signal to the presence or absence of a victim attribute.
+
 
 ### Aggregating rows
 
-The process is slightly more complex when rows are aggregated. This is a result of having to account for potential outlier behavior.
-
-When rows are aggregated the algorithm is as follows:
-1. for each row individually, create the unions of AID per AID type (this will become clearer shortly)
-2. derive the aggregate contribution across all AID sets for one of the AID types (the other AID types will invariably produce the same result) as the result to carry forward
-3. if this is the anonymizing top-level aggregate then do outlier suppression per the regular suppression rules, otherwise do nothing more
+When aggregating rows the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a relation having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows.
 
 Let's make this more concrete with an example. The query we want to handle
 is the following nested query with multiple levels of aggregation:
@@ -45,7 +94,7 @@ FROM (
   SELECT cnt1, count(*) as cnt2
   FROM (
     SELECT card_type, count(amount) as cnt1
-    FROM transactions
+    FROM (... some joined transaction tables ...)
     GROUP BY card_type
   )
   GROUP BY cnt1
@@ -58,184 +107,63 @@ in this query:
 - `cnt2` is how many card types have a certain count
 - `cnt3` is how many instances exist per `cnt2`
 
-In the worked example below I will use the syntax `[{AIDX[Y1, Y2, ...], contribution1}; {AIDX[Y1, Y3, ...], contribution2}; ...]` to describe that a particular value is an aggregate of two distinct AID sets (both for the same AID column) with distinct contributions. It can be thought of as the equivalent of `[{users[Paul], 20 transactions}; {users[Paul, Edon, Cristian], 4 transactions collectively}; {users[Sebastian], 1 transaction}; ...]`. A situation like the previous where Paul is both present as a sole individual as well as part of a set of individuals could happen as a result of him having two `card_type`s (say an infrequently occurring `premium` card as well as a more common `silver` card that both Edon and Cristian also happen to transact with).
+There are additional considerations when aggregating rows (like outlier suppression), but
+we gloss over these for the purposes of showing how AIDs are handled.
 
 The input rows to the innermost query might have looked like the following table
 
-| card type | contribution                 |
-| --------- | ---------------------------- |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
-| standard  | [{AID1[1], 1}; {AID2[3], 1}] |
-| standard  | [{AID1[1], 1}; {AID2[1], 1}] |
-| standard  | [{AID1[2], 1}; {AID2[1], 1}] |
-| standard  | [{AID1[2], 1}; {AID2[1], 1}] |
-| standard  | [{AID1[3], 1}; {AID2[1], 1}] |
-| platinum  | [{AID1[1], 1}; {AID2[1], 1}] |
-| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
-| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
+| card type | AID sets                       |
+| --------- | ------------------------------ |
+| standard  | [customer-1[1]; customer-2[1]] |
+| standard  | [customer-1[1]; customer-2[1]] |
+| standard  | [customer-1[1]; customer-2[3]] |
+| standard  | [customer-1[1]; customer-2[1]] |
+| standard  | [customer-1[2]; customer-2[1]] |
+| standard  | [customer-1[2]; customer-2[1]] |
+| standard  | [customer-1[3]; customer-2[1]] |
+| platinum  | [customer-1[1]; customer-2[1]] |
+| platinum  | [customer-1[4]; customer-2[1]] |
+| platinum  | [customer-1[4]; customer-2[1]] |
 ...
-| platinum  | [{AID1[4], 1}; {AID2[1], 1}] |
-| platinum  | [{AID1[4], 1}; {AID2[2], 1}] |
-| diamond   | [{AID1[4], 1}; {AID2[1], 1}] |
+| platinum  | [customer-1[4]; customer-2[1]] |
+| platinum  | [customer-1[4]; customer-2[2]] |
+| diamond   | [customer-1[4]; customer-2[1]] |
 ...
-| diamond   | [{AID1[4], 1}; {AID2[4], 1}] |
-| diamond   | [{AID1[5], 1}; {AID2[6], 1}] |
+| diamond   | [customer-1[4]; customer-2[4]] |
+| diamond   | [customer-1[5]; customer-2[6]] |
 
-Applying the aggregation algorithm described above:
-- Step 1 is a noop
-- Step 2 combines all the `standard` card type rows into a single row, the `platinum` card type rows into another row, etc. The `cnt1` value for each row is the summed contributions of each AID sets for one of the AID types (i.e. AID1 or AID2. The result would be the same whichever one is used)
-- Step 3 is omitted as we are not in the anonymizing top-level aggregate
+
+After one round of aggregation we are left with:
+
+| card_type | AID sets                                | cnt1 |
+| --------- | --------------------------------------- | ---- |
+| standard  | [customer-1[1, 2, 3]; customer-2[1, 3]] | 5    |
+| platinum  | [customer-1[1, 4]; customer-2[1, 2]]    | 2    |
+| diamond   | [customer-1[4, 5]; customer-2[1, 4, 6]] | 2    |
+
+To derive `cnt2` we repeat the same procedure, taking the union of AID sets across the rows being joined.
 
 The resulting table becomes:
 
-| card_type | contributions                                                               | cnt1 |
-| --------- | --------------------------------------------------------------------------- | ---- |
-| standard  | [{AID1[1], 4}; {AID1[2], 2}; {AID1[3], 1}; {AID2[1], 6}; {AID2[3], 1}]      | 7    |
-| platinum  | [{AID1[1], 1}; {AID1[4], 100}; {AID2[1], 100}; {AID2[2], 1}]                | 101  |
-| diamond   | [{AID1[4], 1000}; {AID1[5], 1}; {AID2[1], 1}; {AID2[4], 999}; {AID2[6], 1}] | 1001 |
+| cnt1 | AID sets                                      | cnt2 |
+| ---- | --------------------------------------------- | ---- |
+| 5    | [customer-1[1, 2, 3]; customer-2[1, 3]]       | 1    |
+| 2    | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] | 2    |
 
-To derive `cnt2` we repeat the same procedure:
+To derive `cnt3` we repeat the same procedure yet once more, resulting in the following table:
 
-- In step 1 we combine the AID sets into a single AID set: `{AID1[1, 2, 3], 7}` for `standard`, etc.
-- Step 2 creates new aggregates based on occurrences of `cnt1`
-- Step 3 is omitted again
+| cnt2 | AID sets                                      | cnt3 |
+| ---- | --------------------------------------------- | ---- |
+| 1    | [customer-1[1, 2, 3]; customer-2[1, 3]]       | 1    |
+| 2    | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] | 1    |
 
-The resulting table becomes:
-
-| cnt1 | contribution                          | cnt2 |
-| ---- | ------------------------------------- | ---- |
-| 7    | [{AID1[1, 2, 3], 1}; {AID2[1, 3], 1}] | 1    |
-| 101  | [{AID1[1, 4], 1}; {AID2[1, 2], 1}]    | 1    |
-| 1001 | [{AID1[4, 5], 1}; {AID2[1, 4, 6], 1}] | 1    |
-
-To derive `cnt3` we repeat the same procedure again:
-
-- Step 1 becomes a noop, all the AID sets have already been combined
-- Step 2 creates new buckets based on the `cnt2` values (in this example it returns a single composite row)
-- Step 3 looks for outlier contributions, of which there are none in this case
-
-The resulting table becomes
-
-| cnt2 | contribution                                                                                                      | cnt3 |
-| ---- | ----------------------------------------------------------------------------------------------------------------- | ---- |
-| 1    | [{AID1[1, 2, 3], 1}; {AID1[1, 4], 1}; {AID1[4, 5], 1}; </br>{AID2[1, 3], 1}; {AID2[1, 2], 1}; {AID2[1, 4, 6], 1}] | 3    |
-
-Since no outliers exist there will also be no suppression in this instance.
 Noise is added as normal.
 
 Also note (for completeness), that if there was one more round of aggregation, the resulting table would be:
 
-| cnt3 | contribution                                         | cnt4 |
-| ---- | ---------------------------------------------------- | ---- |
-| 3    | [{AID1[1, 2, 3, 4, 5], 1}; {AID2[1, 2, 3, 4, 6], 1}] | 1    |
-
-
-### Some elaboration on the safety of this approach
-
-It is not necessary to do outlier suppression in the intermediate non-anonymizing aggregations. Doing so could lead to more consistent results, but thanks to low effect detection the lack of intermediate outlier suppression does not pose a risk to privacy.
-
-Through experiments it has been validated that after ~4 rounds
-of aggregations the values tend to collapse down to a single value, and after 2 rounds of aggregation the difference between the maximum and minimum reported values
-tend to no longer exceeds 2. These results hold irrespective of if the dataset includes
-extreme outliers or not.
-
-## Low count filtering
-
-Low count filtering is done for each AID set individually.
-If any of them fails low count filtering then the bucket is considered low count.
-For example, suppose the table used in a query have two AID columns, AID1 and AID2.
-Suppose a bucket from a query over that table has two distinct AIDs from AID1 (AID1[1, 2]), and three distinct AIDs from AID2 (AID2[1, 2, 3]).
-Assuming the minimum number of distinct AIDs has been set to 3, then AID1 fails low count filtering while AID2 passes. Since the bucket as a whole is considered low count if any of the AID sets fail low count filtering, the bucket is therefore filtered away.
-
-
-## Outliers and top values
-
-When aggregating we suppress outliers and replace their values with those of a representative top-group average.
-This is fairly straight forward in the case where each value represents a single entity or individual. It becomes
-marginally more complex when multiple AID sets have to be taken into account.
-
-The process for suppressing outliers is as follows:
-
-1. Sort the column values to be suppressed in descending order
-2. Produce noisy outlier count (`No`) and top count (`Nt`) values for each AID set
-3. Take outlier values until one of the following criteria has been met:
-   1. One of the values passes low count filtering for all the AID types.
-      If such a value is found, then the more extreme values (if any) are all replaced by this value
-      and the algorithm is considered completed
-   2. The cardinality of the combined AID set meets or exceeds `No` for each of the AID types
-4. Take top values according to the same rules as taking outlier values:
-   1. Stop as soon as a value is found which individually passes low count filtering for all AID types
-   1. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt` for each of the AID types
-6. Replace each `No` value with an average of the `Nt` values weighted by their AID contributions.
-
-Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
-that the low count filter threshold is 2 for all AID types.
-
-### Early termination
-
-| Value | AID sets   |
-| ----: | ---------- |
-|    10 | AID1[1, 2] |
-
-- The columns are sorted in descending order of `Value`
-- `No = 2`, `Nt = 2`
-- We immediately terminate the process due to meeting requirement `3.1` of the value 10 passing low count filtering.
-  No suppression is needed
-
-### Base case
-
-| Value | AID sets |
-| ----: | -------- |
-|    10 | AID1[1]  |
-|     9 | AID1[2]  |
-|     8 | AID1[3]  |
-|     7 | AID1[4]  |
-|     6 | AID1[5]  |
-|     5 | AID1[6]  |
-|     4 | AID1[7]  |
-
-- The columns are sorted in descending order of `Value`
-- `No = 2`, `Nt = 2`
-- The outlier values meet criteria `3.2` after we have taken values 10 and 9
-- The top values meet criteria `4.2` after we have taken values 8 and 7
-- The weighted average is `8 * 1/2 + 7 * 1/2 = 7.5` which is used in place of the values 10 and 9
-
-### Expanded base case
-
-| Value | AID sets   |
-| ----: | ---------- |
-|    10 | AID1[1]    |
-|     9 | AID1[1, 2] |
-|     8 | AID1[2]    |
-|     7 | AID1[3]    |
-|     6 | AID1[4]    |
-|     5 | AID1[5]    |
-
-In this example we are using a low count threshold of 5 (just in order for it not to trigger, and make this example work).
-
-- The columns are sorted in descending order of `Value`
-- `No = 3`, `Nt = 2`
-- The outlier values meet criteria `3.2` after we have taken values 10, 9, 8, and 7! We cannot stop after 8,
-  as the AIDs repeat and do not increase the cardinality of the AID set
-- The top values meet criteria `4.2` after we have taken values 6 and 5
-- The weighted average is `6 * 1/2 + 5 * 1/2 = 2.5` which is used in place of the values 10 through 7.
-
-### Multiple AID types
-
-| Value | AID sets            |
-| ----: | ------------------- |
-|    10 | AID1[1, 2], AID2[1] |
-|     9 | AID1[3], AID2[2]    |
-|     8 | AID1[1], AID2[1, 2] |
-|     7 | AID1[1], AID2[3]    |
-|     6 | AID1[1,2], AID2[1]  |
-
-- The columns are sorted in descending order of `Value`
-- `AID1.No = 2`, `AID1.Nt = 2`, `AID2.No = 2`, `AID2.Nt = 2`
-- Value 10 both meets the low count and `3.1` criteria for AID1, but we additionally need to take value 9 as well in order to fully satisfy `3.1` for both AID types
-- The top values meet criteria `4.2` for the top values by taking values 8, 7, and 6
-- The weighted average becomes: `8 * 3/8 + 7 * 2/8 + 6 * 3/8 = 7` and is used to replace values 10 and 9
+| cnt3 | contribution                                           | cnt4 |
+| ---- | ------------------------------------------------------ | ---- |
+| 1    | [customer-1[1, 2, 3, 4, 5]; customer-2[1, 2, 3, 4, 6]] | 1    |
 
 
 ## Computing noise
