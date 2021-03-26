@@ -107,7 +107,7 @@ in this query:
 - `cnt2` is how many card types have a certain count
 - `cnt3` is how many instances exist per `cnt2`
 
-There are additional considerations when aggregating rows (like outlier flattening), but
+There are additional considerations when aggregating rows (like extreme value flattening), but
 we gloss over these for the purposes of showing how AIDs are handled.
 
 The input rows to the innermost query might have looked like the following table

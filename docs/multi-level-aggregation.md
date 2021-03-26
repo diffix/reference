@@ -28,7 +28,7 @@ In this query:
   card types that we would like to account for in the top-level `count` aggregate
 - each `num_transactions` aggregate contains data (potentially) pertaining to multiple entities, some of which
   might have an outsize contribution on the aggregate produced. Keeping track of the individual contributions
-  across query boundaries in order to have the ability to later do outlier flattening if necessary is feasible
+  across query boundaries in order to have the ability to later do extreme value flattening if necessary is feasible
   for `count` and `sum` aggregates, at the cost of some rather complex and subtle logistics
 - the `avg_spend` aggregate, much like the `num_transactions` aggregate, (potentially) contains data pertaining
   to multiple entities. While it is relatively easy to carry forward the contributions of individual entities
@@ -36,29 +36,29 @@ In this query:
   across multiple entities, particularly if this information must be kept in a form that allows subsequent
   flattening
 
-## Intermediate outlier flattening
+## Intermediate extreme value flattening
 
-Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or outlier flattening)
+Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or extreme value flattening)
 tend to produce values collapsing down to 1 after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
-largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme outliers or not and
+largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not and
 show that the aggregate values themselves quickly become harmless. When in the twilight zone before an aggregate fully collapses
-(around two nested aggregates) an analyst might be able to tell the difference between two results, one containing an outlier
-and one without the outlier, but is likely not able to determine which is which due to the noise we add during anonymization
+(around two nested aggregates) an analyst might be able to tell the difference between two results, one containing an extreme value
+and one without the extreme value, but is likely not able to determine which is which due to the noise we add during anonymization
 being of a similar magnitude.
 Intermediate aggregate values can pose a risk in other ways, for example when used as join conditions. If a join is made that
-uses the value of a row in a nested query that is an outlier, then this might in turn influence what other rows are included in the final
+uses the value of a row in a nested query that is an extreme value, then this might in turn influence what other rows are included in the final
 result, thereby produce a visible effect that can, potentially, be controlled. This effect, like any other aggregate would vanish
-as a result of repeated aggregation, but shows that it is not sufficient to only perform outlier flattening at the very end.
-Performing intermediate outlier flattening has the added benefit that we no longer need to carry forward any information about
+as a result of repeated aggregation, but shows that it is not sufficient to only perform extreme value flattening at the very end.
+Performing intermediate extreme value flattening has the added benefit that we no longer need to carry forward any information about
 how much each entity has contributed to an aggregate. As the aggregate is mostly safe, it is sufficient to know which AIDs were
 involved.
 
 
-## Outliers and top values
+## Extreme and top values
 
-When aggregating we flatten outliers and replace their values with those of a representative top-group average.
+When aggregating we flatten extreme values and replace their values with those of a representative top-group average.
 
-The process for suppressing outliers is done separately for each AID set type. That is to say for a
+The process for suppressing extreme values is done separately for each AID set type. That is to say for a
 dataset with AID sets `[email-1; email-2; company]` the process is repeated three times, even though
 there are only two kinds of AIDs. For each AID set type we calculate the absolute distortion. For our final aggregate we choose,
 and use, the largest of the available distortions.
@@ -67,20 +67,20 @@ Please note that if any of the processes fails due to insufficiently many distin
 
 ### Algorithm
 
-The process for suppressing outliers is as follows:
+The process for suppressing extreme values is as follows:
 
 1. Produce per-AID set contributions as per the aggregate being generated
    (count of rows, sum of row contributions, min/max etc). An AID set in this context
    would be `email-1[1]` and `email-1[1, 2, 3]` and these are dealt with separately even though
    an entity 1 is present in both.
 2. Sort the contribution values to be flattened in descending order
-3. Produce noisy outlier count (`No`) and top count (`Nt`) values
-4. Take outlier values until one of the following criteria has been met:
+3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
+4. Take extreme values until one of the following criteria has been met:
    1. One of the values passes low count filtering.
       If such a value is found, then the more extreme values (if any) are all replaced by this value
       and the algorithm is considered completed
    2. The cardinality of the combined AID set meets or exceeds `No`
-5. Take top values according to the same rules as taking outlier values:
+5. Take top values according to the same rules as taking extreme values:
    1. Stop as soon as a value is found which independently passes low count filtering
    2. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt`
 6. Replace each `No` value with an average of the `Nt` values weighted by their AID contributions.
@@ -118,7 +118,7 @@ that the minimum allowed aids threshold 2 for all AID types.
 - The values have been grouped by AID set
 - The columns are sorted in descending order of `Value`
 - `No = 2`, `Nt = 2`
-- The outlier values meet criteria `4.2` after we have taken values 10 and 9
+- The extreme values meet criteria `4.2` after we have taken values 10 and 9
 - The top values meet criteria `5.2` after we have taken values 8 and 7
 - The weighted average is `8 * 1/2 + 7 * 1/2 = 7.5` which is used in place of the values 10 and 9
 
@@ -138,7 +138,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 - The values have been grouped by AID set
 - The columns are sorted in descending order of `Value`
 - `No = 3`, `Nt = 2`
-- The outlier values meet criteria `4.2` after we have taken values 10, 9, 8, and 7! We cannot stop after 8,
+- The extreme values meet criteria `4.2` after we have taken values 10, 9, 8, and 7! We cannot stop after 8,
   as the AIDs repeat and do not increase the cardinality of the AID set
 - The top values meet criteria `5.2` after we have taken values 6 and 5
 - The weighted average is `6 * 1/3 + 5 * 2/3 = 5.3` which is used in place of the values 10 through 7.
