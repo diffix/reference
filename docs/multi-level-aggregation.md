@@ -39,8 +39,8 @@ In this query:
 ## Intermediate outlier flattening
 
 Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or outlier flattening)
-tend to produce values collapsing down to 1 after ~4 rounds of aggregation. After 2 rounds of aggregation the min-max difference
-does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme outliers or not and
+tend to produce values collapsing down to 1 after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
+largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme outliers or not and
 show that the aggregate values themselves quickly become harmless. When in the twilight zone before an aggregate fully collapses
 (around two nested aggregates) an analyst might be able to tell the difference between two results, one containing an outlier
 and one without the outlier, but is likely not able to determine which is which due to the noise we add during anonymization
