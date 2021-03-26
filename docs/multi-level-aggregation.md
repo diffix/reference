@@ -28,17 +28,17 @@ In this query:
   card types that we would like to account for in the top-level `count` aggregate
 - each `num_transactions` aggregate contains data (potentially) pertaining to multiple entities, some of which
   might have an outsize contribution on the aggregate produced. Keeping track of the individual contributions
-  across query boundaries in order to have the ability to later do outlier suppression if necessary is feasible
+  across query boundaries in order to have the ability to later do outlier flattening if necessary is feasible
   for `count` and `sum` aggregates, at the cost of some rather complex and subtle logistics
 - the `avg_spend` aggregate, much like the `num_transactions` aggregate, (potentially) contains data pertaining
   to multiple entities. While it is relatively easy to carry forward the contributions of individual entities
   for a `sum` or `count`, it is entirely unclear how an individual contributes to an average that is calculated
   across multiple entities, particularly if this information must be kept in a form that allows subsequent
-  suppression
+  flattening
 
-## Intermediate outlier suppression
+## Intermediate outlier flattening
 
-Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or outlier suppression)
+Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or outlier flattening)
 tend to produce values collapsing down to 1 after ~4 rounds of aggregation. After 2 rounds of aggregation the min-max difference
 does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme outliers or not and
 show that the aggregate values themselves quickly become harmless. When in the twilight zone before an aggregate fully collapses
@@ -48,8 +48,8 @@ being of a similar magnitude.
 Intermediate aggregate values can pose a risk in other ways, for example when used as JOIN conditions. If a join is made that
 uses the value of an outlying row within a nested query, then this might in turn influence what other rows are included in the final
 result, thereby produce a visible effect that can, potentially, be controlled. This effect, like any other aggregate would vanish
-as a result of repeated aggregation, but shows that it is not sufficient to only perform outlier suppression at the very end.
-Performing intermediate outlier suppression has the added benefit that we no longer need to carry forward any information about
+as a result of repeated aggregation, but shows that it is not sufficient to only perform outlier flattening at the very end.
+Performing intermediate outlier flattening has the added benefit that we no longer need to carry forward any information about
 how much each entity has contributed to an aggregate. As the aggregate is mostly safe, it is sufficient to know which AIDs were
 involved.
 
@@ -86,7 +86,7 @@ that the low count filter threshold is 2 for all AID types.
 - The columns are sorted in descending order of `Value`
 - `No = 2`, `Nt = 2`
 - We immediately terminate the process due to meeting requirement `3.1` of the value 10 passing low count filtering.
-  No suppression is needed
+  No flattening is needed
 
 ### Base case
 
