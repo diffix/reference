@@ -6,7 +6,7 @@ For the assumed background knowledge, please consult the:
 
 Our goal is to limit the distortion due to anonymization.
 Whereas older versions of Diffix anonymized intermediate queries if they aggregated across distinct AID values
-causing severe loss of data quality, we now attempt to delay the final anonymization decisions to the top-most query.
+causing severe loss of data quality, we now delay the final anonymization decisions to the top-most query.
 
 This design constraint complicates how we handle aggregates.
 
