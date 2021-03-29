@@ -59,7 +59,7 @@ and ScalarFunction =
 and SetFunction =
   | GenerateSeries
 
-  static member ReturnType fn (args: Expression list) =
+  static member ReturnType fn (_args: Expression list) =
     match fn with
     | GenerateSeries -> Ok IntegerType
 
