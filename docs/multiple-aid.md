@@ -32,7 +32,7 @@ Low count filtering is done per AID type individually. For a bucket with the AID
 
 ### JOINing rows
 
-When joining rows from two relations (tables, views, sub queries etc, see the glossary for a definition), the combined rows AID sets is the union of the AID sets of the rows being joined. Crucially AID sets of the same kind (i.e. `email`) are treated as distinct AID sets! You might therefore end up with an AID set such as `[email-1[1]; email-2[1, 2]; email-3[1, 3]]` all referencing the same underlying `email` column, where each AID set might contain partially or fully overlapping AID values (`1` in the example).
+When joining rows from two selectables, the combined rows AID sets is the union of the AID sets of the rows being joined. Crucially AID sets of the same kind (i.e. `email`) are treated as distinct AID sets! You might therefore end up with an AID set such as `[email-1[1]; email-2[1, 2]; email-3[1, 3]]` all referencing the same underlying `email` column, where each AID set might contain partially or fully overlapping AID values (`1` in the example).
 
 The same procedure is followed when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
 
@@ -41,7 +41,7 @@ For a more in-depth discussion about why AID sets have to be merged, but not joi
 
 ### Aggregating rows
 
-When aggregating rows the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a relation having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows.
+When aggregating rows the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a selectable having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows.
 
 Let's make this more concrete with an example. The query we want to handle
 is the following nested query with multiple levels of aggregation:

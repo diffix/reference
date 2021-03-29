@@ -8,6 +8,7 @@ The following terms are frequently used throughout the other documents.
   - [d-row - database row](#d-row---database-row)
   - [i-row - intermediate row](#i-row---intermediate-row)
   - [Relation](#relation)
+  - [Selectable](#selectable)
 
 ## AID - Anonymization Identifier
 
@@ -42,3 +43,7 @@ Such intermediate processing might be non-anonymization intermediate aggregation
 In Postgres the following types of relations exist:
 
 > r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
+
+## Selectable
+
+Is a **relation** or a **subquery**. It is broadly speaking anything that produces a set of column values that can be consumed by a query.
