@@ -94,6 +94,13 @@ and Expression =
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Real _) -> Ok RealType
+    | Constant (Array values) ->
+        values
+        |> Array.tryHead
+        |> Option.map (Constant)
+        |> Option.defaultValue (Constant Null)
+        |> Expression.GetType
+        |> Result.map ArrayType
     | Constant Null -> Ok(UnknownType null)
 
   static member Map(expression, f: Expression -> Expression) =
