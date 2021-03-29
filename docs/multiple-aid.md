@@ -20,7 +20,7 @@ If the table additionally contains a second AID column `recipient_email` then th
 If a table is joined with itself, then the AIDs from the left and right side of the join are treated as distinct.
 You might therefore end up with `[send_emailL[sue1@gmail.com]; send_emailR[sue1@gmail.com]]` for the same row. While both refer to the same entity, our system still treats them as separate AIDs.
 
-Through aggregation a row might be associated with multiple AID values for a single type of AID. Should we aggregate the aforementioned email table by the day of the week, we might for example end up with a row for Mondays with an AID set such as `[send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
+Through aggregation a row might be associated with multiple AID values for a single type of AID. Should we aggregate the aforementioned email table by the day of the week, we might for example end up with an intermediate row for Mondays with an AID set such as `[send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
 
 
 ### Low count filter
@@ -32,7 +32,7 @@ Low count filtering is done per AID type individually. For a bucket with the AID
 
 ### JOINing rows
 
-When joining rows from two relations (tables, views, etc, see the glossary for a definition), the combined row's AID sets is the union of the AID sets of the rows being joined. Crucially AID sets of the same kind (i.e. `email`) are treated as distinct AID sets! You might therefore end up with an AID set such as `[email-1[1]; email-2[1, 2]; email-3[1, 3]]` all referencing the same underlying `email` column, where each AID set might contain partially or fully overlapping AID values (`1` in the example).
+When joining rows from two relations (tables, views, sub queries etc, see the glossary for a definition), the combined rows AID sets is the union of the AID sets of the rows being joined. Crucially AID sets of the same kind (i.e. `email`) are treated as distinct AID sets! You might therefore end up with an AID set such as `[email-1[1]; email-2[1, 2]; email-3[1, 3]]` all referencing the same underlying `email` column, where each AID set might contain partially or fully overlapping AID values (`1` in the example).
 
 The same procedure is followed when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
 
@@ -65,8 +65,8 @@ in this query:
 - `cnt2` is how many card types have a certain count
 - `cnt3` is how many instances exist per `cnt2`
 
-There are additional considerations when aggregating rows (like extreme value flattening), but
-we gloss over these for the purposes of showing how AIDs are handled.
+There are additional considerations when aggregating rows (like extreme value flattening which you can read more about in
+[multi-level-aggregation](multi-level-aggregation.md)), but we gloss over these here for the purposes of showing how AIDs are handled.
 
 The input rows to the innermost query might have looked like the following table
 
