@@ -252,13 +252,13 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private tryfindAid (anonParams: AnonymizationParams) (tables: TargetTables) =
+let rec private tryFindAid (anonParams: AnonymizationParams) (tables: TargetTables) =
   match tables with
   | [] -> None
   | (firstTable, _alias) :: nextTables ->
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None
-      | Some { AidColumns = [] } -> tryfindAid anonParams nextTables
+      | Some { AidColumns = [] } -> tryFindAid anonParams nextTables
       | Some { AidColumns = column :: _ } -> Some(firstTable, column)
 
 let analyze (dataProvider: IDataProvider)
@@ -270,7 +270,7 @@ let analyze (dataProvider: IDataProvider)
     let! query = transformQuery schema parseTree
 
     return!
-      match tryfindAid anonParams query.TargetTables with
+      match tryFindAid anonParams query.TargetTables with
       | None -> query |> SelectQuery |> Ok
       | Some (table, aidColumn) ->
           result {
