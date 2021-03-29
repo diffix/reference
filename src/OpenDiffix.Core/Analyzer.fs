@@ -252,14 +252,20 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private tryFindAid (anonParams: AnonymizationParams) (tables: TargetTables) index =
+let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) index =
   match tables with
-  | [] -> None
+  | [] -> Ok []
   | (firstTable, _alias) :: nextTables ->
+      let remainingTablesAidColumns = findAids anonParams nextTables (index + firstTable.Columns.Length)
+
       match anonParams.TableSettings.TryFind(firstTable.Name) with
-      | None
-      | Some { AidColumns = [] } -> tryFindAid anonParams nextTables (index + firstTable.Columns.Length)
-      | Some { AidColumns = column :: _ } -> Some(firstTable, column)
+      | None -> remainingTablesAidColumns
+      | Some { AidColumns = aidColumns } ->
+          result {
+            let! currentTableAidColumns = aidColumns |> List.map (Table.getColumnI firstTable) |> List.sequenceResultM
+            let! otherColumns = remainingTablesAidColumns
+            return (currentTableAidColumns @ otherColumns)
+          }
 
 let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)
@@ -270,13 +276,11 @@ let analyze (dataProvider: IDataProvider)
     let! query = transformQuery schema parseTree
 
     return!
-      match tryFindAid anonParams query.TargetTables 0 with
-      | None -> query |> SelectQuery |> Ok
-      | Some (table, aidColumn) ->
+      match findAids anonParams query.TargetTables 0 with
+      | Ok [] -> query |> SelectQuery |> Ok
+      | Ok ((aidColumnIndex, aidColumn) :: _otherColumns) ->
           result {
-            let! (aidColumnIndex, aidColumn) = Table.getColumnI table aidColumn
             do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery aidColumnIndex
-
             let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
 
             return
@@ -285,4 +289,5 @@ let analyze (dataProvider: IDataProvider)
               |> rewriteToDiffixAggregate aidColumnExpression
               |> addLowCountFilter aidColumnExpression
           }
+      | Error error -> Error error
   }
