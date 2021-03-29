@@ -36,49 +36,7 @@ When joining rows from two relations (tables, views, etc, see the glossary for a
 
 The same procedure is followed when joining sensitive and non-sensitive data as well. The only difference being that the non-sensitive data have empty AID sets.
 
-
-#### Why it is so
-
-The combined larger row resulting from the join must represent all the entities whose data is part of the row.
-
-Two alternatives to the process as described above would be to:
-
-1. let the AID set for a column be the union of the the AID sets for the particular column (`[email[1, 2, 3]]` when continuing the previous example), or
-2. letting each half of the JOIN retain their previous AID sets and treating them separately
-
-Each of these alternatives opens up a different variant of the "wide then narrow" attack.
-
-The first attack variant would look like this:
-
-```sql
-SELECT l.ssn
-FROM (
-  SELECT left.ssn -- victim
-  FROM left
-) l JOIN (
-  SELECT other, columns, ...
-  FROM right
-) r ON l.X = r.X
-GROUP BY l.ssn
-```
-
-In this attack case a low count social security number would pass the low count threshold through having been joined with other rows and thereby causing the AID set to be inflated.
-
-The other variant, where AID types are kept separate per half of a joined relation might look like this:
-
-```sql
-SELECT r.whateverProperty, count(r.*)
-FROM (
-  SELECT *
-  FROM left
-) l INNER JOIN (
-  SELECT other, columns, ...
-  FROM right
-) r ON l.X = r.X
-GROUP BY l.ssn
-```
-
-In this case the left table contains the victim and is, while not selected in the final query, used to influence which rows from the right table are included. The right table values might all pass low count filter, but still offer a signal to the presence or absence of a victim attribute.
+For a more in-depth discussion about why AID sets have to be merged, but not joined, have a look at the "Wide and Narrow" section of the [attack](attacks.md) document.
 
 
 ### Aggregating rows
