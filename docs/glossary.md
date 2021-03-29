@@ -37,5 +37,8 @@ Such intermediate processing might be non-anonymization intermediate aggregation
 
 ## Relation
 
-**relation** is the term used by Postgres to specify something that, broadly speaking, can be selected from.
-A relation might be a database table, or it could be a view, or for that matter a subquery.
+**relation** is the term used by Postgres to specify something that, broadly speaking, can be selected from. In our usage it will most often refer to a database table or a view.
+
+In Postgres the following types of relations exist:
+
+> r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
