@@ -5,8 +5,8 @@ The following terms are frequently used throughout the other documents.
 - [Glossary](#glossary)
   - [AID - Anonymization Identifier](#aid---anonymization-identifier)
   - [bucket](#bucket)
-  - [drow - database row](#drow---database-row)
-  - [irow - intermediate row](#irow---intermediate-row)
+  - [d-row - database row](#d-row---database-row)
+  - [i-row - intermediate row](#i-row---intermediate-row)
   - [Relation](#relation)
 
 ## AID - Anonymization Identifier
@@ -24,12 +24,12 @@ A piece of data (for example a database row) might belong to multiple AIDs. Exam
 An anonymous row in the output result table (with or without associated AID metadata).
 
 
-## drow - database row
+## d-row - database row
 
-A row from the database. As supposed to an [irow](#irow---intermediate-row) which can contain arbitrary additional metadata.
+A row from the database. As supposed to an [i-row](#irow---intermediate-row) which can contain arbitrary additional metadata.
 
 
-## irow - intermediate row
+## i-row - intermediate row
 
 A row that has undergone intermediate processing but is not a database row or an anonymized bucket.
 Such intermediate processing might be non-anonymization intermediate aggregation which doesn't result in an anonymous value.
