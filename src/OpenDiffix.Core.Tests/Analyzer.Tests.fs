@@ -186,6 +186,8 @@ type Tests(db: DBFixture) =
     }
 
   let idColumn = ColumnReference(4, IntegerType)
+  let companyColumn = ColumnReference(2, StringType)
+  let aidColumns = [| idColumn; companyColumn |] |> Expression.Array
 
   let analyzeQuery query =
     query
@@ -200,10 +202,10 @@ type Tests(db: DBFixture) =
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
 
-    let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ idColumn ])
+    let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumns ])
 
     let countDistinct =
-      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
+      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ aidColumns; idColumn ])
 
     let expectedInTopQuery =
       [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]

@@ -170,16 +170,16 @@ let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
       }
   }
 
-let rewriteToDiffixAggregate aidColumnExpression query =
+let rewriteToDiffixAggregate aidColumnsExpression query =
   Query.Map(
     query,
     (function
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
         let args =
-          match opts.Distinct, args with
-          | true, [ colExpr ] when colExpr = aidColumnExpression -> args
-          | true, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
-          | false, _ -> aidColumnExpression :: args
+          match opts.Distinct, args, aidColumnsExpression with
+          | true, [ colExpr ], (Array aidExpressions) when Array.contains colExpr aidExpressions -> [ aidColumnsExpression; colExpr ]
+          | true, _, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
+          | false, _, _ -> aidColumnsExpression :: args
 
         FunctionExpr(AggregateFunction(DiffixCount, opts), args)
     | expression -> expression)
@@ -218,12 +218,12 @@ let selectColumnsFromQuery columnIndices innerQuery =
     Having = booleanTrueExpression
   }
 
-let addLowCountFilter aidColumnExpression query =
+let addLowCountFilter aidColumnsExpression query =
   Query.Map(
     query,
     fun selectQuery ->
       let lowCountAggregate =
-        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnExpression ])
+        FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnsExpression ])
 
       let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
 
@@ -234,7 +234,7 @@ let addLowCountFilter aidColumnExpression query =
 
         if selectedExpressions |> List.forall scalarExpression then
           let bucketCount =
-            FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnExpression ])
+            FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnsExpression ])
 
           let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
 
@@ -252,11 +252,11 @@ let addLowCountFilter aidColumnExpression query =
         }
   )
 
-let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) index =
+let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTables) index =
   match tables with
   | [] -> Ok []
   | (firstTable, _alias) :: nextTables ->
-      let remainingTablesAidColumns = findAids anonParams nextTables (index + firstTable.Columns.Length)
+      let remainingTablesAidColumns = collectAids anonParams nextTables (index + firstTable.Columns.Length)
 
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None -> remainingTablesAidColumns
@@ -267,6 +267,9 @@ let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables
             return (currentTableAidColumns @ otherColumns)
           }
 
+let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) =
+  collectAids anonParams tables 0 |> Result.map List.toArray
+
 let analyze (dataProvider: IDataProvider)
             (anonParams: AnonymizationParams)
             (parseTree: ParserTypes.SelectQuery)
@@ -276,18 +279,26 @@ let analyze (dataProvider: IDataProvider)
     let! query = transformQuery schema parseTree
 
     return!
-      match findAids anonParams query.TargetTables 0 with
-      | Ok [] -> query |> SelectQuery |> Ok
-      | Ok ((aidColumnIndex, aidColumn) :: _otherColumns) ->
+      match findAids anonParams query.TargetTables with
+      | Ok [||] -> query |> SelectQuery |> Ok
+      | Ok aidColumns ->
           result {
-            do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery aidColumnIndex
-            let aidColumnExpression = ColumnReference(aidColumnIndex, aidColumn.Type)
+            let firstAidColumnIndex =
+              aidColumns
+              |> Array.head
+              |> fst
+            do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
+
+            let aidColumnsExpression =
+              aidColumns
+              |> Array.map(fun (index, column) -> ColumnReference(index, column.Type))
+              |> Expression.Array
 
             return
               query
               |> SelectQuery
-              |> rewriteToDiffixAggregate aidColumnExpression
-              |> addLowCountFilter aidColumnExpression
+              |> rewriteToDiffixAggregate aidColumnsExpression
+              |> addLowCountFilter aidColumnsExpression
           }
       | Error error -> Error error
   }

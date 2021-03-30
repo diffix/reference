@@ -83,24 +83,39 @@ and Expression =
   | FunctionExpr of fn: Function * args: Expression list
   | ColumnReference of index: int * exprType: ValueType
   | Constant of value: Value
+  | Array of Expression array
 
-  static member GetType =
-    function
+  static member GetType expression =
+    let arrayTypes callback values =
+      result {
+          let! valueTypes =
+            values
+            |> Array.map callback
+            |> Array.toList
+            |> List.sequenceResultM
+          let distinctValueTypes = Set.ofList valueTypes
+          match Set.count distinctValueTypes with
+          | 0 -> return! Error "Unknown type"
+          | 1 ->
+            return
+              distinctValueTypes
+              |> Set.toList
+              |> List.head
+              |> ArrayType
+          | _ -> return (ArrayType (UnknownType "mixed type"))
+      }
+
+    match expression with
     | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
     | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
     | FunctionExpr (SetFunction fn, args) -> SetFunction.ReturnType fn args
+    | Array values -> arrayTypes Expression.GetType values
     | ColumnReference (_, exprType) -> Ok exprType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Real _) -> Ok RealType
-    | Constant (Array values) ->
-        values
-        |> Array.tryHead
-        |> Option.map (Constant)
-        |> Option.defaultValue (Constant Null)
-        |> Expression.GetType
-        |> Result.map ArrayType
+    | Constant (Value.Array values) -> arrayTypes (Constant >> Expression.GetType) values
     | Constant Null -> Ok(UnknownType null)
 
   static member Map(expression, f: Expression -> Expression) =
@@ -194,6 +209,7 @@ module Expression =
     | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
     | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
     | FunctionExpr (SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
+    | Array expressions -> expressions |> Array.map (evaluate ctx row) |> Value.Array
     | ColumnReference (index, _) -> row.[index]
     | Constant value -> value
 

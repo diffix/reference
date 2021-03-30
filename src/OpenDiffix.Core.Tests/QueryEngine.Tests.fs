@@ -46,18 +46,6 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 4`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(DISTINCT id) FROM products"
-    assertOkEqual queryResult expected
-
-  [<Fact>]
-  let ``query 5`` () =
-    let expected = { Columns = [ "diffix_count" ]; Rows = [ [| Integer 11L |] ] }
-    let queryResult = runQuery "SELECT DIFFIX_COUNT(id) FROM products"
-    assertOkEqual queryResult expected
-
-  [<Fact>]
-  let ``query 6`` () =
     let expected =
       {
         Columns = [ "city"; "count" ]
@@ -68,7 +56,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 7 - bucket expansion`` () =
+  let ``query 5 - bucket expansion`` () =
     let queryResult = runQuery "SELECT city FROM customers_small"
 
     let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
@@ -78,7 +66,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 8 - cross join`` () =
+  let ``query 6 - cross join`` () =
     let queryResult = runQuery "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
 
     let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
@@ -86,7 +74,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 9 - inner join`` () =
+  let ``query 7 - inner join`` () =
     let queryResult = runQuery "SELECT count(*) FROM purchases join customers_small ON id = cid"
 
     let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
@@ -94,7 +82,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 10 - left join`` () =
+  let ``query 8 - left join`` () =
     let queryResult = runQuery "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
 
     let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
@@ -102,7 +90,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 11 - right join`` () =
+  let ``query 9 - right join`` () =
     let queryResult = runQuery "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
 
     let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
@@ -110,7 +98,7 @@ type Tests(db: DBFixture) =
     assertOkEqual queryResult expected
 
   [<Fact>]
-  let ``query 12`` () =
+  let ``query 10`` () =
     let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected

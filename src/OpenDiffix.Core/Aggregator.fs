@@ -8,15 +8,41 @@ module Aggregator =
 
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
-  let private updateAidMap<'T> (aid: Value) initial transition (aidMap: Map<AidHash, 'T>) =
-    let aidHash = aid.GetHashCode()
+  let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
+    match aidsArray with
+    | Value.Array aidValues ->
+      aidValues
+      |> Array.zip (aidMaps |> Option.defaultValue (Array.create aidValues.Length Map.empty))
+      |> Array.map(fun (aidMap, aidValue) ->
+        let aidHash = aidValue.GetHashCode()
 
-    let newValue =
-      match aidMap |> Map.tryFind aidHash with
-      | Some value -> transition value
-      | None -> initial
+        let newValue =
+          match aidMap |> Map.tryFind aidHash with
+          | Some value -> transition value
+          | None -> initial
 
-    Map.add aidHash newValue aidMap
+        Map.add aidHash newValue aidMap
+      )
+      |> Some
+    | _ -> failwith "Expecting an AID array as input"
+
+  let private allValuesNull =
+    function
+    | Value.Array values ->
+      values
+      |> Array.map((=) Null)
+      |> Array.reduce (&&)
+    | Null -> true
+    | _ -> false
+
+  let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: 'a array) =
+    aidSets
+    |> Option.defaultValue (Array.create aidValues.Length Set.empty)
+    |> Array.zip aidValues
+    |> Array.map(fun (aidValue, aidSet) ->
+      Set.add (valueFn <| aidValue.GetHashCode()) aidSet
+    )
+    |> Some
 
   type private Count(counter) =
     new() = Count(0L)
@@ -58,47 +84,49 @@ module Aggregator =
 
       member this.Final _ctx = sum
 
-  type private DiffixCount(perAidCounts: Map<AidHash, int64>) =
-    new() = DiffixCount(Map.empty)
+  type private DiffixCount(perAidCounts: Map<AidHash, int64> array option) =
+    new() = DiffixCount(None)
 
     interface IAggregator with
       member this.Transition values =
         match values with
-        | [ Null ]
-        | [ Null; _ ] -> this
-        | [ aid; Null ] -> perAidCounts |> updateAidMap aid 0L id |> DiffixCount
-        | [ aid ]
-        | [ aid; _ ] -> perAidCounts |> updateAidMap aid 1L (fun count -> count + 1L) |> DiffixCount
+        | aidValues :: _ when allValuesNull aidValues -> this
+        | [ aidValues; Null ] -> perAidCounts |> updateAidMaps aidValues 0L id |> DiffixCount
+        | [ aidValues ]
+        | [ aidValues; _ ] -> perAidCounts |> updateAidMaps aidValues 1L (fun count -> count + 1L) |> DiffixCount
         | _ -> invalidArgs values
         :> IAggregator
 
       member this.Final ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
-  type private DiffixCountDistinct(aids: Set<AidHash>) =
-    new() = DiffixCountDistinct(Set.empty)
+  type private DiffixCountDistinct(aidSets: Set<AidHash> array option) =
+    new() = DiffixCountDistinct(None)
+
+    interface IAggregator with
+      member this.Transition values =
+        match values with
+        | [ _aidValues; Null ] -> this
+        | [ Value.Array aidValues; aidValue ] ->
+          aidValues
+          |> addToPotentiallyMissingAidsSetsArray aidSets (fun _ -> aidValue.GetHashCode())
+          |> DiffixCountDistinct
+        | _ -> invalidArgs values
+        :> IAggregator
+
+      member this.Final ctx = Anonymizer.countAids aidSets ctx.AnonymizationParams |> int64 |> Integer
+
+  type private DiffixLowCount(aidSets: Set<AidHash> array option) =
+    new() = DiffixLowCount(None)
 
     interface IAggregator with
       member this.Transition values =
         match values with
         | [ Null ] -> this
-        | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixCountDistinct
+        | [ Value.Array aidValues ] -> aidValues |> addToPotentiallyMissingAidsSetsArray aidSets id |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx = Anonymizer.countAids aids ctx.AnonymizationParams |> int64 |> Integer
-
-  type private DiffixLowCount(aids: Set<AidHash>) =
-    new() = DiffixLowCount(Set.empty)
-
-    interface IAggregator with
-      member this.Transition values =
-        match values with
-        | [ Null ] -> this
-        | [ aid ] -> aids |> Set.add (aid.GetHashCode()) |> DiffixLowCount
-        | _ -> invalidArgs values
-        :> IAggregator
-
-      member this.Final ctx = Anonymizer.isLowCount aids ctx.AnonymizationParams |> Boolean
+      member this.Final ctx = Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
 
   let create _ctx fn: IAggregator =
     match fn with

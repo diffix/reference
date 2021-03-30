@@ -90,12 +90,13 @@ let private columnTypeFromString =
   | "real" -> RealType
   | other -> UnknownType other
 
-let columnTypeToString =
+let rec columnTypeToString =
   function
   | IntegerType -> "integer"
   | StringType -> "string"
   | BooleanType -> "boolean"
   | RealType -> "real"
+  | ArrayType elementType -> $"array of %s{columnTypeToString elementType}"
   | UnknownType typeName -> $"unknown ({typeName})"
 
 type DataProvider (dbPath: string) =
