@@ -55,7 +55,7 @@ let private planAggregate (groupingLabels: Expression list) (aggregators: Expres
 
 let private getType expression = expression |> Expression.GetType |> Utils.unwrap
 
-let rec private projectExpression expression columns =
+let rec private projectExpression columns expression =
   if List.isEmpty columns then
     expression
   else
@@ -63,11 +63,11 @@ let rec private projectExpression expression columns =
     | None ->
         match expression with
         | FunctionExpr (fn, args) ->
-            let args = args |> List.map (fun arg -> projectExpression arg columns)
+            let args = args |> List.map (projectExpression columns)
             FunctionExpr(fn, args)
         | Constant _ -> expression
         | ColumnReference _ -> failwith "Expression projection failed"
-        | Array values -> Array(values |> Array.map (fun arg -> projectExpression arg columns))
+        | Array values -> Array(values |> Array.map (projectExpression columns))
     | Some i -> ColumnReference(i, getType expression)
 
 let private planSelect query =
@@ -81,17 +81,11 @@ let private planSelect query =
 
   let aggregatedColumns = groupingLabels @ aggregators
 
-  let selectedExpressions =
-    selectedExpressions
-    |> List.map (fun expression -> projectExpression expression aggregatedColumns)
+  let selectedExpressions = selectedExpressions |> List.map (projectExpression aggregatedColumns)
 
-  let orderByExpressions =
-    OrderByExpression.Map(
-      query.OrderBy,
-      (fun (expression: Expression) -> projectExpression expression aggregatedColumns)
-    )
+  let orderByExpressions = OrderByExpression.Map(query.OrderBy, (projectExpression aggregatedColumns))
 
-  let havingExpression = projectExpression query.Having aggregatedColumns
+  let havingExpression = projectExpression aggregatedColumns query.Having
 
   planFrom query.From
   |> planFilter query.Where
