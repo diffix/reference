@@ -6,6 +6,7 @@ The following terms are frequently used throughout the other documents.
   - [AID - Anonymization Identifier](#aid---anonymization-identifier)
   - [bucket](#bucket)
   - [d-row - database row](#d-row---database-row)
+  - [entity](#entity)
   - [i-row - intermediate row](#i-row---intermediate-row)
   - [Relation](#relation)
   - [Selectable](#selectable)
@@ -28,6 +29,18 @@ An anonymous row in the output result table (with or without associated AID meta
 ## d-row - database row
 
 A row from the database. As supposed to an [i-row](#irow---intermediate-row) which can contain arbitrary additional metadata.
+
+## entity
+
+An **entity** is a thing we look to protect through anonymization.
+In older versions of Diffix we used **user**, but have since moved away from this term as
+it implies that what is being protected is always a human being.
+
+An entity might be a human being (such as a patient or customer), but it could equally well
+be some abstract thing like a circuit, computer, or cell phone.
+
+An entity might have multiple AIDs associated with it. For example we have might have the AIDs
+`customer_no`, `ssn` and `email` all associated with the a customer entity.
 
 
 ## i-row - intermediate row
