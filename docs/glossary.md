@@ -11,6 +11,7 @@ The following terms are frequently used throughout the other documents.
   - [Relation](#relation)
   - [Selectable](#selectable)
 
+
 ## AID - Anonymization Identifier
 
 AID stands for Anonymization Identifier. It is the term we use to specify a column or column value that is used
@@ -29,6 +30,7 @@ An anonymous row in the output result table (with or without associated AID meta
 ## d-row - database row
 
 A row from the database. As supposed to an [i-row](#irow---intermediate-row) which can contain arbitrary additional metadata.
+
 
 ## entity
 
@@ -56,6 +58,7 @@ Such intermediate processing might be non-anonymization intermediate aggregation
 In Postgres the following types of relations exist:
 
 > r = ordinary table, i = index, S = sequence, v = view, m = materialized view, c = composite type, t = TOAST table, f = foreign table
+
 
 ## Selectable
 
