@@ -79,11 +79,11 @@ The process for suppressing extreme values is as follows:
    1. One of the values passes low count filtering.
       If such a value is found, then the more extreme values (if any) are all replaced by this value
       and the algorithm is considered completed
-   2. The cardinality of the combined AID set meets or exceeds `No`
+   2. The cardinality of the combined AID set meets or exceeds `Ne`
 5. Take top values according to the same rules as taking extreme values:
    1. Stop as soon as a value is found which independently passes low count filtering
    2. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt`
-6. Replace each `No` value with an average of the `Nt` values weighted by their AID contributions.
+6. Replace each `Ne` value with an average of the `Nt` values weighted by their AID contributions.
 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
@@ -98,7 +98,7 @@ that the minimum allowed aids threshold 2 for all AID types.
 
 - The values have been grouped by AID set
 - The columns are sorted in descending order of `Value`
-- `No = 2`, `Nt = 2`
+- `Ne = 2`, `Nt = 2`
 - We immediately terminate the process due to meeting requirement `4.1` of the value 10 passing low count filtering
   as the cardinality of the AID set is 2 which meets the minimum allowed aids threshold.
   No flattening is needed
@@ -117,7 +117,7 @@ that the minimum allowed aids threshold 2 for all AID types.
 
 - The values have been grouped by AID set
 - The columns are sorted in descending order of `Value`
-- `No = 2`, `Nt = 2`
+- `Ne = 2`, `Nt = 2`
 - The extreme values meet criteria `4.2` after we have taken values 10 and 9
 - The top values meet criteria `5.2` after we have taken values 8 and 7
 - The weighted average is `8 * 1/2 + 7 * 1/2 = 7.5` which is used in place of the values 10 and 9
@@ -137,7 +137,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 
 - The values have been grouped by AID set
 - The columns are sorted in descending order of `Value`
-- `No = 3`, `Nt = 2`
+- `Ne = 3`, `Nt = 2`
 - The extreme values meet criteria `4.2` after we have taken values 10, 9, 8, and 7! We cannot stop after 8,
   as the AIDs repeat and do not increase the cardinality of the AID set
 - The top values meet criteria `5.2` after we have taken values 6 and 5
@@ -173,7 +173,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 |    15 | AID1[1]    |
 |     9 | AID1[3]    |
 
-- `No = 2`, `Nt = 2`
+- `Ne = 2`, `Nt = 2`
 - Value 16 meets the low count and `4.1` criteria for AID1, hence no flattening is needed for AID1. This terminates the AID1 part of the flattening
 
 ##### AID2
@@ -195,7 +195,7 @@ In this example we are using a low count threshold of 5 (just in order for it no
 |     8 | AID2[1, 2] |
 |     7 | AID2[3]    |
 
-- `No = 2`, `Nt = 3`
+- `Ne = 2`, `Nt = 3`
 - Values 16 and 9 are taken as extreme values to meet criteria `4.2` of having sufficiently many AIDs
 - Value 8 meets criteria `5.1` by independently passing low count filtering.
 - We therefore replace 16 and 9 with 8, which means the total distortion is 9 (`16 - 8 + 9 - 8`) which is larger than the distortion we applied due to AID1, hence the overall aggregate is reduced by 9.
@@ -209,5 +209,5 @@ Let's for arguments sake assume that the table above instead looked like the fol
 |     8 | AID2[3]  |
 |     7 | AID2[4]  |
 
-- The threshold values remain unchanged: `No = 2`, `Nt = 3`
+- The threshold values remain unchanged: `Ne = 2`, `Nt = 3`
 - We would still take values 16 and 9 as the extreme values, however we would fail to find sufficiently many values to meet the `Nt = 3` requirement. Therefore it would not be possible to produce an anonymous aggregate, and we would have to return `null` instead.
