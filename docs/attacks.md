@@ -4,27 +4,65 @@ Contents:
 - [Attacks](#attacks)
   - [Wide then narrow](#wide-then-narrow)
     - [AID sets become the UNION of their constituent parts](#aid-sets-become-the-union-of-their-constituent-parts)
+      - [Attack query](#attack-query)
     - [AID sets are column value properties and do not mix](#aid-sets-are-column-value-properties-and-do-not-mix)
+      - [Attack query](#attack-query-1)
 
 ## Wide then narrow
 
-Wide then narrow is an attack whereby an attack writes a query that in a subquery joins a table with the data of a victim to a table that is harmless. Only harmless seeming values are then selected at the top-most anonymizing query, but, if the anonymization system doesn't work right these values are clear indications of whether a property holds of an individual or not.
+"Wide then narrow" is an attack whereby an attacker joins tables in a subquery, but later only selects from one of the two join halves in a parent query. The other side of the join is only used to influence what data makes it to the parent query, and thereby into the final result, without itself being present in the result.
 
-The [multiple-aid](multiple-aid.md) document describes how AID sets from two queries or relations are merged during a join.
-To explain why the design is the way it is, let's consider two other ways in which AID sets could be joined, and how these open for a "wide then narrow" attack.
+These attacks can be done in ways where the values that are selected seem harmless to the anonymization engine and are thus not anonymized properly, letting information about single individuals through.
+
+**NOTE**: The two attack forms presented below are prevented by being very particular about how AIDs originating from different selectables are treated.
+The [multiple-aid](multiple-aid.md) document describes this design in details, but to explain why the design is the way it is, let's consider two other ways in which AID sets could be joined, and how these make a "wide then narrow" attack possible.
 
 Alternative handling of AID:
 1. AID sets become the UNION of their constituent parts
 2. AID sets are column value properties and do not mix
 
+In both of the attack sketches below we will be operating on the following example `patients` table:
+
+| Name    | SSN  | HasCancer | SmokesToMuch | City  | Comment                              |
+| ------- | ---- | --------- | ------------ | ----- | ------------------------------------ |
+| Alice   | 1234 | True      | True         | Cairo | This is the victim we want to attack |
+| Bob     | 2345 | ...       | ...          | Cairo |                                      |
+| Cynthia | ...  | ...       | ...          | Cairo |                                      |
+| Donny   | ...  | ...       | ...          | Cairo |                                      |
+| Elsa    | ...  | ...       | ...          | Cairo |                                      |
+| Fredrik | ...  | ...       | ...          | Cairo |                                      |
+| Günther | ...  | ...       | ...          | Cairo |                                      |
+
 ### AID sets become the UNION of their constituent parts
 
-Say we are joining two instances of the same table: `patients`. The `ssn` has been labelled as the AID column.
-When joining the patients table with itself you might have two rows with the AIDs `ssn[alice]` and `ssn[bob]`.
-This composite row now has data of both the individuals, and one might want to describe it as being associated with
-`ssn[alice, bob]`.
+Say we are joining two instances of the same `patients` table. `ssn` has been defined as the AID column.
+Under this particular scheme of handling AIDs the resulting AID set for a row is the union of the AID sets of the rows that are joined.
 
-To see how this creates a "wide then narrow" attack vector, consider the following query:
+If we joined the rows from `left` and `right` on the `City` columns:
+
+`left`:
+
+| Name  | AIDs          | City  |
+| ----- | ------------- | ----- |
+| Alice | **SSN[1234]** | Cairo |
+
+`right`:
+
+| Name | AIDs          | City  |
+| ---- | ------------- | ----- |
+| Bob  | **SSN[2345]** | Cairo |
+
+Then the resulting joined row would look like this:
+
+| Left.name | Right.Name | Combined AIDs       | {Left, Right}.City |
+| --------- | ---------- | ------------------- | ------------------ |
+| Alice     | Bob        | **SSN[1234, 2345]** | Cairo              |
+
+i.e. the row now both belongs to Alice _and_ Bob (`SSN[1234, 2345]`).
+
+#### Attack query
+
+The "wide then narrow" attack can be executed with the following query:
 
 ```sql
 SELECT left.*
@@ -38,13 +76,58 @@ FROM (
 ) right
 ```
 
-In the attack query above, we are joining a relation with per patients data (`left`) with one containing aggregates across multiple users (`right`).
-Each bucket on the `right` side might have an AID set such as `ssn[bob, cynthia, dorothea, ferdinand]` whereas the rows on the `left` side have AID sets such as `ssn[alice]`. If the resulting AID sets in the top-level query, after the join, were the combination of the AID sets (`ssn[alice, bob, cynthia, dorothea, ferdinand]`) then absolutely all values from the patients table would pass low count filtering, and the full `patients` table could be read out.
+The `left` side of the join is the original table as shown above.
+The `right` side however is the single row:
+
+| City  | Count | AIDs                 |
+| ----- | ----- | -------------------- |
+| Cairo | 7     | SSN[1234, 2345, ...] |
+
+Since we are doing a cross join here, each resulting row would look like this
+
+| Left.Name | Left.SSN | Left.HasCancer | Left.SmokesToMuch | {Left, Right}.City | Combined AIDs        |
+| --------- | -------- | -------------- | ----------------- | ------------------ | -------------------- |
+| Alice     | 1234     | True           | True              | Cairo              | SSN[1234, 2345, ...] |
+| Bob       | 2345     | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+| Cynthia   | ...      | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+| Donny     | ...      | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+| Elsa      | ...      | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+| Fredrik   | ...      | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+| Günther   | ...      | ...            | ...               | Cairo              | SSN[1234, 2345, ...] |
+
+As a result, when it comes to performing the low count filter check, it will appear to the anonymizer as if every single row has more than the `minimum_allowed_ids` and hence are safe to be reported. No filtering will take place, and as a result the attacker has been able to read the entirety of the `patients` table in a single query.
 
 
 ### AID sets are column value properties and do not mix
 
-Say we are, again, joining two instances of the same `patients` table. This time, to avoid the attack described above, we follow an approach whereby the AID values are a property of a column value itself. That is to say, the column values from the `left` subquery only have the AIDs associated with the individual rows of the `patients` table, and the column values from the `right` subquery from the `right` subquery have the AID sets resulting from the aggregation, but not those from the `left` subquery. This would prevent the previous attack that would allow an attacker to read out the `patients` table in it's entirety, but would still allow a slightly more complex variant of the same attack.
+Say we are joining two instances of the same `patients` table. `ssn` has been defined as the AID column.
+Under this particular scheme of handling AIDs the AID sets are associated with the column values themselves.
+As such the AIDs from two halves of a join do not mix.
+
+Under this particular scheme of handling AIDs, if we joined the rows from `left` and `right` on the `City` columns:
+
+`left`:
+
+| Name  | AIDs      | City  |
+| ----- | --------- | ----- |
+| Alice | SSN[1234] | Cairo |
+
+`right`:
+
+| Name | AIDs      | City  |
+| ---- | --------- | ----- |
+| Bob  | SSN[2345] | Cairo |
+
+Then the resulting joined row would look like this:
+
+| Left.name | Left AIDs | Right.Name | {Left, Right}.City | Right AIDS |
+| --------- | --------- | ---------- | ------------------ | ---------- |
+| Alice     | SSN[1234] | Bob        | Cairo              | SSN[2345]  |
+
+
+#### Attack query
+
+The "wide then narrow" attack can be executed with the following query:
 
 ```sql
 SELECT right.victimExistsIfPresent
@@ -59,6 +142,21 @@ FROM (
 ) right ON left.city = right.city
 ```
 
-In this case we are only reporting values from the `right` subquery in the anonymizing query. Each of these values are likely to pass low count filter as a result of being aggregates. These aggregates however only make it out of the join if the victim exists in the `left` subquery and the victim has a certain set of attributes we want to learn.
+The `left` side of the join is either the singleton table:
 
-Through this attack we can learn any property of any user through asking a series of yes/no queries. Yes being indicated through there being a result returned, and no being indicated by the result being empty.
+| City  | AIDs      |
+| ----- | --------- |
+| Cairo | SSN[1234] |
+
+Or entirely an empty table.
+
+The `right` side of the query results in the following table:
+
+| City  | Count | AIDs                 |
+| ----- | ----- | -------------------- |
+| Cairo | 7     | SSN[1234, 2345, ...] |
+
+Since we are doing an inner join the join will either yield something if the victim is has the properties,
+or an empty result set if the victim does not exist with the given properties.
+
+Through this attack we can learn any property of any user through asking a series of yes/no queries.
