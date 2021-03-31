@@ -283,25 +283,22 @@ let analyze (dataProvider: IDataProvider)
   asyncResult {
     let! schema = dataProvider.GetSchema()
     let! query = transformQuery schema parseTree
+    let! aidColumns = findAids anonParams query.TargetTables
 
-    return!
-      match findAids anonParams query.TargetTables with
-      | Ok [||] -> query |> SelectQuery |> Ok
-      | Ok aidColumns ->
-          result {
-            let firstAidColumnIndex = aidColumns |> Array.head |> fst
-            do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
+    if Array.isEmpty aidColumns then
+      return! query |> SelectQuery |> Ok
+    else
+      let firstAidColumnIndex = aidColumns |> Array.head |> fst
+      do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
 
-            let aidColumnsExpression =
-              aidColumns
-              |> Array.map (fun (index, column) -> ColumnReference(index, column.Type))
-              |> Expression.Array
+      let aidColumnsExpression =
+        aidColumns
+        |> Array.map (fun (index, column) -> ColumnReference(index, column.Type))
+        |> Expression.Array
 
-            return
-              query
-              |> SelectQuery
-              |> rewriteToDiffixAggregate aidColumnsExpression
-              |> addLowCountFilter aidColumnsExpression
-          }
-      | Error error -> Error error
+      return
+        query
+        |> SelectQuery
+        |> rewriteToDiffixAggregate aidColumnsExpression
+        |> addLowCountFilter aidColumnsExpression
   }
