@@ -16,9 +16,6 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
         - [AID1](#aid1)
         - [AID2](#aid2)
         - [AID3](#aid3)
-  - [sum()](#sum)
-  - [median()](#median)
-  - [max(), min()](#max-min)
 
 # Computing Per-AID Contributions
 
@@ -386,42 +383,3 @@ Even though we could have produced an aggregate from the perspectives of AID1 an
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
 Assuming there had been enough AID3 entities and the total distortion due to AID3 would have been 10,
 then we would have used the distortion due to AID1 as it's the largest.
-
-
-## sum()
-
-If the aggregate is `sum()`, we need to determine which AIDs contribute the most, both for flattening and for determining the amount of noise. I'm assuming that, in the DB, aggregates are often computed on the fly. So for instance, `sum()` is computed by adding the column value to the aggregate as rows are determined to be included.
-
-Since we don't know how much each AID contributes until after query execution, we need to keep a data structure for all AIDs, and compute the contribution for each AID on the fly.
-
-I'm envisioning a hash structure for maintaining AID contributions. There must be good support for this in the DB. For `sum()`, we can add the column value in each row to the AID entry in the hash structure.
-
-If LED requires that we remove a row that was previously added, we can subtract the column value from the hashed AID entry.
-
-| goal             | heavy contributors (top 4-5 AIDs)    |
-| ---------------- | ------------------------------------ |
-| data structure 1 | hash indexed by AID                  |
-| data structure 2 | top few contributing AIDs            |
-| insert           | add column value to AID index        |
-| delete           | subtract column value from AID index |
-
-## median()
-
-With median, we want to be able to efficiently find the values (and corresponding AIDs) above and below the true median. The idea here is that we don't want to report the true median unless there are enough other AIDs with the same value. If there are not, then we will need to generate a median from some composite (more or less as we did in an earlier version of Aircloak).
-
-One way to compute median efficiently is with a pair of heaps, where the left heap and the right heap have the same number of entries, and the values in the left heap are smaller than the values in the right heap.
-
-| goal             | AIDs above and below true median                                   |
-| ---------------- | ------------------------------------------------------------------ |
-| data structure 1 | pair of heaps? (see what DB does?)                                 |
-| data structure 2 | AIDs above and below                                               |
-| insert           | add to heap                                                        |
-| delete           | delete from heap (note not needed by native DB median computation) |
-
-## max(), min()
-
-For `max()`, we need to know several AIDs of top values (and bottom values for `min()`).
-
-##
-
-zzzz
