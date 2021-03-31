@@ -8,11 +8,13 @@ module Aggregator =
 
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
-  let private onPotentiallyEmptyAidStructure aidMaps defaultValue (aidValues: 'a array) callback =
+  let private onPotentiallyEmptyAidStructure aidMaps defaultValue (aidValues: Value array) callback =
     aidMaps
     |> Option.defaultValue (Array.create aidValues.Length defaultValue)
     |> Array.zip aidValues
-    |> Array.map (fun (aidValue, aidStructure) -> callback aidValue aidStructure)
+    |> Array.map (fun (aidValue: Value, aidStructure) ->
+      if not (aidValue = Null) then callback aidValue aidStructure else aidStructure
+    )
     |> Some
 
 
@@ -41,7 +43,7 @@ module Aggregator =
     | Null -> true
     | _ -> false
 
-  let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: 'a array) =
+  let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: Value array) =
     onPotentiallyEmptyAidStructure
       aidSets
       Set.empty
