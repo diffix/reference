@@ -28,7 +28,7 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
 
 let countAids (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
   match aidSets with
-  | None -> failwith "Expecting AID sets for count"
+  | None -> 0 // The result set was entirely empty, no aggregation state was created
   | Some aidSets when Set.isEmpty (Array.head aidSets) -> 0 // Is this right? Should it be Null instead?
   | Some aidSets ->
       let aidSet = aidSets |> Array.head
