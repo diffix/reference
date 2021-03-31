@@ -8,7 +8,7 @@ module Aggregator =
 
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
-  let private mapAidStructure aidMaps defaultValue (aidValues: Value array) callback =
+  let private mapAidStructure callback aidMaps defaultValue (aidValues: Value array) =
     aidMaps
     |> Option.defaultValue (Array.create aidValues.Length defaultValue)
     |> Array.zip aidValues
@@ -17,15 +17,11 @@ module Aggregator =
     )
     |> Some
 
-
   let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
     match aidsArray with
     | Value.Array aidValues ->
-        mapAidStructure
-          aidMaps
-          Map.empty
-          aidValues
-          (fun aidValue aidMap ->
+        let fn =
+          fun aidValue aidMap ->
             let aidHash = aidValue.GetHashCode()
 
             let newValue =
@@ -34,11 +30,12 @@ module Aggregator =
               | None -> initial
 
             Map.add aidHash newValue aidMap
-          )
+
+        mapAidStructure fn aidMaps Map.empty aidValues
     | _ -> failwith "Expecting an AID array as input"
 
   let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: Value array) =
-    mapAidStructure aidSets Set.empty aidValues (fun aidValue -> Set.add (valueFn <| aidValue.GetHashCode()))
+    mapAidStructure (fun aidValue -> Set.add (valueFn <| aidValue.GetHashCode())) aidSets Set.empty aidValues
 
   type private Count(counter) =
     new() = Count(0L)
