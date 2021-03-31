@@ -37,12 +37,6 @@ module Aggregator =
           )
     | _ -> failwith "Expecting an AID array as input"
 
-  let private allValuesNull =
-    function
-    | Value.Array values -> values |> Array.map ((=) Null) |> Array.reduce (&&)
-    | Null -> true
-    | _ -> false
-
   let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: Value array) =
     onPotentiallyEmptyAidStructure
       aidSets
@@ -97,7 +91,6 @@ module Aggregator =
     interface IAggregator with
       member this.Transition values =
         match values with
-        | aidValues :: _ when allValuesNull aidValues -> this
         | [ aidValues; Null ] -> perAidCounts |> updateAidMaps aidValues 0L id |> DiffixCount
         | [ aidValues ]
         | [ aidValues; _ ] ->
