@@ -177,7 +177,8 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
         let args =
           match opts.Distinct, args, aidColumnsExpression with
-          | true, [ colExpr ], (Array aidExpressions) when Array.contains colExpr aidExpressions -> [ aidColumnsExpression; colExpr ]
+          | true, [ colExpr ], (Array aidExpressions) when Array.contains colExpr aidExpressions ->
+              [ aidColumnsExpression; colExpr ]
           | true, _, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
           | false, _, _ -> aidColumnsExpression :: args
 
@@ -252,17 +253,22 @@ let addLowCountFilter aidColumnsExpression query =
         }
   )
 
-let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTables) index =
+let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTables) indexOffset =
   match tables with
   | [] -> Ok []
   | (firstTable, _alias) :: nextTables ->
-      let remainingTablesAidColumns = collectAids anonParams nextTables (index + firstTable.Columns.Length)
+      let remainingTablesAidColumns = collectAids anonParams nextTables (indexOffset + firstTable.Columns.Length)
 
       match anonParams.TableSettings.TryFind(firstTable.Name) with
       | None -> remainingTablesAidColumns
       | Some { AidColumns = aidColumns } ->
           result {
-            let! currentTableAidColumns = aidColumns |> List.map (Table.getColumnI firstTable) |> List.sequenceResultM
+            let! currentTableAidColumns =
+              aidColumns
+              |> List.map (Table.getColumnI firstTable)
+              |> List.sequenceResultM
+              |> Result.map (List.map (fun (index, column) -> (index + indexOffset, column)))
+
             let! otherColumns = remainingTablesAidColumns
             return (currentTableAidColumns @ otherColumns)
           }
@@ -283,15 +289,12 @@ let analyze (dataProvider: IDataProvider)
       | Ok [||] -> query |> SelectQuery |> Ok
       | Ok aidColumns ->
           result {
-            let firstAidColumnIndex =
-              aidColumns
-              |> Array.head
-              |> fst
+            let firstAidColumnIndex = aidColumns |> Array.head |> fst
             do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
 
             let aidColumnsExpression =
               aidColumns
-              |> Array.map(fun (index, column) -> ColumnReference(index, column.Type))
+              |> Array.map (fun (index, column) -> ColumnReference(index, column.Type))
               |> Expression.Array
 
             return
