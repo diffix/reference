@@ -13,7 +13,7 @@ module Aggregator =
     |> Option.defaultValue (Array.create aidValues.Length defaultValue)
     |> Array.zip aidValues
     |> Array.map (fun (aidValue: Value, aidStructure) ->
-      if not (aidValue = Null) then callback aidValue aidStructure else aidStructure
+      if aidValue = Null then aidStructure else callback aidValue aidStructure
     )
     |> Some
 
