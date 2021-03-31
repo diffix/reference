@@ -8,41 +8,46 @@ module Aggregator =
 
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
+  let private onPotentiallyEmptyAidStructure aidMaps defaultValue (aidValues: 'a array) callback =
+    aidMaps
+    |> Option.defaultValue (Array.create aidValues.Length defaultValue)
+    |> Array.zip aidValues
+    |> Array.map (fun (aidValue, aidStructure) -> callback aidValue aidStructure)
+    |> Some
+
+
   let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
     match aidsArray with
     | Value.Array aidValues ->
-      aidValues
-      |> Array.zip (aidMaps |> Option.defaultValue (Array.create aidValues.Length Map.empty))
-      |> Array.map(fun (aidMap, aidValue) ->
-        let aidHash = aidValue.GetHashCode()
+        onPotentiallyEmptyAidStructure
+          aidMaps
+          Map.empty
+          aidValues
+          (fun aidValue aidMap ->
+            let aidHash = aidValue.GetHashCode()
 
-        let newValue =
-          match aidMap |> Map.tryFind aidHash with
-          | Some value -> transition value
-          | None -> initial
+            let newValue =
+              match aidMap |> Map.tryFind aidHash with
+              | Some value -> transition value
+              | None -> initial
 
-        Map.add aidHash newValue aidMap
-      )
-      |> Some
+            Map.add aidHash newValue aidMap
+          )
     | _ -> failwith "Expecting an AID array as input"
 
   let private allValuesNull =
     function
-    | Value.Array values ->
-      values
-      |> Array.map((=) Null)
-      |> Array.reduce (&&)
+    | Value.Array values -> values |> Array.map ((=) Null) |> Array.reduce (&&)
     | Null -> true
     | _ -> false
 
   let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: 'a array) =
-    aidSets
-    |> Option.defaultValue (Array.create aidValues.Length Set.empty)
-    |> Array.zip aidValues
-    |> Array.map(fun (aidValue, aidSet) ->
-      Set.add (valueFn <| aidValue.GetHashCode()) aidSet
-    )
-    |> Some
+    onPotentiallyEmptyAidStructure
+      aidSets
+      Set.empty
+      aidValues
+      (fun aidValue -> Set.add (valueFn <| aidValue.GetHashCode())
+      )
 
   type private Count(counter) =
     new() = Count(0L)
@@ -93,7 +98,10 @@ module Aggregator =
         | aidValues :: _ when allValuesNull aidValues -> this
         | [ aidValues; Null ] -> perAidCounts |> updateAidMaps aidValues 0L id |> DiffixCount
         | [ aidValues ]
-        | [ aidValues; _ ] -> perAidCounts |> updateAidMaps aidValues 1L (fun count -> count + 1L) |> DiffixCount
+        | [ aidValues; _ ] ->
+            perAidCounts
+            |> updateAidMaps aidValues 1L (fun count -> count + 1L)
+            |> DiffixCount
         | _ -> invalidArgs values
         :> IAggregator
 
@@ -107,9 +115,9 @@ module Aggregator =
         match values with
         | [ _aidValues; Null ] -> this
         | [ Value.Array aidValues; aidValue ] ->
-          aidValues
-          |> addToPotentiallyMissingAidsSetsArray aidSets (fun _ -> aidValue.GetHashCode())
-          |> DiffixCountDistinct
+            aidValues
+            |> addToPotentiallyMissingAidsSetsArray aidSets (fun _ -> aidValue.GetHashCode())
+            |> DiffixCountDistinct
         | _ -> invalidArgs values
         :> IAggregator
 
