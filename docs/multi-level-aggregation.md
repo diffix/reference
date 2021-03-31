@@ -97,6 +97,15 @@ The process for suppressing extreme values is as follows:
 5. Take next `Nt` highest contributions as the top count.
 6. Replace each `Ne` value with an average of the `Nt` values
 
+In step 1 above it is mentioned that contributions for an AID set is split proportionally across the AID entities.
+Say the AID set `email[1, 2, 3]` had sent 9 emails, in that case we would attribute a count of 3 for each of the AIDs
+individually on top of what other contributions they might already have.
+This is not strictly speaking entirely correct. That is to say the resulting contributions stemming from this simplified redistributions
+do not reflect reality. However since the only way an AID set of multiple AID values can arise is through
+aggregation, and since we always perform extreme value flattening when aggregating, it seems likely that this is not
+going to cause insufficient flattening for extreme contributions (note: this is an assumption that hasn't been fully validated!).
+In fact it might have a positive effect by potentially limiting further unnecessary flattening.
+
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
 
