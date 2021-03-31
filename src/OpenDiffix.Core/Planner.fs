@@ -67,7 +67,7 @@ let rec private projectExpression columns expression =
             FunctionExpr(fn, args)
         | Constant _ -> expression
         | ColumnReference _ -> failwith "Expression projection failed"
-        | Array values -> Array(values |> Array.map (projectExpression columns))
+        | Array values -> values |> Array.map (projectExpression columns) |> Array
     | Some i -> ColumnReference(i, getType expression)
 
 let private planSelect query =
