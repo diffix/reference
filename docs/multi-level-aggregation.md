@@ -86,24 +86,36 @@ Please note that if any of the processes fails due to insufficiently many distin
 
 The process for suppressing extreme values is as follows:
 
-1. Produce per-AID set contributions as per the aggregate being generated
-   (count of rows, sum of row contributions, min/max etc). An AID set in this context
-   would be `email-1[1]` and `email-1[1, 2, 3]` and these are dealt with separately even though
-   an entity 1 is present in both.
+1. Produce per-AID contributions as per the aggregate being generated
+   (count of rows, sum of row contributions, min/max etc). For aid sets such as
+   `email[1]` and `email[1, 2, 3]` an AID would be something like the value 1.
+   When a contribution is for a set of entities (such as `email[1, 2, 3]`) the
+   contribution is made proportional per AID value.
 2. Sort the contribution values to be flattened in descending order
 3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
-4. Take extreme values until one of the following criteria has been met:
-   1. One of the values passes low count filtering.
-      If such a value is found, then the more extreme values (if any) are all replaced by this value
-      and the algorithm is considered completed
-   2. The cardinality of the combined AID set meets or exceeds `Ne`
-5. Take top values according to the same rules as taking extreme values:
-   1. Stop as soon as a value is found which independently passes low count filtering
-   2. Stop as soon as the cardinality of the combined AID set meets or exceeds `Nt`
-6. Replace each `Ne` value with an average of the `Nt` values weighted by their AID contributions.
+4. Take the first `Ne` highest contributions as the extreme values. If any of them appear for `minimum_allowed_aids` distinct AIDs, use that value
+5. Take next `Nt` highest contributions as the top count.
+6. Replace each `Ne` value with an average of the `Nt` values
 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
+
+Note that the tables as shown are the input values to an anonymizing aggregate.
+Imagine they are the result of running a query such as:
+
+```sql
+SELECT count(*)
+FROM table
+```
+
+or alternatively the input for the aggregate for one of the `card_type` values in a query such as:
+
+```sql
+SELECT card_type, count(*)
+FROM table
+GROUP BY card_type
+```
+
 
 ### Examples
 
@@ -113,62 +125,114 @@ that the minimum allowed aids threshold 2 for all AID types.
 | ----: | ---------- |
 |    10 | AID1[1, 2] |
 
-- The values have been grouped by AID set
-- The columns are sorted in descending order of `Value`
+- We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them.
+
+| Value | AID |
+| ----: | --- |
+|     5 | 1   |
+|     5 | 2   |
+
+- The rows are sorted in descending order of `Value`
 - `Ne = 2`, `Nt = 2`
-- We immediately terminate the process due to meeting requirement `4.1` of the value 10 passing low count filtering
-  as the cardinality of the AID set is 2 which meets the minimum allowed aids threshold.
-  No flattening is needed
+- We take the `Ne` first values as extreme values. The values are both the same, and since `minimum_allowed_aids = 2` they would satisfy low count filtering.
+- We abort without any suppression
+
+
+#### Insufficient data
+
+| Value | AID sets   |
+| ----: | ---------- |
+|    10 | AID1[1, 2] |
+|     1 | AID1[1]    |
+
+- We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them. AID 1 has an additional entry too, making for uneven total contributions for the two AIDs:
+
+| Value | AID |
+| ----: | --- |
+|     6 | 1   |
+|     5 | 2   |
+
+- The rows are sorted in descending order of `Value`
+- `Ne = 2`, `Nt = 2`
+- We take the `Ne` first values as the extreme values
+- We try taking the `Nt` next rows for the top group, but have run out of data. We terminate the process and return `Null` to indicate that we couldn't produce an anonymous aggregate
+- The total distortion is _infinite_... sort of
+
 
 #### Base case
-
-| Value | AID sets |
-| ----: | -------- |
-|    10 | AID1[1]  |
-|     9 | AID1[2]  |
-|     8 | AID1[3]  |
-|     7 | AID1[4]  |
-|     6 | AID1[5]  |
-|     5 | AID1[6]  |
-|     4 | AID1[7]  |
-
-- The values have been grouped by AID set
-- The columns are sorted in descending order of `Value`
-- `Ne = 2`, `Nt = 2`
-- The extreme values meet criteria `4.2` after we have taken values 10 and 9
-- The top values meet criteria `5.2` after we have taken values 8 and 7
-- The weighted average is `8 * 1/2 + 7 * 1/2 = 7.5` which is used in place of the values 10 and 9
-
-#### Expanded base case
 
 | Value | AID sets   |
 | ----: | ---------- |
 |    10 | AID1[1]    |
-|     9 | AID1[1, 2] |
-|     8 | AID1[2]    |
-|     7 | AID1[3]    |
-|     6 | AID1[4]    |
-|     5 | AID1[4, 5] |
+|     9 | AID1[2]    |
+|     8 | AID1[3]    |
+|     7 | AID1[4]    |
+|     6 | AID1[5]    |
+|     5 | AID1[6]    |
+|     4 | AID1[7]    |
+|     3 | AID1[1, 2] |
 
-In this example we are using a low count threshold of 5 (just in order for it not to trigger, and make this example work).
+- We produce per-AID contributions. In this case the value `3` is a shared contribution between the AID values 1 and 2. We attribute 1.5 to each of them.
+- The rows are sorted in descending order of `Value`
 
-- The values have been grouped by AID set
-- The columns are sorted in descending order of `Value`
-- `Ne = 3`, `Nt = 2`
-- The extreme values meet criteria `4.2` after we have taken values 10, 9, 8, and 7! We cannot stop after 8,
-  as the AIDs repeat and do not increase the cardinality of the AID set
-- The top values meet criteria `5.2` after we have taken values 6 and 5
-- The weighted average is `6 * 1/3 + 5 * 2/3 = 5.3` which is used in place of the values 10 through 7.
+|           Value |  AID | Required distortion by AID |
+| --------------: | ---: | -------------------------: |
+| 11.5 = 10 + 3/2 |    1 |                        7.5 |
+|  10.5 = 9 + 3/2 |    2 |                        7.5 |
+|               8 |    3 |                            |
+|               7 |    4 |                            |
+|               6 |    5 |                            |
+|               5 |    6 |                            |
+|               4 |    7 |                            |
 
-#### Multiple AID types
+- `Ne = 2`, `Nt = 2`
+- We take the `Ne` first values as extreme values (11.5 and 10.5)
+- We take the `Nt` next values as the top group (8 and 7)
+- We replace the `Ne` values with the average of the top group: 7.5
+- The total distortion is **7** (11.5 - 7.5 + 10.5 - 7.5)
+
+
+#### Base case #2
 
 | Value | AID sets            |
 | ----: | ------------------- |
-|    10 | AID1[1, 2], AID2[1] |
-|     9 | AID1[3], AID2[2]    |
-|     8 | AID1[1], AID2[1, 2] |
-|     7 | AID1[1], AID2[3]    |
-|     6 | AID1[1,2], AID2[1]  |
+|    10 | AID1[1]             |
+|     9 | AID1[1, 2]          |
+|     8 | AID1[2]             |
+|     7 | AID1[3]             |
+|     6 | AID1[4]             |
+|     5 | AID1[4, 5]          |
+|     4 | AID1[1, 2, 3, 4, 5] |
+
+- We produce per-AID contributions. In this case the value 9 is shared, and so is the value 5 and 4. These are distributed amongst the corresponding AIDs. The resulting list of AID contributions, becomes:
+- The rows are sorted in descending order of `Value`
+
+|                 Value | AID | Required distortion by AID |
+| --------------------: | --- | -------------------------- |
+| 15.3 = 10 + 9/2 + 4/5 | 1   | 5.55                       |
+|  13.3 = 8 + 9/2 + 4/5 | 2   | 5.55                       |
+|   9.3 = 6 + 5/2 + 4/5 | 4   | 5.55                       |
+|         7.8 = 7 + 4/5 | 3   |                            |
+|       3.3 = 5/2 + 4/5 | 5   |                            |
+
+
+- `Ne = 3`, `Nt = 2`
+- We take the `Ne` first values as extreme values (15.3, 13.3, 9.3)
+- We take the `Nt` next values as the top group (7.8 and 3.3)
+- We replace the `Ne` values with the average of the top group: 5.55
+- The total distortion is **21.25** (15.3 - 5.55 + 13.3 - 5.55 + 9.3 - 5.55)
+
+
+#### Multiple AID types
+
+| Value | AID sets                     |
+| ----: | ---------------------------- |
+|    10 | AID1[1, 2], AID2[1], AID3[1] |
+|     9 | AID1[3], AID2[2], AID3[1]    |
+|     8 | AID1[1], AID2[1, 2], AID3[1] |
+|     7 | AID1[1], AID2[3], AID3[1]    |
+|     6 | AID1[1,2], AID2[1], AID3[1]  |
+|     5 | AID1[4, 5], AID2[4], AID3[1] |
 
 - We split the values by AID type and then repeat the process for each of the AID sets
 
@@ -180,18 +244,26 @@ In this example we are using a low count threshold of 5 (just in order for it no
 |     9 | AID1[3]    |
 |     8 | AID1[1]    |
 |     7 | AID1[1]    |
-|     6 | AID1[1,2]  |
+|     6 | AID1[1, 2] |
+|     5 | AID1[4, 5] |
 
-- After grouping the values by AID and sorting them in descending order of `Value`, we end up with the following table:
+- We produce per-AID contributions. In this case the values 10 and 6 are shared. These are distributed amongst the corresponding AIDs.
+- The rows are sorted in descending order of `Value`
 
-| Value | AID sets   |
-| ----: | ---------- |
-|    16 | AID1[1, 2] |
-|    15 | AID1[1]    |
-|     9 | AID1[3]    |
+|                   Value |  AID | Required distortion by AID |
+| ----------------------: | ---: | -------------------------: |
+| 26 = 8 + 7 + 10/2 + 6/1 |    1 |                       5.75 |
+|         11 = 10/2 + 6/1 |    2 |                       5.75 |
+|                       9 |    3 |                            |
+|               2.5 = 5/2 |    4 |                            |
+|               2.5 = 5/2 |    5 |                            |
 
 - `Ne = 2`, `Nt = 2`
-- Value 16 meets the low count and `4.1` criteria for AID1, hence no flattening is needed for AID1. This terminates the AID1 part of the flattening
+- We take the `Ne` first values as extreme values (26, 11)
+- We take the `Nt` next values as the top group (9, 2.5)
+- We replace the `Ne` values with the average of the top group: 5.75
+- The total distortion for AID1 is **25.5** (26 - 5.75 + 11 - 5.75)
+
 
 ##### AID2
 
@@ -202,29 +274,48 @@ In this example we are using a low count threshold of 5 (just in order for it no
 |     8 | AID2[1, 2] |
 |     7 | AID2[3]    |
 |     6 | AID2[1]    |
+|     5 | AID2[4]    |
 
-- After grouping the values by AID and sorting them in descending order of `Value`, we end up with the following table:
+- We produce per-AID contributions. In this case the value 8 is shared. It is distributed amongst the corresponding AIDs.
+- The rows are sorted in descending order of `Value`
 
-| Value | AID sets   |
-| ----: | ---------- |
-|    16 | AID2[1]    |
-|     9 | AID2[2]    |
-|     8 | AID2[1, 2] |
-|     7 | AID2[3]    |
+|         Value |  AID | Required distortion by AID |
+| ------------: | ---: | -------------------------: |
+| 14 = 10 + 8/2 |    1 |                          6 |
+|  13 = 9 + 8/2 |    2 |                          6 |
+|             7 |    3 |                            |
+|             6 |    1 |                            |
+|             5 |    4 |                            |
 
 - `Ne = 2`, `Nt = 3`
-- Values 16 and 9 are taken as extreme values to meet criteria `4.2` of having sufficiently many AIDs
-- Value 8 meets criteria `5.1` by independently passing low count filtering.
-- We therefore replace 16 and 9 with 8, which means the total distortion is 9 (`16 - 8 + 9 - 8`) which is larger than the distortion we applied due to AID1, hence the overall aggregate is reduced by 9.
+- We take the `Ne` first values as extreme values (14, 13)
+- We take the `Nt` next values as the top group (7, 6, 5)
+- We replace the `Ne` values with the average of the top group: 6
+- The total distortion for AID1 is **15** (14 - 6 + 13 - 6)
 
-Let's for arguments sake assume that the table above instead looked like the following:
+
+##### AID3
 
 | Value | AID sets |
 | ----: | -------- |
-|    16 | AID2[1]  |
-|     9 | AID2[2]  |
-|     8 | AID2[3]  |
-|     7 | AID2[4]  |
+|    10 | AID3[1]  |
+|     9 | AID3[1]  |
+|     8 | AID3[1]  |
+|     7 | AID3[1]  |
+|     6 | AID3[1]  |
+|     5 | AID3[1]  |
 
-- The threshold values remain unchanged: `Ne = 2`, `Nt = 3`
-- We would still take values 16 and 9 as the extreme values, however we would fail to find sufficiently many values to meet the `Nt = 3` requirement. Therefore it would not be possible to produce an anonymous aggregate, and we would have to return `null` instead.
+- We produce per-AID contributions
+- The rows are sorted in descending order of `Value`
+
+|                       Value |  AID |
+| --------------------------: | ---: |
+| 45 = 10 + 9 + 8 + 7 + 6 + 5 |    1 |
+
+- `Ne = 2`, `Nt = 2`
+- We do not have enough extreme values to form a group of `Ne` extreme values, we abort.
+
+Even though we could have produced an aggregate from the perspectives of AID1 and AID2,
+we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
+Assuming there had been enough AID3 entities and the total distortion due to AID3 would have been 10,
+then we would have used the distortion due to AID1 as it's the largest.
