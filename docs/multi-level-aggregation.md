@@ -39,16 +39,33 @@ In this query:
 ## Intermediate extreme value flattening
 
 Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or extreme value flattening)
-tend to produce values collapsing down to 1 after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
+tend to produce values collapsing down to the number 1, after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
 largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not and
-show that the aggregate values themselves quickly become harmless. When in the twilight zone before an aggregate fully collapses
-(around two nested aggregates) an analyst might be able to tell the difference between two results, one containing an extreme value
-and one without the extreme value, but is likely not able to determine which is which due to the noise we add during anonymization
-being of a similar magnitude.
-Intermediate aggregate values can pose a risk in other ways, for example when used as join conditions. If a join is made that
+show that the aggregate values themselves quickly become harmless.
+
+If only a single level of aggregation is done, like in the following query:
+
+```sql
+SELECT num_transaction, ...
+FROM (
+  SELECT city, count(*) as num_transactions
+  FROM credit_card_transactions
+  GROUP BY city
+) t
+...
+```
+
+then the reported `num_transaction` values in the anonymized buckets are directly influenced by individual extreme value contributors
+in the `count` aggregate in subquery `t`. As a result it is important that extreme value flattening takes place.
+
+When in the twilight zone before an aggregate fully collapses (around two nested aggregates) an analyst might be able to tell
+the difference between two results, one containing an extreme value and one without the extreme value, but might not always be
+able to determine which is which due to the noise we add during anonymization being of a similar magnitude.
+In such a case an aggregate value in an intermediate query can still pose a risk in other ways, for example when used as join conditions. If a join is made that
 uses the value of a row in a nested query that is an extreme value, then this might in turn influence what other rows are included in the final
-result, thereby produce a visible effect that can, potentially, be controlled. This effect, like any other aggregate would vanish
+result, thereby produce a visible effect that can be controlled. This effect, like any other aggregate would vanish
 as a result of repeated aggregation, but shows that it is not sufficient to only perform extreme value flattening at the very end.
+
 Performing intermediate extreme value flattening has the added benefit that we no longer need to carry forward any information about
 how much each entity has contributed to an aggregate. As the aggregate is mostly safe, it is sufficient to know which AIDs were
 involved.
