@@ -88,13 +88,12 @@ and Expression =
   static member GetType expression =
     let arrayTypes values =
       result {
-        let! valueTypes = values |> Array.toList |> List.sequenceResultM
-        let distinctValueTypes = Set.ofList valueTypes
+        let! valueTypes = values |> Array.distinct |> Array.toList |> List.sequenceResultM
 
-        match Set.count distinctValueTypes with
-        | 0 -> return! Error "Unknown type"
-        | 1 -> return distinctValueTypes |> Set.toList |> List.head |> ArrayType
-        | _ -> return (ArrayType(UnknownType "mixed type"))
+        match valueTypes with
+        | [] -> return! Error "Unknown type"
+        | [ valueType ] -> return ArrayType valueType
+        | _ -> return UnknownType "mixed type" |> ArrayType
       }
 
     match expression with
