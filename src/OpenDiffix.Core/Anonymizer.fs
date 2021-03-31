@@ -59,15 +59,18 @@ let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<
   match perUserContributions with
   | None -> Null
   | Some perUserContributions ->
-    let perUserContribution = perUserContributions |> Array.head
+    let perUserContribution =
+      perUserContributions
+      |> Array.head
+      |> Map.toList
 
-    let aids = perUserContribution |> Map.toList |> List.map fst |> Set.ofList
+    let aids = perUserContribution |> List.map fst |> Set.ofList
     let rnd = newRandom aids anonymizationParams
     // The noise value must be generated first to make sure the random number generator is fresh.
     // This ensures count(distinct aid) which uses addNoise directly produces the same results.
     let noise = noiseValue rnd anonymizationParams.Noise
 
-    let sortedUserContributions = perUserContribution |> Map.toList |> List.map snd |> List.sortDescending
+    let sortedUserContributions = perUserContribution |> List.map snd |> List.sortDescending
 
     let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
     let topCount = randomUniform rnd anonymizationParams.TopCount
