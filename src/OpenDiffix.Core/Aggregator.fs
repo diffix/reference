@@ -35,7 +35,7 @@ module Aggregator =
     | _ -> failwith "Expecting an AID array as input"
 
   let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: Value array) =
-    mapAidStructure (fun aidValue -> Set.add (valueFn <| aidValue.GetHashCode())) aidSets Set.empty aidValues
+    mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> valueFn |> Set.add) aidSets Set.empty aidValues
 
   type private Count(counter) =
     new() = Count(0L)
