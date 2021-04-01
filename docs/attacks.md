@@ -3,7 +3,7 @@
 Contents:
 - [Attacks](#attacks)
   - [Wide then narrow](#wide-then-narrow)
-    - [AID sets become the UNION of their constituent parts](#aid-sets-become-the-union-of-their-constituent-parts)
+    - [AID sets are merged](#aid-sets-are-merged)
       - [Attack query](#attack-query)
     - [AID sets are column value properties and do not mix](#aid-sets-are-column-value-properties-and-do-not-mix)
       - [Attack query](#attack-query-1)
@@ -18,7 +18,7 @@ These attacks can be done in ways where the values that are selected seem harmle
 The [multiple-aid](multiple-aid.md) document describes this design in details, but to explain why the design is the way it is, let's consider two other ways in which AID sets could be joined, and how these make a "wide then narrow" attack possible.
 
 Alternative handling of AID:
-1. AID sets become the UNION of their constituent parts
+1. AID sets are merged
 2. AID sets are column value properties and do not mix
 
 In both of the attack sketches below we will be operating on the following example `patients` table:
@@ -33,10 +33,11 @@ In both of the attack sketches below we will be operating on the following examp
 | Fredrik | ...  | ...       | ...          | Cairo |                                      |
 | Günther | ...  | ...       | ...          | Cairo |                                      |
 
-### AID sets become the UNION of their constituent parts
+### AID sets are merged
 
 Say we are joining two instances of the same `patients` table. `ssn` has been defined as the AID column.
 Under this particular scheme of handling AIDs the resulting AID set for a row is the union of the AID sets of the rows that are joined.
+In other words we merge the AID columns within a type.
 
 If we joined the rows from `left` and `right` on the `City` columns:
 
