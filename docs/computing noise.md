@@ -131,12 +131,15 @@ From the admin point of view, I think the steps to configuration is something li
 
 When aggregating we flatten extreme values and replace their values with those of a representative top-group average.
 
-The process for suppressing extreme values is done separately for each AID set type. That is to say for a
+The process for flattening extreme values is done separately for each AID set type. That is to say for a
 dataset with AID sets `[email-1; email-2; company]` the process is repeated three times, even though
 there are only two kinds of AIDs. For each AID set type we calculate the absolute distortion. For our final aggregate we choose,
 and use, the largest of the available distortions.
 
-Please note that if any of the processes fails due to insufficiently many distinct AIDs, the aggregate as a whole returns `null`.
+We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with one significant
+difference: in the final anonymizing aggregate we report `null` when we do not have enough distinct entities to produce
+a sensible aggregate. When aggregating i-rows this is not the case as we frequently come across rows that only belong to
+one, or very few entities. These steps are described in more details in the algorithm section below.
 
 ### Algorithm
 
