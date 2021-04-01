@@ -34,9 +34,6 @@ module Aggregator =
         mapAidStructure fn aidMaps Map.empty aidValues
     | _ -> failwith "Expecting an AID array as input"
 
-  let private addToPotentiallyMissingAidsSetsArray aidSets valueFn (aidValues: Value array) =
-    mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> valueFn |> Set.add) aidSets Set.empty aidValues
-
   type private Count(counter) =
     new() = Count(0L)
 
@@ -103,7 +100,7 @@ module Aggregator =
         | [ _aidValues; Null ] -> this
         | [ Value.Array aidValues; aidValue ] ->
             aidValues
-            |> addToPotentiallyMissingAidsSetsArray aidSets (fun _ -> aidValue.GetHashCode())
+            |> mapAidStructure (fun _ -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
             |> DiffixCountDistinct
         | _ -> invalidArgs values
         :> IAggregator
@@ -117,7 +114,10 @@ module Aggregator =
       member this.Transition values =
         match values with
         | [ Null ] -> this
-        | [ Value.Array aidValues ] -> aidValues |> addToPotentiallyMissingAidsSetsArray aidSets id |> DiffixLowCount
+        | [ Value.Array aidValues ] ->
+            aidValues
+            |> mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
+            |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
 
