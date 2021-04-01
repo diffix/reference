@@ -197,22 +197,18 @@ Once the algorithm has been completed for each AID type, the maximum distortion 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
 
-Note that the tables as shown are the input values to an anonymizing aggregate.
-Imagine they are the result of running a query such as:
+Note that the tables as shown are the row contributions used to calculate an aggregate.
 
-```sql
-SELECT count(*)
-FROM table
-```
+For example, the following table should for example be read as AID 1 contributing 6 to the aggregate, AID 2 contributing 5, and AIDs 3 and 4 collectively contributing 4 (as a result of the rows already having been aggregated). `Value` is not to be confused with a row that is being grouped by!
 
-or alternatively the input for the aggregate for one of the `card_type` values in a query such as:
+| Value | AID sets  |
+| ----: | --------- |
+|     6 | AID[1]    |
+|     5 | AID[2]    |
+|     4 | AID[3, 4] |
 
-```sql
-SELECT card_type, count(*)
-FROM table
-GROUP BY card_type
-```
-
+The `Value`s could be interpreted as a certain entity having contributed a certain number of rows in the case of a `count` aggregator, or it could
+the the per entity sum contribution the case of a `sum` aggregate.
 
 ### Examples
 
