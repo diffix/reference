@@ -184,7 +184,13 @@ The process for suppressing extreme values is as follows:
 3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
 4. Take the first `Ne` highest contributions as the extreme values. If any of them appear for `minimum_allowed_aids` distinct AIDs, use that value
 5. Take next `Nt` highest contributions as the top count.
-6. Replace each `Ne` value with an average of the `Nt` values
+6. (only on final aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` as the aggregate to indicate that
+  there were was not enough data to return an anonymous aggregate
+6. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
+   1. If no entities were chosen for the top group, then use the entity with the lowest contribution as the top group and continue, or
+   2. If some values were chosen for the top group, but not quite `Nt` distinct ones, then use the values chosen and continue
+7. Calculate the average of the `Nt` values
+8. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
