@@ -192,6 +192,8 @@ The process for suppressing extreme values is as follows:
 7. Calculate the average of the `Nt` values
 8. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
+Once the algorithm has been completed for each AID type, the maximum distortion is chosen as the flattening value and the corresponding `Nt` average is used to determine the magnitude of the noise.
+
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
 
