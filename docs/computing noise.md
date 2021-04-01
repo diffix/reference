@@ -16,6 +16,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
         - [AID1](#aid1)
         - [AID2](#aid2)
         - [AID3](#aid3)
+- [Rationale](#rationale)
 
 # Computing Per-AID Contributions
 
@@ -383,3 +384,58 @@ Even though we could have produced an aggregate from the perspectives of AID1 an
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
 Assuming there had been enough AID3 entities and the total distortion due to AID3 would have been 10,
 then we would have used the distortion due to AID1 as it's the largest.
+
+
+# Rationale
+
+The reason we choose the largest standard deviation (versus summing all of the standard deviations from all of the AIDs) is because the noise from any smaller standard deviation is masked by the noise of the larger standard deviation.
+
+The reason we choose the largest flattening value (versus the sum of flattening values) is less obvious, and best explained by example. Suppose that a query has two AIDs, AID1 and AID2. Suppose that the extreme values are as follows:
+
+| val  | AID1 | AID2 | flatten AID1 | flatten AID2 |
+|------|------|------|--------------|--------------|
+| 2000 | 1    | A    | 1100         | 1500         |
+| 900  | 2    | A    | 0            | 400          |
+| 900  | 3    | A    | -            | 400          |
+| 900  | 4    | B    | -            | 400          |
+| 900  | 5    | B    | -            | 400          |
+| 900  | 6    | B    | -            | 400          |
+| 900  | 7    | B    | -            | 400          |
+| 500  | 8    | C    | -            | -            |
+| 500  | 9    | D    | -            | -            |
+| ...  | ...  | ...  | ...          | ...          |
+
+where the ... rows have val=500, increasing values of AID1 and AID2. Assuming that the extreme group has two distinct AIDs, then:
+
+* flatten AID1 = 1100 (2000 --> 900 for the first row because top group average is 900)
+* flatten AID2 = 3900 (because top group average is 500, and all of the A and B AIDs are reduced to 500)
+
+We choose the larger of the two, so `flatten = 3900`, and noise is proportional to 500.
+
+Assume that `sum()` is the aggregate, and that the true sum in 20000. Then the noisy sum is 16100+noise.
+
+Now suppose an attacker knows that user AID1.1 has extreme value 2000, and wants to determine if AID1.1 is in the answer or not. So he generates another query with `WHERE AID1 <> 1`, thus removing AID1.1 from the second query for sure. The resulting table looks like this:
+
+| val  | AID1 | AID2 | flatten AID1 | flatten AID2 |
+|------|------|------|--------------|--------------|
+| 900  | 2    | A    | 0            | 400          |
+| 900  | 3    | A    | 0            | 400          |
+| 900  | 4    | B    | -            | 400          |
+| 900  | 5    | B    | -            | 400          |
+| 900  | 6    | B    | -            | 400          |
+| 900  | 7    | B    | -            | 400          |
+| 500  | 8    | C    | -            | -            |
+| 500  | 9    | D    | -            | -            |
+| ...  | ...  | ...  | ...          | ...          |
+
+In this case, there is no flattening for AID1, and flattening for AID2 is 2400. The true sum is now 18000 and the noisy sum is 15600+noise. So:
+
+* First query: 16100+noise
+* Second query: 15600+noise
+* Difference: 500+noise
+
+Here the noise is proportional to the absolute difference, and so the attacker is unsure if the victim AID1.1 was in the first query or not.
+
+The general observation is that a given row will have some contribution to flattening for all of the AIDs, and so it is only necessary to flatten for one of the AIDs (that with the most flattening). Furthermore, is we flatten for all AIDs, then any given row is being flattened multiple times, which we don't want.
+
+> TODO: There may be counter-examples, so we might want to look at this more.
