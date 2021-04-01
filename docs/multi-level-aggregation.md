@@ -2,6 +2,10 @@ For the assumed background knowledge, please consult the:
 - [glossary](glossary.md) for definitions of terms used in this document
 - [multi-aid](multiple-aid.md) for a description of how AIDs spread through a query
 
+- [Aggregation across query boundaries](#aggregation-across-query-boundaries)
+  - [Intermediate extreme value flattening](#intermediate-extreme-value-flattening)
+    - [Example "twilight zone" attack query](#example-twilight-zone-attack-query)
+
 # Aggregation across query boundaries
 
 Our goal is to limit the distortion due to anonymization.
