@@ -240,16 +240,18 @@ the the per entity sum contribution the case of a `sum` aggregate.
 
 - We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them. AID 1 has an additional entry too, making for uneven total contributions for the two AIDs:
 
-| Value | AID |
-| ----: | --- |
-|     6 | 1   |
-|     5 | 2   |
+| Value | AID | Required distortion by AID if intermediate aggregator |
+| ----: | --- | ----------------------------------------------------: |
+|     6 | 1   |                                                     1 |
+|     5 | 2   |                                                       |
 
 - The rows are sorted in descending order of `Value`
 - `Ne = 2`, `Nt = 2`
 - We take the `Ne` first values as the extreme values
-- We try taking the `Nt` next rows for the top group, but have run out of data. We terminate the process and return `Null` to indicate that we couldn't produce an anonymous aggregate
-- The total distortion is _infinite_... sort of
+- We try taking the `Nt` next rows for the top group, but have run out of data.
+  - If this was a final anonymized aggregate (i.e. the top level query), then we would terminate the process and return `Null` to indicate that we couldn't produce an anonymous aggregate,
+  - If this was an intermediate aggregation step meant to solely flatten extreme values, then we follow the alternative step, and instead use value 5 as the top group.
+- The total distortion is _infinite_... sort of in the case of this being a top-level aggregator, and 1 if it's an intermediate one.
 
 
 #### Base case
