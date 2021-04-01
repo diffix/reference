@@ -1,5 +1,7 @@
 namespace OpenDiffix.Core
 
+open System
+
 type AidHash = int
 
 type Value =
@@ -8,6 +10,7 @@ type Value =
   | Integer of int64
   | Real of float
   | String of string
+  | Array of Value array
 
   static member ToString =
     function
@@ -16,6 +19,7 @@ type Value =
     | Integer i -> i.ToString()
     | Real r -> r.ToString()
     | String s -> s
+    | Array values -> values |> Array.map Value.ToString |> fun values -> String.Join(",", values)
 
 type Row = Value array
 
@@ -24,6 +28,7 @@ type ValueType =
   | IntegerType
   | RealType
   | StringType
+  | ArrayType of ValueType
   | UnknownType of string
 
 type OrderByDirection =

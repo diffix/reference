@@ -59,7 +59,7 @@ and ScalarFunction =
 and SetFunction =
   | GenerateSeries
 
-  static member ReturnType fn (args: Expression list) =
+  static member ReturnType fn (_args: Expression list) =
     match fn with
     | GenerateSeries -> Ok IntegerType
 
@@ -83,17 +83,30 @@ and Expression =
   | FunctionExpr of fn: Function * args: Expression list
   | ColumnReference of index: int * exprType: ValueType
   | Constant of value: Value
+  | Array of Expression array
 
-  static member GetType =
-    function
+  static member GetType expression =
+    let arrayTypes values =
+      result {
+        let! valueTypes = values |> Array.distinct |> Array.toList |> List.sequenceResultM
+
+        match valueTypes with
+        | [] -> return! Error "Unknown type"
+        | [ valueType ] -> return ArrayType valueType
+        | _ -> return UnknownType "mixed type" |> ArrayType
+      }
+
+    match expression with
     | FunctionExpr (ScalarFunction fn, args) -> ScalarFunction.ReturnType fn args
     | FunctionExpr (AggregateFunction (fn, _options), args) -> AggregateFunction.ReturnType fn args
     | FunctionExpr (SetFunction fn, args) -> SetFunction.ReturnType fn args
+    | Array values -> values |> Array.map Expression.GetType |> arrayTypes
     | ColumnReference (_, exprType) -> Ok exprType
     | Constant (String _) -> Ok StringType
     | Constant (Integer _) -> Ok IntegerType
     | Constant (Boolean _) -> Ok BooleanType
     | Constant (Real _) -> Ok RealType
+    | Constant (Value.Array values) -> values |> Array.map (Constant >> Expression.GetType) |> arrayTypes
     | Constant Null -> Ok(UnknownType null)
 
   static member Map(expression, f: Expression -> Expression) =
@@ -187,6 +200,7 @@ module Expression =
     | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
     | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
     | FunctionExpr (SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
+    | Array expressions -> expressions |> Array.map (evaluate ctx row) |> Value.Array
     | ColumnReference (index, _) -> row.[index]
     | Constant value -> value
 

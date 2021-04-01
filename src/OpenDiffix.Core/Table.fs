@@ -24,6 +24,7 @@ module Table =
     |> List.indexed
     |> List.tryFind (fun (_index, column) -> equalsI column.Name columnName)
 
+  /// Returns a column along with an index into the table columns. The index is zero-based.
   let getColumnI table columnName =
     columnName
     |> tryGetColumnI table

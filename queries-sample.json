@@ -3,7 +3,13 @@
     "query": "SELECT city, count(*) FROM customers GROUP BY city",
     "db_path": "data/data.sqlite",
     "anonymization_parameters": {
-      "table_settings": {"customers": {"aid_columns":  ["id"]}},
+      "table_settings": {
+        "customers": {
+          "aid_columns": [
+            "id"
+          ]
+        }
+      },
       "seed": 1,
       "minimum_allowed_aids": 2,
       "outlier_count": {
@@ -24,7 +30,13 @@
     "query": "SELECT count(*), count(distinct id) FROM customers",
     "db_path": "data/data.sqlite",
     "anonymization_parameters": {
-      "table_settings": {"customers": {"aid_columns":  ["id"]}},
+      "table_settings": {
+        "customers": {
+          "aid_columns": [
+            "id"
+          ]
+        }
+      },
       "seed": 1,
       "minimum_allowed_aids": 2,
       "outlier_count": {
@@ -45,7 +57,13 @@
     "query": "SELECT city, count(*), count(distinct id) FROM customers",
     "db_path": "data/data.sqlite",
     "anonymization_parameters": {
-      "table_settings": {"customers": {"aid_columns":  ["id"]}},
+      "table_settings": {
+        "customers": {
+          "aid_columns": [
+            "id"
+          ]
+        }
+      },
       "seed": 1,
       "minimum_allowed_aids": 2,
       "outlier_count": {

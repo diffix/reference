@@ -164,7 +164,7 @@ let ``Selecting columns from an aliased table`` () =
 let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
 
 [<Fact>]
-let ``Selecting ambigous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
+let ``Selecting ambiguous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
@@ -174,8 +174,8 @@ type Tests(db: DBFixture) =
     {
       TableSettings =
         Map [
-          "customers", { AidColumns = [ "id" ] }
-          "customers_small", { AidColumns = [ "id" ] }
+          "customers", { AidColumns = [ "id"; "company_name" ] }
+          "customers_small", { AidColumns = [ "id"; "company_name" ] }
           "purchases", { AidColumns = [ "cid" ] }
         ]
       Seed = 1
@@ -185,7 +185,9 @@ type Tests(db: DBFixture) =
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
-  let idColumn = ColumnReference(3, IntegerType)
+  let idColumn = ColumnReference(4, IntegerType)
+  let companyColumn = ColumnReference(2, StringType)
+  let aidColumns = [| idColumn; companyColumn |] |> Expression.Array
 
   let analyzeQuery query =
     query
@@ -200,10 +202,10 @@ type Tests(db: DBFixture) =
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
 
-    let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ idColumn ])
+    let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumns ])
 
     let countDistinct =
-      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ idColumn ])
+      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ aidColumns; idColumn ])
 
     let expectedInTopQuery =
       [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
@@ -219,7 +221,7 @@ type Tests(db: DBFixture) =
     let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
 
     let condition =
-      FunctionExpr(ScalarFunction Equals, [ ColumnReference(3, IntegerType); ColumnReference(6, IntegerType) ])
+      FunctionExpr(ScalarFunction Equals, [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ])
 
     let customers = getTable "customers_small"
     let purchases = getTable "purchases"

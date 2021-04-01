@@ -4,17 +4,30 @@ open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
 
+let companies i =
+  let names =
+    [
+      "Alpha"
+      "Beta"
+      "Gamma"
+    ]
+  names |> List.item (i % names.Length)
 
 let rows =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
-  |> List.map (int64 >> Integer)
-  |> List.append [ Null ]
-  |> List.map (fun id -> [| id; String "value" |])
-  |> List.append [ [| Integer 8L; Null |] ]
+  |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id |> String |])
+  |> List.append [
+    [| Null; String "value"; String "Alpha" |]
+    [| Integer 8L; Null; String "Alpha" |]
+    [| Integer 9L; String "value"; Null |]
+  ]
 
 let aidColumn = ColumnReference(0, IntegerType)
+let aidColumnArray = Expression.Array [| aidColumn |]
 let strColumn = ColumnReference(1, StringType)
+let companyColumn = ColumnReference(2, IntegerType)
+let allAidColumns = Expression.Array [| aidColumn; companyColumn |]
 
 let context =
   { EvaluationContext.Default with
@@ -37,16 +50,16 @@ let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with
 [<Fact>]
 let ``anon count distinct aid`` () =
   rows
-  |> evaluateAggregator distinctDiffixCount [ aidColumn ]
-  |> should equal (Integer 8L)
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; aidColumn ]
+  |> should equal (Integer 9L)
 
 [<Fact>]
 let ``anon count()`` () =
   // - replacing outlier 6, with top 5
   // - 0 noise
   rows
-  |> evaluateAggregator diffixCount [ aidColumn ]
-  |> should equal (Integer 29L)
+  |> evaluateAggregator diffixCount [ aidColumnArray ]
+  |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count(col)`` () =
@@ -54,23 +67,31 @@ let ``anon count(col)`` () =
   // - replacing outlier 6 with top 5
   // - 0 noise
   rows
-  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
-  |> should equal (Integer 29L)
+  |> evaluateAggregator diffixCount [ aidColumnArray; strColumn ]
+  |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count returns Null if insufficient users`` () =
   let firstRow = rows |> List.take 1
 
   firstRow
-  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
+  |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal Null
 
-  firstRow |> evaluateAggregator diffixCount [ aidColumn ] |> should equal Null
+  firstRow |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ] |> should equal Null
 
 [<Fact>]
 let ``anon count returns 0 for Null inputs`` () =
   let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; Null |])
 
   rows
-  |> evaluateAggregator diffixCount [ aidColumn; strColumn ]
+  |> evaluateAggregator diffixCount [ aidColumnArray; strColumn ]
   |> should equal (Integer 0L)
+
+[<Fact>]
+let ``anon count returns Null when all AIDs null`` () =
+  let rows = [ 1L .. 10L ] |> List.map (fun _ -> [| Null; String "value"; Null |])
+
+  rows
+  |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
+  |> should equal Null

@@ -9,13 +9,14 @@ type QueryRequest = {
   AnonymizationParameters: AnonymizationParams
 }
 
-let encodeValue =
+let rec encodeValue =
   function
   | OpenDiffix.Core.Value.Null -> Encode.nil
   | OpenDiffix.Core.Value.Boolean bool -> Encode.bool bool
   | OpenDiffix.Core.Value.Integer int64 -> Encode.int64 int64
   | OpenDiffix.Core.Value.Real float -> Encode.float float
   | OpenDiffix.Core.Value.String string -> Encode.string string
+  | OpenDiffix.Core.Value.Array values -> Encode.array (values |> Array.map encodeValue)
 
 let encodeRow values =
   Encode.list (
