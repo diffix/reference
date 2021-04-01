@@ -6,6 +6,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Pseudo-AIDs (or multi-column AIDs)](#pseudo-aids-or-multi-column-aids)
     - [Configuration](#configuration)
   - [Determining extreme and top values](#determining-extreme-and-top-values)
+    - [Redistribution of values](#redistribution-of-values)
     - [Algorithm](#algorithm)
     - [Examples](#examples)
       - [Early termination](#early-termination)
@@ -141,6 +142,35 @@ difference: in the final anonymizing aggregate we report `null` when we do not h
 a sensible aggregate. When aggregating i-rows this is not the case as we frequently come across rows that only belong to
 one, or very few entities. These steps are described in more details in the algorithm section below.
 
+
+### Redistribution of values
+
+When aggregating rows of data the rows might either be d-rows (each row belongs to a single AID such as `email[1]`) or
+i-rows that have already gone through one or more rows or aggregation (a row can belong to multiple AIDs such as `email[1, 2, 3]`).
+
+In the case where you have AID sets it can also happen that you have the same entity present in multiple AID sets.
+For example you could have three rows such as:
+
+| Value | AID set        |
+| ----: | -------------- |
+|     1 | email[1]       |
+|     2 | email[1, 2]    |
+|     3 | email[1, 3, 4] |
+
+As part of the flattening of outliers we calculate the contribution each entity has made.
+In the example table above entity 1 has contributed to each of the three values.
+When calculating an individuals contributions we split their shared contributions proportionally with
+the other AIDs.
+
+The entity with email AID 1 would therefore end up with a contribution of: `1 + 1/2 + 3/3 = 2.5`.
+
+This is not strictly speaking entirely correct. That is to say the resulting contributions stemming from this simplified redistributions
+do not reflect reality. However since the only way an AID set of multiple AID values can arise is through
+aggregation, and since we always perform extreme value flattening when aggregating, it seems likely that this is not
+going to cause insufficient flattening for extreme contributions (note: this is an assumption that hasn't been tested).
+In fact it might have a positive effect by potentially limiting further unnecessary flattening.
+
+
 ### Algorithm
 
 The process for suppressing extreme values is as follows:
@@ -155,15 +185,6 @@ The process for suppressing extreme values is as follows:
 4. Take the first `Ne` highest contributions as the extreme values. If any of them appear for `minimum_allowed_aids` distinct AIDs, use that value
 5. Take next `Nt` highest contributions as the top count.
 6. Replace each `Ne` value with an average of the `Nt` values
-
-In step 1 above it is mentioned that contributions for an AID set is split proportionally across the AID entities.
-Say the AID set `email[1, 2, 3]` had sent 9 emails, in that case we would attribute a count of 3 for each of the AIDs
-individually on top of what other contributions they might already have.
-This is not strictly speaking entirely correct. That is to say the resulting contributions stemming from this simplified redistributions
-do not reflect reality. However since the only way an AID set of multiple AID values can arise is through
-aggregation, and since we always perform extreme value flattening when aggregating, it seems likely that this is not
-going to cause insufficient flattening for extreme contributions (note: this is an assumption that hasn't been fully validated!).
-In fact it might have a positive effect by potentially limiting further unnecessary flattening.
 
 Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
 that the minimum allowed aids threshold 2 for all AID types.
