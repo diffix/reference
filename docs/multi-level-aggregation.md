@@ -72,3 +72,54 @@ involved.
 
 Flattening is done the same way for intermediate aggregates as it is for the top-level fully anonymized aggregates.
 Read more about how this is done in the [computing noise](computing%20noise.md) document.
+
+### Example "twilight zone" attack query
+
+Let's assume we have the following two tables:
+
+`medical_history`
+
+|  AID | hasCancer |
+| ---: | --------- |
+|    1 | true      |
+|  ... | ...       |
+
+`purchases`
+
+|    # |  AID | ProductId |
+| ---: | ---: | --------: |
+|    1 |    1 |       ... |
+|    2 |    1 |       ... |
+|    3 |    1 |       ... |
+|  ... |  ... |       ... |
+| 1000 |    1 |       ... |
+| 1001 |    2 |       ... |
+| 1002 |    3 |       ... |
+| 1003 |    4 |       ... |
+| 1004 |    5 |       ... |
+
+`products`
+
+| Name        | Price |
+| ----------- | ----- |
+| Apple Juice | 10    |
+| Carrots     | 3     |
+| iPhone      | 900   |
+
+If we didn't do intermediate flattening, the product name reported would give an accurate
+estimate of the number of purchases having taken place.
+
+```sql
+SELECT products.Name
+FROM (
+  SELECT count(*) as numPurchases
+  FROM purchases INNER JOIN medical_history on purchases.AID = medical_history.AID
+  WHERE medical_history.hasCancer
+) t INNER JOIN products ON t.numPurchases > products.Price
+```
+
+It would in this instance also rely on:
+- there being sufficiently many other patients with cancer
+- some knowledge about the user having unnaturally many purchases
+
+With intermediate outlier suppression `Carrots` would have been the only product name returned.
