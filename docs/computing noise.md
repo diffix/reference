@@ -218,7 +218,7 @@ the the per entity sum contribution the case of a `sum` aggregate.
 | ----: | ---------- |
 |    10 | AID1[1, 2] |
 
-- We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them.
+- We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them (see [redistribution of values](#redistribution-of-values) for details).
 
 | Value | AID |
 | ----: | --- |
