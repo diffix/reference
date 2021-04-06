@@ -236,6 +236,18 @@ sqrt(price) = 2
 ```
 
 ```
+price - price = 0
+
+  1: SCAN_FETCHSOME      4
+  2: SCAN_VAR            price
+  3: SCAN_VAR            price
+  4: FUNCEXPR_STRICT     float8mi
+  5: FUNCEXPR_STRICT     float8eq
+  6: QUAL (AND step)     short_circuit 7
+  7: DONE
+```
+
+```
 uid + 10 = 12
 
 ----------------------------------------------------------
