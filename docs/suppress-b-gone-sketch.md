@@ -1,5 +1,8 @@
 # Suppress B Gone
 
+For the assumed background knowledge, please consult the:
+- [glossary](glossary.md) for definitions of terms used in this document
+
 This document sketches out some basic ideas for how to eliminate the need for suppression, and along with that the need for `*` buckets.
 
 ## Background
@@ -25,7 +28,7 @@ This approach has several issues.
 This doc sketches out a new approach with the following characteristics:
 
 1. All answers produce an approximately correct number of buckets.
-2. The bucket values (the GROUP BY columns) may or may represent real bucket values, but do so to the extent possible.
+2. The bucket values (the GROUP BY columns) may or may not represent real bucket values, but do so to the extent possible.
 3. A bucket with a real value but with zero contributing rows (i.e. one that would normally not be output) may be in the answer. Such buckets, however, should be selected among enough other such buckets that nothing about how many AIDs comprise the bucket can be inferred with high probability.
 
 By way of example, consider the query:
@@ -40,7 +43,7 @@ GROUP BY 1
 With Insights, this would produce a table like this:
 
 | lastname | count    |
-|----------|----------|
+|----------|---------:|
 | `*`      | 19221    |
 | Smith    | 133      |
 | Jones    | 98       |
@@ -50,7 +53,7 @@ With Insights, this would produce a table like this:
 With the new approach, the table might be like this:
 
 | lastname | count    |   | comments                                 |
-|----------|----------|---|------------------------------------------|
+|----------|---------:|---|------------------------------------------|
 | Smith    | 133      |   |                                          |
 | Jones    | 98       |   |                                          |
 | Miller   | 32       |   |                                          |
@@ -68,12 +71,12 @@ Note that the `*` bucket is gone. Johnson was suppressed before, but now shows u
 
 The basic approach uses a new concept which I'll call *showable*. A value is showable if there are *any* circumstances under which the analyst could have learned the value using Diffix. For instance, in the `lastname` example, an analyst could learn `lastname=Brown` with the query `SELECT DISTINCT lastname FROM table`, even though all Browns are filtered with the condition `age = 25`. So in other words, `Brown` is showable.
 
-With this in mind, let's consider a basic approach. The following example is for the selected column lastname. This is an enumerating column with many values. As an enumerating column, the values aren't naturally aggregatable (unlike numeric or datetime columns). We look at numeric and datatime after this example.
+With this in mind, let's consider a basic approach. The following example is for the selected column lastname. This is a categorical column with many values. As a categorical column, the values aren't naturally aggregatable (unlike numeric or datetime columns). We look at numeric and datatime after this example.
 
 During a query, the query engine examines d-rows. Some of these are included in a given bucket (`age=25`) and some are excluded (`age<>25`). Suppose during execution we record both the selected values that are included and those that are excluded, along with the associated number of distinct AIDs. For the above query, we could end up with the following table:
 
 | lastname  | count | AIDs-included | AIDs-excluded | showable |
-|-----------|-------|---------------|---------------|----------|
+|-----------|------:|--------------:|---------------|----------|
 | Smith     | 133   | 29            | 439           | yes      |
 | Jones     | 98    | 22            | 318           | yes      |
 | ...       |       | ...           | ...           | ...      |
@@ -96,10 +99,12 @@ During a query, the query engine examines d-rows. Some of these are included in 
 
 From `AIDs-included + AIDs-excluded`, we can determine if each name is showable. (Assume here that a given AID is not counted in AIDs-excluded if it is in AIDs-included.)
 
-Define a modified LCF computation LCF-soft, where instead of having a hard lower bound on AID count, we include buckets that have an AID count of zero so long as they are showable. (Unless otherwise stated, 'LCF' refers to 'LCF-soft'.) The following table adds a column with the resulting LCF noisy thresholds:
+Define a modified LCF computation LCF-soft, where instead of having a hard lower bound on AID count, we include buckets that have an AID count of zero so long as they are showable. (Unless otherwise stated, 'LCF' refers to 'LCF-soft'.) 
+
+The following table adds a column with the resulting LCF noisy thresholds, where a *threshold* here is simple the AIDs-included count with noise added:
 
 | lastname  | count | AIDs-included | AIDs-excluded | showable | threshold | type   |
-|-----------|-------|---------------|---------------|----------|-----------|--------|
+|-----------|------:|--------------:|--------------:|----------|----------:|--------|
 | Smith     | 133   | 29            | 439           | yes      | 30        | type 1 |
 | Jones     | 98    | 22            | 318           | yes      | 21        |        |
 | ...       | ...   | ...           | ...           | ...      | ...       | ...    |
@@ -139,7 +144,7 @@ Now what we could do is the following.
 So, to continue the above example, the ranked list might be:
 
 | lastname  | AIDs-included | AIDs-excluded | showable | threshold |
-|-----------|---------------|---------------|----------|-----------|
+|-----------|--------------:|--------------:|----------|----------:|
 | Smith     | 29            | 439           | yes      | 30        |
 | Jones     | 22            | 318           | yes      | 21        |
 | ...       | ...           | ...           | ...      | ...       |
@@ -159,9 +164,37 @@ A key observation here is that the number of AIDs-included does not have the sam
 
 Of course it could happen that there are not enough showable buckets to reach N. In this case, we need to generate synthetic values from the non-showable data that we have (ideally what we have after normal query processing).
 
-As a general rule, if we are going to build synthetic values it is better to do so from data that matches as many query conditions as possible because these values may more accurate in some respect. This is probably not normally the case with relatively un-correlated data like lastnames, but might be the case with other data like numeric or datetime.
+As a general rule, if we are going to build synthetic values it is better to do so from data that matches as many query conditions as possible because these values may be more accurate in some respect. This is probably not normally the case with relatively un-correlated data like lastnames, but might be the case with other data like numeric or datetime.
 
 In the example above, any d-rows contributing to AIDs-included fully match the query conditions. D-rows contributing to AIDs-excluded do not match all conditions, but may match some. The more matching conditions the better.
+
+### Showable but nonsensical buckets
+
+There can clearly be cases where buckets are showable, but don't really make sense in the context of the query. An example is this query:
+
+```
+SELECT city, count(*)
+FROM persons
+WHERE age = 10 and country = 'Germany'
+```
+
+If cities listed include New York, Seattle, and Oslo, then the answer is nonsensical and confusing.
+
+One idea to deal with this would be to detect strong correlations between selected and filtered columns, and focus the result on those rows that match the strongly-correlated condition. For instance, in the above query, there would be essentially no correlation between city and age. There would be a strong correlation, however, between city and country (not perfect, since there are for instance multiple Berlin's in the USA), but the correlation would be strong. In this case, we could limit ourselves to cities that are True for `country = 'Germany'`.
+
+### Multiple GROUP BY columns
+
+The concept of showable extends to the case with multiple GROUP BY columns. For instance, if there query is:
+
+```
+SELECT make, model
+FROM car_purchases
+WHERE age = 30 and gender = 'M'
+```
+
+then we would look for cases where `make` and `model` together are showable (i.e. Ford/Mustang and Tesla/Model S). If the GROUP BY columns are strongly correlated, then this should happen rather naturally. If not, then the fact that the value from one column doesn't make sense with respect to a value from another column won't be as confusing.
+
+If the GROUP BY columns are aggregatable and correlated, then we'd want to produce synthetic values that reflect the correlation.
 
 ### Possible issues
 
@@ -180,7 +213,7 @@ The details on how to do this can vary by a lot. I think a basic approach is to 
 1. Length of the values (number of characters).
 2. Character sets in each character position.
 
-We can sample from here so long as the number of AIDs for each aspect passes LCF (both included and excluded AIDs).
+We can sample from from these aspects so long as the number of AIDs for each aspect passes LCF (both included and excluded AIDs).
 
 So for instance, if the value is lastname, then there are a variety of lastname lengths from two characters upwards to 30 or 40. But we'd want to ensure that for each lastname length, we have an adequate number of distinct AIDs, and only select the lengths of synthetic strings from passing lengths.
 
