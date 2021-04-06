@@ -5,6 +5,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Definition of extreme contributor](#definition-of-extreme-contributor)
   - [Pre-processing](#pre-processing)
   - [Algorithm sketch in detail](#algorithm-sketch-in-detail)
+    - [Algorithm](#algorithm)
     - [Worked example](#worked-example)
       - [Processing for email](#processing-for-email)
       - [Processing for first_name](#processing-for-first_name)
@@ -14,19 +15,18 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
 ## Intuition
 
 Our regular aggregates work on the notion that all entities contribute some part of a whole,
-and that these individual parts can be combined to a whole.
+and that these parts can be combined.
 This intuition, and these design assumptions, do not hold when aggregating distinct values.
-A distinct value should only occur once irrespective of how many entities report to have it.
+A distinct value should only occur once, irrespective of how many entities report to have it.
 
 ### Definition of extreme contributor
 
 An entity is an extreme contributor if their presence has a noticeable difference on the aggregate.
-In a distinct aggregate what makes an entity stand out differs from what makes an entity stand
-out in a non-distinct aggregate. We therefore cannot apply flattening as we would for other aggregates.
+In a distinct aggregator, what makes an entity stand out differs from what makes an entity stand
+out in a non-distinct aggregator. We, therefore, cannot flatten as we would for other aggregators.
 
-The reason that this is so is because, unlike in a non-distinct aggregate,
-contributions in a distinct aggregate might be shared. For example, let's consider the following
-example dataset:
+Unlike a non-distinct aggregator, the contributions made to a distinct aggregator might be shared.
+For example, let's consider the following example dataset:
 
 | AID sets  | Value |
 | --------- | ----: |
@@ -37,11 +37,11 @@ example dataset:
 ...
 | [999, 1000] |   999 |
 
-In this example table AID 1000 has each and every value in the dataset. While the presence or
-absence would half or double the total count in a non-distinct count, it does not at all affect
+In this example table, AID 1000 has each value in the dataset. While the presence or
+the absence would half or double the total count in a non-distinct count it does not at all affect
 the distinct count as all values are shared.
 
-The way in which an entity can be an extreme contributor to a distinct aggregate is if they have
+An entity can be an extreme contributor to a distinct aggregate if they have
 significantly more values than other entities for which they are the sole contributor within their AID type.
 
 To map it onto our previous example, AID 1000 would be an extreme contributor if the table looked like this:
@@ -59,39 +59,43 @@ To map it onto our previous example, AID 1000 would be an extreme contributor if
 
 ## Pre-processing
 
-We have validated designs for our other aggregates. What we want to do is map distinct aggregates
+We have validated designs for our other aggregators. What we want to do is map distinct aggregates
 onto non-distinct ones so we can reuse our existing work and machinery.
 
-The mapping we want to achieve is such that it spreads the individual values across entities such
-that the individual contributions can be combined like a regular aggregate would. This way existing
-extreme value flattening can also apply.
+The mapping we want to achieve spreads the individual values across entities such
+that the individual contributions can be combined like a regular aggregate would.
+With such a mapping in place, the existing aggregator implementations can perform flattening and noise adding
+in their usual way.
 
-Care must be taken in this mapping to ensure the spread of values across AIDs is as wide as possible.
-Otherwise individual entities will unnecessarily exhibit what our aggregates will consider extreme contribution
-behavior, which in turn will lead to potentially unnecessary flattening.
+We must spread the values across as many AIDs as possible. Otherwise, individual entities will unnecessarily
+exhibit what our aggregators will consider extreme-contribution behaviour, which will lead to potentially unnecessary flattening.
 
-Unfortunately it is not clear how this mapping can happen be done such that it accounts for
-multiple AID types at the same time. It therefore maps for each AID type individually.
-Much like for other aggregates we want to use the most extreme flattening required. This leads to
-distinct aggregates having to be processed as follows:
+It is not clear how we can map in a way that accounts for multiple AID types.
+The proposed design, therefore, maps each AID type individually.
+Much like for other aggregators, we want to use the most extreme flattening required. Doing so leads to
+distinct aggregators having to be processed as follows:
 
-For each AID type do:
+For each AID-type:
 
 - map values onto individual contributors
-- aggregate using existing non-distinct aggregates and determine amount of flattening needed,
-  the largest of which is subsequently used for the final distinct aggregate
+- aggregate using existing non-distinct aggregators and determine the amount of flattening needed,
+  using the largest of value returned for the final aggregate result
+- the non-distinct aggregator applies noise as usual
 
 
 ## Algorithm sketch in detail
 
-A simple implementation of this algorithm can be found [in the experiments](https://github.com/diffix/experiments/blob/master/count%20distinct/CountDistinctPlayground/CountDistinctPlayground/CountDistinctExperiment.fs) repository.
+An implementation of this algorithm exists [in the experiments](https://github.com/diffix/experiments/blob/master/count%20distinct/CountDistinctPlayground/CountDistinctPlayground/CountDistinctExperiment.fs) repository.
 
-The following algorithm is done by AID type individually.
-That is to say that if you have a row with an AID such as `[email-1[alice, bob]; email-2[alice, cynthia]; ssn[1, 2, 3]]`
-then it is individually run to completion for `email-1`, `email-2` and `ssn`. The run yielding the largest flattening
-is used.
+The following algorithm is applied individually for each AID type.
+If you have a row with an AID such as `[email-1[alice, bob]; email-2[alice, cynthia]; ssn[1, 2, 3]]`
+then then the algorithm is individually run, to completion, for `email-1`, `email-2` and `ssn`.
+The run yielding the largest flattening is used. Additionally, noise is applied proportional to the
+top group average, as specified by the particular non-distinct aggregator used.
 
-**Algorithm**
+
+### Algorithm
+
 - Split AID sets into individual contributions. A shared contribution of value `A` by AIDs `email-1[alice, bob]`
   is treated as if they were individual contributions of value `A` by `email-1[alice]` and `email-1[bob]`.
 - Group the values by AID, producing sets of values per AID (no duplicates)
@@ -124,11 +128,11 @@ Let's say we have the following table:
 | [email[Cristian]; first_name[Felix]]            | Lemon     |
 | [email[Cristian]; first_name[Felix]]            | Orange    |
 
-we process this table by AID type, i.e. `email` and `first_name`, separately.
+We process this table by AID type, i.e. `email` and `first_name`, separately.
 
 #### Processing for email
 
-Split into individual contributions we end up with:
+After splitting the per-AID contributions into individual contributions, we end up with:
 
 | AID       | Value     |
 | --------- | --------- |
@@ -141,7 +145,7 @@ Split into individual contributions we end up with:
 | Cristian  | Lemon     |
 | Cristian  | Orange    |
 
-grouping by AID and sorting by number of contributions, yields:
+grouping by AID and sorting by the number of contributions, yields:
 
 | AID       | Values                 |
 | --------- | ---------------------- |
@@ -177,10 +181,11 @@ contribution list of:
 | Cristian  | Lemon     |
 | Cristian  | Orange    |
 
-If the original aggregate was `count(distinct value)`, then we would now
-pass the list through our regular `count(value)` aggregator which would determine
-that Cristian is an extreme contributor (with 2 contributions vs 1 for the others)
+If the original aggregator is `count(distinct value)`, then we would now
+pass the list through our regular `count(value)` aggregator, which would determine
+that Cristian is an extreme contributor (having 2 contributions vs 1 for the others)
 and a total flattening of 1.
+
 
 #### Processing for first_name
 
@@ -208,5 +213,6 @@ the following contribution list:
 Which, when used as input for the `count(value)` aggregate, might consider both Felix and Paul extreme contributors (with 2 values each as opposed to 1 for Sebastian) and
 a required flattening of 2.
 
-The overall flattening of 2 is therefore used as it exceeds the flattening of 1
-resulting from processing the data based on `email`.
+We use an overall flattening of 2 taken from aggregating based on `first_name` as it exceeds the flattening of 1 resulting from
+aggregating based on `email`. Additionally, if this is the top-level anonymizing aggregator, we would add noise proportional to the
+top-group average reported by the `count(value)` processing done based on the `first_name` AID.
