@@ -1,20 +1,65 @@
 # Expression evaluation in Postgres
 
-In this document we show how expessions of conditions are evaluated during query execution.
+During query parsing and planning, expressions are modeled as trees.
+After planning, the trees are converted to a flat list of instructions which the executor then runs.
+
+In this document we show how expressions of boolean conditions are compiled and evaluated during query execution.
 
 **Table of Contents**
 
 - [Expression evaluation in Postgres](#expression-evaluation-in-postgres)
-- [Setup](#setup)
-- [Notes](#notes)
+- [Operator reference](#operator-reference)
+  - [Notes](#notes)
 - [Examples](#examples)
+  - [Setup](#setup)
   - [Basic operators (AND/OR/NOT)](#basic-operators-andornot)
   - [Functions and math](#functions-and-math)
   - [Multiple columns](#multiple-columns)
   - [Subqueries](#subqueries)
-- [OpCode Reference](#opcode-reference)
 
-# Setup
+# Operator reference
+
+The following table gives a short description of the instructions found in this document.
+
+| Operator            | Explanation                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| SCAN_FETCHSOME      | Prepares `n` first attributes from the scan tuple for reading.                                             |
+| SCAN_VAR            | Retrieves a variable (column) from a scan tuple. Value is stored in some destination.                      |
+| FUNCEXPR            | Calls a function. Result is stored in some destination.                                                    |
+| FUNCEXPR_STRICT     | Calls a function if all args are non-NULL. If any arg is NULL then NULL is returned directly.              |
+| BOOL_OR_STEP        | Evaluates value passed to operation. If `false` or `NULL` do nothing; if `true` jump to `jumpdone`.        |
+| BOOL_OR_STEP_FIRST  | Optimized `BOOL_OR_STEP` for first subexpression in `OR` series.                                           |
+| BOOL_OR_STEP_LAST   | Optimized `BOOL_OR_STEP` for last subexpression in `OR` series. Has no reason to jump on truthy value.     |
+| BOOL_AND_STEP       | Evaluates value passed to operation. If `true` do nothing; if `false` or `NULL` jump to `jumpdone`.        |
+| BOOL_AND_STEP_FIRST | Optimized `BOOL_AND_STEP` for first subexpression in `AND` series.                                         |
+| BOOL_AND_STEP_LAST  | Optimized `BOOL_AND_STEP` for last subexpression in `AND` series. Has no reason to jump on falsy value.    |
+| BOOL_NOT            | Converts `true` to `false`, `false` to `true`, and `NULL` to `NULL`. Result is stored in some destination. |
+| QUAL                | Same as AND step, but optimized for performance. Jumps to `DONE` if value is `NULL` or `false`.            |
+| DONE                | Evaluation is complete. Return result to caller.                                                           |
+
+This is only a small subset of all available instructions.
+See [execExpr.h](https://github.com/postgres/postgres/blob/ca3b37487be333a1d241dab1bbdd17a211a88f43/src/include/executor/execExpr.h#L40-L244)
+for the complete list of opcodes.
+
+## Notes
+
+Postgres prefers to use the word `tuple` instead of `row`. These terms are usually interchangeable.
+
+Instructions usually store their result to some destination slot.
+That slot is a pointer to memory, usually a function argument or the expression result value.
+Considering these are pointers, printing them in a human-friendly format is difficult.
+
+In boolean steps (AND/OR), `short_circuit_to` (`jumpdone` in Postgres) refers to the jump that will be done in case
+the condition short circuits, i.e. `FALSE` for `AND`s; `TRUE` for `ORs`.
+
+A `QUAL` step is almost identical to an `AND` step. It exists for performance optimization purposes.
+
+We can also customize what happens on these instructions by providing our own interpreter based on Postgres'
+[ExecInterpExpr](https://github.com/postgres/postgres/blob/ca3b37487be333a1d241dab1bbdd17a211a88f43/src/backend/executor/execExprInterp.c#L335-L1745).
+
+# Examples
+
+## Setup
 
 For these examples we will use table `purchases` which has the following shape:
 
@@ -27,13 +72,6 @@ CREATE TABLE purchases (
 )
 ```
 
-# Notes
-
-In boolean steps (AND/OR), `short_circuit_to` refers to the jump that will be done in case
-the condition short circuits, i.e. `FALSE` for `AND`s; `TRUE` for `ORs`.
-
-A `QUAL` step is almost identical to an `AND` step. It exists for performance optimization purposes.
-
 When queries are of the following shape, we show the `<condition>` part only.
 
 ```sql
@@ -41,8 +79,6 @@ SELECT *
 FROM purchases
 WHERE <condition>
 ```
-
-# Examples
 
 ## Basic operators (AND/OR/NOT)
 
@@ -390,21 +426,3 @@ WHERE uid < 20
 ```
 
 In the example above the planner has been smart enough to push the `uid < 20` condition down to the inner seq scan.
-
-# OpCode Reference
-
-| Operator            | Explanation                                                                                                |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| SCAN_FETCHSOME      | Prepares `n` first attributes from the scan tuple for reading.                                             |
-| SCAN_VAR            | Retrieves a variable (column) from a scan tuple. Value is stored in some destination.                      |
-| FUNCEXPR            | Calls a function. Result is stored in some destination.                                                    |
-| FUNCEXPR_STRICT     | Calls a function if all args are non-NULL. If any arg is NULL then NULL is returned directly.              |
-| BOOL_OR_STEP        | Evaluates value passed to operation. If `false` or `NULL` do nothing; if `true` jump to `jumpdone`.        |
-| BOOL_OR_STEP_FIRST  | Optimized `BOOL_OR_STEP` for first subexpression in `OR` series.                                           |
-| BOOL_OR_STEP_LAST   | Optimized `BOOL_OR_STEP` for last subexpression in `OR` series. Has no reason to jump on truthy value.     |
-| BOOL_AND_STEP       | Evaluates value passed to operation. If `true` do nothing; if `false` or `NULL` jump to `jumpdone`.        |
-| BOOL_AND_STEP_FIRST | Optimized `BOOL_AND_STEP` for first subexpression in `AND` series.                                         |
-| BOOL_AND_STEP_LAST  | Optimized `BOOL_AND_STEP` for last subexpression in `AND` series. Has no reason to jump on falsy value.    |
-| BOOL_NOT            | Converts `true` to `false`, `false` to `true`, and `NULL` to `NULL`. Result is stored in some destination. |
-| QUAL                | Same as AND step, but optimized for performance. Jumps to `DONE` if value is `NULL` or `false`.            |
-| DONE                | Evaluation is complete. Return result to caller.                                                           |
