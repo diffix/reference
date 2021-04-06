@@ -296,14 +296,14 @@ round(price * 3.45) > 100 OR round(uid * 13.25) > 10
   3: FUNCEXPR_STRICT     float8mul
   4: FUNCEXPR_STRICT     round
   5: FUNCEXPR_STRICT     float8gt
-  6: BOOL_OR_STEP_FIRST  short_circuit 13
+  6: BOOL_OR_STEP_FIRST  short_circuit_to 13
   7: SCAN_VAR            uid
   8: FUNCEXPR_STRICT     numeric
   9: FUNCEXPR_STRICT     numeric_mul
  10: FUNCEXPR_STRICT     round
  11: FUNCEXPR_STRICT     numeric_gt
  12: BOOL_OR_STEP_LAST
- 13: QUAL (AND step)     short_circuit 14
+ 13: QUAL (AND step)     short_circuit_to 14
  14: DONE
 ```
 
@@ -389,10 +389,10 @@ In the example above the planner has been smart enough to push the `uid < 20` co
 | FUNCEXPR_STRICT     | Calls a function if all args are non-NULL. If any arg is NULL then NULL is returned directly.              |
 | BOOL_OR_STEP        | Evaluates value passed to operation. If `false` or `NULL` do nothing; if `true` jump to `jumpdone`.        |
 | BOOL_OR_STEP_FIRST  | Optimized `BOOL_OR_STEP` for first subexpression in `OR` series.                                           |
-| BOOL_OR_STEP_LAST   | Optimized `BOOL_OR_STEP` for last subexpression in `OR` series.                                            |
+| BOOL_OR_STEP_LAST   | Optimized `BOOL_OR_STEP` for last subexpression in `OR` series. Has no reason to jump on truthy value.     |
 | BOOL_AND_STEP       | Evaluates value passed to operation. If `true` do nothing; if `false` or `NULL` jump to `jumpdone`.        |
 | BOOL_AND_STEP_FIRST | Optimized `BOOL_AND_STEP` for first subexpression in `AND` series.                                         |
-| BOOL_AND_STEP_LAST  | Optimized `BOOL_AND_STEP` for last subexpression in `AND` series.                                          |
+| BOOL_AND_STEP_LAST  | Optimized `BOOL_AND_STEP` for last subexpression in `AND` series. Has no reason to jump on falsy value.    |
 | BOOL_NOT            | Converts `true` to `false`, `false` to `true`, and `NULL` to `NULL`. Result is stored in some destination. |
 | QUAL                | Same as AND step, but optimized for performance. Jumps to `DONE` if value is `NULL` or `false`.            |
 | DONE                | Evaluation is complete. Return result to caller.                                                           |
