@@ -79,7 +79,7 @@ Read more about how this is done in the [computing noise](computing%20noise.md) 
 
 ### Example "twilight zone" attack query
 
-Let's assume we have the following two tables:
+Let's assume we have the following three tables:
 
 `medical_history`
 

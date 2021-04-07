@@ -199,7 +199,7 @@ that the minimum allowed aids threshold 2 for all AID types.
 
 Note that the tables as shown are the row contributions used to calculate an aggregate.
 
-For example, the following table should for example be read as AID 1 contributing 6 to the aggregate, AID 2 contributing 5, and AIDs 3 and 4 collectively contributing 4 (as a result of the rows already having been aggregated). `Value` is not to be confused with a row that is being grouped by!
+For example, the following table should be read as AID 1 contributing 6 to the aggregate, AID 2 contributing 5, and AIDs 3 and 4 collectively contributing 4 (as a result of the rows already having been aggregated). `Value` is not to be confused with a row that is being grouped by!
 
 | Value | AID sets  |
 | ----: | --------- |
@@ -299,8 +299,10 @@ the the per entity sum contribution the case of a `sum` aggregate.
 |     5 | AID1[4, 5]          |
 |     4 | AID1[1, 2, 3, 4, 5] |
 
-- We produce per-AID contributions. In this case the value 9 is shared, and so is the value 5 and 4. These are distributed amongst the corresponding AIDs. The resulting list of AID contributions, becomes:
+- We produce per-AID contributions. In this case, the value 9 is shared, and so are the values 5 and 4. These are distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
+
+The resulting list of AID contributions becomes:
 
 |                 Value | AID | Required distortion by AID |
 | --------------------: | --- | -------------------------- |
@@ -342,7 +344,7 @@ the the per entity sum contribution the case of a `sum` aggregate.
 |     6 | AID1[1, 2] |
 |     5 | AID1[4, 5] |
 
-- We produce per-AID contributions. In this case the values 10 and 6 are shared. These are distributed amongst the corresponding AIDs.
+- We produce per-AID contributions. In this case, the values 10 and 6 are shared. These are distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
 
 |                   Value |  AID | Required distortion by AID |
@@ -371,7 +373,7 @@ the the per entity sum contribution the case of a `sum` aggregate.
 |     6 | AID2[1]    |
 |     5 | AID2[4]    |
 
-- We produce per-AID contributions. In this case the value 8 is shared. It is distributed amongst the corresponding AIDs.
+- We produce per-AID contributions. In this case, the value 8 is shared. It is distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
 
 |         Value |  AID | Required distortion by AID |
@@ -418,9 +420,9 @@ then we would have used the distortion due to AID1 as it's the largest.
 
 # Rationale
 
-The reason we choose the largest standard deviation (versus summing all of the standard deviations from all of the AIDs) is because the noise from any smaller standard deviation is masked by the noise of the larger standard deviation.
+The reason we choose the largest standard deviation (versus summing all of the standard deviations from all of the AIDs) is that the noise from a smaller standard deviation is masked by the noise of any larger standard deviation.
 
-The reason we choose the largest flattening value (versus the sum of flattening values) is less obvious, and best explained by example. Suppose that a query has two AIDs, AID1 and AID2. Suppose that the extreme values are as follows:
+The reason we choose the largest flattening value (versus the sum of flattening values) is less obvious and best explained by example. Suppose that a query has two AIDs, AID1 and AID2. Suppose that the extreme values are as follows:
 
 |  val | AID1 | AID2 |
 | ---: | ---- | ---- |
@@ -519,6 +521,6 @@ In this case, there is no flattening for AID1, and flattening for AID2 is 4400. 
 
 Here the noise is proportional to the absolute difference, and so the attacker is unsure if the victim AID1[1] was in the first query or not.
 
-The general observation is that a given row will have some contribution to flattening for all of the AIDs, and so it is only necessary to flatten for one of the AIDs (that with the most flattening). Furthermore, is we flatten for all AIDs, then any given row is being flattened multiple times, which we don't want.
+The general observation is that a given row will have some contribution to flattening for all of the AIDs, and so it is only necessary to flatten for one of the AIDs (that with the most flattening). Furthermore, if we flatten for all AIDs, then any given row is being flattened multiple times, which we do not want.
 
 > TODO: There may be counter-examples, so we might want to look at this more.
