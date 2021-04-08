@@ -2,6 +2,10 @@ For the assumed background knowledge, please consult the:
 - [glossary](glossary.md) for definitions of terms used in this document
 - [multi-aid](multiple-aid.md) for a description of how AIDs spread through a query
 
+- [Aggregation across query boundaries](#aggregation-across-query-boundaries)
+  - [Intermediate extreme value flattening](#intermediate-extreme-value-flattening)
+    - [Example "twilight zone" attack query](#example-twilight-zone-attack-query)
+
 # Aggregation across query boundaries
 
 Our goal is to limit the distortion due to anonymization.
@@ -38,10 +42,17 @@ In this query:
 
 ## Intermediate extreme value flattening
 
-Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or extreme value flattening)
-tend to produce values collapsing down to the number 1, after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
-largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not and
-show that the aggregate values themselves quickly become harmless.
+Experiments show that repeated count aggregation (counts of counts without any form for anonymization or extreme value flattening)
+tend to produce values collapsing down to the number 1, after ~4 rounds of aggregation. After 2 rounds of aggregation, the difference between the
+largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not.
+
+The same is not true for other aggregators. `min`/`max`/`sum`/`avg`, if aggregating the value that is being grouped by, very quickly
+reached a fix-point where nothing changes after additional rounds of aggregation. In these cases, extreme values remain visible in the result.
+Aggregating by the value that is being grouped by is, arguably, a somewhat odd thing to do but, unlike the `count` aggregator
+which does not need a column expression as an input, other aggregators will invariably consume one selected column
+per round of aggregation. This puts a natural limit on the number of rounds of aggregation that are possible.
+
+It seems intermediate flattening of extreme values is necessary to prevent these extreme values from becoming attack vectors.
 
 If only a single level of aggregation is done, like in the following query:
 
@@ -72,3 +83,54 @@ involved.
 
 Flattening is done the same way for intermediate aggregates as it is for the top-level fully anonymized aggregates.
 Read more about how this is done in the [computing noise](computing%20noise.md) document.
+
+### Example "twilight zone" attack query
+
+Let's assume we have the following three tables:
+
+`medical_history`
+
+|  AID | hasCancer |
+| ---: | --------- |
+|    1 | true      |
+|  ... | ...       |
+
+`purchases`
+
+|    # |  AID | ProductId |
+| ---: | ---: | --------: |
+|    1 |    1 |       ... |
+|    2 |    1 |       ... |
+|    3 |    1 |       ... |
+|  ... |  ... |       ... |
+| 1000 |    1 |       ... |
+| 1001 |    2 |       ... |
+| 1002 |    3 |       ... |
+| 1003 |    4 |       ... |
+| 1004 |    5 |       ... |
+
+`products`
+
+| Name        | Price |
+| ----------- | ----- |
+| Apple Juice | 10    |
+| Carrots     | 3     |
+| iPhone      | 900   |
+
+If we didn't do intermediate flattening, the product name reported would give an accurate
+estimate of the number of purchases having taken place.
+
+```sql
+SELECT products.Name
+FROM (
+  SELECT count(*) as numPurchases
+  FROM purchases INNER JOIN medical_history on purchases.AID = medical_history.AID
+  WHERE medical_history.hasCancer
+) t INNER JOIN products ON t.numPurchases > products.Price
+```
+
+It would in this instance also rely on:
+- there being sufficiently many other patients with cancer
+- some knowledge about the user having unnaturally many purchases
+
+With intermediate outlier suppression `Carrots` would have been the only product name returned.

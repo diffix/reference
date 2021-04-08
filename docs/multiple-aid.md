@@ -1,5 +1,11 @@
 Please consult the [glossary](glossary.md) for definitions of terms used in this document.
 
+- [Multiple AIDs](#multiple-aids)
+  - [Low count filter](#low-count-filter)
+- [How AIDs spread](#how-aids-spread)
+  - [JOINing rows](#joining-rows)
+  - [Aggregating rows](#aggregating-rows)
+
 # Multiple AIDs
 
 A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID in a query (either because there are multiple AIDs in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly, and also is robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
@@ -31,7 +37,7 @@ For a more in-depth discussion about why AID sets have to be merged, but not joi
 
 ## Aggregating rows
 
-When aggregating rows the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a selectable having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows.
+When aggregating rows, the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a selectable having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows. Crucially `email-1` and `email-2` AID sets do not mix.
 
 Let's make this more concrete with an example. The query we want to handle
 is the following nested query with multiple levels of aggregation:
@@ -55,10 +61,15 @@ in this query:
 - `cnt2` is how many card types have a certain count
 - `cnt3` is how many instances exist per `cnt2`
 
-There are additional considerations when aggregating rows (like extreme value flattening which you can read more about in
-[multi-level-aggregation](multi-level-aggregation.md)), but we gloss over these here for the purposes of showing how AIDs are handled.
+There are additional considerations when aggregating rows such as extreme value flattening. Extreme value flattening is discussed in
+[multi-level-aggregation](multi-level-aggregation.md). To better illustrate how the process works,
+the result tables below contain both the flattened and un-flattened aggregates.
+The flattened counts are the ones carried forward to the subsequent rounds of aggregation.
 
-The input rows to the innermost query might have looked like the following table
+The input rows to the innermost query might have looked like in the following table below.
+Since we have multiple AID sets per row this data either comes from a database table with
+multiple AID columns defined, or more likely in this particular case is the result of having
+[joined a table with itself](#joining-rows).
 
 | card type | AID sets                       |
 | --------- | ------------------------------ |
@@ -73,42 +84,63 @@ The input rows to the innermost query might have looked like the following table
 | platinum  | [customer-1[4]; customer-2[1]] |
 | platinum  | [customer-1[4]; customer-2[1]] |
 ...
-| platinum  | [customer-1[4]; customer-2[1]] |
-| platinum  | [customer-1[4]; customer-2[2]] |
-| diamond   | [customer-1[4]; customer-2[1]] |
+| platinum   | [customer-1[4]; customer-2[1]] |
+| platinum   | [customer-1[4]; customer-2[2]] |
+| diamond    | [customer-1[4]; customer-2[1]] |
 ...
-| diamond   | [customer-1[4]; customer-2[4]] |
-| diamond   | [customer-1[5]; customer-2[6]] |
-
+| diamond    | [customer-1[4]; customer-2[4]] |
+| diamond    | [customer-1[5]; customer-2[6]] |
+| kryptonite | [customer-1[6]; customer-2[7]] |
 
 After one round of aggregation we are left with:
 
-| card_type | AID sets                                | cnt1 |
-| --------- | --------------------------------------- | ---- |
-| standard  | [customer-1[1, 2, 3]; customer-2[1, 3]] | 5    |
-| platinum  | [customer-1[1, 4]; customer-2[1, 2]]    | 2    |
-| diamond   | [customer-1[4, 5]; customer-2[1, 4, 6]] | 2    |
+| card_type  | AID sets                                | cnt1 (flattened) | cnt1 (real) |
+| ---------- | --------------------------------------- | ---------------: | ----------: |
+| standard   | [customer-1[1, 2, 3]; customer-2[1, 3]] |                4 |           7 |
+| platinum   | [customer-1[1, 4]; customer-2[1, 2]]    |                2 |        1001 |
+| diamond    | [customer-1[4, 5]; customer-2[1, 4, 6]] |                2 |          21 |
+| kryptonite | [customer-1[6]; customer-2[6]]          |                1 |           1 |
 
-To derive `cnt2` we repeat the same procedure, taking the union of AID sets across the rows being joined.
+To derive `cnt2` we repeat the same procedure, taking the union of AID sets across the rows being joined. In particular we see that there are two instances of rows with a `cnt1` (the flattened kind) of 2. These will be aggregated to a single row and their respective AID sets merged.
 
-The resulting table becomes:
+It's also worth noting that from this point onwards the flattened and unflattened values are in fact identical.
 
-| cnt1 | AID sets                                      | cnt2 |
-| ---- | --------------------------------------------- | ---- |
-| 5    | [customer-1[1, 2, 3]; customer-2[1, 3]]       | 1    |
-| 2    | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] | 2    |
+After the aggregation, the resulting table becomes:
 
-To derive `cnt3` we repeat the same procedure yet once more, resulting in the following table:
+| cnt1 | AID sets                                      | cnt2 (flattened) | cnt2 (real) |
+| ---: | --------------------------------------------- | ---------------: | ----------: |
+|    4 | [customer-1[1, 2, 3]; customer-2[1, 3]]       |                1 |           1 |
+|    2 | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] |                2 |           2 |
+|    1 | [customer-1[6]; customer-2[6]]                |                1 |           1 |
 
-| cnt2 | AID sets                                      | cnt3 |
-| ---- | --------------------------------------------- | ---- |
-| 1    | [customer-1[1, 2, 3]; customer-2[1, 3]]       | 1    |
-| 2    | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] | 1    |
+To derive `cnt3` we repeat the same procedure yet once more.
 
-Noise is added as normal.
+| cnt2 | AID sets                                      | cnt3 (flattened) | cnt3 (real) |
+| ---: | --------------------------------------------- | ---------------: | ----------: |
+|    1 | [customer-1[1, 2, 3, 6]; customer-2[1, 3, 6]] |                2 |           2 |
+|    2 | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] |                1 |           1 |
 
-Also note (for completeness), that if there was one more round of aggregation, the resulting table would be:
+Also note, that if there was one more round of aggregation, the resulting table would be:
 
-| cnt3 | contribution                                           | cnt4 |
-| ---- | ------------------------------------------------------ | ---- |
-| 1    | [customer-1[1, 2, 3, 4, 5]; customer-2[1, 2, 3, 4, 6]] | 1    |
+| cnt3 | contribution                                  | cnt4 (flattened) | cnt4 (real) |
+| ---: | --------------------------------------------- | ---------------: | ----------: |
+|    2 | [customer-1[1, 2, 3, 6]; customer-2[1, 3, 6]] |                1 |           1 |
+|    1 | [customer-1[1, 4, 5]; customer-2[1, 2, 4, 6]] |                1 |           1 |
+
+And if, we were to repeat it once more then the result would become:
+
+| cnt4 | contribution                                              | cnt5 (flattened) | cnt5 (real) |
+| ---: | --------------------------------------------------------- | ---------------: | ----------: |
+|    1 | [customer-1[1, 2, 3, 4, 5, 6]; customer-2[1, 2, 3, 4, 6]] |                2 |           2 |
+
+and then:
+
+| cnt5 | contribution                                              | cnt6 (flattened) | cnt6 (real) |
+| ---: | --------------------------------------------------------- | ---------------: | ----------: |
+|    2 | [customer-1[1, 2, 3, 4, 5, 6]; customer-2[1, 2, 3, 4, 6]] |                1 |           1 |
+
+and once more (at which point we end up at an equilibrium where aggregation has no effect)
+
+| cntN | contribution                                              | cntN+1 (flattened) | cntN+1 (real) |
+| ---: | --------------------------------------------------------- | -----------------: | ------------: |
+|    1 | [customer-1[1, 2, 3, 4, 5, 6]; customer-2[1, 2, 3, 4, 6]] |                  1 |             1 |
