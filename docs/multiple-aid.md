@@ -37,7 +37,7 @@ For a more in-depth discussion about why AID sets have to be merged, but not joi
 
 ## Aggregating rows
 
-When aggregating rows the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a selectable having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows. Crucially `email-1` and `email-2` AID sets do not mix.
+When aggregating rows, the resulting aggregate has AID sets that are the union of the AID sets of the rows being aggregated. Each AID set is taken the union of independently, that is to say that a row with two AID sets of kind `email` (say `email-1` and `email-2` resulting from a selectable having been joined with itself) after the aggregation has an `email-1` AID set that is the union of all the `email-1` AID sets of the aggregated rows, and an `email-2` AID set that is the union of all the `email-2` AID sets of the aggregated rows. Crucially `email-1` and `email-2` AID sets do not mix.
 
 Let's make this more concrete with an example. The query we want to handle
 is the following nested query with multiple levels of aggregation:

@@ -42,10 +42,17 @@ In this query:
 
 ## Intermediate extreme value flattening
 
-Experiments show that repeated aggregation (aggregation of aggregates without any form for anonymization or extreme value flattening)
-tend to produce values collapsing down to the number 1, after ~4 rounds of aggregation. After 2 rounds of aggregation the difference between the
-largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not and
-show that the aggregate values themselves quickly become harmless.
+Experiments show that repeated count aggregation (counts of counts without any form for anonymization or extreme value flattening)
+tend to produce values collapsing down to the number 1, after ~4 rounds of aggregation. After 2 rounds of aggregation, the difference between the
+largest and smallest value reported does not generally exceed 2. These results have held true irrespective of if the dataset includes extreme values or not.
+
+The same is not true for other aggregators. `min`/`max`/`sum`/`avg`, if aggregating the value that is being grouped by, very quickly
+reached a fix-point where nothing changes after additional rounds of aggregation. In these cases, extreme values remain visible in the result.
+Aggregating by the value that is being grouped by is, arguably, a somewhat odd thing to do but, unlike the `count` aggregator
+which does not need a column expression as an input, other aggregators will invariably consume one selected column
+per round of aggregation. This puts a natural limit on the number of rounds of aggregation that are possible.
+
+It seems intermediate flattening of extreme values is necessary to prevent these extreme values from becoming attack vectors.
 
 If only a single level of aggregation is done, like in the following query:
 
