@@ -10,6 +10,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Worked example #1](#worked-example-1)
       - [Processing for email](#processing-for-email)
       - [Processing for first_name](#processing-for-first_name)
+    - [Worked example #2](#worked-example-2)
 
 
 # Distinct aggregates
@@ -272,3 +273,28 @@ from a count of 3 to 1.
 
 In this case the flattening is the same for both AID types. In both cases we have a flattening of 2 and a top-group average of 1.
 The final aggregate therefore is: `apple + other fruits - flattening + noise` = `1 + 6 - 2 + noise proportional to 1`.
+
+
+### Worked example #2
+
+Let's say we have the following table:
+
+| AIDs                                            | Value     |
+| ----------------------------------------------- | --------- |
+| [email[Paul; Sebastian]; first_name[Sebastian]] | Apple     |
+| [email[Paul; Edon]; first_name[Sebastian]]      | Apple     |
+| [email[Sebastian]; first_name[Sebastian]]       | Apple     |
+| [email[Cristian]; first_name[Paul]]             | Apple     |
+| [email[Edon]; first_name[Paul]]                 | Apple     |
+| [email[Edon]; first_name[Paul]]                 | Orange    |
+| [email[Paul]; first_name[Paul]]                 | Orange    |
+| [email[Cristian]; first_name[Felix]]            | Orange    |
+| [email[Cristian]; first_name[Felix]]            | Orange    |
+
+The `minimum_allowed_aids` is 2 for both `email` and `first_name`.
+In this case neither Apple nor Orange have to be low count filtered.
+Apple occurs for 5 distinct `email` AIDs and 2 distinct `first_name` AIDs.
+Orange occurs for 3 distinct `email` AIDs and 2 distinct `first_name` AIDs.
+
+If the requested aggregate was `count(distinct value)` then we would return the
+completely unaltered count of 2.
