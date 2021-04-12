@@ -26,7 +26,7 @@ let rows =
 let aidColumn = ColumnReference(0, IntegerType)
 let aidColumnArray = Expression.Array [| aidColumn |]
 let strColumn = ColumnReference(1, StringType)
-let companyColumn = ColumnReference(2, IntegerType)
+let companyColumn = ColumnReference(2, StringType)
 let allAidColumns = Expression.Array [| aidColumn; companyColumn |]
 
 let context =
