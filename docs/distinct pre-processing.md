@@ -2,6 +2,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
 
 - [Distinct aggregates](#distinct-aggregates)
   - [Intuition](#intuition)
+  - [Design goal](#design-goal)
     - [Definition of extreme contributor](#definition-of-extreme-contributor)
   - [Pre-processing](#pre-processing)
   - [Algorithm sketch in detail](#algorithm-sketch-in-detail)
@@ -10,14 +11,56 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
       - [Processing for email](#processing-for-email)
       - [Processing for first_name](#processing-for-first_name)
 
+
 # Distinct aggregates
 
 ## Intuition
 
-Our regular aggregates work on the notion that all entities contribute some part of a whole,
-and that these parts can be combined.
-This intuition, and these design assumptions, do not hold when aggregating distinct values.
-A distinct value should only occur once, irrespective of how many entities report to have it.
+Regular aggregators work on the notion that all entities contribute a part of a whole
+that can be combined. For example, if we are counting card transactions, and
+Alice had  card transactions, Bob 5, Cynthia 2 then the total would be 17
+(give and take some noise, extreme value flattening).
+
+When aggregating distinct values the contributions of individuals cannot be combined in the same way.
+A distinct aggregate might be "how many distinct card types were used for card transactions",
+where card types are not considered protectable entities, whereas their owners would be.
+In this case, Alice, Bob, and Cynthia might all have used their "premium" cards. This should result
+in a distinct count of 1, despite the result involving 3 individuals.
+
+## Design goal
+
+We have two design goals for our distinct aggregators:
+
+1. We want to make use of our regular aggregators where possible (hence why the title of this
+   document contains "pre-processing" in its name)
+2. We want to avoid unnecessarily distorting results where no distortion is necessary.
+
+An example of the latter might be a dataset where the query:
+
+```sql
+SELECT card_type, count(distinct customer_id)
+FROM cards
+GROUP BY card_type
+```
+
+produces the table
+
+| card_type | count |
+| --------- | ----: |
+| gold      |  1000 |
+| silver    |  1000 |
+| diamond   |    10 |
+
+In this case, each card type is safe to include in the result as there are enough distinct customer entities for each
+card. The related distinct count query:
+
+```sql
+SELECT count(distinct card_type)
+FROM cards
+```
+
+can therefore return the count 3 without any distortion.
+
 
 ### Definition of extreme contributor
 
