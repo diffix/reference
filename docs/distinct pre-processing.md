@@ -5,9 +5,9 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
   - [Design goal](#design-goal)
     - [Definition of extreme contributor](#definition-of-extreme-contributor)
   - [Pre-processing](#pre-processing)
-  - [Algorithm sketch in detail](#algorithm-sketch-in-detail)
-    - [Algorithm](#algorithm)
-    - [Worked example](#worked-example)
+    - [Per-AID type algorithm sketch in detail](#per-aid-type-algorithm-sketch-in-detail)
+      - [Algorithm](#algorithm)
+    - [Worked example #1](#worked-example-1)
       - [Processing for email](#processing-for-email)
       - [Processing for first_name](#processing-for-first_name)
 
@@ -64,11 +64,11 @@ can therefore return the count 3 without any distortion.
 
 ### Definition of extreme contributor
 
-An entity is an extreme contributor if their presence has a noticeable difference on the aggregate.
+An entity is an extreme contributor if their presence has a noticeable impact on the aggregate.
 In a distinct aggregator, what makes an entity stand out differs from what makes an entity stand
 out in a non-distinct aggregator. We, therefore, cannot flatten as we would for other aggregators.
 
-Unlike a non-distinct aggregator, the contributions made to a distinct aggregator might be shared.
+Unlike a non-distinct aggregator, the contributions made to a distinct aggregator might be shared by multiple entities.
 For example, let's consider the following example dataset:
 
 | AID sets  | Value |
@@ -81,11 +81,11 @@ For example, let's consider the following example dataset:
 | [999, 1000] |   999 |
 
 In this example table, AID 1000 has each value in the dataset. While the presence or
-the absence would half or double the total count in a non-distinct count it does not at all affect
-the distinct count as all values are shared.
+the absence of the entity with AID 1000 would half or double the total count in a non-distinct count aggregate,
+it does not at all affect the distinct count as all values are shared.
 
 An entity can be an extreme contributor to a distinct aggregate if they have
-significantly more values than other entities for which they are the sole contributor within their AID type.
+significantly more unique values than other entities.
 
 To map it onto our previous example, AID 1000 would be an extreme contributor if the table looked like this:
 
@@ -105,10 +105,8 @@ To map it onto our previous example, AID 1000 would be an extreme contributor if
 We have validated designs for our other aggregators. What we want to do is map distinct aggregates
 onto non-distinct ones so we can reuse our existing work and machinery.
 
-The mapping we want to achieve spreads the individual values across entities such
+The mapping we want to achieve spreads the individual values across different entities in such a way
 that the individual contributions can be combined like a regular aggregate would.
-With such a mapping in place, the existing aggregator implementations can perform flattening and noise adding
-in their usual way.
 
 We must spread the values across as many AIDs as possible. Otherwise, individual entities will unnecessarily
 exhibit what our aggregators will consider extreme-contribution behaviour, which will lead to potentially unnecessary flattening.
@@ -118,26 +116,35 @@ The proposed design, therefore, maps each AID type individually.
 Much like for other aggregators, we want to use the most extreme flattening required. Doing so leads to
 distinct aggregators having to be processed as follows:
 
+Globally:
+
+- filter out all values that pass the low count filter. These are safe and can be aggregated as they are
+  without further processing.
+
 For each AID-type:
 
-- map values onto individual contributors
-- aggregate using existing non-distinct aggregators and determine the amount of flattening needed,
-  using the largest of value returned for the final aggregate result
-- the non-distinct aggregator applies noise as usual
+- map the remaining values onto individual contributors
+- aggregate using existing non-distinct aggregators and determine the amount of flattening needed
+
+Post-processing:
+
+- Aggregate the the values that passed low count filtering without any further noise
+- For the remaining values use the flattening and noise amount from the per-AID type
+  processing for the AID type that yielded the amount of flattening
 
 
-## Algorithm sketch in detail
+### Per-AID type algorithm sketch in detail
 
 An implementation of this algorithm exists [in the experiments](https://github.com/diffix/experiments/blob/master/count%20distinct/CountDistinctPlayground/CountDistinctPlayground/CountDistinctExperiment.fs) repository.
 
 The following algorithm is applied individually for each AID type.
 If you have a row with an AID such as `[email-1[alice, bob]; email-2[alice, cynthia]; ssn[1, 2, 3]]`
-then then the algorithm is individually run, to completion, for `email-1`, `email-2` and `ssn`.
+then the algorithm is individually run for `email-1`, `email-2` and `ssn`.
 The run yielding the largest flattening is used. Additionally, noise is applied proportional to the
 top group average, as specified by the particular non-distinct aggregator used.
 
 
-### Algorithm
+#### Algorithm
 
 - Split AID sets into individual contributions. A shared contribution of value `A` by AIDs `email-1[alice, bob]`
   is treated as if they were individual contributions of value `A` by `email-1[alice]` and `email-1[bob]`.
@@ -147,115 +154,121 @@ top group average, as specified by the particular non-distinct aggregator used.
   not yet been assigned to another AID and output it as belonging to the particular AID
 - Process the output using the corresponding regular aggregate function
 
-The first step requires some explanation. For regular aggregates a shared contribution
-is divided across each contributing AID. I.e. an Apple contributed by Alice and Bob,
-would mean that both Alice and Bob contributed half an apple.
-For a distinct aggregate this doesn't make sense as what we are recording is the
-fact that a value was contributed and now how many times. Therefore it is valid
-to say that both Alice and Bob fully contributed the Apple.
+The first step requires some explanation. For regular aggregate values, a shared contribution
+is divided across each contributing AID. I.e. an Apple was contributed collectively by Alice and Bob,
+then we normally assume Alice and Bob contributed half an apple each.
+For a distinct aggregator this doesn't make sense as what we are recording is
+that a particular value was contributed, not how many times it was contributed.
 
 
-### Worked example
+### Worked example #1
 
 Let's say we have the following table:
 
-| AIDs                                            | Value     |
-| ----------------------------------------------- | --------- |
-| [email[Paul; Sebastian]; first_name[Sebastian]] | Apple     |
-| [email[Paul; Edon]; first_name[Sebastian]]      | Apple     |
-| [email[Sebastian]; first_name[Sebastian]]       | Apple     |
-| [email[Cristian]; first_name[Paul]]             | Apple     |
-| [email[Edon]; first_name[Paul]]                 | Apple     |
-| [email[Edon]; first_name[Paul]]                 | Pear      |
-| [email[Paul]; first_name[Paul]]                 | Pineapple |
-| [email[Cristian]; first_name[Felix]]            | Lemon     |
-| [email[Cristian]; first_name[Felix]]            | Orange    |
+| AIDs                                            | Value      |
+| ----------------------------------------------- | ---------- |
+| [email[Paul; Sebastian]; first_name[Sebastian]] | Apple      |
+| [email[Paul; Edon]; first_name[Sebastian]]      | Apple      |
+| [email[Sebastian]; first_name[Sebastian]]       | Apple      |
+| [email[Cristian]; first_name[Paul]]             | Apple      |
+| [email[Edon]; first_name[Paul]]                 | Apple      |
+| [email[Edon]; first_name[Paul]]                 | Pear       |
+| [email[Paul]; first_name[Paul]]                 | Pineapple  |
+| [email[Cristian]; first_name[Paul]]             | Lemon      |
+| [email[Cristian]; first_name[Felix]]            | Orange     |
+| [email[Felix]; first_name[Edon]]                | Banana     |
+| [email[Edon]; first_name[Cristian]]             | Grapefruit |
 
-We process this table by AID type, i.e. `email` and `first_name`, separately.
+Apple was contributed by 4 `email` entities (`Paul`, `Sebastian, `Cristian`, and `Edon`),
+and 2 `first_name` entities (`Sebastian` and `Paul`). It is therefore safe and we set it aside.
+
+The remaining values are processed separately by AID type (i.e. `email` and `first_name`).
 
 #### Processing for email
 
 After splitting the per-AID contributions into individual contributions, we end up with:
 
-| AID       | Value     |
-| --------- | --------- |
-| Paul      | Apple     |
-| Sebastian | Apple     |
-| Edon      | Apple     |
-| Cristian  | Apple     |
-| Edon      | Pear      |
-| Paul      | Pineapple |
-| Cristian  | Lemon     |
-| Cristian  | Orange    |
+| AID      | Value      |
+| -------- | ---------- |
+| Edon     | Pear       |
+| Paul     | Pineapple  |
+| Cristian | Lemon      |
+| Cristian | Orange     |
+| Felix    | Banana     |
+| Edon     | Grapefruit |
 
 grouping by AID and sorting by the number of contributions, yields:
 
-| AID       | Values                 |
-| --------- | ---------------------- |
-| Sebastian | [Apple]                |
-| Paul      | [Apple; Pineapple]     |
-| Edon      | [Apple; Pear]          |
-| Cristian  | [Apple; Lemon; Orange] |
+| AID      | Values             |
+| -------- | ------------------ |
+| Paul     | [Pineapple]        |
+| Felix    | [Banana]           |
+| Edon     | [Pear, Grapefruit] |
+| Cristian | [Lemon; Orange]    |
 
 repeatedly scanning and assigning unassigned values from the list,
 after the first pass through the list yields the following assigned values:
 
-| AID       | Value     |
-| --------- | --------- |
-| Sebastian | Apple     |
-| Paul      | Pineapple |
-| Edon      | Pear      |
-| Cristian  | Lemon     |
+| AID      | Value     |
+| -------- | --------- |
+| Paul     | Pineapple |
+| Felix    | Banana    |
+| Edon     | Pear      |
+| Cristian | Lemon     |
 
 leaving the following table of unassigned values:
 
-| AID      | Values   |
-| -------- | -------- |
-| Cristian | [Orange] |
+| AID      | Values       |
+| -------- | ------------ |
+| Edon     | [Grapefruit] |
+| Cristian | [Orange]     |
 
 repeating the process consumes all available values resulting in a final
 contribution list of:
 
-| AID       | Value     |
-| --------- | --------- |
-| Sebastian | Apple     |
-| Paul      | Pineapple |
-| Edon      | Pear      |
-| Cristian  | Lemon     |
-| Cristian  | Orange    |
+| AID      | Value      |
+| -------- | ---------- |
+| Paul     | Pineapple  |
+| Felix    | Banana     |
+| Edon     | Pear       |
+| Cristian | Lemon      |
+| Edon     | Grapefruit |
+| Cristian | Orange     |
 
-If the original aggregator is `count(distinct value)`, then we would now
-pass the list through our regular `count(value)` aggregator, which would determine
-that Cristian is an extreme contributor (having 2 contributions vs 1 for the others)
-and a total flattening of 1.
+If the aggregator is count (i.e. the analyst asked for `count(distinct value)`), then we can now
+pass this table through our regular `count(value)` aggregator. Assuming `Ne = 2` and `Nt = 2` the
+algorithm would deduce that Cristian and Edon are extreme contributors (having 2 contributions each vs 1 for Felix and Paul)
+and the total flattening resulting from AID type `email` would be 2 (one for each of Edon and Cristian).
 
 
 #### Processing for first_name
 
-The process is similar as it was for `email`. We split values
+The process is similar to that done for `email`. We split the values
 across users, group by AID and order ascending by number of distinct
 contributed values:
 
-| AID       | Values                   |
-| --------- | ------------------------ |
-| Sebastian | [Apple]                  |
-| Felix     | [Lemon; Orange]          |
-| Paul      | [Apple; Pear; Pineapple] |
+| AID      | Values                   |
+| -------- | ------------------------ |
+| Edon     | [Banana]                 |
+| Cristian | [Grapefruit]             |
+| Felix    | [Orange]                 |
+| Paul     | [Pear; Pineapple; Lemon] |
 
 Iteratively scanning through this list and assigning values to AIDs would yield
 the following contribution list:
 
-| AID       | Values    |
-| --------- | --------- |
-| Sebastian | Apple     |
-| Felix     | Lemon     |
-| Paul      | Pear      |
-| Felix     | Orange    |
-| Paul      | Pineapple |
+| AID      | Values     |
+| -------- | ---------- |
+| Edon     | Banana     |
+| Cristian | Grapefruit |
+| Felix    | Orange     |
+| Paul     | Pear       |
+| Paul     | Pineapple  |
+| Paul     | Lemon      |
 
-Which, when used as input for the `count(value)` aggregate, might consider both Felix and Paul extreme contributors (with 2 values each as opposed to 1 for Sebastian) and
-a required flattening of 2.
+Which, when used as input for the `count(value)` aggregator with an `Ne = 2` and `Nt = 2`, places both Paul and Felix
+in the extreme value group and Edon and Cristian in the top group. The required flattening is 2 reducing Paul down
+from a count of 3 to 1.
 
-We use an overall flattening of 2 taken from aggregating based on `first_name` as it exceeds the flattening of 1 resulting from
-aggregating based on `email`. Additionally, if this is the top-level anonymizing aggregator, we would add noise proportional to the
-top-group average reported by the `count(value)` processing done based on the `first_name` AID.
+In this case the flattening is the same for both AID types. In both cases we have a flattening of 2 and a top-group average of 1.
+The final aggregate therefore is: `apple + other fruits - flattening + noise` = `1 + 6 - 2 + noise proportional to 1`.
