@@ -23,8 +23,8 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> randomNormal rnd
   |> max -noiseParam.Cutoff
   |> min noiseParam.Cutoff
-  |> round
-  |> int32
+
+let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
 
 let countAids (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
   match aidSets with
@@ -33,7 +33,7 @@ let countAids (aidSets: Set<AidHash> array option) (anonymizationParams: Anonymi
   | Some aidSets ->
       let aidSet = aidSets |> Array.head
       let rnd = newRandom aidSet anonymizationParams
-      let noise = noiseValue rnd anonymizationParams.Noise
+      let noise = noiseValueInt rnd anonymizationParams.Noise
       max (aidSet.Count + noise) 0
 
 let isLowCount (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
@@ -59,37 +59,59 @@ let isLowCount (aidSets: Set<AidHash> array option) (anonymizationParams: Anonym
       )
       |> Array.reduce (||)
 
+type private AidCount = { NoisyCount: float; Flattening: float }
+
+let private aidFlattening
+  (anonymizationParams: AnonymizationParams)
+  (aidContributions: Map<AidHash, int64>)
+  : AidCount option =
+  match Map.toList aidContributions with
+  | [] -> None
+  | perAidContributions ->
+      let aids = perAidContributions |> List.map fst |> Set.ofList
+      let rnd = newRandom aids anonymizationParams
+
+      // The noise value must be generated first to make sure the random number generator is fresh.
+      // This ensures count(distinct aid) which uses addNoise directly produces the same results.
+      let noise = noiseValue rnd anonymizationParams.Noise
+
+      let sortedUserContributions = perAidContributions |> List.map snd |> List.sortDescending
+
+      let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
+      let topCount = randomUniform rnd anonymizationParams.TopCount
+
+      if sortedUserContributions.Length < outlierCount + topCount then
+        None
+      else
+        let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
+
+        let topValueSummed =
+          sortedUserContributions
+          |> List.skip outlierCount
+          |> List.take topCount
+          |> List.sum
+
+        let topValueAverage = (float topValueSummed) / (float topCount)
+        let outlierReplacement = topValueAverage * (float outlierCount)
+
+        let totalCount = sortedUserContributions |> List.sum
+        let flattening = float outliersSummed - outlierReplacement
+        let noisyCount = float totalCount - flattening + noise |> max 0.
+
+        Some { NoisyCount = noisyCount; Flattening = flattening }
+
+
 let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<AidHash, int64> array option) =
   match perUserContributions with
   | None -> Null
   | Some perUserContributions ->
-      match perUserContributions |> Array.head |> Map.toList with
+      let results =
+        perUserContributions
+        |> Array.toList
+        |> List.map (aidFlattening anonymizationParams)
+        |> List.choose id
+        |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
+
+      match results with
       | [] -> Null
-      | perUserContribution ->
-          let aids = perUserContribution |> List.map fst |> Set.ofList
-          let rnd = newRandom aids anonymizationParams
-          // The noise value must be generated first to make sure the random number generator is fresh.
-          // This ensures count(distinct aid) which uses addNoise directly produces the same results.
-          let noise = noiseValue rnd anonymizationParams.Noise
-
-          let sortedUserContributions = perUserContribution |> List.map snd |> List.sortDescending
-
-          let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
-          let topCount = randomUniform rnd anonymizationParams.TopCount
-
-          if sortedUserContributions.Length < outlierCount + topCount then
-            Null
-          else
-            let topValueSummed =
-              sortedUserContributions
-              |> List.skip outlierCount
-              |> List.take topCount
-              |> List.sum
-
-            let topValueAverage = (float topValueSummed) / (float topCount)
-            let outlierReplacement = topValueAverage * (float outlierCount) |> int64
-
-            let sumExcludingOutliers = sortedUserContributions |> List.skip (outlierCount) |> List.sum
-
-            let totalCount = sumExcludingOutliers + outlierReplacement
-            (max (totalCount + int64 noise) 0L) |> Integer
+      | flattenedCount :: _ -> flattenedCount.NoisyCount |> round |> int64 |> Integer

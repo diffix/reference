@@ -5,12 +5,7 @@ open FsUnit.Xunit
 open OpenDiffix.Core
 
 let companies i =
-  let names =
-    [
-      "Alpha"
-      "Beta"
-      "Gamma"
-    ]
+  let names = [ "Alpha"; "Beta"; "Gamma" ]
   names |> List.item (i % names.Length)
 
 let rows =
@@ -18,10 +13,10 @@ let rows =
   |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id |> String |])
   |> List.append [
-    [| Null; String "value"; String "Alpha" |]
-    [| Integer 8L; Null; String "Alpha" |]
-    [| Integer 9L; String "value"; Null |]
-  ]
+       [| Null; String "value"; String "Alpha" |]
+       [| Integer 8L; Null; String "Alpha" |]
+       [| Integer 9L; String "value"; Null |]
+     ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let aidColumnArray = Expression.Array [| aidColumn |]
@@ -78,7 +73,9 @@ let ``anon count returns Null if insufficient users`` () =
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal Null
 
-  firstRow |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ] |> should equal Null
+  firstRow
+  |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ]
+  |> should equal Null
 
 [<Fact>]
 let ``anon count returns 0 for Null inputs`` () =
@@ -95,3 +92,30 @@ let ``anon count returns Null when all AIDs null`` () =
   rows
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal Null
+
+[<Fact>]
+let ``multi-AID count`` () =
+  let rows = [
+    // AID1 ; String column ; AID 2
+    [| Integer 1L; String "value"; String "Alpha" |]
+    [| Integer 2L; String "value"; String "Alpha" |]
+    [| Integer 3L; String "value"; String "Alpha" |]
+    [| Integer 4L; String "value"; String "Alpha" |]
+    [| Integer 5L; String "value"; String "Alpha" |]
+    [| Integer 6L; String "value"; String "Alpha" |]
+    [| Integer 7L; String "value"; String "Alpha" |]
+    [| Integer 8L; String "value"; String "Alpha" |]
+    [| Integer 9L; String "value"; String "Alpha" |]
+    [| Integer 10L; String "value"; String "Alpha" |]
+    [| Integer 11L; String "value"; String "Alpha" |]
+    [| Integer 12L; String "value"; String "Beta" |]
+    [| Integer 13L; String "value"; String "Gamma" |]
+    [| Integer 14L; String "value"; String "Delta" |]
+    [| Integer 15L; String "value"; String "Epsilon" |]
+  ]
+
+  // Alpha is outlier with 11 entries. Should be flattened by 10.
+
+  rows
+  |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
+  |> should equal (Integer 5L)
