@@ -134,7 +134,8 @@ When aggregating, we flatten extreme values and replace their values with those 
 
 The process for flattening extreme values is done separately for each AID set. That is to say, for a
 dataset with AID sets `[email-1; email-2; company]`, the process is repeated three times, even though
-there are only two kinds of AIDs. For each AID set, we calculate the absolute amount of flattening required. We use the flattening and noise parameters of the AID set with the largest flattening.
+there are only two kinds of AIDs. For each AID set, we calculate the absolute amount of flattening required.
+We use the highest flattening and noise parameters calculated across all the AID sets.
 
 We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with two significant
 differences:
@@ -149,9 +150,10 @@ and top group averages:
 - `email-2`: flattening 4500, top group average 100
 - `company`: flattening 250, top group average 500
 
-Then we would use the parameters associated with `email-2`.
+Then we would use the flattening parameters associated with `email-2`, and the
+top group average from `company` for the noise.
 The real aggregate value would be flattened by 4500 and in the case of a
-fully anonymize aggregate value we would add noise value proportional to 100.
+fully anonymize aggregate value we would additionally add noise value proportional to 500.
 
 
 ### Redistribution of values
@@ -204,7 +206,8 @@ The process for suppressing extreme values is as follows:
 10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
 Once the algorithm has been completed for each AID set individual, we continue based on the AID set with the largest amount of flattening.
-In the case of the fully anonymizing aggregation in the top-most query we also add noise proportional to the top group average of that AID set.
+In the case of the fully anonymizing aggregation in the top-most query we also add noise proportional to the absolute largest top group average
+across the AID sets.
 
 Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AID types unless otherwise stated.
 
@@ -428,7 +431,7 @@ The resulting list of AID contributions becomes:
 Even though we could have produced an aggregate from the perspectives of AID1 and AID2,
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
 Assuming there had been enough AID3 entities and that the total flattening due to AID3 had been 10,
-then we would have used the flattening due to AID1 as it is the largest.
+then we would have used the flattening by 25.5 due to AID1 and added noise proportional to the top group average 6 of AID2.
 
 
 # Rationale
