@@ -95,8 +95,9 @@ let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map
     )
     Map.empty
 
-let transposeToPerValue (perAidTypeValueMap: Map<Value, Set<AidHash>> array) : Map<Value, Set<AidHash> array> =
+let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> array) : Map<Value, Set<AidHash> array> =
   perAidTypeValueMap
+  |> Array.map transposePerAidMapsToPerValue
   |> Array.fold
     (fun (acc: Map<Value, Set<AidHash> array>) (valueHashMap: Map<Value, Set<AidHash>>) ->
       valueHashMap
@@ -159,7 +160,6 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
   // without any additional noise.
   let valuesPassingLowCount =
     perAidValuesByAidType
-    |> Array.map transposePerAidMapsToPerValue
     |> transposeToPerValue
     |> Map.toList
     |> List.filter (fun (_value, aidSets) -> not <| isLowCount aidSets anonymizationParams)
