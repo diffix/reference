@@ -261,7 +261,7 @@ the the per entity sum contribution in the case of a `sum` aggregator.
 - We take the `Ne` first values as the extreme values
 - We try taking the `Nt` next rows for the top group, but have run out of data.
   - If this was a final anonymized aggregate (i.e. the top level query), then we would terminate the process and return `null` to indicate that we could not produce an anonymous aggregate,
-  - If this was an intermediate aggregation step meant, then we follow the alternative approahc of instead using the value with the lowest contribution as the top group average. In this case the value 5 becoems the top group average substitute.
+  - If this was an intermediate aggregation step meant, then we follow the alternative approach of instead using the value with the lowest contribution as the top group average. In this case the value 5 becomes the top group average substitute.
 - The total distortion is _infinite_... sort of in the case of this being a top-level aggregator, and 1 for intermediate ones.
 
 
