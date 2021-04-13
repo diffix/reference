@@ -179,14 +179,7 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
     query,
     (function
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
-        let args =
-          match opts.Distinct, args, aidColumnsExpression with
-          | true, [ colExpr ], Array aidExpressions when Array.contains colExpr aidExpressions ->
-              [ aidColumnsExpression; colExpr ]
-          | true, _, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
-          | false, _, _ -> aidColumnsExpression :: args
-
-        FunctionExpr(AggregateFunction(DiffixCount, opts), args)
+        FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
     | expression -> expression)
   )
 
