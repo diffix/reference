@@ -1,8 +1,8 @@
 namespace OpenDiffix.Core
 
 type IAggregator =
-  abstract Transition: Value list -> IAggregator
-  abstract Final: EvaluationContext -> Value
+  abstract Transition : Value list -> IAggregator
+  abstract Final : EvaluationContext -> Value
 
 module Aggregator =
 
@@ -123,7 +123,7 @@ module Aggregator =
 
       member this.Final ctx = Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
 
-  let create _ctx fn: IAggregator =
+  let create _ctx fn : IAggregator =
     match fn with
     | AggregateFunction (Count, { Distinct = false }) -> Count() :> IAggregator
     | AggregateFunction (Count, { Distinct = true }) -> CountDistinct() :> IAggregator

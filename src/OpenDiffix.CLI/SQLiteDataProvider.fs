@@ -99,7 +99,7 @@ let rec columnTypeToString =
   | ArrayType elementType -> $"array of %s{columnTypeToString elementType}"
   | UnknownType typeName -> $"unknown ({typeName})"
 
-type DataProvider (dbPath: string) =
+type DataProvider(dbPath: string) =
   let connection =
     let connection = dbPath |> dbConnection |> Utils.unwrap
     connection.Open()
@@ -123,6 +123,7 @@ type DataProvider (dbPath: string) =
             { Name = table.Name; Columns = columns }
           )
       }
+
     member this.LoadData(table) =
       let columns =
         table.Columns
@@ -132,4 +133,3 @@ type DataProvider (dbPath: string) =
       let loadQuery = $"SELECT {columns} FROM {table.Name}"
 
       executeQuery connection loadQuery
-

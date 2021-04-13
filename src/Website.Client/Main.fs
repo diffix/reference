@@ -50,7 +50,7 @@ let matchUpCells anon raw =
        | (a, r) when a = r -> IdenticalCell a
        | (a, r) -> MixedCell { AnonymizedValue = a; RawValue = r })
 
-let compareResults (anon: QueryResult) (raw: QueryResult): ComparativeResult =
+let compareResults (anon: QueryResult) (raw: QueryResult) : ComparativeResult =
   let rec compareRowsRecursively a r =
     match a, r with
     | [], [] -> []
@@ -180,32 +180,46 @@ let homePage model dispatch =
   Main
     .Home()
     .Query(model.Query, (fun query -> dispatch (SetQuery query)))
-    .MinimumNumberAIDs(model.AnonParams.MinimumAllowedAids,
-                       fun v -> dispatch <| AdjustAnonParam(fun a -> { a with MinimumAllowedAids = v }))
-    .OutlierMin(model.AnonParams.OutlierCount.Lower,
-                fun v ->
-                  dispatch
-                  <| AdjustAnonParam(fun a -> { a with OutlierCount = { a.OutlierCount with Lower = v } }))
-    .OutlierMax(model.AnonParams.OutlierCount.Upper,
-                fun v ->
-                  dispatch
-                  <| AdjustAnonParam(fun a -> { a with OutlierCount = { a.OutlierCount with Upper = v } }))
-    .TopMin(model.AnonParams.TopCount.Lower,
-            fun v ->
-              dispatch
-              <| AdjustAnonParam(fun a -> { a with TopCount = { a.TopCount with Lower = v } }))
-    .TopMax(model.AnonParams.TopCount.Upper,
-            fun v ->
-              dispatch
-              <| AdjustAnonParam(fun a -> { a with TopCount = { a.TopCount with Upper = v } }))
-    .NoiseStdDev(model.AnonParams.Noise.StandardDev,
-                 fun v ->
-                   dispatch
-                   <| AdjustAnonParam(fun a -> { a with Noise = { a.Noise with StandardDev = v } }))
-    .NoiseCutoff(model.AnonParams.Noise.Cutoff,
-                 fun v ->
-                   dispatch
-                   <| AdjustAnonParam(fun a -> { a with Noise = { a.Noise with Cutoff = v } }))
+    .MinimumNumberAIDs(
+      model.AnonParams.MinimumAllowedAids,
+      fun v -> dispatch <| AdjustAnonParam(fun a -> { a with MinimumAllowedAids = v })
+    )
+    .OutlierMin(
+      model.AnonParams.OutlierCount.Lower,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with OutlierCount = { a.OutlierCount with Lower = v } })
+    )
+    .OutlierMax(
+      model.AnonParams.OutlierCount.Upper,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with OutlierCount = { a.OutlierCount with Upper = v } })
+    )
+    .TopMin(
+      model.AnonParams.TopCount.Lower,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with TopCount = { a.TopCount with Lower = v } })
+    )
+    .TopMax(
+      model.AnonParams.TopCount.Upper,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with TopCount = { a.TopCount with Upper = v } })
+    )
+    .NoiseStdDev(
+      model.AnonParams.Noise.StandardDev,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with Noise = { a.Noise with StandardDev = v } })
+    )
+    .NoiseCutoff(
+      model.AnonParams.Noise.Cutoff,
+      fun v ->
+        dispatch
+        <| AdjustAnonParam(fun a -> { a with Noise = { a.Noise with Cutoff = v } })
+    )
     .Error(model.Error |> Option.map errorTemplate |> Option.defaultValue empty)
     .Result(model.Result |> Option.map resultTable |> Option.defaultValue empty)
     .Elt()

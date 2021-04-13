@@ -6,7 +6,7 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let testTable: Table =
+let testTable : Table =
   {
     Name = "table"
     Columns =
@@ -205,7 +205,10 @@ type Tests(db: DBFixture) =
     let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumns ])
 
     let countDistinct =
-      FunctionExpr(AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }), [ aidColumns; idColumn ])
+      FunctionExpr(
+        AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true }),
+        [ aidColumns; idColumn ]
+      )
 
     let expectedInTopQuery =
       [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]

@@ -110,7 +110,7 @@ let ``plan all`` () =
         Plan.Filter(
           Plan.Aggregate(
             Plan.Filter(
-              Plan.Scan(table),  //
+              Plan.Scan(table), //
               whereCondition
             ),
             groupingSet,

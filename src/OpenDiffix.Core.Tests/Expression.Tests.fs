@@ -194,7 +194,7 @@ module DefaultFunctionsTests =
         Boolean false, Boolean false, Boolean true
       ]
 
-let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list): Row list =
+let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
 let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |]

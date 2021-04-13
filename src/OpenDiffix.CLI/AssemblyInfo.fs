@@ -33,8 +33,12 @@ open Thoth.Json.Net
 let versionJsonValue =
   Encode.object [
     "name", Encode.string "OpenDiffix Reference implementation"
-    "version", Encode.object [
-      "version", Encode.string (sprintf "%s.%s.%s" ThisAssembly.Git.SemVer.Major ThisAssembly.Git.SemVer.Minor ThisAssembly.Git.SemVer.Patch)
+    "version",
+    Encode.object [
+      "version",
+      Encode.string (
+        sprintf "%s.%s.%s" ThisAssembly.Git.SemVer.Major ThisAssembly.Git.SemVer.Minor ThisAssembly.Git.SemVer.Patch
+      )
       "commit_number", Encode.int (int ThisAssembly.Git.Commits)
       "branch", Encode.string ThisAssembly.Git.Branch
       "sha", Encode.string ThisAssembly.Git.Commit

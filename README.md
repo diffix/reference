@@ -71,6 +71,20 @@ The codebase is currently organized in a number of projects:
 To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
 
+### Formatting
+
+We use fantomas for formatting.
+It might be benefitial to have a `pre-commit` git hook like the following to ensure the code
+you commit to the repository has been formatted:
+
+`.git/hooks/pre-commit`:
+
+```
+#!/bin/sh
+git diff --cached --name-only --diff-filter=ACM -z | xargs -0 dotnet fantomas
+git diff --cached --name-only --diff-filter=ACM -z | xargs -0 git add -p
+```
+
 ## Creating a release
 
 To generate an executable of the command line interface, run one of:

@@ -5,12 +5,7 @@ open FsUnit.Xunit
 open OpenDiffix.Core
 
 let companies i =
-  let names =
-    [
-      "Alpha"
-      "Beta"
-      "Gamma"
-    ]
+  let names = [ "Alpha"; "Beta"; "Gamma" ]
   names |> List.item (i % names.Length)
 
 let rows =
@@ -18,10 +13,10 @@ let rows =
   |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id |> String |])
   |> List.append [
-    [| Null; String "value"; String "Alpha" |]
-    [| Integer 8L; Null; String "Alpha" |]
-    [| Integer 9L; String "value"; Null |]
-  ]
+       [| Null; String "value"; String "Alpha" |]
+       [| Integer 8L; Null; String "Alpha" |]
+       [| Integer 9L; String "value"; Null |]
+     ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let aidColumnArray = Expression.Array [| aidColumn |]
@@ -78,7 +73,9 @@ let ``anon count returns Null if insufficient users`` () =
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal Null
 
-  firstRow |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ] |> should equal Null
+  firstRow
+  |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ]
+  |> should equal Null
 
 [<Fact>]
 let ``anon count returns 0 for Null inputs`` () =
