@@ -7,8 +7,8 @@ type Table = { Name: string; Columns: Column list }
 type Schema = Table list
 
 type IDataProvider =
-  abstract LoadData: table:Table -> Async<Result<Row seq, string>>
-  abstract GetSchema: unit -> Async<Result<Schema, string>>
+  abstract LoadData : table: Table -> Async<Result<Row seq, string>>
+  abstract GetSchema : unit -> Async<Result<Schema, string>>
 
 module Table =
   open FsToolkit.ErrorHandling

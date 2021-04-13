@@ -3,7 +3,7 @@ module OpenDiffix.Core.Tests.Analysis.QueryValidity_Tests
 open Xunit
 open OpenDiffix.Core
 
-let testTable: Table =
+let testTable : Table =
   {
     Name = "table"
     Columns =

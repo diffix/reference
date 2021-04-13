@@ -1,13 +1,15 @@
 # open-diffix reference implementation
 
-- [Purpose](#purpose)
-- [Gotcha - Please read!](#gotcha)
-- [Development process](#development-process)
-  - [Design considerations](#design-considerations)
-  - [Organization](#organization)
-  - [Branches](#branches)
-- [Creating a release](#creating-a-release)
-- [Using CLI](#using-cli)
+- [open-diffix reference implementation](#open-diffix-reference-implementation)
+  - [Purpose](#purpose)
+  - [Gotcha](#gotcha)
+  - [Development process](#development-process)
+    - [Anonymization design](#anonymization-design)
+    - [Design considerations](#design-considerations)
+    - [Organization](#organization)
+    - [Branches](#branches)
+  - [Creating a release](#creating-a-release)
+  - [Using CLI](#using-cli)
 
 
 ## Purpose
@@ -36,6 +38,20 @@ Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 The tests rely on the presence of a test database existing.
 For more information on how to create it, please read the [data/README](data/README.md).
 
+### Anonymization design
+
+We keep design nodes in the docs folder.
+Currently we describe:
+
+- anonymization specific terms in [glossary.md](docs/glossary.md)
+- noise computation in [computing noise.md](docs/computing%20noise.md)
+- low count filtering in [lcf.md](docs/lcf.md)
+- low effect detection in [led.md](docs/led.md)
+- handling of multiple AIDs in [multiple-aid.md](docs/multiple-aid.md)
+- how to deal with multiple levels of aggregation in [multi-level-aggregation.md](docs/multi-level-aggregation.md)
+- high level attacks and related gotchas in [attacks.md](docs/attacks.md)
+
+
 ### Design considerations
 
 We use SQLite as a dumb backing store for data. Dumb in the sense that we just read the data out of it and
@@ -54,6 +70,20 @@ The codebase is currently organized in a number of projects:
 
 To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
+
+### Formatting
+
+We use fantomas for formatting.
+It might be benefitial to have a `pre-commit` git hook like the following to ensure the code
+you commit to the repository has been formatted:
+
+`.git/hooks/pre-commit`:
+
+```
+#!/bin/sh
+git diff --cached --name-only --diff-filter=ACM -z | xargs -0 dotnet fantomas
+git diff --cached --name-only --diff-filter=ACM -z | xargs -0 git add -p
+```
 
 ## Creating a release
 
