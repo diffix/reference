@@ -288,8 +288,7 @@ let analyze (dataProvider: IDataProvider)
     if Array.isEmpty aidColumns then
       return! query |> SelectQuery |> Ok
     else
-      let firstAidColumnIndex = aidColumns |> Array.head |> fst
-      do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
+      do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery
 
       let aidColumnsExpression =
         aidColumns

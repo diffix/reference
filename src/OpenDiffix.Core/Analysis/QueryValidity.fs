@@ -24,15 +24,15 @@ let private validateOnlyCount query =
        | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
        | _ -> ())
 
-let private allowedCountUsage aidColIdx query =
+let private allowedCountUsage query =
   query
   |> onAggregates
        (function
        | FunctionExpr (AggregateFunction (Count, _), args) ->
            match args with
-           | [] -> ()
-           | [ ColumnReference (index, _) ] when index = aidColIdx -> ()
-           | _ -> failwith "Only count(*) and count(distinct aid-column) are supported"
+           | []
+           | [ ColumnReference _ ] -> ()
+           | _ -> failwith "Only count(*) and count(distinct column) are supported"
        | _ -> ())
 
 let rec private validateSelectTarget query =
@@ -45,13 +45,13 @@ let rec private validateSelectTarget query =
   )
   |> ignore
 
-let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query) =
+let private allowedAggregate (query: AnalyzerTypes.Query) =
   validateOnlyCount query
-  allowedCountUsage aidColIdx query
+  allowedCountUsage query
   validateSelectTarget query
 
-let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
+let validateQuery (query: AnalyzerTypes.Query): Result<unit, string> =
   try
-    allowedAggregate aidColIdx query
+    allowedAggregate query
     Ok()
   with exn -> Error exn.Message
