@@ -199,7 +199,7 @@ module QueryParser =
 
 type SqlParserError = string
 
-let parse sql : Result<SelectQuery, SqlParserError> =
+let parse sql: Result<SelectQuery, SqlParserError> =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with

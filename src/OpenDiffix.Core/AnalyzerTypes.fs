@@ -35,10 +35,10 @@ type Query =
     | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.Map(q1, f), Query.Map(q2, f))
     | SelectQuery selectQuery -> SelectQuery(f selectQuery)
 
-  static member Map(query: Query, f: SelectFrom -> SelectFrom) : Query =
+  static member Map(query: Query, f: SelectFrom -> SelectFrom): Query =
     Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
-  static member Map(query: Query, f: Expression -> Expression) : Query =
+  static member Map(query: Query, f: Expression -> Expression): Query =
     Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
 and SelectQuery =

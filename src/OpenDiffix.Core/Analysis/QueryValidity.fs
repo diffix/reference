@@ -50,7 +50,7 @@ let private allowedAggregate aidColIdx (query: AnalyzerTypes.Query) =
   allowedCountUsage aidColIdx query
   validateSelectTarget query
 
-let validateQuery aidColIdx (query: AnalyzerTypes.Query) : Result<unit, string> =
+let validateQuery aidColIdx (query: AnalyzerTypes.Query): Result<unit, string> =
   try
     allowedAggregate aidColIdx query
     Ok()

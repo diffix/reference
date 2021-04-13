@@ -38,7 +38,7 @@ let private executeAggregate context groupingLabels aggregators rowsStream =
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
   let defaultAggregators = aggFns |> Array.map (Aggregator.create context)
 
-  let initialState : Map<Row, IAggregator array> =
+  let initialState: Map<Row, IAggregator array> =
     if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []
 
   rowsStream

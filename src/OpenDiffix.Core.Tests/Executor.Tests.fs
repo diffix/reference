@@ -82,7 +82,7 @@ type Tests(db: DBFixture) =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
     let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [ nameLength ], [ countStar ])
 
-    let expected : Row list = []
+    let expected: Row list = []
     plan |> execute |> should equal expected
 
   [<Fact>]

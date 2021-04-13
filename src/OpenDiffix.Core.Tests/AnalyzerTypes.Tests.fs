@@ -5,7 +5,7 @@ open FsUnit.Xunit
 open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 
-let testTable : Table =
+let testTable: Table =
   {
     Name = "table"
     Columns =

@@ -77,7 +77,7 @@ let private toTableSettings (aidColumns: string list) =
   |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
   |> Map.ofList
 
-let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
+let constructAnonParameters (parsedArgs: ParseResults<CliArguments>): AnonymizationParams =
   {
     TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
@@ -95,11 +95,7 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
 
 let getDbPath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.Database with
-  | Some dbPath ->
-      if File.Exists(dbPath) then
-        dbPath
-      else
-        failWithUsageInfo $"Could not find a database at %s{dbPath}"
+  | Some dbPath -> if File.Exists(dbPath) then dbPath else failWithUsageInfo $"Could not find a database at %s{dbPath}"
   | None -> failWithUsageInfo $"Please specify the database path!"
 
 let dryRun query dbPath anonParams =

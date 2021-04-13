@@ -6,7 +6,7 @@ open OpenDiffix.Core
 open OpenDiffix.Core.AnalyzerTypes
 open OpenDiffix.Core.AnonymizerTypes
 
-let testTable : Table =
+let testTable: Table =
   {
     Name = "table"
     Columns =

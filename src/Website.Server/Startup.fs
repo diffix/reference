@@ -18,9 +18,7 @@ type Startup() =
 
     services.AddBoleroHost()
 #if DEBUG
-      .AddHotReload(
-        templateDir = __SOURCE_DIRECTORY__ + "/../Website.Client"
-      )
+      .AddHotReload(templateDir = __SOURCE_DIRECTORY__ + "/../Website.Client")
 #endif
     |> ignore
 

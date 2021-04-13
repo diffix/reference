@@ -75,7 +75,7 @@ let expressionName =
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 
-let rec mapSelectedExpression tables selectedExpression : Result<SelectExpression, string> =
+let rec mapSelectedExpression tables selectedExpression: Result<SelectExpression, string> =
   match selectedExpression with
   | ParserTypes.As (parsedExpression, parsedAlias) ->
       let alias = parsedAlias |> Option.defaultWith (fun () -> expressionName parsedExpression)
@@ -139,10 +139,7 @@ let rec private transformFrom schema from =
 let private validateTargetTables (tables: TargetTables) =
   let aliases = tables |> List.map (fun (_table, alias) -> alias.ToLower())
 
-  if aliases.Length <> (List.distinct aliases).Length then
-    Error "Ambiguous target names in `FROM` clause."
-  else
-    Ok()
+  if aliases.Length <> (List.distinct aliases).Length then Error "Ambiguous target names in `FROM` clause." else Ok()
 
 let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
   result {
@@ -280,11 +277,10 @@ let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTab
 let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) =
   collectAids anonParams tables 0 |> Result.map List.toArray
 
-let analyze
-  (dataProvider: IDataProvider)
-  (anonParams: AnonymizationParams)
-  (parseTree: ParserTypes.SelectQuery)
-  : Async<Result<AnalyzerTypes.Query, string>> =
+let analyze (dataProvider: IDataProvider)
+            (anonParams: AnonymizationParams)
+            (parseTree: ParserTypes.SelectQuery)
+            : Async<Result<AnalyzerTypes.Query, string>> =
   asyncResult {
     let! schema = dataProvider.GetSchema()
     let! query = transformQuery schema parseTree

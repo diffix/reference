@@ -51,10 +51,7 @@ let rec private extractAggregators expression =
   |> Expression.Collect expression
 
 let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) plan =
-  if groupingLabels.IsEmpty && aggregators.IsEmpty then
-    plan
-  else
-    Plan.Aggregate(plan, groupingLabels, aggregators)
+  if groupingLabels.IsEmpty && aggregators.IsEmpty then plan else Plan.Aggregate(plan, groupingLabels, aggregators)
 
 let private getType expression = expression |> Expression.GetType |> Utils.unwrap
 
