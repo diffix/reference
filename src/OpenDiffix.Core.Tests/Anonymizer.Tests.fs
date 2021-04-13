@@ -1,5 +1,6 @@
 module OpenDiffix.Core.AnonymizerTests
 
+open OpenDiffix.Core.AnonymizerTypes
 open Xunit
 open FsUnit.Xunit
 open OpenDiffix.Core
@@ -43,10 +44,18 @@ let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Defa
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
 [<Fact>]
-let ``anon count distinct aid`` () =
+let ``anon count distinct column`` () =
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; aidColumn ]
   |> should equal (Integer 9L)
+
+  rows
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; companyColumn ]
+  |> should equal (Integer 3L)
+
+  rows
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; strColumn ]
+  |> should equal (Integer 1L)
 
 [<Fact>]
 let ``anon count()`` () =
@@ -119,3 +128,67 @@ let ``multi-AID count`` () =
   rows
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal (Integer 5L)
+
+[<Fact>]
+let ``count distinct with flattening - worked example 1 from doc`` () =
+  let rows = [
+    // AID1; AID2; Fruit
+    [| String "Paul"; String "Sebastian"; String "Apple" |]
+    [| String "Sebastian"; String "Sebastian"; String "Apple" |]
+    [| String "Paul"; String "Sebastian"; String "Apple" |]
+    [| String "Edon"; String "Sebastian"; String "Apple" |]
+    [| String "Sebastian"; String "Sebastian"; String "Apple" |]
+    [| String "Cristian"; String "Paul"; String "Apple" |]
+    [| String "Edon"; String "Paul"; String "Apple" |]
+    [| String "Edon"; String "Paul"; String "Pear" |]
+    [| String "Paul"; String "Paul"; String "Pineapple" |]
+    [| String "Cristian"; String "Paul"; String "Lemon" |]
+    [| String "Cristian"; String "Felix"; String "Orange" |]
+    [| String "Felix"; String "Edon"; String "Banana" |]
+    [| String "Edon"; String "Cristian"; String "Grapefruit" |]
+  ]
+  let aid1 = ColumnReference(0, StringType)
+  let aid2 = ColumnReference(1, StringType)
+  let fruit = ColumnReference(2, StringType)
+  let allAidColumns = Expression.Array [| aid1; aid2 |]
+
+  let threshold = {Lower = 2; Upper = 2}
+  let anonParams = {context.AnonymizationParams with OutlierCount = threshold; TopCount = threshold}
+  let context = {context with AnonymizationParams = anonParams}
+
+  rows
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidColumns; fruit ]
+  |> should equal (Integer 5L)
+
+[<Fact>]
+let ``count distinct with flattening - re-worked example 2 from doc`` () =
+  // This example differs from the one in the docs by it altering the
+  // AIDs to ensure that the number of distinct AIDs of each kind are
+  // truly always above the minimum allowed AIDs, even in the case where
+  // we operate with `minimum_allowed_aids + 2`. The original example assumed
+  // the noisy `minimum_allowed_aids` is equal to 2.
+  let rows = [
+    // AID1; AID2; Fruit
+    [| String "Paul"; String "Paul"; String "Apple" |]
+    [| String "Edon"; String "Edon"; String "Apple" |]
+    [| String "Felix"; String "Felix"; String "Apple" |]
+    [| String "Sebastian"; String "Sebastian"; String "Apple" |]
+    [| String "Cristian"; String "Cristian"; String "Apple" |]
+    [| String "Paul"; String "Paul"; String "Orange" |]
+    [| String "Edon"; String "Edon"; String "Orange" |]
+    [| String "Felix"; String "Felix"; String "Orange" |]
+    [| String "Sebastian"; String "Sebastian"; String "Orange" |]
+    [| String "Cristian"; String "Cristian"; String "Orange" |]
+  ]
+  let aid1 = ColumnReference(0, StringType)
+  let aid2 = ColumnReference(1, StringType)
+  let fruit = ColumnReference(2, StringType)
+  let allAidColumns = Expression.Array [| aid1; aid2 |]
+
+  let threshold = {Lower = 2; Upper = 2}
+  let anonParams = {context.AnonymizationParams with OutlierCount = threshold; TopCount = threshold}
+  let context = {context with AnonymizationParams = anonParams}
+
+  rows
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidColumns; fruit ]
+  |> should equal (Integer 2L)

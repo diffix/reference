@@ -91,21 +91,25 @@ module Aggregator =
 
       member this.Final ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
-  type private DiffixCountDistinct(aidSets: Set<AidHash> array option) =
+  type private DiffixCountDistinct(perAidValuesByAidType: Map<AidHash, Set<Value>> array option) =
     new() = DiffixCountDistinct(None)
 
     interface IAggregator with
       member this.Transition values =
         match values with
         | [ _aidValues; Null ] -> this
-        | [ Value.Array aidValues; aidValue ] ->
-            aidValues
-            |> mapAidStructure (fun _ -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
+        | [ aidValues; value ] ->
+            perAidValuesByAidType
+            |> updateAidMaps aidValues (Set.singleton value) (fun set -> Set.add value set)
             |> DiffixCountDistinct
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx = Anonymizer.countAids aidSets ctx.AnonymizationParams |> int64 |> Integer
+      member this.Final ctx =
+        match perAidValuesByAidType with
+        | None -> 0L |> Integer
+        | Some perAidValuesByAidType ->
+          Anonymizer.countDistinct perAidValuesByAidType ctx.AnonymizationParams
 
   type private DiffixLowCount(aidSets: Set<AidHash> array option) =
     new() = DiffixLowCount(None)
@@ -121,7 +125,10 @@ module Aggregator =
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx = Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
+      member this.Final ctx =
+        match aidSets with
+        | None -> true |> Boolean
+        | Some aidSets -> Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
 
   let create _ctx fn : IAggregator =
     match fn with

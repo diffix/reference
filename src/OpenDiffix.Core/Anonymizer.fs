@@ -26,38 +26,25 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
 
 let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
 
-let countAids (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
-  match aidSets with
-  | None -> 0 // The result set was entirely empty, no aggregation state was created
-  | Some aidSets when Set.isEmpty (Array.head aidSets) -> 0 // Is this right? Should it be Null instead?
-  | Some aidSets ->
-      let aidSet = aidSets |> Array.head
+let isLowCount (aidSets: Set<AidHash> array) (anonymizationParams: AnonymizationParams) =
+  aidSets
+  |> Array.map (fun aidSet ->
+    if aidSet.Count = 0 then
+      true
+    else
       let rnd = newRandom aidSet anonymizationParams
-      let noise = noiseValueInt rnd anonymizationParams.Noise
-      max (aidSet.Count + noise) 0
 
-let isLowCount (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
-  match aidSets with
-  | None -> true
-  | Some aidSets ->
-      aidSets
-      |> Array.map (fun aidSet ->
-        if aidSet.Count = 0 then
-          true
-        else
-          let rnd = newRandom aidSet anonymizationParams
+      let threshold =
+        randomUniform
+          rnd
+          {
+            Lower = anonymizationParams.MinimumAllowedAids
+            Upper = anonymizationParams.MinimumAllowedAids + 2
+          }
 
-          let threshold =
-            randomUniform
-              rnd
-              {
-                Lower = anonymizationParams.MinimumAllowedAids
-                Upper = anonymizationParams.MinimumAllowedAids + 2
-              }
-
-          aidSet.Count < threshold
-      )
-      |> Array.reduce (||)
+      aidSet.Count < threshold
+  )
+  |> Array.reduce (||)
 
 type private AidCount = { NoisyCount: float; Flattening: float }
 
@@ -100,6 +87,101 @@ let private aidFlattening
 
         Some { NoisyCount = noisyCount; Flattening = flattening }
 
+let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map<Value, Set<AidHash>> =
+  valuesPerAid
+  |> Map.toList
+  |> List.collect (fun (aidHash, valuesSet) -> valuesSet |> Set.toList |> List.map (fun value -> value, aidHash))
+  |> List.fold
+    (fun acc (value, aidHash) ->
+      match Map.tryFind value acc with
+      | None -> Map.add value (Set.singleton aidHash) acc
+      | Some aidSet -> Map.add value (Set.add aidHash aidSet) acc
+    )
+    Map.empty
+
+let transposeToPerValue (perAidTypeValueMap: Map<Value, Set<AidHash>> array) : Map<Value, Set<AidHash> array> =
+  perAidTypeValueMap
+  |> Array.fold
+    (fun (acc: Map<Value, Set<AidHash> array>) (valueHashMap: Map<Value, Set<AidHash>>) ->
+      valueHashMap
+      |> Map.toList
+      |> List.fold
+        (fun (valueAcc: Map<Value, Set<AidHash> array>) (value, aidHashSet) ->
+          let a = Array.singleton aidHashSet
+
+          match Map.tryFind value valueAcc with
+          | None -> Map.add value a valueAcc
+          | Some existingAidSets -> Map.add value (Array.append existingAidSets a) valueAcc
+        )
+        acc
+    )
+    Map.empty
+
+let rec distributeUntilEmpty takenValues queue itemsByAID =
+  match itemsByAID, queue with
+  | [], [] -> [] // Done :D
+  | [], _ -> distributeUntilEmpty takenValues [] (List.rev queue)
+
+  | (aid, values) :: rest, _ ->
+      match values |> List.tryFind (fun value -> not <| Set.contains value takenValues) with
+      | Some value ->
+          let updatedTaken = Set.add value takenValues
+
+          match values |> List.filter ((<>) value) with
+          | [] -> (aid, value) :: distributeUntilEmpty updatedTaken queue rest
+          | remaining ->
+              let queue = (aid, remaining) :: queue
+              (aid, value) :: distributeUntilEmpty updatedTaken queue rest
+      | None ->
+          // No more value to take for user...
+          distributeUntilEmpty takenValues queue rest
+
+let private countDistinctFlatteningByAid
+  anonParams
+  valuesPassingLowCount
+  (perAidContributions: Map<AidHash, Set<Value>>)
+  =
+  let distributableValues =
+    perAidContributions
+    |> Map.map (fun _aidHash valuesSet ->
+      let _ = valuesSet
+      Set.difference valuesSet valuesPassingLowCount
+    )
+    |> Map.toList
+    |> List.sortBy (fun (_aid, valuesSet) -> Set.count valuesSet)
+    |> List.map (fun (aid, valuesSet) -> aid, Set.toList valuesSet)
+
+  distributableValues
+  |> distributeUntilEmpty Set.empty []
+  |> List.groupBy fst
+  |> List.map (fun (aid, values) -> aid, List.length values |> int64)
+  |> Map.ofList
+  |> aidFlattening anonParams
+
+let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anonymizationParams: AnonymizationParams) =
+  // These values are safe, and can be counted as they are
+  // without any additional noise.
+  let valuesPassingLowCount =
+    perAidValuesByAidType
+    |> Array.map transposePerAidMapsToPerValue
+    |> transposeToPerValue
+    |> Map.toList
+    |> List.filter (fun (_value, aidSets) -> not <| isLowCount aidSets anonymizationParams)
+    |> List.map fst
+    |> Set.ofList
+
+  let safeCount = Set.count valuesPassingLowCount
+
+  perAidValuesByAidType
+  |> Array.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
+  |> Array.choose id
+  |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
+  |> Array.tryHead
+  |> function
+  | None -> if safeCount > 0 then safeCount |> int64 |> Integer else Null
+  | Some flattenedCount ->
+      let flattenedCount = flattenedCount.NoisyCount |> round |> int64
+      int64 safeCount + flattenedCount |> Integer
 
 let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<AidHash, int64> array option) =
   match perUserContributions with
