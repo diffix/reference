@@ -6,7 +6,7 @@ open FsUnit.Xunit
 open OpenDiffix.Core
 
 let companies i =
-  let names = [ "Alpha"; "Beta"; "Gamma" ]
+  let names = [ "Alpha"; "Beta"; "Gamma"; "Delta" ]
   names |> List.item (i % names.Length)
 
 let rows =
@@ -51,7 +51,7 @@ let ``anon count distinct column`` () =
 
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; companyColumn ]
-  |> should equal (Integer 3L)
+  |> should equal (Integer 4L)
 
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; strColumn ]
