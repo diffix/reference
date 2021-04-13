@@ -313,12 +313,15 @@ let ``Failed Paul attack query 2`` () =
 
 [<Fact>]
 let ``Parse sub-query`` () =
-  let query = {defaultSelect with Expressions = [As(Identifier(None, "col"), None)]}
+  let query = { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] }
 
-  assertOkEqual
-    (parse from "FROM (SELECT col FROM table) t")
-    (SubQuery (query, "t"))
+  assertOkEqual (parse from "FROM (SELECT col FROM table) t") (SubQuery(query, "t"))
 
   assertOkEqual
     (parse from "FROM (SELECT col FROM table) t INNER JOIN (SELECT col FROM table) s ON t.col = s.col")
-    (Join(InnerJoin, SubQuery(query, "t"), SubQuery(query, "s"), Equals(Identifier(Some "t", "col"), Identifier(Some "s", "col"))))
+    (Join(
+      InnerJoin,
+      SubQuery(query, "t"),
+      SubQuery(query, "s"),
+      Equals(Identifier(Some "t", "col"), Identifier(Some "s", "col"))
+    ))
