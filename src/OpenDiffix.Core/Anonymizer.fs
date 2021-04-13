@@ -187,13 +187,11 @@ let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<
   match perUserContributions with
   | None -> Null
   | Some perUserContributions ->
-      let results =
-        perUserContributions
-        |> Array.toList
-        |> List.map (aidFlattening anonymizationParams)
-        |> List.choose id
-        |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
-
-      match results with
-      | [] -> Null
-      | flattenedCount :: _ -> flattenedCount.NoisyCount |> round |> int64 |> Integer
+      perUserContributions
+      |> Array.map (aidFlattening anonymizationParams)
+      |> Array.choose id
+      |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
+      |> Array.tryHead
+      |> function
+      | None -> Null
+      | Some flattenedCount -> flattenedCount.NoisyCount |> round |> int64 |> Integer
