@@ -21,15 +21,11 @@ module Aggregator =
     match aidsArray with
     | Value.Array aidValues ->
         let fn =
-          fun aidValue aidMap ->
-            let aidHash = aidValue.GetHashCode()
-
-            let newValue =
-              match aidMap |> Map.tryFind aidHash with
-              | Some value -> transition value
-              | None -> initial
-
-            Map.add aidHash newValue aidMap
+          fun aidValue ->
+            Map.change (aidValue.GetHashCode()) (
+              function
+              | Some value -> Some <| transition value
+              | None -> Some initial)
 
         mapAidStructure fn aidMaps Map.empty aidValues
     | _ -> failwith "Expecting an AID array as input"
