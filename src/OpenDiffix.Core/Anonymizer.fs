@@ -179,11 +179,11 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
       let flattenedCount = flattenedCount.NoisyCount |> round |> int64
       int64 safeCount + flattenedCount |> Integer
 
-let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<AidHash, int64> array option) =
-  match perUserContributions with
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> array option) =
+  match perAidContributions with
   | None -> Null
-  | Some perUserContributions ->
-      perUserContributions
+  | Some perAidContributions ->
+      perAidContributions
       |> Array.map (aidFlattening anonymizationParams)
       |> Array.choose id
       |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
