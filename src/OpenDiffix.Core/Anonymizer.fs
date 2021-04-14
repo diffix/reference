@@ -13,7 +13,7 @@ let private randomNormal (rnd: Random) stdDev =
 
   stdDev * randStdNormal
 
-let private newRandom (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
+let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: Set<AidHash>) =
   let combinedAids = aidSet |> Set.toList |> List.reduce (^^^)
   let seed = combinedAids ^^^ anonymizationParams.Seed
   Random(seed)
@@ -32,7 +32,7 @@ let isLowCount (aidSets: Set<AidHash> array) (anonymizationParams: Anonymization
     if aidSet.Count = 0 then
       true
     else
-      let rnd = newRandom aidSet anonymizationParams
+      let rnd = newRandom anonymizationParams aidSet
 
       let threshold =
         randomUniform
@@ -55,8 +55,12 @@ let private aidFlattening
   match Map.toList aidContributions with
   | [] -> None
   | perAidContributions ->
-      let aids = perAidContributions |> List.map fst |> Set.ofList
-      let rnd = newRandom aids anonymizationParams
+      let rnd =
+        perAidContributions
+        |> List.map fst
+        |> Set.ofList
+        |> newRandom anonymizationParams
+
       let noise = noiseValue rnd anonymizationParams.Noise
       let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
       let topCount = randomUniform rnd anonymizationParams.TopCount
