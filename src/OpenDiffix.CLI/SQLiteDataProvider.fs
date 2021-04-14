@@ -50,7 +50,7 @@ let private dbSchema (connection: SQLiteConnection) =
         )
         |> List.sortBy (fun table -> table.Name)
     with ex ->
-      printfn "Exception: %A" ex
+      printfn $"Exception: %A{ex}"
       return! Error("Execution error: " + ex.Message)
   }
 
