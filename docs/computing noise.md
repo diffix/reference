@@ -5,7 +5,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Problem Case: Proxy AIDs](#problem-case-proxy-aids)
     - [Pseudo-AIDs (or multi-column AIDs)](#pseudo-aids-or-multi-column-aids)
     - [Configuration](#configuration)
-  - [Determining extreme and top values](#determining-extreme-and-top-values)
+  - [Flattening - Determining extreme and top values](#flattening---determining-extreme-and-top-values)
     - [Redistribution of values](#redistribution-of-values)
     - [Algorithm](#algorithm)
     - [Examples](#examples)
@@ -128,47 +128,59 @@ From the admin point of view, I think the steps to configuration is something li
 > NOTE(Sebastian): I don't think #5 (not tagging redundant AIDs) should be a goal. In fact tagging all possible AID columns could be the conservative safe thing to do. It certainly adds runtime overhead but helps protect against dirty data (same individual under multiple IDs). I think we should measure the performance impact before making a recommendation against tagging multiple AIDs.
 
 
-## Determining extreme and top values
+## Flattening - Determining extreme and top values
 
-When aggregating we flatten extreme values and replace their values with those of a representative top-group average.
+When aggregating, we flatten extreme values and replace their values with those of a representative top-group average.
 
-The process for flattening extreme values is done separately for each AID set type. That is to say for a
-dataset with AID sets `[email-1; email-2; company]` the process is repeated three times, even though
-there are only two kinds of AIDs. For each AID set type we calculate the absolute distortion. For our final aggregate we choose,
-and use, the largest of the available distortions.
+The process for flattening extreme values is done separately for each AID set. That is to say, for a
+dataset with AID sets `[email-1; email-2; company]`, the process is repeated three times, even though
+there are only two kinds of AIDs. For each AID set, we calculate the absolute amount of flattening required.
+We use the highest flattening and noise parameters calculated across all the AID sets.
 
-We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with one significant
-difference: in the final anonymizing aggregate we report `null` when we do not have enough distinct entities to produce
-a sensible aggregate. When aggregating i-rows this is not the case as we frequently come across rows that only belong to
-one, or very few entities. These steps are described in more details in the algorithm section below.
+We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with two significant
+differences:
+
+- for the final anonymized aggregate value, we report `null` when we do not have enough distinct entities to produce an anonymous aggregate. When aggregating i-rows this is not the case, and we follow an alternative approach described in more detail below
+- for the final anonymize aggregate value we add noise proportional to the top group average. No such noise is added to intermediate aggregate values
+
+If the three AID sets in the example above resulted in the following flattening
+and top group averages:
+
+- `email-1`: flattening 4000, top group average 250
+- `email-2`: flattening 4500, top group average 100
+- `company`: flattening 250, top group average 500
+
+Then we would use the flattening parameters associated with `email-2`, and the
+top group average from `company` for the noise.
+The real aggregate value would be flattened by 4500 and in the case of a
+fully anonymize aggregate value we would additionally add noise value proportional to 500.
 
 
 ### Redistribution of values
 
-When aggregating rows of data the rows might either be d-rows (each row belongs to a single AID such as `email[1]`) or
-i-rows that have already gone through one or more rows or aggregation (a row can belong to multiple AIDs such as `email[1, 2, 3]`).
+When aggregating rows of data the rows might either be d-rows (each row belongs to a single AID per AID type, such as `email[1]`) or
+i-rows that have already gone through one or more rounds of aggregation, in which case a row can belong to a set of AIDs per type (such as `email[1, 2, 3]`).
 
-In the case where you have AID sets it can also happen that you have the same entity present in multiple AID sets.
-For example you could have three rows such as:
+In the case where we have AID sets it can also happen that the same entity is present in multiple distinct AID sets.
+For example, you could have three rows such as:
 
-| Value | AID set        |
-| ----: | -------------- |
-|     1 | email[1]       |
-|     2 | email[1, 2]    |
-|     3 | email[1, 3, 4] |
+| Value | AID set               |
+| ----: | --------------------- |
+|     1 | email[**1**]          |
+|     2 | email[**1**, 2]       |
+|     3 | email[**1**, 3, 4, 5] |
 
 As part of the flattening of outliers we calculate the contribution each entity has made.
 In the example table above entity 1 has contributed to each of the three values.
 When calculating an individuals contributions we split their shared contributions proportionally with
 the other AIDs.
 
-The entity with email AID 1 would therefore end up with a contribution of: `1 + 1/2 + 3/3 = 2.5`.
+The entity with email AID 1 would end up with a contribution of: `1 + 2/2 + 3/4 = 2.75` (which could be interpreted as the entity having contributed 2.75 emails).
 
-This is not strictly speaking entirely correct. That is to say the resulting contributions stemming from this simplified redistributions
-do not reflect reality. However since the only way an AID set of multiple AID values can arise is through
-aggregation, and since we always perform extreme value flattening when aggregating, it seems likely that this is not
-going to cause insufficient flattening for extreme contributions (note: this is an assumption that hasn't been tested).
-In fact it might have a positive effect by potentially limiting further unnecessary flattening.
+This approach to distributing contributions is not strictly speaking correct. That is to say that the resulting contributions after the redistribution
+do not reflect reality. However, as the only way an AID set of multiple AID values can arise is through
+aggregation, and as we always perform extreme value flattening when aggregating, it seems likely that this is not
+going to cause insufficient flattening for extreme contributions (note: this is an assumption that has not been tested).
 
 
 ### Algorithm
@@ -182,20 +194,22 @@ The process for suppressing extreme values is as follows:
    contribution is made proportional per AID value.
 2. Sort the contribution values to be flattened in descending order
 3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
-4. Take the first `Ne` highest contributions as the extreme values. If any of them appear for `minimum_allowed_aids` distinct AIDs, use that value
+4. Take the first `Ne` highest contributions as the extreme values.
 5. Take next `Nt` highest contributions as the top count.
-6. (only on final aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` as the aggregate to indicate that
-  there were was not enough data to return an anonymous aggregate
-6. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
+6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aids` distinct AIDs, then use that value as the the top group average
+7. (only for the final anonymizing aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` to indicate that
+  there were was not enough data
+8. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
    1. If no entities were chosen for the top group, then use the entity with the lowest contribution as the top group and continue, or
    2. If some values were chosen for the top group, but not quite `Nt` distinct ones, then use the values chosen and continue
-7. Calculate the average of the `Nt` values
-8. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
+9. Calculate the average of the `Nt` values
+10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
-Once the algorithm has been completed for each AID type, the maximum distortion is chosen as the flattening value and the corresponding `Nt` average is used to determine the magnitude of the noise.
+Once the algorithm has been completed for each AID set individual, we continue based on the AID set with the largest amount of flattening.
+In the case of the fully anonymizing aggregation in the top-most query we also add noise proportional to the absolute largest top group average
+across the AID sets.
 
-Below follows some concrete examples. In all examples I have made the simplified assumption, unless otherwise stated,
-that the minimum allowed aids threshold 2 for all AID types.
+Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AID types unless otherwise stated.
 
 Note that the tables as shown are the row contributions used to calculate an aggregate.
 
@@ -207,8 +221,8 @@ For example, the following table should be read as AID 1 contributing 6 to the a
 |     5 | AID[2]    |
 |     4 | AID[3, 4] |
 
-The `Value`s could be interpreted as a certain entity having contributed a certain number of rows in the case of a `count` aggregator, or it could
-the the per entity sum contribution the case of a `sum` aggregate.
+The `Value`s can be interpreted as an entity having contributed that number of rows in the case of a `count` aggregator, or it could
+the the per entity sum contribution in the case of a `sum` aggregator.
 
 ### Examples
 
@@ -220,15 +234,15 @@ the the per entity sum contribution the case of a `sum` aggregate.
 
 - We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them (see [redistribution of values](#redistribution-of-values) for details).
 
-| Value | AID |
-| ----: | --- |
-|     5 | 1   |
-|     5 | 2   |
+| Value | AID | Required flattening by AID |
+| ----: | --- | -------------------------: |
+|     5 | 1   |                          0 |
+|     5 | 2   |                          0 |
 
 - The rows are sorted in descending order of `Value`
 - `Ne = 2`, `Nt = 2`
 - We take the `Ne` first values as extreme values. The values are both the same, and since `minimum_allowed_aids = 2` they would satisfy low count filtering.
-- We abort without any suppression
+- We use 5 as the top group average which means there is no flattening necessary
 
 
 #### Insufficient data
@@ -240,7 +254,7 @@ the the per entity sum contribution the case of a `sum` aggregate.
 
 - We produce per-AID contributions. In this case the value `10` is a shared contribution between the AID values 1 and 2. We attribute 5 to each of them. AID 1 has an additional entry too, making for uneven total contributions for the two AIDs:
 
-| Value | AID | Required distortion by AID if intermediate aggregator |
+| Value | AID | Required flattening by AID if intermediate aggregator |
 | ----: | --- | ----------------------------------------------------: |
 |     6 | 1   |                                                     1 |
 |     5 | 2   |                                                       |
@@ -249,9 +263,9 @@ the the per entity sum contribution the case of a `sum` aggregate.
 - `Ne = 2`, `Nt = 2`
 - We take the `Ne` first values as the extreme values
 - We try taking the `Nt` next rows for the top group, but have run out of data.
-  - If this was a final anonymized aggregate (i.e. the top level query), then we would terminate the process and return `Null` to indicate that we couldn't produce an anonymous aggregate,
-  - If this was an intermediate aggregation step meant to solely flatten extreme values, then we follow the alternative step, and instead use value 5 as the top group.
-- The total distortion is _infinite_... sort of in the case of this being a top-level aggregator, and 1 if it's an intermediate one.
+  - If this was a final anonymized aggregate (i.e. the top level query), then we would terminate the process and return `null` to indicate that we could not produce an anonymous aggregate,
+  - If this was an intermediate aggregation step meant, then we follow the alternative approach of instead using the value with the lowest contribution as the top group average. In this case the value 5 becomes the top group average substitute.
+- The total distortion is _infinite_... sort of in the case of this being a top-level aggregator, and 1 for intermediate ones.
 
 
 #### Base case
@@ -270,10 +284,10 @@ the the per entity sum contribution the case of a `sum` aggregate.
 - We produce per-AID contributions. In this case the value `3` is a shared contribution between the AID values 1 and 2. We attribute 1.5 to each of them.
 - The rows are sorted in descending order of `Value`
 
-|           Value |  AID | Required distortion by AID |
+|           Value |  AID | Required flattening by AID |
 | --------------: | ---: | -------------------------: |
-| 11.5 = 10 + 3/2 |    1 |                        7.5 |
-|  10.5 = 9 + 3/2 |    2 |                        7.5 |
+| 11.5 = 10 + 3/2 |    1 |                          4 |
+|  10.5 = 9 + 3/2 |    2 |                          3 |
 |               8 |    3 |                            |
 |               7 |    4 |                            |
 |               6 |    5 |                            |
@@ -284,7 +298,7 @@ the the per entity sum contribution the case of a `sum` aggregate.
 - We take the `Ne` first values as extreme values (11.5 and 10.5)
 - We take the `Nt` next values as the top group (8 and 7)
 - We replace the `Ne` values with the average of the top group: 7.5
-- The total distortion is **7** (11.5 - 7.5 + 10.5 - 7.5)
+- The total flattening is **7** (11.5 - 7.5 + 10.5 - 7.5)
 
 
 #### Base case #2
@@ -299,16 +313,16 @@ the the per entity sum contribution the case of a `sum` aggregate.
 |     5 | AID1[4, 5]          |
 |     4 | AID1[1, 2, 3, 4, 5] |
 
-- We produce per-AID contributions. In this case, the value 9 is shared, and so are the values 5 and 4. These are distributed amongst the corresponding AIDs.
+- We produce per-AID contributions. In this case, the value 9 is shared, and so are the values 5 and 4. These values are distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
 
 The resulting list of AID contributions becomes:
 
-|                 Value | AID | Required distortion by AID |
-| --------------------: | --- | -------------------------- |
-| 15.3 = 10 + 9/2 + 4/5 | 1   | 5.55                       |
-|  13.3 = 8 + 9/2 + 4/5 | 2   | 5.55                       |
-|   9.3 = 6 + 5/2 + 4/5 | 4   | 5.55                       |
+|                 Value | AID | Required flattening by AID |
+| --------------------: | --- | -------------------------: |
+| 15.3 = 10 + 9/2 + 4/5 | 1   |                       9.75 |
+|  13.3 = 8 + 9/2 + 4/5 | 2   |                       7.75 |
+|   9.3 = 6 + 5/2 + 4/5 | 4   |                       3.75 |
 |         7.8 = 7 + 4/5 | 3   |                            |
 |       3.3 = 5/2 + 4/5 | 5   |                            |
 
@@ -317,7 +331,7 @@ The resulting list of AID contributions becomes:
 - We take the `Ne` first values as extreme values (15.3, 13.3, 9.3)
 - We take the `Nt` next values as the top group (7.8 and 3.3)
 - We replace the `Ne` values with the average of the top group: 5.55
-- The total distortion is **21.25** (15.3 - 5.55 + 13.3 - 5.55 + 9.3 - 5.55)
+- The total flattening is **21.25** (15.3 - 5.55 + 13.3 - 5.55 + 9.3 - 5.55)
 
 
 #### Multiple AID types
@@ -347,10 +361,10 @@ The resulting list of AID contributions becomes:
 - We produce per-AID contributions. In this case, the values 10 and 6 are shared. These are distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
 
-|                   Value |  AID | Required distortion by AID |
+|                   Value |  AID | Required flattening by AID |
 | ----------------------: | ---: | -------------------------: |
-| 26 = 8 + 7 + 10/2 + 6/1 |    1 |                       5.75 |
-|         11 = 10/2 + 6/1 |    2 |                       5.75 |
+| 26 = 8 + 7 + 10/2 + 6/1 |    1 |                      20.25 |
+|         11 = 10/2 + 6/1 |    2 |                       5.25 |
 |                       9 |    3 |                            |
 |               2.5 = 5/2 |    4 |                            |
 |               2.5 = 5/2 |    5 |                            |
@@ -359,7 +373,7 @@ The resulting list of AID contributions becomes:
 - We take the `Ne` first values as extreme values (26, 11)
 - We take the `Nt` next values as the top group (9, 2.5)
 - We replace the `Ne` values with the average of the top group: 5.75
-- The total distortion for AID1 is **25.5** (26 - 5.75 + 11 - 5.75)
+- The total flattening for AID1 is **25.5** (26 - 5.75 + 11 - 5.75)
 
 
 ##### AID2
@@ -376,10 +390,10 @@ The resulting list of AID contributions becomes:
 - We produce per-AID contributions. In this case, the value 8 is shared. It is distributed amongst the corresponding AIDs.
 - The rows are sorted in descending order of `Value`
 
-|         Value |  AID | Required distortion by AID |
+|         Value |  AID | Required flattening by AID |
 | ------------: | ---: | -------------------------: |
-| 14 = 10 + 8/2 |    1 |                          6 |
-|  13 = 9 + 8/2 |    2 |                          6 |
+| 14 = 10 + 8/2 |    1 |                          8 |
+|  13 = 9 + 8/2 |    2 |                          7 |
 |             7 |    3 |                            |
 |             6 |    1 |                            |
 |             5 |    4 |                            |
@@ -388,7 +402,7 @@ The resulting list of AID contributions becomes:
 - We take the `Ne` first values as extreme values (14, 13)
 - We take the `Nt` next values as the top group (7, 6, 5)
 - We replace the `Ne` values with the average of the top group: 6
-- The total distortion for AID1 is **15** (14 - 6 + 13 - 6)
+- The total flattening for AID1 is **15** (14 - 6 + 13 - 6)
 
 
 ##### AID3
@@ -410,12 +424,14 @@ The resulting list of AID contributions becomes:
 | 45 = 10 + 9 + 8 + 7 + 6 + 5 |    1 |
 
 - `Ne = 2`, `Nt = 2`
-- We do not have enough extreme values to form a group of `Ne` extreme values, we abort.
+- We do not have enough extreme values to form a group of `Ne` extreme values
+  - If this is an intermediate aggregation step, we flatten 0 and continue
+  - If this is the top-level aggregation step producing an anonymous value we have to return `null` instead
 
 Even though we could have produced an aggregate from the perspectives of AID1 and AID2,
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
-Assuming there had been enough AID3 entities and the total distortion due to AID3 would have been 10,
-then we would have used the distortion due to AID1 as it's the largest.
+Assuming there had been enough AID3 entities and that the total flattening due to AID3 had been 10,
+then we would have used the flattening by 25.5 due to AID1 and added noise proportional to the top group average 6 of AID2.
 
 
 # Rationale
