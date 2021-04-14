@@ -38,6 +38,17 @@ let context =
         }
   }
 
+let contextWithOutlierAndTop =
+  let threshold = { Lower = 2; Upper = 2 }
+
+  let anonParams =
+    { context.AnonymizationParams with
+        OutlierCount = threshold
+        TopCount = threshold
+    }
+
+  { context with AnonymizationParams = anonParams }
+
 let evaluateAggregator = evaluateAggregator context
 
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
@@ -155,18 +166,8 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   let fruit = ColumnReference(2, StringType)
   let allAidColumns = Expression.Array [| aid1; aid2 |]
 
-  let threshold = { Lower = 2; Upper = 2 }
-
-  let anonParams =
-    { context.AnonymizationParams with
-        OutlierCount = threshold
-        TopCount = threshold
-    }
-
-  let context = { context with AnonymizationParams = anonParams }
-
   rows
-  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidColumns; fruit ]
+  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
   |> should equal (Integer 5L)
 
 [<Fact>]
@@ -196,16 +197,6 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   let fruit = ColumnReference(2, StringType)
   let allAidColumns = Expression.Array [| aid1; aid2 |]
 
-  let threshold = { Lower = 2; Upper = 2 }
-
-  let anonParams =
-    { context.AnonymizationParams with
-        OutlierCount = threshold
-        TopCount = threshold
-    }
-
-  let context = { context with AnonymizationParams = anonParams }
-
   rows
-  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidColumns; fruit ]
+  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
   |> should equal (Integer 2L)
