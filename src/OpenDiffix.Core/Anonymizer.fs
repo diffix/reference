@@ -168,26 +168,34 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
 
   let safeCount = Set.count valuesPassingLowCount
 
-  perAidValuesByAidType
-  |> Array.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
-  |> Array.choose id
-  |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
-  |> Array.tryHead
-  |> function
-  | None -> if safeCount > 0 then safeCount |> int64 |> Integer else Null
-  | Some flattenedCount ->
-      let flattenedCount = flattenedCount.NoisyCount |> round |> int64
-      int64 safeCount + flattenedCount |> Integer
+  let byAid =
+    perAidValuesByAidType
+    |> Array.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
+
+  if byAid |> Array.exists ((=) None) then
+    if safeCount > 0 then safeCount |> int64 |> Integer else Null
+  else
+    byAid
+    |> Array.choose id
+    |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> Array.head
+    |> fun flattenedCount ->
+         let flattenedCount = flattenedCount.NoisyCount |> round |> int64
+         int64 safeCount + flattenedCount |> Integer
 
 let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> array option) =
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->
-      perAidContributions
-      |> Array.map (aidFlattening anonymizationParams)
-      |> Array.choose id
-      |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
-      |> Array.tryHead
-      |> function
-      | None -> Null
-      | Some flattenedCount -> flattenedCount.NoisyCount |> round |> int64 |> Integer
+      let byAid = perAidContributions |> Array.map (aidFlattening anonymizationParams)
+
+      // If any of the AIDs had insufficient data to produce a sensible flattening
+      // we have to abort anonymization.
+      if byAid |> Array.exists ((=) None) then
+        Null
+      else
+        byAid
+        |> Array.choose id
+        |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
+        |> Array.head
+        |> fun flattenedCount -> flattenedCount.NoisyCount |> round |> int64 |> Integer

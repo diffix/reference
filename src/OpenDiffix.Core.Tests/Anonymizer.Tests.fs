@@ -200,3 +200,28 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   rows
   |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
   |> should equal (Integer 2L)
+
+[<Fact>]
+let ``counts with insufficient values for one AID return Null`` () =
+  let rows =
+    [
+      // AID1; AID2; Fruit
+      [| String "Paul"; String "Paul"; Integer 1L |]
+      [| String "Paul"; String "Felix"; Integer 2L |]
+      [| String "Paul"; String "Edon"; Integer 3L |]
+      [| String "Paul"; String "Cristian"; Integer 4L |]
+      [| String "Paul"; String "Sebastian"; Integer 5L |]
+    ]
+
+  let aid1 = ColumnReference(0, StringType)
+  let aid2 = ColumnReference(1, StringType)
+  let value = ColumnReference(2, IntegerType)
+  let allAidColumns = Expression.Array [| aid1; aid2 |]
+
+  rows
+  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop diffixCount [ allAidColumns; value ]
+  |> should equal Null
+
+  rows
+  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; value ]
+  |> should equal Null
