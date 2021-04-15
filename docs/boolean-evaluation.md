@@ -16,6 +16,7 @@ In this document we show how expressions of boolean conditions are compiled and 
   - [Functions and math](#functions-and-math)
   - [Multiple columns](#multiple-columns)
   - [Subqueries](#subqueries)
+  - [Case statements](#case-statements)
 
 # Operator reference
 
@@ -35,6 +36,8 @@ The following table gives a short description of the instructions found in this 
 | BOOL_AND_STEP_LAST  | Optimized `BOOL_AND_STEP` for last subexpression in `AND` series. Has no reason to jump on falsy value.    |
 | BOOL_NOT            | Converts `true` to `false`, `false` to `true`, and `NULL` to `NULL`. Result is stored in some destination. |
 | QUAL                | Same as AND step, but optimized for performance. Jumps to `DONE` if value is `NULL` or `false`.            |
+| JUMP                | Unconditional jump to instruction.                                                                         |
+| JUMP_IF_X           | Conditional jump to instruction. Condition is either `IF_NULL`, `IF_NOT_NULL`, or `IF_NOT_TRUE`.           |
 | DONE                | Evaluation is complete. Return result to caller.                                                           |
 
 This is only a small subset of all available instructions.
@@ -426,3 +429,30 @@ WHERE uid < 20
 ```
 
 In the example above the planner has been smart enough to push the `uid < 20` condition down to the inner seq scan.
+
+## Case statements
+
+```
+CASE
+  WHEN price > 100 THEN product = 'laptop'
+  WHEN price > 0 THEN product = 'ticket'
+  ELSE false
+END
+
+  1: SCAN_FETCHSOME      4
+  2: SCAN_VAR            price
+  3: FUNCEXPR_STRICT     float8gt
+  4: JUMP_IF_NOT_TRUE    to 8
+  5: SCAN_VAR            product
+  6: FUNCEXPR_STRICT     texteq
+  7: JUMP                to 15
+  8: SCAN_VAR            price
+  9: FUNCEXPR_STRICT     float8gt
+ 10: JUMP_IF_NOT_TRUE    to 14
+ 11: SCAN_VAR            product
+ 12: FUNCEXPR_STRICT     texteq
+ 13: JUMP                to 15
+ 14: CONST               0x0000000000000000
+ 15: QUAL (AND step)     short_circuit_to 16
+ 16: DONE
+```
