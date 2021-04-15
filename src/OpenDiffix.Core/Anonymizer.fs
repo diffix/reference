@@ -163,8 +163,8 @@ let private countDistinctFlatteningByAid
     perAidContributions
     |> Map.map (fun _aidHash valuesSet -> Set.difference valuesSet valuesPassingLowCount)
     |> Map.toList
-    |> List.sortBy (fun (_aid, valuesSet) -> Set.count valuesSet)
-    |> List.map (fun (aid, valuesSet) -> aid, Set.toList valuesSet)
+    |> List.sortBy (fun (aid, valuesSet) -> Set.count valuesSet, aid)
+    |> List.map (fun (aid, valuesSet) -> aid, Set.toList valuesSet |> List.sort)
 
   distributableValues
   |> distributeUntilEmpty Set.empty []
