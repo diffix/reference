@@ -17,6 +17,10 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
         - [AID1](#aid1)
         - [AID2](#aid2)
         - [AID3](#aid3)
+    - [The need for a "no data" result case](#the-need-for-a-no-data-result-case)
+      - [Aggregating `a.value`](#aggregating-avalue)
+      - [Aggregating `b.value`](#aggregating-bvalue)
+      - [Aggregating while grouping by `a.day`](#aggregating-while-grouping-by-aday)
 - [Rationale](#rationale)
 
 # Computing Per-AID Contributions
@@ -189,7 +193,8 @@ The algorithm described below is run for each AID individually.
 There are three potential outcomes for an AID:
 
 a) success - we get back the amount of flattening and the top group average associated with the AID
-b) no data - there was absolutely no data associated with the AID
+b) no data - there was absolutely no data associated with the AID (the rationale behind this case
+  is described in [the need for a "no data" result case section](#the-need-for-a-no-data-result-case)) below.
 c) insufficient data – indicates that there was not enough distinct AIDs to form an outlier and top group
 
 How to proceed depends on if the aggregator is an anonymizing query (typically the top-most query),
@@ -451,6 +456,61 @@ Even though we could have produced an aggregate from the perspectives of AID1 an
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
 Assuming there had been enough AID3 entities and that the total flattening due to AID3 had been 10,
 then we would have used the flattening by 25.5 due to AID1 and added noise proportional to the top group average 6 of AID2.
+
+
+### The need for a "no data" result case
+
+From the examples shown above, it is not clear how a "no data" case can arise, and hence it's equally
+unclear why such a case might be needed at all.
+
+Let's consider a query with a LEFT OUTER JOIN between two tables: `A` and `B`.
+The JOIN results in a table such as this:
+
+| a.day   | a.value | b.value | AIDs       |
+| ------- | ------: | ------: | ---------- |
+| Monday  |      10 |      20 | a[1], b[1] |
+| Monday  |      11 |      21 | a[2], b[2] |
+| Tuesday |      12 |    NULL | a[3]       |
+| Tuesday |      13 |    NULL | a[4]       |
+
+Among the things an analyst might want to do at this point are:
+
+a) aggregate `a.value`
+b) aggregate `b.value`
+c) perform either of these aggregates while grouping by `a.day`
+
+#### Aggregating `a.value`
+
+In previous incarnations of Diffix we only supported a single AID and would reject any
+row for which the AID was not defined. In this particular instance we have the odd occurrence
+of some of the rows being aggregated belonging to both entities from AID `a` and entities from
+AID `b`, and other rows belonging exclusively to entities from AID `a`. The latter category
+of rows do not pose a risk of leaking information about entities of AID `b`, as no such entity exists
+in the context of these rows.
+It would be inconvenient, and lead to worse data quality, if we were to discard the data about entities
+with AID `a` because of the lack of an AID `b` entity.
+
+We therefore allow the continued processing of the data as if nothing happened. However if there
+are some, but insufficiently many distinct AID `b` values at the end of the aggregation (which would
+be the case in the table above) we would have to return a `null` value due to insufficient data
+in the case of an anonymizing aggregator.
+
+#### Aggregating `b.value`
+
+When aggregating the `b.value` column, our aggregators would naturally skip the missing rows.
+No change is needed.
+
+#### Aggregating while grouping by `a.day`
+
+When aggregating (and particularly when aggregating `a.value`) while grouping by `a.day`
+we have the situation where, for `a.day = Tuesday` there is no AID `b` values at all.
+In other words what we are aggregating is purely about AID `a` and the equivalent of what
+an analyst might want to do when aggregating table `A` by itself. We do not want to drop
+these aggregate values because of insufficiently many AID `b` values, and therefore introduce
+the concept of, when running the aggregation algorithm on AID `b`, returning that no data
+was present for an AID at all. In this instance, the right thing to do is outright ignore
+AID `b` for anonymization purposes when processing the aggregate for `Tuesday` and otherwise
+continue as normal.
 
 
 # Rationale
