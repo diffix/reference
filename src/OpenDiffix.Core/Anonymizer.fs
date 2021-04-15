@@ -46,7 +46,7 @@ let isLowCount (aidSets: Set<AidHash> array) (anonymizationParams: Anonymization
   )
   |> Array.reduce (||)
 
-type private AidCount = { NoisyCount: float; Flattening: float }
+type private AidCount = { FlattenedSum: float; Flattening: float; NoiseParam: NoiseParam; Rnd: Random }
 
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
@@ -61,7 +61,6 @@ let private aidFlattening
         |> Set.ofList
         |> newRandom anonymizationParams
 
-      let noise = noiseValue rnd anonymizationParams.Noise
       let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
       let topCount = randomUniform rnd anonymizationParams.TopCount
 
@@ -72,20 +71,32 @@ let private aidFlattening
       else
         let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
 
-        let topValueSummed =
+        let topGroupValuesSummed =
           sortedUserContributions
           |> List.skip outlierCount
           |> List.take topCount
           |> List.sum
 
-        let topValueAverage = (float topValueSummed) / (float topCount)
-        let outlierReplacement = topValueAverage * (float outlierCount)
+        let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
+        let outlierReplacement = topGroupAverage * (float outlierCount)
 
         let totalCount = sortedUserContributions |> List.sum
         let flattening = float outliersSummed - outlierReplacement
-        let noisyCount = float totalCount - flattening + noise |> max 0.
+        let noisyCount = float totalCount - flattening
 
-        Some { NoisyCount = noisyCount; Flattening = flattening }
+        let noiseParam =
+          {
+            StandardDev = topGroupAverage |> max anonymizationParams.Noise.StandardDev
+            Cutoff = 3. * topGroupAverage |> max anonymizationParams.Noise.Cutoff
+          }
+
+        Some
+          {
+            FlattenedSum = noisyCount
+            Flattening = flattening
+            NoiseParam = noiseParam
+            Rnd = rnd
+          }
 
 let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map<Value, Set<AidHash>> =
   valuesPerAid
@@ -162,6 +173,22 @@ let private countDistinctFlatteningByAid
   |> Map.ofList
   |> aidFlattening anonParams
 
+let private flattenedAndNoisySum (byAidSum: AidCount option []) =
+  let values = byAidSum |> Array.choose id
+
+  let aidForFlattening =
+    values
+    |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> Array.head
+
+  let noise =
+    values
+    |> Array.sortByDescending (fun aggregate -> aggregate.NoiseParam.StandardDev)
+    |> Array.head
+    |> fun flatteningResult -> noiseValue flatteningResult.Rnd flatteningResult.NoiseParam
+
+  aidForFlattening.FlattenedSum + noise
+
 let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anonymizationParams: AnonymizationParams) =
   // These values are safe, and can be counted as they are
   // without any additional noise.
@@ -182,13 +209,8 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
   if byAid |> Array.exists ((=) None) then
     if safeCount > 0 then safeCount |> int64 |> Integer else Null
   else
-    byAid
-    |> Array.choose id
-    |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
-    |> Array.head
-    |> fun flattenedCount ->
-         let flattenedCount = flattenedCount.NoisyCount |> round |> int64
-         int64 safeCount + flattenedCount |> Integer
+    let flattenedCount = flattenedAndNoisySum byAid
+    float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
 
 let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> array option) =
   match perAidContributions with
@@ -201,8 +223,4 @@ let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<A
       if byAid |> Array.exists ((=) None) then
         Null
       else
-        byAid
-        |> Array.choose id
-        |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
-        |> Array.head
-        |> fun flattenedCount -> flattenedCount.NoisyCount |> round |> int64 |> Integer
+        flattenedAndNoisySum byAid |> round |> int64 |> Integer
