@@ -5,6 +5,7 @@ type IAggregator =
   abstract Final : EvaluationContext -> Value
 
 module Aggregator =
+  let private noAidsNull aidValues = aidValues |> Array.exists ((=) Null) |> not
 
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
@@ -19,15 +20,17 @@ module Aggregator =
 
   let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
     match aidsArray with
-    | Value.Array aidValues ->
+    | Value.Array aidValues when noAidsNull aidValues ->
         let fn =
           fun aidValue ->
-            Map.change (aidValue.GetHashCode()) (
-              function
+            Map.change
+              (aidValue.GetHashCode())
+              (function
               | Some value -> Some <| transition value
               | None -> Some initial)
 
         mapAidStructure fn aidMaps Map.empty aidValues
+    | Value.Array _ -> aidMaps
     | _ -> failwith "Expecting an AID array as input"
 
   type private Count(counter) =
@@ -104,8 +107,7 @@ module Aggregator =
       member this.Final ctx =
         match perAidValuesByAidType with
         | None -> 0L |> Integer
-        | Some perAidValuesByAidType ->
-          Anonymizer.countDistinct perAidValuesByAidType ctx.AnonymizationParams
+        | Some perAidValuesByAidType -> Anonymizer.countDistinct perAidValuesByAidType ctx.AnonymizationParams
 
   type private DiffixLowCount(aidSets: Set<AidHash> array option) =
     new() = DiffixLowCount(None)
@@ -114,10 +116,11 @@ module Aggregator =
       member this.Transition values =
         match values with
         | [ Null ] -> this
-        | [ Value.Array aidValues ] ->
+        | [ Value.Array aidValues ] when noAidsNull aidValues ->
             aidValues
             |> mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
             |> DiffixLowCount
+        | [ Value.Array _ ] -> aidSets |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
 
