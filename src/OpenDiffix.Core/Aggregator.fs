@@ -5,8 +5,6 @@ type IAggregator =
   abstract Final : EvaluationContext -> Value
 
 module Aggregator =
-  let private noAidsNull aidValues = aidValues |> Array.exists ((=) Null) |> not
-
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
   let private mapAidStructure callback aidMaps defaultValue (aidValues: Value array) =
@@ -20,7 +18,7 @@ module Aggregator =
 
   let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
     match aidsArray with
-    | Value.Array aidValues when noAidsNull aidValues ->
+    | Value.Array aidValues ->
         let fn =
           fun aidValue ->
             Map.change
@@ -30,7 +28,6 @@ module Aggregator =
               | None -> Some initial)
 
         mapAidStructure fn aidMaps Map.empty aidValues
-    | Value.Array _ -> aidMaps
     | _ -> failwith "Expecting an AID array as input"
 
   type private Count(counter) =
@@ -116,11 +113,10 @@ module Aggregator =
       member this.Transition values =
         match values with
         | [ Null ] -> this
-        | [ Value.Array aidValues ] when noAidsNull aidValues ->
+        | [ Value.Array aidValues ] ->
             aidValues
             |> mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
             |> DiffixLowCount
-        | [ Value.Array _ ] -> aidSets |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
 
