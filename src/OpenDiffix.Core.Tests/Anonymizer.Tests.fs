@@ -182,7 +182,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   rows
   |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
   |> asFloat
-  |> should (equalWithin 1) 5
+  |> should (equalWithin 3) 5
 
 [<Fact>]
 let ``count distinct with flattening - re-worked example 2 from doc`` () =
