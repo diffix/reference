@@ -1,6 +1,7 @@
 module OpenDiffix.Core.QueryEngineTests
 
 open Xunit
+open FsUnit.Xunit
 open OpenDiffix.Core
 open OpenDiffix.Core.AnonymizerTypes
 
@@ -49,7 +50,8 @@ type Tests(db: DBFixture) =
     let expected =
       {
         Columns = [ "city"; "count" ]
-        Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+        // 10 + noise
+        Rows = [ [| String "Berlin"; Integer 11L |]; [| String "Rome"; Integer 11L |] ]
       }
 
     let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
@@ -59,43 +61,60 @@ type Tests(db: DBFixture) =
   let ``query 5 - bucket expansion`` () =
     let queryResult = runQuery "SELECT city FROM customers_small"
 
-    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
+    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 11 -> [| String name |] ]) [ "Berlin"; "Rome" ]
 
     let expected = { Columns = [ "city" ]; Rows = expectedRows }
 
     assertOkEqual queryResult expected
 
+  /// Returns the aggregate result of a query such as `SELECT count(*) FROM ...`
+  let runQueryToSingleNumericAggregate query =
+    runQuery query
+    |> Utils.unwrap
+    |> fun result ->
+         result.Rows
+         |> List.head
+         |> Array.head
+         |> function
+         | Integer i -> float i
+         | Real r -> r
+         | other -> failwith $"Unexpected return '%A{other}'"
+
   [<Fact>]
   let ``query 6 - cross join`` () =
-    let queryResult = runQuery "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
-
-    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
-
-    assertOkEqual queryResult expected
+    "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
+    |> runQueryToSingleNumericAggregate
+    |> should (equalWithin 21) 72
 
   [<Fact>]
   let ``query 7 - inner join`` () =
-    let queryResult = runQuery "SELECT count(*) FROM purchases join customers_small ON id = cid"
-
-    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
-
-    assertOkEqual queryResult expected
+    "SELECT count(*) FROM purchases join customers_small ON id = cid"
+    |> runQueryToSingleNumericAggregate
+    |> should (equalWithin 21) 72
 
   [<Fact>]
   let ``query 8 - left join`` () =
-    let queryResult = runQuery "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
-
-    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
-
-    assertOkEqual queryResult expected
+    "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
+    |> runQueryToSingleNumericAggregate
+    |> should (equalWithin 21) 72
 
   [<Fact>]
   let ``query 9 - right join`` () =
-    let queryResult = runQuery "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
-
-    let expected = { Columns = [ "count" ]; Rows = [ [| Integer 72L |] ] }
-
-    assertOkEqual queryResult expected
+    // The underlying data looks like this:
+    //
+    // ID = null, CID = null, COUNT
+    //     false,      false,    73
+    //      true,      false,   445
+    //      true,       true,     1
+    //
+    // The query should yield the 73 + 445 values,
+    // but only the 73 where neither column is null
+    // should be considered by the anonymizer.
+    // There is a flattening of 1 and noise proportional to
+    // the top group average of 7
+    "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
+    |> runQueryToSingleNumericAggregate
+    |> should (equalWithin 21) 72
 
   [<Fact>]
   let ``query 10`` () =
