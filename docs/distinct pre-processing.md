@@ -3,7 +3,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
 - [Distinct aggregates](#distinct-aggregates)
   - [Intuition](#intuition)
   - [Design goal](#design-goal)
-    - [Definition of extreme contributor](#definition-of-extreme-contributor)
+    - [Extreme contribution](#extreme-contribution)
   - [Pre-processing](#pre-processing)
     - [Per-AID type algorithm sketch in detail](#per-aid-type-algorithm-sketch-in-detail)
       - [Algorithm](#algorithm)
@@ -63,13 +63,14 @@ FROM cards
 can therefore return the count 3 without any distortion.
 
 
-### Definition of extreme contributor
+### Extreme contribution
 
-An entity is an extreme contributor if their presence has a noticeable impact on the aggregate.
-In a distinct aggregator, what makes an entity stand out differs from what makes an entity stand
-out in a non-distinct aggregator. We, therefore, cannot flatten as we would for other aggregators.
+In our other aggregators, we use the concept of an extreme contributor to describe an entity that contributes more values than most others.
+We flatten the effect of these entities through "extreme value flattening".
+When performing a distinct aggregation, we need to augment the notion of "contributing values" in the context of flattening.
+The type of behaviour that makes an entity stand out and must be flattened occurs when contributed values are unique to an entity.
+We need flattening here too, but a different kind of flattening.
 
-Unlike a non-distinct aggregator, the contributions made to a distinct aggregator might be shared by multiple entities.
 For example, let's consider the following example dataset:
 
 | AID sets  | Value |
@@ -81,14 +82,13 @@ For example, let's consider the following example dataset:
 ...
 | [999, 1000] |   999 |
 
-In this example table, AID 1000 has each value in the dataset. While the presence or
-the absence of the entity with AID 1000 would half or double the total count in a non-distinct count aggregate,
-it does not at all affect the distinct count as all values are shared.
+In this example table, two distinct AIDs contribute every value, one of them always being AID 1000.
+The presence or absence of AID 1000 would have no impact on the count of the distinct values in this table.
+(of course, if we were to calculate the number of entries in the table rather than of distinct values, then the absence
+of AID 1000 would halve the count). By our previous definition AID 1000 is not an extreme contributor in this table.
 
-An entity can be an extreme contributor to a distinct aggregate if they have
-significantly more unique values than other entities.
-
-To map it onto our previous example, AID 1000 would be an extreme contributor if the table looked like this:
+In the table below, AID 1000 _is_ an extreme contributor. Values 5 through 1000 are only contributed by AID 1000, and
+if all values contributed by AID 1000 were removed from the table, it would significantly impact the count of distinct values.
 
 | AID sets | Value |
 | -------- | ----: |
