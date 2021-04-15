@@ -185,31 +185,49 @@ going to cause insufficient flattening for extreme contributions (note: this is 
 
 ### Algorithm
 
-The process for suppressing extreme values is as follows:
+The algorithm described below is run for each AID individually.
+There are three potential outcomes for an AID:
+
+a) success - we get back the amount of flattening and the top group average associated with the AID
+b) no data - there was absolutely no data associated with the AID
+c) insufficient data – indicates that there was not enough distinct AIDs to form an outlier and top group
+
+How to proceed depends on if the aggregator is an anonymizing query (typically the top-most query),
+or an intermediate query (typically a subquery).
+
+In the case of an **anonymizing query** we take the following steps:
+- if any of the AIDs produce a result of type "c) insufficient data", then we return `null`
+  to indicate that we could not produce an anonymous aggregate value, otherwise
+- we filter out all instances of "b) no data" and from the remaining results we take the largest
+  flattening and the largest top-group average returned. These are used to adjust the aggregate value.
+
+In the case of an **intermediate query** we take the following steps:
+- drop all "b) no data" results, and find the largest amount of flattening among the remaining
+  returned results. Flatten the aggregate by this amount, without adding any additional noise.
+
+The per-AID steps for suppressing extreme values is as follows:
 
 1. Produce per-AID contributions as per the aggregate being generated
    (count of rows, sum of row contributions, min/max etc). For aid sets such as
    `email[1]` and `email[1, 2, 3]` an AID would be something like the value 1.
    When a contribution is for a set of entities (such as `email[1, 2, 3]`) the
    contribution is made proportional per AID value.
+   If there is no data for the AID, the algorithm is aborted with the "no data" result, otherwise continue.
 2. Sort the contribution values to be flattened in descending order
 3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
 4. Take the first `Ne` highest contributions as the extreme values.
-5. Take next `Nt` highest contributions as the top count.
-6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aids` distinct AIDs, then use that value as the the top group average
-7. (only for the final anonymizing aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` to indicate that
-  there were was not enough data
+5. Take the subsequent `Nt` highest contributions as the top count.
+6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aids` distinct AIDs, then use that value as the top group average
+7. (only for the final anonymizing aggregation) If there are less than `Ne + Nt` many distinct entities then abort and return the "insufficient dat" result
 8. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
    1. If no entities were chosen for the top group, then use the entity with the lowest contribution as the top group and continue, or
    2. If some values were chosen for the top group, but not quite `Nt` distinct ones, then use the values chosen and continue
 9. Calculate the average of the `Nt` values
-10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
+10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average,
+    and return this as a "success" result.
 
-Once the algorithm has been completed for each AID set individual, we continue based on the AID set with the largest amount of flattening.
-In the case of the fully anonymizing aggregation in the top-most query we also add noise proportional to the absolute largest top group average
-across the AID sets.
 
-Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AID types unless otherwise stated.
+Below are examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AID types unless otherwise stated.
 
 Note that the tables as shown are the row contributions used to calculate an aggregate.
 
@@ -223,6 +241,7 @@ For example, the following table should be read as AID 1 contributing 6 to the a
 
 The `Value`s can be interpreted as an entity having contributed that number of rows in the case of a `count` aggregator, or it could
 the the per entity sum contribution in the case of a `sum` aggregator.
+
 
 ### Examples
 
