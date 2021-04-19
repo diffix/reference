@@ -9,11 +9,11 @@ let private randomNormal (rnd: Random) stdDev =
   let u1 = 1.0 - rnd.NextDouble()
   let u2 = 1.0 - rnd.NextDouble()
 
-  let randStdNormal = Math.Sqrt(-2.0 * log (u1)) * Math.Sin(2.0 * Math.PI * u2)
+  let randStdNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
 
   stdDev * randStdNormal
 
-let private newRandom (aidSet: Set<AidHash>) (anonymizationParams: AnonymizationParams) =
+let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: Set<AidHash>) =
   let combinedAids = aidSet |> Set.toList |> List.reduce (^^^)
   let seed = combinedAids ^^^ anonymizationParams.Seed
   Random(seed)
@@ -23,73 +23,211 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> randomNormal rnd
   |> max -noiseParam.Cutoff
   |> min noiseParam.Cutoff
-  |> round
-  |> int32
 
-let countAids (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
-  match aidSets with
-  | None -> 0 // The result set was entirely empty, no aggregation state was created
-  | Some aidSets when Set.isEmpty (Array.head aidSets) -> 0 // Is this right? Should it be Null instead?
-  | Some aidSets ->
-      let aidSet = aidSets |> Array.head
-      let rnd = newRandom aidSet anonymizationParams
-      let noise = noiseValue rnd anonymizationParams.Noise
-      max (aidSet.Count + noise) 0
+let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
 
-let isLowCount (aidSets: Set<AidHash> array option) (anonymizationParams: AnonymizationParams) =
-  match aidSets with
-  | None -> true
-  | Some aidSets ->
-      aidSets
-      |> Array.map (fun aidSet ->
-        if aidSet.Count = 0 then
-          true
-        else
-          let rnd = newRandom aidSet anonymizationParams
+let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
+  aidSets
+  |> List.map (fun aidSet ->
+    if aidSet.Count = 0 then
+      true
+    else
+      let rnd = newRandom anonymizationParams aidSet
 
-          let threshold =
-            randomUniform
-              rnd
-              {
-                Lower = anonymizationParams.MinimumAllowedAids
-                Upper = anonymizationParams.MinimumAllowedAids + 2
-              }
+      let threshold =
+        randomUniform
+          rnd
+          {
+            Lower = anonymizationParams.MinimumAllowedAids
+            Upper = anonymizationParams.MinimumAllowedAids + 2
+          }
 
-          aidSet.Count < threshold
-      )
-      |> Array.reduce (||)
+      aidSet.Count < threshold
+  )
+  |> List.reduce (||)
 
-let count (anonymizationParams: AnonymizationParams) (perUserContributions: Map<AidHash, int64> array option) =
-  match perUserContributions with
+type private AidCount = { FlattenedSum: float; Flattening: float; TopGroupAverage: float; Rnd: Random }
+
+let private aidFlattening
+  (anonymizationParams: AnonymizationParams)
+  (aidContributions: Map<AidHash, int64>)
+  : AidCount option =
+  match Map.toList aidContributions with
+  | [] -> None
+  | perAidContributions ->
+      let rnd =
+        perAidContributions
+        |> List.map fst
+        |> Set.ofList
+        |> newRandom anonymizationParams
+
+      let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
+      let topCount = randomUniform rnd anonymizationParams.TopCount
+
+      let sortedUserContributions = perAidContributions |> List.map snd |> List.sortDescending
+
+      if sortedUserContributions.Length < outlierCount + topCount then
+        None
+      else
+        let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
+
+        let topGroupValuesSummed =
+          sortedUserContributions
+          |> List.skip outlierCount
+          |> List.take topCount
+          |> List.sum
+
+        let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
+        let outlierReplacement = topGroupAverage * (float outlierCount)
+
+        let summedContributions = sortedUserContributions |> List.sum
+        let flattening = float outliersSummed - outlierReplacement
+        let flattenedSum = float summedContributions - flattening
+
+        Some
+          {
+            FlattenedSum = flattenedSum
+            Flattening = flattening
+            TopGroupAverage = topGroupAverage
+            Rnd = rnd
+          }
+
+let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map<Value, Set<AidHash>> =
+  valuesPerAid
+  |> Map.toList
+  |> List.collect (fun (aidHash, valuesSet) -> valuesSet |> Set.toList |> List.map (fun value -> value, aidHash))
+  |> List.fold
+    (fun acc (value, aidHash) ->
+      Map.change value (Option.map (Set.add aidHash) >> Option.orElse (Some(Set.singleton aidHash))) acc
+    )
+    Map.empty
+
+let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Map<Value, Set<AidHash> list> =
+  perAidTypeValueMap
+  |> List.map transposePerAidMapsToPerValue
+  |> List.fold
+    (fun (acc: Map<Value, Set<AidHash> list>) (valueHashMap: Map<Value, Set<AidHash>>) ->
+      valueHashMap
+      |> Map.toList
+      |> List.fold
+        (fun (valueAcc: Map<Value, Set<AidHash> list>) (value, aidHashSet) ->
+          let a = List.singleton aidHashSet
+
+          Map.change
+            value
+            (Option.map (fun existingAidSets -> List.append existingAidSets a)
+             >> Option.orElse (Some a))
+            valueAcc
+        )
+        acc
+    )
+    Map.empty
+
+let rec distributeUntilEmpty takenValues queue itemsByAID =
+  match itemsByAID, queue with
+  | [], [] -> [] // Done :D
+  | [], _ -> distributeUntilEmpty takenValues [] (List.rev queue)
+
+  | (aid, values) :: rest, _ ->
+      match values |> List.tryFind (fun value -> not <| Set.contains value takenValues) with
+      | Some value ->
+          let updatedTaken = Set.add value takenValues
+
+          match values |> List.filter ((<>) value) with
+          | [] -> (aid, value) :: distributeUntilEmpty updatedTaken queue rest
+          | remaining ->
+              let queue = (aid, remaining) :: queue
+              (aid, value) :: distributeUntilEmpty updatedTaken queue rest
+      | None ->
+          // No more value to take for user...
+          distributeUntilEmpty takenValues queue rest
+
+let private countDistinctFlatteningByAid
+  anonParams
+  valuesPassingLowCount
+  (perAidContributions: Map<AidHash, Set<Value>>)
+  =
+  let distributableValues =
+    perAidContributions
+    |> Map.map (fun _aidHash valuesSet -> Set.difference valuesSet valuesPassingLowCount)
+    |> Map.toList
+    |> List.sortBy (fun (aid, valuesSet) -> Set.count valuesSet, aid)
+    |> List.map (fun (aid, valuesSet) -> aid, Set.toList valuesSet |> List.sort)
+
+  distributableValues
+  |> distributeUntilEmpty Set.empty []
+  |> List.groupBy fst
+  |> List.map (fun (aid, values) -> aid, List.length values |> int64)
+  |> Map.ofList
+  |> aidFlattening anonParams
+
+let private anonymizedSum (anonymizationParams: AnonymizationParams) (byAidSum: AidCount list) =
+  let aidForFlattening =
+    byAidSum
+    |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> List.groupBy (fun aggregate -> aggregate.Flattening)
+    |> List.tryHead
+    // We might end up with multiple different flattened sums that have the same amount of flattening.
+    // This could be the result of some AID values being null for one of the AIDs, while there were still
+    // overall enough AIDs to produce a flattened sum.
+    // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
+    |> Option.map (fun (_, values) -> values |> List.maxBy (fun aggregate -> aggregate.FlattenedSum))
+
+  let noise =
+    byAidSum
+    |> List.sortByDescending (fun aggregate -> aggregate.TopGroupAverage)
+    |> List.tryHead
+    |> Option.map (fun flatteningResult ->
+      let noise = noiseValue flatteningResult.Rnd anonymizationParams.Noise
+      noise * flatteningResult.TopGroupAverage
+    )
+
+  match aidForFlattening, noise with
+  | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
+  | _ -> None
+
+let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> list) (anonymizationParams: AnonymizationParams) =
+  // These values are safe, and can be counted as they are
+  // without any additional noise.
+  let valuesPassingLowCount =
+    perAidValuesByAidType
+    |> transposeToPerValue
+    |> Map.toList
+    |> List.filter (fun (_value, aidSets) -> not <| isLowCount aidSets anonymizationParams)
+    |> List.map fst
+    |> Set.ofList
+
+  let safeCount = Set.count valuesPassingLowCount
+
+  let byAid =
+    perAidValuesByAidType
+    |> List.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
+
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // we can only report the count of values we already know to be safe as they
+  // individually passed low count filtering.
+  if byAid |> List.exists ((=) None) then
+    if safeCount > 0 then safeCount |> int64 |> Integer else Null
+  else
+    byAid
+    |> List.choose id
+    |> anonymizedSum anonymizationParams
+    |> Option.defaultValue 0.
+    |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
+
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> list option) =
+  match perAidContributions with
   | None -> Null
-  | Some perUserContributions ->
-      match perUserContributions |> Array.head |> Map.toList with
-      | [] -> Null
-      | perUserContribution ->
-          let aids = perUserContribution |> List.map fst |> Set.ofList
-          let rnd = newRandom aids anonymizationParams
-          // The noise value must be generated first to make sure the random number generator is fresh.
-          // This ensures count(distinct aid) which uses addNoise directly produces the same results.
-          let noise = noiseValue rnd anonymizationParams.Noise
+  | Some perAidContributions ->
+      let byAid = perAidContributions |> List.map (aidFlattening anonymizationParams)
 
-          let sortedUserContributions = perUserContribution |> List.map snd |> List.sortDescending
-
-          let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
-          let topCount = randomUniform rnd anonymizationParams.TopCount
-
-          if sortedUserContributions.Length < outlierCount + topCount then
-            Null
-          else
-            let topValueSummed =
-              sortedUserContributions
-              |> List.skip outlierCount
-              |> List.take topCount
-              |> List.sum
-
-            let topValueAverage = (float topValueSummed) / (float topCount)
-            let outlierReplacement = topValueAverage * (float outlierCount) |> int64
-
-            let sumExcludingOutliers = sortedUserContributions |> List.skip (outlierCount) |> List.sum
-
-            let totalCount = sumExcludingOutliers + outlierReplacement
-            (max (totalCount + int64 noise) 0L) |> Integer
+      // If any of the AIDs had insufficient data to produce a sensible flattening
+      // we have to abort anonymization.
+      if byAid |> List.exists ((=) None) then
+        Null
+      else
+        byAid
+        |> List.choose id
+        |> anonymizedSum anonymizationParams
+        |> Option.map (round >> int64 >> Integer)
+        |> Option.defaultValue Null

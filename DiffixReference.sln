@@ -6,10 +6,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.Core.Tests", "sr
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.CLI", "src\OpenDiffix.CLI\OpenDiffix.CLI.fsproj", "{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Website.Server", "src\Website.Server\Website.Server.fsproj", "{6EDC4034-CD6D-4420-87C4-9A563FF46021}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Website.Client", "src\Website.Client\Website.Client.fsproj", "{FBB40D98-718D-4BA4-A84D-F3C2F5A3E6C6}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,13 +24,5 @@ Global
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6EDC4034-CD6D-4420-87C4-9A563FF46021}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6EDC4034-CD6D-4420-87C4-9A563FF46021}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6EDC4034-CD6D-4420-87C4-9A563FF46021}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6EDC4034-CD6D-4420-87C4-9A563FF46021}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FBB40D98-718D-4BA4-A84D-F3C2F5A3E6C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FBB40D98-718D-4BA4-A84D-F3C2F5A3E6C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FBB40D98-718D-4BA4-A84D-F3C2F5A3E6C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FBB40D98-718D-4BA4-A84D-F3C2F5A3E6C6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

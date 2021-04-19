@@ -187,7 +187,7 @@ type Tests(db: DBFixture) =
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
-  let aidColumns = [| idColumn; companyColumn |] |> Expression.Array
+  let aidColumns = [ idColumn; companyColumn ] |> Expression.List
 
   let analyzeQuery query =
     query

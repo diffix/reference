@@ -179,14 +179,7 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
     query,
     (function
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
-        let args =
-          match opts.Distinct, args, aidColumnsExpression with
-          | true, [ colExpr ], (Array aidExpressions) when Array.contains colExpr aidExpressions ->
-              [ aidColumnsExpression; colExpr ]
-          | true, _, _ -> failwith "Should have failed validation. Only count(distinct aid) is allowed"
-          | false, _, _ -> aidColumnsExpression :: args
-
-        FunctionExpr(AggregateFunction(DiffixCount, opts), args)
+        FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
     | expression -> expression)
   )
 
@@ -278,7 +271,7 @@ let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTab
           }
 
 let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) =
-  collectAids anonParams tables 0 |> Result.map List.toArray
+  collectAids anonParams tables 0
 
 let analyze
   (dataProvider: IDataProvider)
@@ -290,16 +283,15 @@ let analyze
     let! query = transformQuery schema parseTree
     let! aidColumns = findAids anonParams query.TargetTables
 
-    if Array.isEmpty aidColumns then
+    if List.isEmpty aidColumns then
       return! query |> SelectQuery |> Ok
     else
-      let firstAidColumnIndex = aidColumns |> Array.head |> fst
-      do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery firstAidColumnIndex
+      do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery
 
       let aidColumnsExpression =
         aidColumns
-        |> Array.map (fun (index, column) -> ColumnReference(index, column.Type))
-        |> Expression.Array
+        |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
+        |> Expression.List
 
       return
         query

@@ -12,7 +12,7 @@ let rec encodeValue =
   | OpenDiffix.Core.Value.Integer int64 -> Encode.int64 int64
   | OpenDiffix.Core.Value.Real float -> Encode.float float
   | OpenDiffix.Core.Value.String string -> Encode.string string
-  | OpenDiffix.Core.Value.Array values -> Encode.array (values |> Array.map encodeValue)
+  | OpenDiffix.Core.Value.List values -> Encode.list (values |> List.map encodeValue)
 
 let encodeRow values = Encode.list (values |> Array.toList |> List.map encodeValue)
 

@@ -25,7 +25,7 @@ let analyzeQuery queryString =
   |> Result.bind (Analyzer.transformQuery schema)
   |> Result.bind (fun query ->
     AnalyzerTypes.SelectQuery query
-    |> Analysis.QueryValidity.validateQuery aidColIndex
+    |> Analysis.QueryValidity.validateQuery
   )
 
 let ensureFailParsedQuery queryString (errorFragment: string) =
@@ -43,7 +43,6 @@ let ensureAnalyzeValid queryString = assertOkEqual (analyzeQuery queryString) ()
 let ``Fail on sum aggregate`` () = ensureFailParsedQuery "SELECT sum(int_col) FROM table" "only count"
 
 [<Fact>]
-let ``Only allow count(*) and count(distinct aid)`` () =
+let ``Only allow count(*) and count(distinct column)`` () =
   ensureAnalyzeValid "SELECT count(*) FROM table"
   ensureAnalyzeValid "SELECT count(distinct int_col) FROM table"
-  ensureFailParsedQuery "SELECT count(distinct str_col) FROM table" "distinct aid-column"
