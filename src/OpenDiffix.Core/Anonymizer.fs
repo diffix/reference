@@ -109,12 +109,7 @@ let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map
   |> List.collect (fun (aidHash, valuesSet) -> valuesSet |> Set.toList |> List.map (fun value -> value, aidHash))
   |> List.fold
     (fun acc (value, aidHash) ->
-      Map.change
-        value
-        (function
-        | None -> Some <| Set.singleton aidHash
-        | Some aidSet -> Some <| Set.add aidHash aidSet)
-        acc
+      Map.change value (Option.map (Set.add aidHash) >> Option.orElse (Some(Set.singleton aidHash))) acc
     )
     Map.empty
 
@@ -131,9 +126,8 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> array) : M
 
           Map.change
             value
-            (function
-            | None -> Some a
-            | Some existingAidSets -> Some <| Array.append existingAidSets a)
+            (Option.map (fun existingAidSets -> Array.append existingAidSets a)
+             >> Option.orElse (Some a))
             valueAcc
         )
         acc

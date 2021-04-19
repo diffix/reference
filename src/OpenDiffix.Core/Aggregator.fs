@@ -23,9 +23,7 @@ module Aggregator =
           fun aidValue ->
             Map.change
               (aidValue.GetHashCode())
-              (function
-              | Some value -> Some <| transition value
-              | None -> Some initial)
+              (Option.map transition >> Option.orElse (Some initial))
 
         mapAidStructure fn aidMaps Map.empty aidValues
     | _ -> failwith "Expecting an AID array as input"
