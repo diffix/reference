@@ -50,8 +50,7 @@ type Tests(db: DBFixture) =
     let expected =
       {
         Columns = [ "city"; "count" ]
-        // 10 + noise
-        Rows = [ [| String "Berlin"; Integer 11L |]; [| String "Rome"; Integer 11L |] ]
+        Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
       }
 
     let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
@@ -61,14 +60,14 @@ type Tests(db: DBFixture) =
   let ``query 5 - bucket expansion`` () =
     let queryResult = runQuery "SELECT city FROM customers_small"
 
-    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 11 -> [| String name |] ]) [ "Berlin"; "Rome" ]
+    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
 
     let expected = { Columns = [ "city" ]; Rows = expectedRows }
 
     assertOkEqual queryResult expected
 
   /// Returns the aggregate result of a query such as `SELECT count(*) FROM ...`
-  let runQueryToSingleNumericAggregate query =
+  let runQueryToInteger query =
     runQuery query
     |> Utils.unwrap
     |> fun result ->
@@ -76,27 +75,26 @@ type Tests(db: DBFixture) =
          |> List.head
          |> Array.head
          |> function
-         | Integer i -> float i
-         | Real r -> r
+         | Integer i -> Integer i
          | other -> failwith $"Unexpected return '%A{other}'"
 
   [<Fact>]
   let ``query 6 - cross join`` () =
     "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
-    |> runQueryToSingleNumericAggregate
-    |> should (equalWithin 21) 72
+    |> runQueryToInteger
+    |> should equal (Integer 72L)
 
   [<Fact>]
   let ``query 7 - inner join`` () =
     "SELECT count(*) FROM purchases join customers_small ON id = cid"
-    |> runQueryToSingleNumericAggregate
-    |> should (equalWithin 21) 72
+    |> runQueryToInteger
+    |> should equal (Integer 72L)
 
   [<Fact>]
   let ``query 8 - left join`` () =
     "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
-    |> runQueryToSingleNumericAggregate
-    |> should (equalWithin 21) 72
+    |> runQueryToInteger
+    |> should equal (Integer 72L)
 
   [<Fact>]
   let ``query 9 - right join`` () =
@@ -113,8 +111,8 @@ type Tests(db: DBFixture) =
     // There is a flattening of 1 and noise proportional to
     // the top group average of 7
     "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
-    |> runQueryToSingleNumericAggregate
-    |> should (equalWithin 21) 72
+    |> runQueryToInteger
+    |> should equal (Integer 72L)
 
   [<Fact>]
   let ``query 10`` () =
@@ -127,11 +125,11 @@ type Tests(db: DBFixture) =
     let outerJoinCount =
       // Note that this is an entirely bogus join forcing the joined table to return Null values only
       "SELECT count(*) FROM customers_small as c LEFT JOIN products as p ON c.city = p.name"
-      |> runQueryToSingleNumericAggregate
+      |> runQueryToInteger
 
     let plainCount =
       "SELECT count(*) FROM customers_small"
-      |> runQueryToSingleNumericAggregate
+      |> runQueryToInteger
 
     outerJoinCount |> should equal plainCount
 

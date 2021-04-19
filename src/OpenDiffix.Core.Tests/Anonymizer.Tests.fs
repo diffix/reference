@@ -54,28 +54,19 @@ let evaluateAggregator = evaluateAggregator context
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
 
-let asFloat =
-  function
-  | Real f -> f
-  | Integer i -> i |> float
-  | other -> failwith $"Expected numerical value, got '%A{other}'"
-
 [<Fact>]
 let ``anon count distinct column`` () =
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; aidColumn ]
-  |> asFloat
-  |> should (equalWithin 2) 9
+  |> should equal (Integer 9L)
 
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; companyColumn ]
-  |> asFloat
-  |> should (equalWithin 2) 4
+  |> should equal (Integer 4L)
 
   rows
   |> evaluateAggregator distinctDiffixCount [ allAidColumns; strColumn ]
-  |> asFloat
-  |> should (equalWithin 2) 1
+  |> should equal (Integer 1L)
 
 [<Fact>]
 let ``anon count()`` () =
@@ -83,8 +74,7 @@ let ``anon count()`` () =
   // - noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList ]
-  |> asFloat
-  |> should (equalWithin 5) 30
+  |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count(col)`` () =
@@ -93,8 +83,7 @@ let ``anon count(col)`` () =
   // - noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
-  |> asFloat
-  |> should (equalWithin 5) 30
+  |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count returns Null if insufficient users`` () =
@@ -151,8 +140,7 @@ let ``multi-AID count`` () =
 
   rows
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
-  |> asFloat
-  |> should (equalWithin 1) 5
+  |> should equal (Integer 5L)
 
 [<Fact>]
 let ``count distinct with flattening - worked example 1 from doc`` () =
@@ -181,8 +169,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
-  |> asFloat
-  |> should (equalWithin 3) 5
+  |> should equal (Integer 5L)
 
 [<Fact>]
 let ``count distinct with flattening - re-worked example 2 from doc`` () =
@@ -213,8 +200,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
-  |> asFloat
-  |> should (equalWithin 1) 2
+  |> should equal (Integer 2L)
 
 [<Fact>]
 let ``counts with insufficient values for one AID return Null`` () =
