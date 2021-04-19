@@ -38,7 +38,7 @@ let context =
         }
   }
 
-let contextWithOutlierAndTop =
+let anonymizedAggregationContext =
   let threshold = { Lower = 2; Upper = 2 }
 
   let anonParams =
@@ -180,7 +180,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   let allAidColumns = Expression.Array [| aid1; aid2 |]
 
   rows
-  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
+  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
   |> asFloat
   |> should (equalWithin 3) 5
 
@@ -212,7 +212,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   let allAidColumns = Expression.Array [| aid1; aid2 |]
 
   rows
-  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; fruit ]
+  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
   |> asFloat
   |> should (equalWithin 1) 2
 
@@ -234,9 +234,9 @@ let ``counts with insufficient values for one AID return Null`` () =
   let allAidColumns = Expression.Array [| aid1; aid2 |]
 
   rows
-  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop diffixCount [ allAidColumns; value ]
+  |> TestHelpers.evaluateAggregator anonymizedAggregationContext diffixCount [ allAidColumns; value ]
   |> should equal Null
 
   rows
-  |> TestHelpers.evaluateAggregator contextWithOutlierAndTop distinctDiffixCount [ allAidColumns; value ]
+  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; value ]
   |> should equal Null
