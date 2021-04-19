@@ -7,18 +7,18 @@ type IAggregator =
 module Aggregator =
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
-  let private mapAidStructure callback aidMaps defaultValue (aidValues: Value array) =
+  let private mapAidStructure callback aidMaps defaultValue (aidValues: Value list) =
     aidMaps
-    |> Option.defaultValue (Array.create aidValues.Length defaultValue)
-    |> Array.zip aidValues
-    |> Array.map (fun (aidValue: Value, aidStructure) ->
+    |> Option.defaultValue (List.replicate aidValues.Length defaultValue)
+    |> List.zip aidValues
+    |> List.map (fun (aidValue: Value, aidStructure) ->
       if aidValue = Null then aidStructure else callback aidValue aidStructure
     )
     |> Some
 
-  let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> array option) =
+  let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> list option) =
     match aidsArray with
-    | Value.Array aidValues ->
+    | Value.List aidValues ->
         let fn =
           fun aidValue ->
             Map.change
@@ -26,7 +26,7 @@ module Aggregator =
               (Option.map transition >> Option.orElse (Some initial))
 
         mapAidStructure fn aidMaps Map.empty aidValues
-    | _ -> failwith "Expecting an AID array as input"
+    | _ -> failwith "Expecting an AID list as input"
 
   type private Count(counter) =
     new() = Count(0L)
@@ -68,7 +68,7 @@ module Aggregator =
 
       member this.Final _ctx = sum
 
-  type private DiffixCount(perAidCounts: Map<AidHash, int64> array option) =
+  type private DiffixCount(perAidCounts: Map<AidHash, int64> list option) =
     new() = DiffixCount(None)
 
     interface IAggregator with
@@ -85,7 +85,7 @@ module Aggregator =
 
       member this.Final ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
-  type private DiffixCountDistinct(perAidValuesByAidType: Map<AidHash, Set<Value>> array option) =
+  type private DiffixCountDistinct(perAidValuesByAidType: Map<AidHash, Set<Value>> list option) =
     new() = DiffixCountDistinct(None)
 
     interface IAggregator with
@@ -104,14 +104,14 @@ module Aggregator =
         | None -> 0L |> Integer
         | Some perAidValuesByAidType -> Anonymizer.countDistinct perAidValuesByAidType ctx.AnonymizationParams
 
-  type private DiffixLowCount(aidSets: Set<AidHash> array option) =
+  type private DiffixLowCount(aidSets: Set<AidHash> list option) =
     new() = DiffixLowCount(None)
 
     interface IAggregator with
       member this.Transition values =
         match values with
         | [ Null ] -> this
-        | [ Value.Array aidValues ] ->
+        | [ Value.List aidValues ] ->
             aidValues
             |> mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
             |> DiffixLowCount

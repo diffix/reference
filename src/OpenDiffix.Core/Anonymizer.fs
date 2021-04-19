@@ -26,9 +26,9 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
 
 let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
 
-let isLowCount (aidSets: Set<AidHash> array) (anonymizationParams: AnonymizationParams) =
+let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
-  |> Array.map (fun aidSet ->
+  |> List.map (fun aidSet ->
     if aidSet.Count = 0 then
       true
     else
@@ -44,7 +44,7 @@ let isLowCount (aidSets: Set<AidHash> array) (anonymizationParams: Anonymization
 
       aidSet.Count < threshold
   )
-  |> Array.reduce (||)
+  |> List.reduce (||)
 
 type private AidCount = { FlattenedSum: float; Flattening: float; NoiseParam: NoiseParam; Rnd: Random }
 
@@ -113,20 +113,20 @@ let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map
     )
     Map.empty
 
-let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> array) : Map<Value, Set<AidHash> array> =
+let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Map<Value, Set<AidHash> list> =
   perAidTypeValueMap
-  |> Array.map transposePerAidMapsToPerValue
-  |> Array.fold
-    (fun (acc: Map<Value, Set<AidHash> array>) (valueHashMap: Map<Value, Set<AidHash>>) ->
+  |> List.map transposePerAidMapsToPerValue
+  |> List.fold
+    (fun (acc: Map<Value, Set<AidHash> list>) (valueHashMap: Map<Value, Set<AidHash>>) ->
       valueHashMap
       |> Map.toList
       |> List.fold
-        (fun (valueAcc: Map<Value, Set<AidHash> array>) (value, aidHashSet) ->
-          let a = Array.singleton aidHashSet
+        (fun (valueAcc: Map<Value, Set<AidHash> list>) (value, aidHashSet) ->
+          let a = List.singleton aidHashSet
 
           Map.change
             value
-            (Option.map (fun existingAidSets -> Array.append existingAidSets a)
+            (Option.map (fun existingAidSets -> List.append existingAidSets a)
              >> Option.orElse (Some a))
             valueAcc
         )
@@ -172,30 +172,30 @@ let private countDistinctFlatteningByAid
   |> Map.ofList
   |> aidFlattening anonParams
 
-let private anonymizedSum (byAidSum: FlatteningResult []) =
+let private anonymizedSum (byAidSum: FlatteningResult list) =
   let values =
     byAidSum
-    |> Array.choose
+    |> List.choose
          (function
          | FlatteningResult result -> Some result
          | _ -> None)
 
   let aidForFlattening =
     values
-    |> Array.sortByDescending (fun aggregate -> aggregate.Flattening)
-    |> Array.tryHead
+    |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> List.tryHead
 
   let noise =
     values
-    |> Array.sortByDescending (fun aggregate -> aggregate.NoiseParam.StandardDev)
-    |> Array.tryHead
+    |> List.sortByDescending (fun aggregate -> aggregate.NoiseParam.StandardDev)
+    |> List.tryHead
     |> Option.map (fun flatteningResult -> noiseValue flatteningResult.Rnd flatteningResult.NoiseParam)
 
   match aidForFlattening, noise with
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
   | _ -> None
 
-let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anonymizationParams: AnonymizationParams) =
+let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> list) (anonymizationParams: AnonymizationParams) =
   // These values are safe, and can be counted as they are
   // without any additional noise.
   let valuesPassingLowCount =
@@ -210,24 +210,24 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
 
   let byAid =
     perAidValuesByAidType
-    |> Array.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
+    |> List.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
 
-  if byAid |> Array.exists ((=) InsufficientData) then
+  if byAid |> List.exists ((=) InsufficientData) then
     if safeCount > 0 then safeCount |> int64 |> Integer else Null
   else
     anonymizedSum byAid
     |> Option.defaultValue 0.
     |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> array option) =
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> list option) =
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->
-      let byAid = perAidContributions |> Array.map (aidFlattening anonymizationParams)
+      let byAid = perAidContributions |> List.map (aidFlattening anonymizationParams)
 
       // If any of the AIDs had insufficient data to produce a sensible flattening
       // we have to abort anonymization.
-      if byAid |> Array.exists ((=) InsufficientData) then
+      if byAid |> List.exists ((=) InsufficientData) then
         Null
       else
         anonymizedSum byAid

@@ -271,7 +271,7 @@ let rec private collectAids (anonParams: AnonymizationParams) (tables: TargetTab
           }
 
 let rec private findAids (anonParams: AnonymizationParams) (tables: TargetTables) =
-  collectAids anonParams tables 0 |> Result.map List.toArray
+  collectAids anonParams tables 0
 
 let analyze
   (dataProvider: IDataProvider)
@@ -283,15 +283,15 @@ let analyze
     let! query = transformQuery schema parseTree
     let! aidColumns = findAids anonParams query.TargetTables
 
-    if Array.isEmpty aidColumns then
+    if List.isEmpty aidColumns then
       return! query |> SelectQuery |> Ok
     else
       do! query |> SelectQuery |> Analysis.QueryValidity.validateQuery
 
       let aidColumnsExpression =
         aidColumns
-        |> Array.map (fun (index, column) -> ColumnReference(index, column.Type))
-        |> Expression.Array
+        |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
+        |> Expression.List
 
       return
         query

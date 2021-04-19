@@ -20,10 +20,10 @@ let rows =
      ]
 
 let aidColumn = ColumnReference(0, IntegerType)
-let aidColumnArray = Expression.Array [| aidColumn |]
+let aidColumnList = Expression.List [ aidColumn ]
 let strColumn = ColumnReference(1, StringType)
 let companyColumn = ColumnReference(2, StringType)
-let allAidColumns = Expression.Array [| aidColumn; companyColumn |]
+let allAidColumns = Expression.List [ aidColumn; companyColumn ]
 
 let context =
   { EvaluationContext.Default with
@@ -82,7 +82,7 @@ let ``anon count()`` () =
   // - replacing outlier 6, with top 5 --> flattened by 1
   // - noise proportional to top group average of 5
   rows
-  |> evaluateAggregator diffixCount [ aidColumnArray ]
+  |> evaluateAggregator diffixCount [ aidColumnList ]
   |> asFloat
   |> should (equalWithin 5) 30
 
@@ -92,7 +92,7 @@ let ``anon count(col)`` () =
   // - replacing outlier 6 with top 5
   // - noise proportional to top group average of 5
   rows
-  |> evaluateAggregator diffixCount [ aidColumnArray; strColumn ]
+  |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
   |> asFloat
   |> should (equalWithin 5) 30
 
@@ -113,7 +113,7 @@ let ``anon count returns 0 for Null inputs`` () =
   let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; Null |])
 
   rows
-  |> evaluateAggregator diffixCount [ aidColumnArray; strColumn ]
+  |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
   |> should equal (Integer 0L)
 
 [<Fact>]
@@ -177,7 +177,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let fruit = ColumnReference(2, StringType)
-  let allAidColumns = Expression.Array [| aid1; aid2 |]
+  let allAidColumns = Expression.List [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
@@ -209,7 +209,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let fruit = ColumnReference(2, StringType)
-  let allAidColumns = Expression.Array [| aid1; aid2 |]
+  let allAidColumns = Expression.List [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
@@ -231,7 +231,7 @@ let ``counts with insufficient values for one AID return Null`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let value = ColumnReference(2, IntegerType)
-  let allAidColumns = Expression.Array [| aid1; aid2 |]
+  let allAidColumns = Expression.List [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext diffixCount [ allAidColumns; value ]

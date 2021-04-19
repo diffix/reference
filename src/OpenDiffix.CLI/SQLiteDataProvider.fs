@@ -96,7 +96,7 @@ let rec columnTypeToString =
   | StringType -> "string"
   | BooleanType -> "boolean"
   | RealType -> "real"
-  | ArrayType elementType -> $"array of %s{columnTypeToString elementType}"
+  | ListType elementType -> $"list of %s{columnTypeToString elementType}"
   | UnknownType typeName -> $"unknown ({typeName})"
 
 type DataProvider(dbPath: string) =

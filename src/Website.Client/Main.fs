@@ -124,7 +124,7 @@ let cellClasses =
   | Integer _
   | Real _ -> [ "text-right px-1 py-0.5" ]
   | String _
-  | Array _ -> [ "text-left px-1 py-0.5" ]
+  | List _ -> [ "text-left px-1 py-0.5" ]
 
 let valueToNode value = text <| Value.ToString value
 
