@@ -85,9 +85,9 @@ let private aidFlattening
         let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
         let outlierReplacement = topGroupAverage * (float outlierCount)
 
-        let totalCount = sortedUserContributions |> List.sum
+        let summedContributions = sortedUserContributions |> List.sum
         let flattening = float outliersSummed - outlierReplacement
-        let noisyCount = float totalCount - flattening
+        let flattenedSum = float summedContributions - flattening
 
         let noiseParam =
           {
@@ -97,7 +97,7 @@ let private aidFlattening
 
         FlatteningResult
           {
-            FlattenedSum = noisyCount
+            FlattenedSum = flattenedSum
             Flattening = flattening
             NoiseParam = noiseParam
             Rnd = rnd
@@ -172,7 +172,7 @@ let private countDistinctFlatteningByAid
   |> Map.ofList
   |> aidFlattening anonParams
 
-let private flattenedAndNoisySum (byAidSum: FlatteningResult []) =
+let private anonymizedSum (byAidSum: FlatteningResult []) =
   let values =
     byAidSum
     |> Array.choose
@@ -215,7 +215,7 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> array) (anony
   if byAid |> Array.exists ((=) InsufficientData) then
     if safeCount > 0 then safeCount |> int64 |> Integer else Null
   else
-    flattenedAndNoisySum byAid
+    anonymizedSum byAid
     |> Option.defaultValue 0.
     |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
 
@@ -230,6 +230,6 @@ let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<A
       if byAid |> Array.exists ((=) InsufficientData) then
         Null
       else
-        flattenedAndNoisySum byAid
+        anonymizedSum byAid
         |> Option.map (round >> int64 >> Integer)
         |> Option.defaultValue Null
