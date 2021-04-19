@@ -120,20 +120,4 @@ type Tests(db: DBFixture) =
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected
 
-  [<Fact>]
-  let ``query 11`` () =
-    let outerJoinCount =
-      // Note that this is an entirely bogus join forcing the joined table to return Null values only
-      "SELECT count(*) FROM customers_small as c LEFT JOIN products as p ON c.city = p.name"
-      |> runQueryToInteger
-
-    let plainCount =
-      "SELECT count(*) FROM customers_small"
-      |> runQueryToInteger
-
-    outerJoinCount |> should equal plainCount
-
-    // Flattening by 2 and noise with std proportional to top group average of 5
-    plainCount |> should (equalWithin 15) 31
-
   interface IClassFixture<DBFixture>

@@ -226,3 +226,39 @@ let ``counts with insufficient values for one AID return Null`` () =
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; value ]
   |> should equal Null
+
+[<Fact>]
+let ``allows null-values for some of the AID rows`` () =
+  let rows =
+    [
+      // AID1; AID2; Fruit
+      [| String "Paul"; String "Paul"; Integer 1L |]
+      [| String "Felix"; String "Felix"; Integer 2L |]
+      [| String "Edon"; String "Sebastian"; Integer 3L |]
+      [| String "Cristian"; Null; Integer 4L |]
+      [| String "Sebastian"; Null; Integer 5L |]
+    ]
+
+  let aid1 = ColumnReference(0, StringType)
+  let aid2 = ColumnReference(1, StringType)
+  let value = ColumnReference(2, IntegerType)
+  let allAidColumns = Expression.List [ aid1; aid2 ]
+
+  rows
+  |> TestHelpers.evaluateAggregator context diffixCount [ allAidColumns; value ]
+  |> should equal (Integer 5L)
+
+  rows
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidColumns; value ]
+  |> should equal (Integer 5L)
+
+  // The aggregate result should not be affected by the order of the AIDs
+  let allAidsFlipped = Expression.List [ aid2; aid1 ]
+
+  rows
+  |> TestHelpers.evaluateAggregator context diffixCount [ allAidsFlipped; value ]
+  |> should equal (Integer 5L)
+
+  rows
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidsFlipped; value ]
+  |> should equal (Integer 5L)

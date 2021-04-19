@@ -48,17 +48,12 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
 
 type private AidCount = { FlattenedSum: float; Flattening: float; TopGroupAverage: float; Rnd: Random }
 
-type private FlatteningResult =
-  | InsufficientData
-  | NoData
-  | FlatteningResult of AidCount
-
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
   (aidContributions: Map<AidHash, int64>)
-  : FlatteningResult =
+  : AidCount option =
   match Map.toList aidContributions with
-  | [] -> NoData
+  | [] -> None
   | perAidContributions ->
       let rnd =
         perAidContributions
@@ -72,7 +67,7 @@ let private aidFlattening
       let sortedUserContributions = perAidContributions |> List.map snd |> List.sortDescending
 
       if sortedUserContributions.Length < outlierCount + topCount then
-        InsufficientData
+        None
       else
         let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
 
@@ -89,7 +84,7 @@ let private aidFlattening
         let flattening = float outliersSummed - outlierReplacement
         let flattenedSum = float summedContributions - flattening
 
-        FlatteningResult
+        Some
           {
             FlattenedSum = flattenedSum
             Flattening = flattening
@@ -166,21 +161,20 @@ let private countDistinctFlatteningByAid
   |> Map.ofList
   |> aidFlattening anonParams
 
-let private anonymizedSum (anonymizationParams: AnonymizationParams) (byAidSum: FlatteningResult list) =
-  let values =
-    byAidSum
-    |> List.choose
-         (function
-         | FlatteningResult result -> Some result
-         | _ -> None)
-
+let private anonymizedSum (anonymizationParams: AnonymizationParams) (byAidSum: AidCount list) =
   let aidForFlattening =
-    values
+    byAidSum
     |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> List.groupBy (fun aggregate -> aggregate.Flattening)
     |> List.tryHead
+    // We might end up with multiple different flattened sums that have the same amount of flattening.
+    // This could be the result of some AID values being null for one of the AIDs, while there were still
+    // overall enough AIDs to produce a flattened sum.
+    // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
+    |> Option.map (fun (_, values) -> values |> List.maxBy (fun aggregate -> aggregate.FlattenedSum))
 
   let noise =
-    values
+    byAidSum
     |> List.sortByDescending (fun aggregate -> aggregate.TopGroupAverage)
     |> List.tryHead
     |> Option.map (fun flatteningResult ->
@@ -209,10 +203,14 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> list) (anonym
     perAidValuesByAidType
     |> List.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
 
-  if byAid |> List.exists ((=) InsufficientData) then
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // we can only report the count of values we already know to be safe as they
+  // individually passed low count filtering.
+  if byAid |> List.exists ((=) None) then
     if safeCount > 0 then safeCount |> int64 |> Integer else Null
   else
     byAid
+    |> List.choose id
     |> anonymizedSum anonymizationParams
     |> Option.defaultValue 0.
     |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
@@ -225,10 +223,11 @@ let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<A
 
       // If any of the AIDs had insufficient data to produce a sensible flattening
       // we have to abort anonymization.
-      if byAid |> List.exists ((=) InsufficientData) then
+      if byAid |> List.exists ((=) None) then
         Null
       else
         byAid
+        |> List.choose id
         |> anonymizedSum anonymizationParams
         |> Option.map (round >> int64 >> Integer)
         |> Option.defaultValue Null
