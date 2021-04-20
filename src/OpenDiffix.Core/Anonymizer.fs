@@ -46,7 +46,7 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
   )
   |> List.reduce (||)
 
-type private AidCount = { FlattenedSum: float; Flattening: float; TopGroupAverage: float; Rnd: Random }
+type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoiseParam; Rnd: Random }
 
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
@@ -83,12 +83,16 @@ let private aidFlattening
         let summedContributions = sortedUserContributions |> List.sum
         let flattening = float outliersSummed - outlierReplacement
         let flattenedSum = float summedContributions - flattening
+        let flattenedAvg = flattenedSum / float sortedUserContributions.Length
+
+        let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
+        let noiseSD = anonymizationParams.Noise.StandardDev * noiseScale
 
         Some
           {
             FlattenedSum = flattenedSum
             Flattening = flattening
-            TopGroupAverage = topGroupAverage
+            noise = { anonymizationParams.Noise with StandardDev = noiseSD }
             Rnd = rnd
           }
 
@@ -161,7 +165,7 @@ let private countDistinctFlatteningByAid
   |> Map.ofList
   |> aidFlattening anonParams
 
-let private anonymizedSum (anonymizationParams: AnonymizationParams) (byAidSum: AidCount list) =
+let private anonymizedSum (byAidSum: AidCount list) =
   let aidForFlattening =
     byAidSum
     |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
@@ -175,12 +179,9 @@ let private anonymizedSum (anonymizationParams: AnonymizationParams) (byAidSum: 
 
   let noise =
     byAidSum
-    |> List.sortByDescending (fun aggregate -> aggregate.TopGroupAverage)
+    |> List.sortByDescending (fun aggregate -> aggregate.noise.StandardDev)
     |> List.tryHead
-    |> Option.map (fun flatteningResult ->
-      let noise = noiseValue flatteningResult.Rnd anonymizationParams.Noise
-      noise * flatteningResult.TopGroupAverage
-    )
+    |> Option.map (fun aggregate -> noiseValue aggregate.Rnd aggregate.noise)
 
   match aidForFlattening, noise with
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
@@ -211,7 +212,7 @@ let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> list) (anonym
   else
     byAid
     |> List.choose id
-    |> anonymizedSum anonymizationParams
+    |> anonymizedSum
     |> Option.defaultValue 0.
     |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
 
@@ -228,6 +229,6 @@ let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<A
       else
         byAid
         |> List.choose id
-        |> anonymizedSum anonymizationParams
+        |> anonymizedSum
         |> Option.map (round >> int64 >> Integer)
         |> Option.defaultValue Null
