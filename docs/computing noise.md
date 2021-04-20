@@ -17,6 +17,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
         - [AID1](#aid1)
         - [AID2](#aid2)
         - [AID3](#aid3)
+- [Seeding](#seeding)
 - [Rationale](#rationale)
 
 # Computing Per-AID Contributions
@@ -431,6 +432,22 @@ Even though we could have produced an aggregate from the perspectives of AID1 an
 we cannot produce a final aggregate as we have insufficiently many AID3 entities represented.
 Assuming there had been enough AID3 entities and that the total flattening due to AID3 had been 10,
 then we would have used the flattening by 25.5 due to AID1 and added noise proportional to the top group average 6 of AID2.
+
+
+# Seeding
+
+All AIDs that can influence the result in some way must be represented when seeding the random number generator
+used to generate threshold and noise values during anonymization. An AID has the ability to influence the result
+of a query as soon as the table in which it is defined is part of a query.
+
+If we did not seed the random number generators by all AID values across all AIDs, then the threshold values used for one AID
+might be entirely uninfluenced by one or more other AIDs. This could in turn lead to attacks whereby a value change for
+one of these AIDs without influence over the noise might result in a query result change without a change in noise.
+
+Where stateful random number generators are used, it is important that the analyst cannot influence
+the order in which per-AID random values are generated. We can achieve this either through creating a consistent and
+deterministic ordering of the AIDs for our internal data processing, or otherwise by using the same
+extreme and top value thresholds for flattening across all AIDs.
 
 
 # Rationale
