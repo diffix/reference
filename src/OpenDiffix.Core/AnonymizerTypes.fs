@@ -14,7 +14,7 @@ type NoiseParam =
     Cutoff: float
   }
 
-  static member Default = { StandardDev = 2.; Cutoff = 5. }
+  static member Default = { StandardDev = 2.; Cutoff = 3. }
 
 type TableSettings = { AidColumns: string list }
 

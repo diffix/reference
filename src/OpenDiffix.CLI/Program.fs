@@ -21,7 +21,7 @@ type CliArguments =
   | [<Unique>] Minimum_Allowed_Aids of threshold: int
 
   // General anonymization parameters
-  | [<Unique>] Noise of std_dev: float * limit: float
+  | [<Unique>] Noise of std_dev: float * factor: float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -48,7 +48,8 @@ type CliArguments =
           "Sets the bound for the minimum number of AIDs must be present in a bucket for it to pass the low count filter."
       | Noise _ ->
           "Specifies the standard deviation used when calculating the noise throughout the system. "
-          + "Additionally a limit must be specified which is used to truncate the normal distributed value generated."
+          + "Additionally, a factor for the SD must be specified which is used to truncate the normal "
+          + "distributed value generated."
 
 let executableName = "OpenDiffix.CLI"
 
@@ -63,7 +64,7 @@ let toThreshold =
 
 let toNoise =
   function
-  | Some (stdDev, cutoffLimit) -> { StandardDev = stdDev; Cutoff = cutoffLimit }
+  | Some (stdDev, cutoffFactor) -> { StandardDev = stdDev; Cutoff = cutoffFactor }
   | _ -> NoiseParam.Default
 
 let private toTableSettings (aidColumns: string list) =
