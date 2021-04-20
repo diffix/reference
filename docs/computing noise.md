@@ -30,7 +30,7 @@ With an integrated cloak, we go back to the original style of computing noise, w
 
 ## Computing noise
 
-When computing noise, the noise amount (standard deviation) is computed separately for each AID set, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of all AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
+When computing noise, the noise amount (standard deviation) is computed separately for each AID set, and the largest such standard deviation value is used. (Note that for `sum()`, for instance, the standard deviation value is taken from the average contribution of flattened AIDs, or 1/2 the average of the top group. This is how AID affects noise amount.)
 
 When computing flattening (for `sum()`), a flattening value for each distinct AID column is computed separately, and the output is adjusted (flattened) by whichever value is greater. Note that it is possible for the AID columns used for noise and for flattening to be different.
 
@@ -206,8 +206,7 @@ The process for suppressing extreme values is as follows:
 10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
 Once the algorithm has been completed for each AID set individual, we continue based on the AID set with the largest amount of flattening.
-In the case of the fully anonymizing aggregation in the top-most query we also add noise proportional to the absolute largest top group average
-across the AID sets.
+In the case of the fully anonymizing aggregation in the top-most query we also add the largest noise amount required across the AID sets.
 
 Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AID types unless otherwise stated.
 

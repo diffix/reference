@@ -19,10 +19,12 @@ let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: Set<Ai
   Random(seed)
 
 let private noiseValue rnd (noiseParam: NoiseParam) =
+  let absoluteCutoff = noiseParam.Cutoff * noiseParam.StandardDev
+
   noiseParam.StandardDev
   |> randomNormal rnd
-  |> max -noiseParam.Cutoff
-  |> min noiseParam.Cutoff
+  |> max -absoluteCutoff
+  |> min absoluteCutoff
 
 let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
 
