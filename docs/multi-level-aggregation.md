@@ -1,6 +1,6 @@
 For the assumed background knowledge, please consult the:
 - [glossary](glossary.md) for definitions of terms used in this document
-- [multi-aid](multiple-aid.md) for a description of how AIDs spread through a query
+- [multi-aid](multiple-aid.md) for a description of how AID values spread through a query
 
 - [Aggregation across query boundaries](#aggregation-across-query-boundaries)
   - [Intermediate extreme value flattening](#intermediate-extreme-value-flattening)
@@ -78,7 +78,7 @@ result, thereby produce a visible effect that can be controlled. This effect, li
 as a result of repeated aggregation, but shows that it is not sufficient to only perform extreme value flattening at the very end.
 
 Performing intermediate extreme value flattening has the added benefit that we no longer need to carry forward any information about
-how much each entity has contributed to an aggregate. As the aggregate is mostly safe, it is sufficient to know which AIDs were
+how much each entity has contributed to an aggregate. As the aggregate is mostly safe, it is sufficient to know which AID values were
 involved.
 
 Flattening is done the same way for intermediate aggregates as it is for the top-level fully anonymized aggregates.
@@ -90,24 +90,24 @@ Let's assume we have the following three tables:
 
 `medical_history`
 
-|  AID | hasCancer |
-| ---: | --------- |
-|    1 | true      |
-|  ... | ...       |
+| AID value | hasCancer |
+| --------: | --------- |
+|         1 | true      |
+|       ... | ...       |
 
 `purchases`
 
-|    # |  AID | ProductId |
-| ---: | ---: | --------: |
-|    1 |    1 |       ... |
-|    2 |    1 |       ... |
-|    3 |    1 |       ... |
-|  ... |  ... |       ... |
-| 1000 |    1 |       ... |
-| 1001 |    2 |       ... |
-| 1002 |    3 |       ... |
-| 1003 |    4 |       ... |
-| 1004 |    5 |       ... |
+|    # | AID value | ProductId |
+| ---: | --------: | --------: |
+|    1 |         1 |       ... |
+|    2 |         1 |       ... |
+|    3 |         1 |       ... |
+|  ... |       ... |       ... |
+| 1000 |         1 |       ... |
+| 1001 |         2 |       ... |
+| 1002 |         3 |       ... |
+| 1003 |         4 |       ... |
+| 1004 |         5 |       ... |
 
 `products`
 
