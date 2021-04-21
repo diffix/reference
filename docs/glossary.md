@@ -14,12 +14,44 @@ The following terms are frequently used throughout the other documents.
 
 ## AID - Anonymization Identifier
 
-AID stands for Anonymization Identifier. It is the term we use to specify a column or column value that is used
-by the system to identify the entity that is protected.
+AID stands for Anonymization Identifier. It is the term we use to specify a column used for the purposes of anonymization.
 
 AID replaces the term UID (user identifier) which we used in earlier versions of Diffix. The name change is meant to allow for specifying sensitive entities other than human beings.
 
-A piece of data (for example a d-row) might belong to multiple AIDs. Examples of this is where a d-row describes something like a transaction taking place between a sender and a recipient (in which case the row has two AID types defined) or where an aggregate row describes something that might pertain to multiple distinct entities of the same AID type.
+There are multiple terms relating to AIDs that serve slightly different purposes.
+These are:
+
+- AID or AID-column
+- AID instance or AID-i
+- AID value
+- AID value set
+
+You can see how these terms relate in the graphic below:
+
+![The hierarchy of AID related terms](graphics/AID%20terminology.png)
+
+These terms might become clearer when illustrated with an example.
+Let's say we have a `patients` table with a `id` column.
+The `id` column is used to identify the patients and the patients are the entities we
+want to protect through anonymization. In this case, the `id` is the AID-column (or AID for short).
+
+When writing a query an instance of this AID column will be used for anonymization.
+In the query example below we even have two instances of the same AID, one stemming from the left side of
+the join, and the other from the right. We would call these AID instances `id-1` and `id-2`, or
+`patients.id-1` and `patients.id-2` if you want to fully qualify them.
+
+```sql
+SELECT count(*)
+FROM patients as left, patients as right
+```
+
+A patient's id might have a value such as `#1` or `#2`. We call these AID values.
+As a result of intermediate aggregation, you can end up with multiple AID values being associated with
+a single [i-row](#i-row---intermediate-row). These are called AID value sets and could be written as `patients.id-1[#1, #2]` indicating a value contributed collectively by patients `#1` and `#2`.
+
+The equivalent of the graphic above for the `patients` table's `id-1` column would be:
+
+![AID terms for patients table](graphics/AID%20terminology%20patients.png)
 
 
 ## bucket
@@ -41,8 +73,8 @@ it implies that what is being protected is always a human being.
 An entity might be a human being (such as a patient or customer), but it could equally well
 be some abstract thing like a circuit, computer, or cell phone.
 
-An entity might have multiple AIDs associated with it. For example we have might have the AIDs
-`customer_no`, `ssn` and `email` all associated with the a customer entity.
+An entity might have multiple AIDs associated with it. For example, we have might have the AIDs
+`customer_no`, `ssn` and `email` all associated with the same customer entity.
 
 
 ## i-row - intermediate row
