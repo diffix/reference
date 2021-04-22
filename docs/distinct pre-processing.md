@@ -5,7 +5,7 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
   - [Design goal](#design-goal)
     - [Extreme contribution](#extreme-contribution)
   - [Pre-processing](#pre-processing)
-    - [Per-AID type algorithm sketch in detail](#per-aid-type-algorithm-sketch-in-detail)
+    - [Per-AID instance algorithm sketch in detail](#per-aid-instance-algorithm-sketch-in-detail)
       - [Algorithm](#algorithm)
     - [Worked example #1](#worked-example-1)
       - [Processing for email](#processing-for-email)
@@ -73,32 +73,32 @@ We need flattening here too, but a different kind of flattening.
 
 For example, let's consider the following example dataset:
 
-| AID sets  | Value |
-| --------- | ----: |
-| [1, 1000] |     1 |
-| [2, 1000] |     2 |
-| [3, 1000] |     3 |
-| [4, 1000] |     4 |
+| AID value sets | Value |
+| -------------- | ----: |
+| [1, 1000]      |     1 |
+| [2, 1000]      |     2 |
+| [3, 1000]      |     3 |
+| [4, 1000]      |     4 |
 ...
-| [999, 1000] |   999 |
+| [999, 1000]    |   999 |
 
-In this example table, two distinct AIDs contribute every value, one of them always being AID 1000.
-The presence or absence of AID 1000 would have no impact on the count of the distinct values in this table.
+In this example table, two distinct AID values contribute every value, one of them always being AID value 1000.
+The presence or absence of AID value 1000 would have no impact on the count of the distinct values in this table.
 (of course, if we were to calculate the number of entries in the table rather than of distinct values, then the absence
-of AID 1000 would halve the count). By our previous definition AID 1000 is not an extreme contributor in this table.
+of AID value 1000 would halve the count). By our previous definition AID value 1000 is not an extreme contributor in this table.
 
-In the table below, AID 1000 _is_ an extreme contributor. Values 5 through 1000 are only contributed by AID 1000, and
-if all values contributed by AID 1000 were removed from the table, it would significantly impact the count of distinct values.
+In the table below, AID value 1000 _is_ an extreme contributor. Values 5 through 1000 are only contributed by AID value 1000, and
+if all values contributed by AID value 1000 were removed from the table, it would significantly impact the count of distinct values.
 
-| AID sets | Value |
-| -------- | ----: |
-| 1        |     1 |
-| 2        |     2 |
-| 3        |     3 |
-| 4        |     4 |
-| 1000     |     5 |
+| AID value sets | Value |
+| -------------- | ----: |
+| 1              |     1 |
+| 2              |     2 |
+| 3              |     3 |
+| 4              |     4 |
+| 1000           |     5 |
 ...
-| 1000     |  1000 |
+| 1000           |  1000 |
 
 
 ## Pre-processing
@@ -109,11 +109,11 @@ onto non-distinct ones so we can reuse our existing work and machinery.
 The mapping we want to achieve spreads the individual values across different entities in such a way
 that the individual contributions can be combined like a regular aggregate would.
 
-We must spread the values across as many AIDs as possible. Otherwise, individual entities will unnecessarily
+We must spread the values across as many AID values as possible. Otherwise, individual entities will unnecessarily
 exhibit what our aggregators will consider extreme-contribution behaviour, which will lead to potentially unnecessary flattening.
 
-It is not clear how we can map in a way that accounts for multiple AID types.
-The proposed design, therefore, maps each AID type individually.
+It is not clear how we can map in a way that accounts for multiple AID instances.
+The proposed design, therefore, maps each AID instance individually.
 Much like for other aggregators, we want to use the most extreme flattening required. Doing so leads to
 distinct aggregators having to be processed as follows:
 
@@ -122,7 +122,7 @@ Globally:
 - filter out all values that pass the low count filter. These are safe and can be aggregated as they are
   without further processing.
 
-For each AID-type:
+For each AID-instance:
 
 - map the remaining values onto individual contributors
 - aggregate using existing non-distinct aggregators and determine the amount of flattening needed
@@ -130,16 +130,16 @@ For each AID-type:
 Post-processing:
 
 - Aggregate the the values that passed low count filtering without any further noise
-- For the remaining values use the flattening and noise amount from the per-AID type
-  processing for the AID type that yielded the amount of flattening
+- For the remaining values use the flattening and noise amount from the per-AID instance
+  processing for the AID instance that yielded the largest amount of flattening
 
 
-### Per-AID type algorithm sketch in detail
+### Per-AID instance algorithm sketch in detail
 
 An implementation of this algorithm exists [in the experiments](https://github.com/diffix/experiments/blob/master/count%20distinct/CountDistinctPlayground/CountDistinctPlayground/CountDistinctExperiment.fs) repository.
 
-The following algorithm is applied individually for each AID type.
-If you have a row with an AID such as `[email-1[alice, bob]; email-2[alice, cynthia]; ssn[1, 2, 3]]`
+The following algorithm is applied individually for each AID instance.
+If you have a row with AID instances such as `[email-1[alice, bob]; email-2[alice, cynthia]; ssn[1, 2, 3]]`
 then the algorithm is individually run for `email-1`, `email-2` and `ssn`.
 The run yielding the largest flattening is used. Additionally, noise is applied proportional to the
 top group average, as specified by the particular non-distinct aggregator used.
@@ -147,16 +147,16 @@ top group average, as specified by the particular non-distinct aggregator used.
 
 #### Algorithm
 
-- Split AID sets into individual contributions. A shared contribution of value `A` by AIDs `email-1[alice, bob]`
-  is treated as if they were individual contributions of value `A` by `email-1[alice]` and `email-1[bob]`.
-- Group the values by AID, producing sets of values per AID (no duplicates)
-- Order AID groupings in ascending order by the number of distinct values
-- Repeatedly scan through the list of AID groupings until the list has been exhausted, taking a value that has
-  not yet been assigned to another AID and output it as belonging to the particular AID
+- Split AID value sets into individual contributions. A shared contribution of value `A` by AID value set `email-1[alice, bob]`
+  is treated as if they were individual contributions of value `A` by AID values `email-1[alice]` and `email-1[bob]`.
+- Group the values by AID value, producing sets of values per AID value (no duplicates)
+- Order AID value groupings in ascending order by the number of distinct values
+- Repeatedly scan through the list of AID value groupings until the list has been exhausted, taking a value that has
+  not yet been assigned to another AID value and output it as belonging to the particular AID value
 - Process the output using the corresponding regular aggregate function
 
 The first step requires some explanation. For regular aggregate values, a shared contribution
-is divided across each contributing AID. I.e. an Apple was contributed collectively by Alice and Bob,
+is divided across each contributing AID value. I.e. an Apple was contributed collectively by Alice and Bob,
 then we normally assume Alice and Bob contributed half an apple each.
 For a distinct aggregator this doesn't make sense as what we are recording is
 that a particular value was contributed, not how many times it was contributed.
@@ -166,7 +166,7 @@ that a particular value was contributed, not how many times it was contributed.
 
 Let's say we have the following table:
 
-| AIDs                                            | Value      |
+| AID value sets                                  | Value      |
 | ----------------------------------------------- | ---------- |
 | [email[Paul; Sebastian]; first_name[Sebastian]] | Apple      |
 | [email[Paul; Edon]; first_name[Sebastian]]      | Apple      |
@@ -183,95 +183,95 @@ Let's say we have the following table:
 Apple was contributed by 4 `email` entities (`Paul`, `Sebastian, `Cristian`, and `Edon`),
 and 2 `first_name` entities (`Sebastian` and `Paul`). It is therefore safe and we set it aside.
 
-The remaining values are processed separately by AID type (i.e. `email` and `first_name`).
+The remaining values are processed separately by AID instance (i.e. `email` and `first_name`).
 
 #### Processing for email
 
-After splitting the per-AID contributions into individual contributions, we end up with:
+After splitting the per-AID value set contributions into individual contributions, we end up with:
 
-| AID      | Value      |
-| -------- | ---------- |
-| Edon     | Pear       |
-| Paul     | Pineapple  |
-| Cristian | Lemon      |
-| Cristian | Orange     |
-| Felix    | Banana     |
-| Edon     | Grapefruit |
+| AID value | Value      |
+| --------- | ---------- |
+| Edon      | Pear       |
+| Paul      | Pineapple  |
+| Cristian  | Lemon      |
+| Cristian  | Orange     |
+| Felix     | Banana     |
+| Edon      | Grapefruit |
 
-grouping by AID and sorting by the number of contributions, yields:
+grouping by AID value and sorting by the number of contributions, yields:
 
-| AID      | Values             |
-| -------- | ------------------ |
-| Paul     | [Pineapple]        |
-| Felix    | [Banana]           |
-| Edon     | [Pear, Grapefruit] |
-| Cristian | [Lemon; Orange]    |
+| AID value | Values             |
+| --------- | ------------------ |
+| Paul      | [Pineapple]        |
+| Felix     | [Banana]           |
+| Edon      | [Pear, Grapefruit] |
+| Cristian  | [Lemon; Orange]    |
 
 repeatedly scanning and assigning unassigned values from the list,
 after the first pass through the list yields the following assigned values:
 
-| AID      | Value     |
-| -------- | --------- |
-| Paul     | Pineapple |
-| Felix    | Banana    |
-| Edon     | Pear      |
-| Cristian | Lemon     |
+| AID value | Value     |
+| --------- | --------- |
+| Paul      | Pineapple |
+| Felix     | Banana    |
+| Edon      | Pear      |
+| Cristian  | Lemon     |
 
 leaving the following table of unassigned values:
 
-| AID      | Values       |
-| -------- | ------------ |
-| Edon     | [Grapefruit] |
-| Cristian | [Orange]     |
+| AID value | Values       |
+| --------- | ------------ |
+| Edon      | [Grapefruit] |
+| Cristian  | [Orange]     |
 
 repeating the process consumes all available values resulting in a final
 contribution list of:
 
-| AID      | Value      |
-| -------- | ---------- |
-| Paul     | Pineapple  |
-| Felix    | Banana     |
-| Edon     | Pear       |
-| Cristian | Lemon      |
-| Edon     | Grapefruit |
-| Cristian | Orange     |
+| AID value | Value      |
+| --------- | ---------- |
+| Paul      | Pineapple  |
+| Felix     | Banana     |
+| Edon      | Pear       |
+| Cristian  | Lemon      |
+| Edon      | Grapefruit |
+| Cristian  | Orange     |
 
 If the aggregator is count (i.e. the analyst asked for `count(distinct value)`), then we can now
 pass this table through our regular `count(value)` aggregator. Assuming `Ne = 2` and `Nt = 2` the
 algorithm would deduce that Cristian and Edon are extreme contributors (having 2 contributions each vs 1 for Felix and Paul)
-and the total flattening resulting from AID type `email` would be 2 (one for each of Edon and Cristian).
+and the total flattening resulting from AID instance `email` would be 2 (one for each of AID values Edon and Cristian).
 
 
 #### Processing for first_name
 
 The process is similar to that done for `email`. We split the values
-across users, group by AID and order ascending by number of distinct
+across users, group by AID value and order ascending by number of distinct
 contributed values:
 
-| AID      | Values                   |
-| -------- | ------------------------ |
-| Edon     | [Banana]                 |
-| Cristian | [Grapefruit]             |
-| Felix    | [Orange]                 |
-| Paul     | [Pear; Pineapple; Lemon] |
+| AID value | Values                   |
+| --------- | ------------------------ |
+| Edon      | [Banana]                 |
+| Cristian  | [Grapefruit]             |
+| Felix     | [Orange]                 |
+| Paul      | [Pear; Pineapple; Lemon] |
 
-Iteratively scanning through this list and assigning values to AIDs would yield
+Iteratively scanning through this list and assigning values to AID values would yield
 the following contribution list:
 
-| AID      | Values     |
-| -------- | ---------- |
-| Edon     | Banana     |
-| Cristian | Grapefruit |
-| Felix    | Orange     |
-| Paul     | Pear       |
-| Paul     | Pineapple  |
-| Paul     | Lemon      |
+| AID value | Values     |
+| --------- | ---------- |
+| Edon      | Banana     |
+| Cristian  | Grapefruit |
+| Felix     | Orange     |
+| Paul      | Pear       |
+| Paul      | Pineapple  |
+| Paul      | Lemon      |
 
 Which, when used as input for the `count(value)` aggregator with an `Ne = 2` and `Nt = 2`, places both Paul and Felix
 in the extreme value group and Edon and Cristian in the top group. The required flattening is 2 reducing Paul down
 from a count of 3 to 1.
 
-In this case the flattening is the same for both AID types. In both cases we have a flattening of 2 and a top-group average of 1.
+In this case the flattening is the same for both AID instances. In both cases we have a flattening of 2 and a top-group average of 1.
 The final aggregate therefore is: `apple + other fruits - flattening + noise` = `1 + 6 - 2 + noise proportional to 1`.
 
 
@@ -279,22 +279,22 @@ The final aggregate therefore is: `apple + other fruits - flattening + noise` = 
 
 Let's say we have the following table:
 
-| AIDs                                            | Value     |
-| ----------------------------------------------- | --------- |
-| [email[Paul; Sebastian]; first_name[Sebastian]] | Apple     |
-| [email[Paul; Edon]; first_name[Sebastian]]      | Apple     |
-| [email[Sebastian]; first_name[Sebastian]]       | Apple     |
-| [email[Cristian]; first_name[Paul]]             | Apple     |
-| [email[Edon]; first_name[Paul]]                 | Apple     |
-| [email[Edon]; first_name[Paul]]                 | Orange    |
-| [email[Paul]; first_name[Paul]]                 | Orange    |
-| [email[Cristian]; first_name[Felix]]            | Orange    |
-| [email[Cristian]; first_name[Felix]]            | Orange    |
+| AID value sets                                  | Value  |
+| ----------------------------------------------- | ------ |
+| [email[Paul; Sebastian]; first_name[Sebastian]] | Apple  |
+| [email[Paul; Edon]; first_name[Sebastian]]      | Apple  |
+| [email[Sebastian]; first_name[Sebastian]]       | Apple  |
+| [email[Cristian]; first_name[Paul]]             | Apple  |
+| [email[Edon]; first_name[Paul]]                 | Apple  |
+| [email[Edon]; first_name[Paul]]                 | Orange |
+| [email[Paul]; first_name[Paul]]                 | Orange |
+| [email[Cristian]; first_name[Felix]]            | Orange |
+| [email[Cristian]; first_name[Felix]]            | Orange |
 
 The `minimum_allowed_aids` is 2 for both `email` and `first_name`.
 In this case neither Apple nor Orange have to be low count filtered.
-Apple occurs for 5 distinct `email` AIDs and 2 distinct `first_name` AIDs.
-Orange occurs for 3 distinct `email` AIDs and 2 distinct `first_name` AIDs.
+Apple occurs for 5 distinct `email` AID values and 2 distinct `first_name` AID values.
+Orange occurs for 3 distinct `email` AID values and 2 distinct `first_name` AID values.
 
 If the requested aggregate was `count(distinct value)` then we would return the
 completely unaltered count of 2.
