@@ -31,11 +31,11 @@ You can see how these terms relate in the graphic below:
 ![The hierarchy of AID related terms](graphics/AID%20terminology.png)
 
 These terms might become clearer when illustrated with an example.
-Let's say we have a `patients` table with a `id` column.
-The `id` column is used to identify the patients and the patients are the entities we
+Let's say we have a `patients` table with an `id` column.
+The `id` column is used to identify the patients and the patients are the [entities](#entity) we
 want to protect through anonymization. In this case, the `id` is the AID-column (or AID for short).
 
-When writing a query an instance of this AID column will be used for anonymization.
+When writing a query an instance of this AID-column will be used for anonymization.
 In the query example below we even have two instances of the same AID, one stemming from the left side of
 the join, and the other from the right. We would call these AID instances `id-1` and `id-2`, or
 `patients.id-1` and `patients.id-2` if you want to fully qualify them.
@@ -45,11 +45,13 @@ SELECT count(*)
 FROM patients as left, patients as right
 ```
 
-A patient's id might have a value such as `#1` or `#2`. We call these AID values.
+A patient's id might have a value such as `#1` or `#2`. We call these AID values. An AID value is
+what uniquely identifies an entity (in this case, a patient).
 As a result of intermediate aggregation, you can end up with multiple AID values being associated with
-a single [i-row](#i-row---intermediate-row). These are called AID value sets and could be written as `patients.id-1[#1, #2]` indicating a value contributed collectively by patients `#1` and `#2`.
+a single [i-row](#i-row---intermediate-row). These are called AID value sets and could be written as `patients.id-1[#1, #2]`
+indicating a value contributed collectively by patients `#1` and `#2`.
 
-The equivalent of the graphic above for the `patients` table's `id-1` column would be:
+The equivalent of the graphic above for the `patients` table's `id` column would be:
 
 ![AID terms for patients table](graphics/AID%20terminology%20patients.png)
 

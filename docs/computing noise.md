@@ -197,7 +197,7 @@ The process for suppressing extreme values is as follows:
 9. Calculate the average of the `Nt` values
 10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
 
-Once the algorithm has been completed for each AID-instance individual, we continue based on the AID instance with the largest amount of flattening.
+Once the algorithm has been completed for each AID-instance, we continue based on the AID instance with the largest amount of flattening.
 In the case of the fully anonymizing aggregation in the top-most query we also add the noise proportional to the AID-instance with the largest top group average.
 
 Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AIDs unless otherwise stated.

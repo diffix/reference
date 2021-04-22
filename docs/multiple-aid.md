@@ -1,12 +1,12 @@
 Please consult the [glossary](glossary.md) for definitions of terms used in this document.
 
-- [Multiple AIDs](#multiple-aids)
+- [Multiple AIDs columns](#multiple-aids-columns)
   - [Low count filter](#low-count-filter)
 - [How AIDs spread](#how-aids-spread)
   - [JOINing rows](#joining-rows)
   - [Aggregating rows](#aggregating-rows)
 
-# Multiple AIDs
+# Multiple AIDs columns
 
 A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID instance in a query (either because there are multiple AID columns in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly and is also robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
 

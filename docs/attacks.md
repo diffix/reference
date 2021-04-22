@@ -37,7 +37,7 @@ In both of the attack sketches below, we will be operating on the following exam
 
 Say we are joining two instances of the same `patients` table. `ssn` has been defined as the AID column.
 Under this particular scheme of handling AIDs the resulting AID value set for a row is the union of the AID value sets of the rows that are joined.
-In other words, we merge the AID value sets within a given AID column type.
+In other words, we merge the AID value sets for a given AID column.
 
 If we joined the rows from `left` and `right` on the `City` columns:
 
@@ -78,7 +78,7 @@ FROM (
 ```
 
 The `left` side of the join is the original table as shown above.
-The `right` side however, is the single row:
+The `right` side however is the single row:
 
 | City  | Count | AID value set        |
 | ----- | ----- | -------------------- |
