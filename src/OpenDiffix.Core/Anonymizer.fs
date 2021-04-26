@@ -119,15 +119,15 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Ma
     )
     Map.empty
 
-let rec distributeUntilEmpty takenValues queue itemsByAID =
+let rec distributeUntilEmpty (takenValues: Set<Value>) queue itemsByAID =
   match itemsByAID, queue with
   | [], [] -> [] // Done :D
   | [], _ -> distributeUntilEmpty takenValues [] (List.rev queue)
 
   | (aid, values) :: rest, _ ->
-      match values |> List.tryFind (fun value -> not <| Set.contains value takenValues) with
+      match values |> List.tryFind (takenValues.Contains >> not) with
       | Some value ->
-          let updatedTaken = Set.add value takenValues
+          let updatedTaken = takenValues.Add value
 
           match values |> List.filter ((<>) value) with
           | [] -> (aid, value) :: distributeUntilEmpty updatedTaken queue rest
