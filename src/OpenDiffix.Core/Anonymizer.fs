@@ -119,24 +119,16 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Ma
     )
     Map.empty
 
-let rec distributeUntilEmpty (takenValues: Set<Value>) queue itemsByAID =
-  match itemsByAID, queue with
-  | [], [] -> [] // Done :D
-  | [], _ -> distributeUntilEmpty takenValues [] (List.rev queue)
-
-  | (aid, values) :: rest, _ ->
-      match values |> List.tryFind (takenValues.Contains >> not) with
-      | Some value ->
-          let updatedTaken = takenValues.Add value
-
-          match values |> List.filter ((<>) value) with
-          | [] -> (aid, value) :: distributeUntilEmpty updatedTaken queue rest
-          | remaining ->
-              let queue = (aid, remaining) :: queue
-              (aid, value) :: distributeUntilEmpty updatedTaken queue rest
-      | None ->
-          // No more value to take for user...
-          distributeUntilEmpty takenValues queue rest
+let rec distributeUntilEmpty (takenValues: Set<Value>) itemsByAID =
+  match itemsByAID with
+  | [] -> [] // Done :D
+  | (_aid, []) :: rest -> distributeUntilEmpty takenValues rest
+  | (aid, value :: restValues) :: restItemsByAID ->
+      if takenValues.Contains value then
+        distributeUntilEmpty takenValues ((aid, restValues) :: restItemsByAID)
+      else
+        (aid, value)
+        :: distributeUntilEmpty (takenValues.Add value) (restItemsByAID @ [ aid, restValues ])
 
 let private countDistinctFlatteningByAid
   anonParams
@@ -148,7 +140,7 @@ let private countDistinctFlatteningByAid
   |> Map.filter (fun _aidHash values -> values.Length > 0)
   |> Map.toList
   |> List.sortBy (fun (aid, values) -> values.Length, aid)
-  |> distributeUntilEmpty Set.empty []
+  |> distributeUntilEmpty Set.empty
   |> List.groupBy fst
   |> List.map (fun (aid, values) -> aid, List.length values |> int64)
   |> aidFlattening anonParams
