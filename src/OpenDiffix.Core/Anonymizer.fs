@@ -119,16 +119,15 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Ma
     )
     Map.empty
 
-let rec distributeUntilEmpty (takenValues: Set<Value>) itemsByAID =
-  match itemsByAID with
+let rec distributeValues =
+  function
   | [] -> [] // Done :D
-  | (_aid, []) :: rest -> distributeUntilEmpty takenValues rest
-  | (aid, value :: restValues) :: restItemsByAID ->
-      if takenValues.Contains value then
-        distributeUntilEmpty takenValues ((aid, restValues) :: restItemsByAID)
-      else
-        (aid, value)
-        :: distributeUntilEmpty (takenValues.Add value) (restItemsByAID @ [ aid, restValues ])
+  | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
+  | (aid, value :: restValues) :: restValuesByAID ->
+      let restValuesByAID = // Drop current value from the remaining items.
+        List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
+
+      (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
 let private countDistinctFlatteningByAid
   anonParams
@@ -140,7 +139,7 @@ let private countDistinctFlatteningByAid
   |> Map.filter (fun _aidHash values -> values.Length > 0)
   |> Map.toList
   |> List.sortBy (fun (aid, values) -> values.Length, aid)
-  |> distributeUntilEmpty Set.empty
+  |> distributeValues
   |> List.groupBy fst
   |> List.map (fun (aid, values) -> aid, List.length values |> int64)
   |> aidFlattening anonParams
