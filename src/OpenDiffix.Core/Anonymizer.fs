@@ -13,8 +13,8 @@ let private randomNormal (rnd: Random) stdDev =
 
   stdDev * randStdNormal
 
-let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: Set<AidHash>) =
-  let combinedAids = aidSet |> Set.toList |> List.fold (^^^) 0
+let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
+  let combinedAids = Seq.fold (^^^) 0 aidSet
   let seed = combinedAids ^^^ anonymizationParams.Seed
   Random(seed)
 
@@ -54,7 +54,7 @@ let private aidFlattening
   (anonymizationParams: AnonymizationParams)
   (aidContributions: (AidHash * int64) list)
   : AidCount option =
-  let rnd = aidContributions |> List.map fst |> Set.ofList |> newRandom anonymizationParams
+  let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
 
   let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
   let topCount = randomUniform rnd anonymizationParams.TopCount
