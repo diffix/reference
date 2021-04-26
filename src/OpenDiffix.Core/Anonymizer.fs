@@ -140,8 +140,8 @@ let private countDistinctFlatteningByAid
   |> Map.toList
   |> List.sortBy (fun (aid, values) -> values.Length, aid)
   |> distributeValues
-  |> List.groupBy fst
-  |> List.map (fun (aid, values) -> aid, List.length values |> int64)
+  |> List.countBy fst
+  |> List.map (fun (aid, count) -> aid, int64 count)
   |> aidFlattening anonParams
 
 let private anonymizedSum (byAidSum: AidCount list) =
