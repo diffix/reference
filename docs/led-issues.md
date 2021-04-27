@@ -277,6 +277,8 @@ In that case, the resulting table would be this:
 
 As required, the left and right buckets for any given row always differ (because of both the static and dynamic noise layers), and the difference between rows always differs because of the dynamic noise layers. In addition, the *amount* of noise difference is the same. This means that the chaff attack won't work.
 
+## Multi-histogram (first derivative difference attack)
+
 Now, suppose that the attacker knows a number of attributes of the victim, K1, K2, K3, etc. The attacker can now make a *set of* histograms, one for each known attribute. 
 
 The right side answers for one histogram would be obtained with the query:
@@ -321,9 +323,61 @@ The noise values Si are the same for all the sums, so they cancel out, so to spe
 
 In other words, if the attacker knows enough things about K1, K2 etc. about the victim (probably 5 or 6 such things), then the victim attribute can be learned.
 
+Let's call this the multi-histogram first derivative difference attack (or just multi-histogram for short).
+
+
+## Multi-sample difference attack using JOIN
+
+There is an attack whereby a JOIN is used to replicate the victim across many different buckets. This works when the ON condition allows the victim in (say) the left selectable to match with multiple entities in the right selectable. Following is an example:
+
+```
+SELECT left.unknown_col, right.replicate_col, count(*)
+FROM (
+    SELECT * FROM table1
+    WHERE aid_col <> 'victim'
+    ) left
+JOIN (
+    SELECT * from table2
+    ) right
+ON left.join_col = right.join_col
+```
+
+(Unfortunately the nomenclature gets confusing now, because I've been using 'left' and 'right' to refer to the two queries in a difference attack, and now I'm going to use them also to refer to the JOIN selectables.) The above query would be the right query in an attack, while the left query would not have the WHERE clause.
+
+In the above query, the columns are:
+
+1. `unknown_col`: This is the column for which we want to learn the victim's value.
+2. `join_col`: This is a column on which the JOIN takes place. Each value in `join_col` should be shared among a largish number of entities, so that the victim is paired with multiple entities in the right selectable.
+2. `replicate_col`: This is a column that is selected in the outer selectable that will give us multiple buckets, each of which the victim will appear.
+
+The query will produce a table like this:
+
+| unknown_col | replicate_col | count |
+|-------------|---------------|-------|
+| u1          | r1            | 22    |
+| u1          | r2            | 31    |
+| u1          | r3            | 19    |
+| ...         | ...           | ...   |
+| u1          | rN            | 31    |
+| u2          | r1            | 41    |
+| u2          | r2            | 16    |
+| u2          | r3            | 22    |
+| ...         | ...           | ...   |
+| u2          | rN            | 29    |
+
+Regarding the left query (which does not exclude the victim), if the victim has `unknown_col` value `u1`, then the victim will appear in *all* of the buckets with `unknown_col=u1`, and in none of the other buckets.
+
+If we were to take the difference of the left and right queries for each of the buckets individually, then there is enough noise to hide the presence or absence of the victim. If, however, we sum the counts for all the buckets with `u1`, and again for all the buckets with `u2`, then we effectively get multiple samples on the victim, and difference in the count is no longer hidden by the noise.
+
+## Solution
+
+
+
+
+zzzz
+
 This implies that it isn't enough to simply make left and right dynamic noise the same. We must also adjust aggregate outputs (i.e. add 1 to each of the right-hand answers for attribute A).
 
-Let's call this the multi-histogram first derivative different attack (or just multi-histogram for short).
 
 ### The multi-histogram attack is hard if the attacker has to distinguish between N and N-1 users (versus 0 and 1 user)
 
