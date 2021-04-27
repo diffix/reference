@@ -369,10 +369,119 @@ Regarding the left query (which does not exclude the victim), if the victim has 
 
 If we were to take the difference of the left and right queries for each of the buckets individually, then there is enough noise to hide the presence or absence of the victim. If, however, we sum the counts for all the buckets with `u1`, and again for all the buckets with `u2`, then we effectively get multiple samples on the victim, and difference in the count is no longer hidden by the noise.
 
+There are examples of this attack at [https://github.com/diffix/experiments/tree/master/join-lcf-noise](https://github.com/diffix/experiments/tree/master/join-lcf-noise).
+
 ## Solution
 
+The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every condition.
+
+### LE noise layers without AIDVs (fail)
+
+Assume that the LE noise layer is seeded as follows:
+
+`[static_condition_materials, LE_static_condition_materials]`
+
+Where:
+
+* The `static_condition_materials` are the same seed materials used for normal static conditions
+* The `LE_static_condition_materials` are the static seed materials for the LE condition itself
+
+Working with the query in the multi-sample attack from above, a single bucket from the left query has:
+
+* Static: SNu1, SNr1, SNj1
+* Dynamic: DNu1, DNr1, DNj1
+* LE: LENu1, LENr1, LENj1
+
+From the right query with the victim:
+
+* Static: SNu1, SNr1, SNj1, SNa
+* Dynamic: DNu1v, DNr1v, DNj1v, DNa1v
+* LE: LENu1, LENr1, LENj1, LENa1
+
+And from the right query without the victim:
+
+* Static: SNu2, SNr1, SNj1, SNa
+* Dynamic: DNu2, DNr1, DNj1, DNa1
+* LE: LENu2, LENr1, LENj1, LENa1
+
+All the dynamic layers are zero-mean, and average away. All the static layers except SNa are removed with the difference of the left and right queries. Note that the SNj static layers will be seeded with a lot of different values for a given bucket, but are likely to be the same right and left. All of the LEN layers are removed with the difference.
+
+So if we sum the counts across all the buckets for each `unknown_col` value and take the left/right difference, then for buckets with the victim we get:
+
+`SNa, (zero-mean noise), victim x samples`
+
+and for buckets without the victim:
+
+`SNa, (zero-mean noise)`
+
+This doesn't work, obviously.
+
+### LE noise layer with AIDVs (fail)
+
+Assume that the LE noise layer is seeded as follows:
+
+`[static_condition_materials, LE_static_condition_materials, LE_AIDVs]`
+
+Where:
+
+* The `static_condition_materials` are the same seed materials used for normal static conditions
+* The `LE_static_condition_materials` are the static seed materials for the LE condition itself
+* The `LE_AIDVs` are the AID Values that are affected by the LE condition.
+
+For the query above, the seed materials for the condition `unknown_col=u1` in a bucket where the victim is included would look be:
+
+`['unknown_col','=','u1','aid_col','<>','victim',('victim')]`
+
+The first three (`'unknown_col','=','u1'`) are the static materials for the condition, the second three (`'aid_col','<>','victim'`) are the static materials for the LE condition, and the final `victim` is the AIDV of the victim.
+
+The seed materials for the the condition `unknown_col=u2` in a bucket where the victim is excluded would be:
+
+`['unknown_col','=','u2','aid_col','<>','victim',()]`
+
+Oops, doesn't this create though a histogram attack?
+
+left           right
+
+u1 with V      u1 w/o V
+u2 w/o  V      u2 w/o V
+u3 w/o  V      u3 w/o V
+etc.
+
+Well, the left and right noise is the same except for the u1 bucket. That doesn't look good.
+
+A single bucket from the left query has:
+
+* Static: SNu1, SNr1, SNj1
+* Dynamic: DNu1, DNr1, DNj1
+* LE: LENu1, LENr1, LENj1
+
+From the right query with the victim:
+
+* Static: SNu1, SNr1, SNj1, SNa
+* Dynamic: DNu1v, DNr1v, DNj1v, DNa1v
+* LE: LENu1v, LENr1v, LENj1v, LENa1v
+
+And from the right query without the victim:
+
+* Static: SNu2, SNr1, SNj1, SNa
+* Dynamic: DNu2, DNr1, DNj1, DNa1
+* LE: LENu2, LENr1, LENj1, LENa1
+
+All the dynamic layers are zero-mean, and average away. All the static layers except SNa are removed with the difference of the left and right queries. Note that the SNj static layers will be seeded with a lot of different values for a given bucket, but are likely to be the same right and left.
+
+So if we sum the counts across all the buckets for each `unknown_col` value and take the left/right difference, then for buckets with the victim we get:
+
+`SNa, (zero-mean noise), (all LEN layers), victim x samples`
+
+and for buckets without the victim:
+
+`SNa, (zero-mean noise)`
+
+This looks like a problem, because the summed-buckets bucket with the victim (`unknown_col=u1`) will have a lot more noise than the summed-buckets buckets without the victim (all other `unknown_col` values). This is a form of noise exploitation.
 
 
+
+-------
 
 zzzz
 
