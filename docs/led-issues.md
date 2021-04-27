@@ -375,9 +375,8 @@ There are examples of this attack at [https://github.com/diffix/experiments/tree
 
 The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every condition.
 
-### LE noise layers without AIDVs (fail)
 
-Assume that the LE noise layer is seeded as follows:
+The LE noise layer is seeded as follows:
 
 `[static_condition_materials, LE_static_condition_materials]`
 
@@ -386,45 +385,73 @@ Where:
 * The `static_condition_materials` are the same seed materials used for normal static conditions
 * The `LE_static_condition_materials` are the static seed materials for the LE condition itself
 
-Working with the query in the multi-sample attack from above, a single bucket from the left query has:
+### Multi-sample JOIN attack
+
+Now let's see how this protects against the multi-sample attack from above.
+
+Working with the query example in the multi-sample attack from above, a single bucket from the left query has:
 
 * Static: SNu1, SNr1, SNj1
 * Dynamic: DNu1, DNr1, DNj1
-* LE: LENu1, LENr1, LENj1
 
 From the right query with the victim:
 
 * Static: SNu1, SNr1, SNj1, SNa
 * Dynamic: DNu1v, DNr1v, DNj1v, DNa1v
-* LE: LENu1, LENr1, LENj1, LENa1
+* LE: LENu1, LENr1, LENj1
 
 And from the right query without the victim:
 
 * Static: SNu2, SNr1, SNj1, SNa
 * Dynamic: DNu2, DNr1, DNj1, DNa1
-* LE: LENu2, LENr1, LENj1, LENa1
+* LE: LENu2, LENr1, LENj1
 
 All the dynamic layers are zero-mean, and average away. All the static layers except SNa are removed with the difference of the left and right queries. Note that the SNj static layers will be seeded with a lot of different values for a given bucket, but are likely to be the same right and left. All of the LEN layers are removed with the difference.
 
 So if we sum the counts across all the buckets for each `unknown_col` value and take the left/right difference, then for buckets with the victim we get:
 
-`SNa, (zero-mean noise), victim x samples`
+`cnt, SNa, (zero-mean noise), victim x samples, LENu1, LENr1, LENj1, LENa1`
 
 and for buckets without the victim:
 
-`SNa, (zero-mean noise)`
+```
+cnt, SNa, (zero-mean noise), LENu2, LENr1, LENj1
+cnt, SNa, (zero-mean noise), LENu3, LENr1, LENj1
+etc.
+```
 
-This doesn't work, obviously.
+The LENuX hides the victim because they differ with each `unknown_col` gorup.
 
-### LE noise layer with AIDVs (fail)
+### Multi-histogram attack
 
-Assume that the LE noise layer is seeded as follows:
+The following table is a repeat of the example from the Multi-histogram attack above, but with the LE noise layers added.
 
-`[static_condition_materials, LE_static_condition_materials, LE_AIDVs]`
+| L query            | R query  | L answer                                       | R answer (V in first row) | diff                       |
+|--------------------|----------|------------------------------------------------|---------------------------|----------------------------|
+| Kn and A and not I | Kn and A | cnt + Skn + LEkn + Sa + LEa + Si + Da1n + Di1n | cnt + 1 + Skn + Sa + Da1n | Si + LEkn + LEa + Di1n - 1 |
+| Kn and B and not I | Kn and B | cnt + Skn + LEkn + Sb + LEb + Si + Db2n + Di2n | cnt + Skn + Sb + Db2n     | Si + LEkn + LEb + Di2n     |
+| Kn and C and not I | Kn and C | cnt + Skn + LEkn + Sc + LEc + Si + Dc3n + Di3n | cnt + Skn + Sc + Dc3n     | Si + LEkn + LEc + Di3n     |
+
+The following is the result of summing the left and right query difference for each attribute A, B, C, etc.:
+
+| Bucket | Sum                                                                                              |
+|--------|--------------------------------------------------------------------------------------------------|
+| A      | (Si + LEkn + LEa + Di11 - 1) + (Si + LEkn + LEa + Di12 - 1) + (Si + LEkn + LEa + Di13 - 1) + ... |
+| B      | (Si + LEkn + LEb + Di21) + (Si + LEkn + LEb + Di22) + (Si + LEkn + LEb + Di23) + ...             |
+| C      | (Si + LEkn + LEc + Di31) + (Si + LEkn + LEc + Di32) + (Si + LEkn + LEc + Di33) + ...             |
+
+The `LEa`, `LEb`, etc. noise layers in each row effectively hide which bucket the victim is in.
+
+
+### LE noise layer with AIDVs (not as good)
+
+Now, assume that the LE noise layer is applied to each nonLE condition, and is seeded as follows:
+
+`[non-LE_static_condition_materials, LE_static_condition_materials, LE_AIDVs]`
 
 Where:
 
-* The `static_condition_materials` are the same seed materials used for normal static conditions
+* The `non-LE_static_condition_materials` are the same seed materials used for normal static conditions
 * The `LE_static_condition_materials` are the static seed materials for the LE condition itself
 * The `LE_AIDVs` are the AID Values that are affected by the LE condition.
 
@@ -438,79 +465,41 @@ The seed materials for the the condition `unknown_col=u2` in a bucket where the 
 
 `['unknown_col','=','u2','aid_col','<>','victim',()]`
 
-Oops, doesn't this create though a histogram attack?
-
-left           right
-
-u1 with V      u1 w/o V
-u2 w/o  V      u2 w/o V
-u3 w/o  V      u3 w/o V
-etc.
-
-Well, the left and right noise is the same except for the u1 bucket. That doesn't look good.
-
 A single bucket from the left query has:
 
-* Static: SNu1, SNr1, SNj1
-* Dynamic: DNu1, DNr1, DNj1
-* LE: LENu1, LENr1, LENj1
+* Static: `SNu1, SNr1, SNj1`
+* Dynamic: `DNu1, DNr1, DNj1`
 
 From the right query with the victim:
 
-* Static: SNu1, SNr1, SNj1, SNa
-* Dynamic: DNu1v, DNr1v, DNj1v, DNa1v
-* LE: LENu1v, LENr1v, LENj1v, LENa1v
+* Static: `SNu1, SNr1, SNj1, SNa`
+* Dynamic: `DNu1v, DNr1v, DNj1v, DNa1v`
+* LE: `LENu1v, LENr1v, LENj1v`
 
 And from the right query without the victim:
 
-* Static: SNu2, SNr1, SNj1, SNa
-* Dynamic: DNu2, DNr1, DNj1, DNa1
-* LE: LENu2, LENr1, LENj1, LENa1
+* Static: `SNu2, SNr1, SNj1, SNa`
+* Dynamic: `DNu2, DNr1, DNj1, DNa1`
+* LE: `LENu2, LENr1, LENj1`
 
 All the dynamic layers are zero-mean, and average away. All the static layers except SNa are removed with the difference of the left and right queries. Note that the SNj static layers will be seeded with a lot of different values for a given bucket, but are likely to be the same right and left.
 
 So if we sum the counts across all the buckets for each `unknown_col` value and take the left/right difference, then for buckets with the victim we get:
 
-`SNa, (zero-mean noise), (all LEN layers), victim x samples`
+`SNa, (zero-mean noise), victim x samples, LENu1v, LENr1v, LENj1v, LENa1v` 
 
 and for buckets without the victim:
 
-`SNa, (zero-mean noise)`
-
-This looks like a problem, because the summed-buckets bucket with the victim (`unknown_col=u1`) will have a lot more noise than the summed-buckets buckets without the victim (all other `unknown_col` values). This is a form of noise exploitation.
-
-
-
--------
-
-zzzz
-
-This implies that it isn't enough to simply make left and right dynamic noise the same. We must also adjust aggregate outputs (i.e. add 1 to each of the right-hand answers for attribute A).
-
-
-### The multi-histogram attack is hard if the attacker has to distinguish between N and N-1 users (versus 0 and 1 user)
-
-It was pointed out earlier that we need to have a noisy threshold for LE, and in fact the range should be fairly wide (not just between 1 and 2 users, but rather between 2 and 5 or 6 users), but on the other hand doing so would lead to poor utility if we adjust aggregates in all cases.  One thing we can try instead is to adjust the aggregate when there is one LE user only, but use the wider range for adjusting seeds for dynamic layers only.
-
-> TODO: Validate that the basic first derivative difference attack with 1/2 users doesn't work well because of the number of noise layers that are needed practically speaking.
-
-The idea for the attacker is that he has a known set of attributes for the victim, K1, K2, .... For each such attribute, the attacker needs to come up with an expression like:
-
 ```
-WHERE Kn and A and not (isolates two users that share Kn)
+SNa, (zero-mean noise), LENu2, LENr1, LENj1, LENa1
+SNa, (zero-mean noise), LENu3, LENr1, LENj1, LENa1
+etc.
 ```
 
-where one of the two users is the victim, and the other we'll call a 'plant' (because the other user is planted in the query alongside the victim).
+Across a set of buckets with the same uX, the `LENuX` or `LENuXv` buckets are static, and so hide the `victim x samples` difference. However, all of the other LEN layers are the same for every other condition, and so there might be a way to detect that the victim's `unknown_col` group is different from the others.
 
-In order to discover if the victim has attribute A, the plant must have attribute A. So in total, the requirements for a successful plant are:
+## Adjusting when LE = 1 only
 
-1. The plant must have the unknown attribute A
-2. The plant must have the known per-histogram attribute Kn
-3. The plant must share enough other attributes with the victim to isolate the plant and the victim together
-4. The bucket needs to pass LCF
+In an earlier section, we pointed out that using adjustment of LE rows leads to too much distortion.
 
-My guess is that meeting all of these requirements to produce enough histograms to effectively attack a given victim will be exceedingly rare.
-
-> TODO: Validate that meeting these requirements would indeed be rare.
-
-zzzz
+One thing we could do, however, is adjust in only the case where a single user is affected. Even though doing so doesn't appear necessary at this point, I have a general concern that if an attacker runs many different difference attacks on the same user, that the attacker will be able to detect a signal through the noise.
