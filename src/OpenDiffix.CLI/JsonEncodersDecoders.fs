@@ -40,7 +40,7 @@ let encodeAnonParams (ap: AnonymizationParams) =
         Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
       )
     )
-    "minimum_allowed_aids", Encode.int ap.MinimumAllowedAids
+    "minimum_allowed_aid_values", Encode.int ap.MinimumAllowedAids
     "outlier_count", encodeThreshold ap.OutlierCount
     "top_count", encodeThreshold ap.TopCount
     "noise", encodeNoiseParam ap.Noise

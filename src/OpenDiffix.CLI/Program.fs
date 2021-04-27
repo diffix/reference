@@ -18,7 +18,7 @@ type CliArguments =
   // Threshold values
   | [<Unique>] Threshold_Outlier_Count of lower: int * upper: int
   | [<Unique>] Threshold_Top_Count of lower: int * upper: int
-  | [<Unique>] Minimum_Allowed_Aids of threshold: int
+  | [<Unique>] Minimum_Allowed_Aid_Values of threshold: int
 
   // General anonymization parameters
   | [<Unique>] Noise of std_dev: float * factor: float
@@ -44,8 +44,8 @@ type CliArguments =
           "Threshold used in the count aggregate together with the outlier count threshold. It determines how many "
           + "of the next most contributing users' values should be used to calculate the replacement value for the "
           + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
-      | Minimum_Allowed_Aids _ ->
-          "Sets the bound for the minimum number of AIDs must be present in a bucket for it to pass the low count filter."
+      | Minimum_Allowed_Aid_Values _ ->
+          "Sets the bound for the minimum number of AID values must be present in a bucket for it to pass the low count filter."
       | Noise _ ->
           "Specifies the standard deviation used when calculating the noise throughout the system. "
           + "Additionally, a factor for the SD must be specified which is used to truncate the normal "
@@ -82,7 +82,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
   {
     TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
-    MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aids |> Option.defaultValue 2
+    MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
     Noise = parsedArgs.TryGetResult Noise |> toNoise

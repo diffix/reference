@@ -291,7 +291,7 @@ Let's say we have the following table:
 | [email[Cristian]; first_name[Felix]]            | Orange |
 | [email[Cristian]; first_name[Felix]]            | Orange |
 
-The `minimum_allowed_aids` is 2 for both `email` and `first_name`.
+The `minimum_allowed_aid_values` is 2 for both `email` and `first_name`.
 In this case neither Apple nor Orange have to be low count filtered.
 Apple occurs for 5 distinct `email` AID values and 2 distinct `first_name` AID values.
 Orange occurs for 3 distinct `email` AID values and 2 distinct `first_name` AID values.
