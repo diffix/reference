@@ -188,7 +188,7 @@ The process for suppressing extreme values is as follows:
 3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
 4. Take the first `Ne` highest contributions as the extreme values.
 5. Take next `Nt` highest contributions as the top count.
-6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aids` distinct AID values, then use that value as the the top group average
+6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aid_values` distinct AID values, then use that value as the the top group average
 7. (only for the final anonymizing aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` to indicate that
   there were was not enough data
 8. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
@@ -200,7 +200,7 @@ The process for suppressing extreme values is as follows:
 Once the algorithm has been completed for each AID-instance, we continue based on the AID instance with the largest amount of flattening.
 In the case of the fully anonymizing aggregation in the top-most query we also add the noise proportional to the AID-instance with the largest top group average.
 
-Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aids` threshold is 2 across all AIDs unless otherwise stated.
+Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aid_values` threshold is 2 across all AIDs unless otherwise stated.
 
 Note that the tables as shown are the row contributions used to calculate an aggregate.
 
@@ -232,7 +232,7 @@ the the per entity sum contribution in the case of a `sum` aggregator.
 
 - The rows are sorted in descending order of `Value`
 - `Ne = 2`, `Nt = 2`
-- We take the `Ne` first values as extreme values. The values are both the same, and since `minimum_allowed_aids = 2` they would satisfy low count filtering.
+- We take the `Ne` first values as extreme values. The values are both the same, and since `minimum_allowed_aid_values = 2` they would satisfy low count filtering.
 - We use 5 as the top group average which means there is no flattening necessary
 
 

@@ -10,21 +10,21 @@ What I'm proposing now is a *thin-spread* approach, where the lower-bound is hig
 
 LCF is defined by one parameter:
 
-1. `minimum_allowed_aids`: The minimum number of distinct AID values that can be in a reported bucket. Buckets with any number of distinct AID values lower than this will be suppressed.
+1. `minimum_allowed_aid_values`: The minimum number of distinct AID values that can be in a reported bucket. Buckets with any number of distinct AID values lower than this will be suppressed.
 
 This parameter is defined separately for each AID column.
 
-The minimum possible `minimum_allowed_aids` must be 2.
+The minimum possible `minimum_allowed_aid_values` must be 2.
 
 When the AID column identifies a human individual, then the following values are recommended:
 
-| Situation       | `minimum_allowed_aids` | Comments                             |
+| Situation       | `minimum_allowed_aid_values` | Comments                             |
 | --------------- | ---------------------: | ------------------------------------ |
 | Very high trust |                    2-3 | Analyst that has access to raw data  |
 | Moderate trust  |                    4-5 | Analyst in-company or under contract |
 | Low trust       |                     >7 | Public (or data released to public)  |
 
-Note that `minimum_allowed_aids = 3` is roughly equivalent to the current Diffix Dogwood default setting.
+Note that `minimum_allowed_aid_values = 3` is roughly equivalent to the current Diffix Dogwood default setting.
 
 When the AID column identifies something else, then probably 2 or 3 is fine in all cases.
 
@@ -38,7 +38,7 @@ The `seed` for an AID instance some function of the set of distinct AID values (
 
 The per-AID instance decision then goes like this:
 
-1. With a PRNG seeded by `seed`, select a threshold uniformly among three values, `K`, `K+1`, and `K+2`, where `K=minimum_allowed_aids`.
+1. With a PRNG seeded by `seed`, select a threshold uniformly among three values, `K`, `K+1`, and `K+2`, where `K=minimum_allowed_aid_values`.
 2. If `num_distinct` is less than `threshold`, then suppress.
 
-> Note that since we no longer have a permanent lower bound value, we'll have to take `minimum_allowed_aids` into account when deciding what aggregate value to report for any given aggregate. The reason we need this is because if the reported aggregate value is well below that which is possible based on `minimum_allowed_aids`, then the analyst would know with high confidence that there are exactly `minimum_allowed_aids` AID values in the bucket.  How to determine the lower bound reported value is specified somewhere else.
+> Note that since we no longer have a permanent lower bound value, we'll have to take `minimum_allowed_aid_values` into account when deciding what aggregate value to report for any given aggregate. The reason we need this is because if the reported aggregate value is well below that which is possible based on `minimum_allowed_aid_values`, then the analyst would know with high confidence that there are exactly `minimum_allowed_aid_values` AID values in the bucket.  How to determine the lower bound reported value is specified somewhere else.

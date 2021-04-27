@@ -176,8 +176,8 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   // This example differs from the one in the docs by it altering the
   // AIDs to ensure that the number of distinct AIDs of each kind are
   // truly always above the minimum allowed AIDs, even in the case where
-  // we operate with `minimum_allowed_aids + 2`. The original example assumed
-  // the noisy `minimum_allowed_aids` is equal to 2.
+  // we operate with `minimum_allowed_aid_values + 2`. The original example assumed
+  // the noisy `minimum_allowed_aid_values` is equal to 2.
   let rows =
     [
       // AID1; AID2; Fruit

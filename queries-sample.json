@@ -11,7 +11,7 @@
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
+      "minimum_allowed_aid_values": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -38,7 +38,7 @@
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
+      "minimum_allowed_aid_values": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -65,7 +65,7 @@
         }
       },
       "seed": 1,
-      "minimum_allowed_aids": 2,
+      "minimum_allowed_aid_values": 2,
       "outlier_count": {
         "lower": 1,
         "upper": 2

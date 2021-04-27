@@ -21,7 +21,7 @@ Through aggregation a row might be associated with multiple AID values for a sin
 
 ## Low count filter
 
-Low count filtering is done per AID instance individually. For a bucket with the AID instances `[email1; email2; email3; ssn1; ssn2]` all five AID instances individually need to pass the low count threshold. Each AID column might have a distinct  `minimum_allowed_aids` parameter (i.e. the parameter for `email` might differ from that of `ssn`).
+Low count filtering is done per AID instance individually. For a bucket with the AID instances `[email1; email2; email3; ssn1; ssn2]` all five AID instances individually need to pass the low count threshold. Each AID column might have a distinct  `minimum_allowed_aid_values` parameter (i.e. the parameter for `email` might differ from that of `ssn`).
 
 
 # How AIDs spread
