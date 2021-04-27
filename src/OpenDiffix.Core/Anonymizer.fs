@@ -119,8 +119,8 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Ma
     )
     Map.empty
 
-let rec distributeValues =
-  function
+let rec distributeValues valuesByAID =
+  match valuesByAID with
   | [] -> [] // Done :D
   | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
   | (aid, value :: restValues) :: restValuesByAID ->
