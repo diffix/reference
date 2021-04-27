@@ -13,8 +13,8 @@ let private randomNormal (rnd: Random) stdDev =
 
   stdDev * randStdNormal
 
-let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: Set<AidHash>) =
-  let combinedAids = aidSet |> Set.toList |> List.reduce (^^^)
+let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
+  let combinedAids = Seq.fold (^^^) 0 aidSet
   let seed = combinedAids ^^^ anonymizationParams.Seed
   Random(seed)
 
@@ -52,51 +52,44 @@ type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoisePa
 
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
-  (aidContributions: Map<AidHash, int64>)
+  (aidContributions: (AidHash * int64) list)
   : AidCount option =
-  match Map.toList aidContributions with
-  | [] -> None
-  | perAidContributions ->
-      let rnd =
-        perAidContributions
-        |> List.map fst
-        |> Set.ofList
-        |> newRandom anonymizationParams
+  let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
 
-      let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
-      let topCount = randomUniform rnd anonymizationParams.TopCount
+  let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
+  let topCount = randomUniform rnd anonymizationParams.TopCount
 
-      let sortedUserContributions = perAidContributions |> List.map snd |> List.sortDescending
+  let sortedUserContributions = aidContributions |> List.map snd |> List.sortDescending
 
-      if sortedUserContributions.Length < outlierCount + topCount then
-        None
-      else
-        let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
+  if sortedUserContributions.Length < outlierCount + topCount then
+    None
+  else
+    let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
 
-        let topGroupValuesSummed =
-          sortedUserContributions
-          |> List.skip outlierCount
-          |> List.take topCount
-          |> List.sum
+    let topGroupValuesSummed =
+      sortedUserContributions
+      |> List.skip outlierCount
+      |> List.take topCount
+      |> List.sum
 
-        let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
-        let outlierReplacement = topGroupAverage * (float outlierCount)
+    let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
+    let outlierReplacement = topGroupAverage * (float outlierCount)
 
-        let summedContributions = sortedUserContributions |> List.sum
-        let flattening = float outliersSummed - outlierReplacement
-        let flattenedSum = float summedContributions - flattening
-        let flattenedAvg = flattenedSum / float sortedUserContributions.Length
+    let summedContributions = sortedUserContributions |> List.sum
+    let flattening = float outliersSummed - outlierReplacement
+    let flattenedSum = float summedContributions - flattening
+    let flattenedAvg = flattenedSum / float sortedUserContributions.Length
 
-        let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
-        let noiseSD = anonymizationParams.Noise.StandardDev * noiseScale
+    let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
+    let noiseSD = anonymizationParams.Noise.StandardDev * noiseScale
 
-        Some
-          {
-            FlattenedSum = flattenedSum
-            Flattening = flattening
-            noise = { anonymizationParams.Noise with StandardDev = noiseSD }
-            Rnd = rnd
-          }
+    Some
+      {
+        FlattenedSum = flattenedSum
+        Flattening = flattening
+        noise = { anonymizationParams.Noise with StandardDev = noiseSD }
+        Rnd = rnd
+      }
 
 let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map<Value, Set<AidHash>> =
   valuesPerAid
@@ -112,59 +105,46 @@ let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Ma
   perAidTypeValueMap
   |> List.map transposePerAidMapsToPerValue
   |> List.fold
-    (fun (acc: Map<Value, Set<AidHash> list>) (valueHashMap: Map<Value, Set<AidHash>>) ->
+    (fun acc valueHashMap ->
       valueHashMap
-      |> Map.toList
-      |> List.fold
-        (fun (valueAcc: Map<Value, Set<AidHash> list>) (value, aidHashSet) ->
-          let a = List.singleton aidHashSet
-
+      |> Map.fold
+        (fun valueAcc value aidHashSet ->
           Map.change
             value
-            (Option.map (fun existingAidSets -> List.append existingAidSets a)
-             >> Option.orElse (Some a))
+            (Option.map (fun existingAidSets -> existingAidSets @ [ aidHashSet ])
+             >> Option.orElse (Some [ aidHashSet ]))
             valueAcc
         )
         acc
     )
     Map.empty
 
-let rec distributeUntilEmpty takenValues queue itemsByAID =
-  match itemsByAID, queue with
-  | [], [] -> [] // Done :D
-  | [], _ -> distributeUntilEmpty takenValues [] (List.rev queue)
+let rec distributeValues valuesByAID =
+  match valuesByAID with
+  | [] -> [] // Done :D
+  | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
+  | (aid, value :: restValues) :: restValuesByAID ->
+      let restValuesByAID = // Drop current value from the remaining items.
+        List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
 
-  | (aid, values) :: rest, _ ->
-      match values |> List.tryFind (fun value -> not <| Set.contains value takenValues) with
-      | Some value ->
-          let updatedTaken = Set.add value takenValues
-
-          match values |> List.filter ((<>) value) with
-          | [] -> (aid, value) :: distributeUntilEmpty updatedTaken queue rest
-          | remaining ->
-              let queue = (aid, remaining) :: queue
-              (aid, value) :: distributeUntilEmpty updatedTaken queue rest
-      | None ->
-          // No more value to take for user...
-          distributeUntilEmpty takenValues queue rest
+      (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
 let private countDistinctFlatteningByAid
   anonParams
   valuesPassingLowCount
   (perAidContributions: Map<AidHash, Set<Value>>)
   =
-  let distributableValues =
-    perAidContributions
-    |> Map.map (fun _aidHash valuesSet -> Set.difference valuesSet valuesPassingLowCount)
-    |> Map.toList
-    |> List.sortBy (fun (aid, valuesSet) -> Set.count valuesSet, aid)
-    |> List.map (fun (aid, valuesSet) -> aid, Set.toList valuesSet |> List.sort)
-
-  distributableValues
-  |> distributeUntilEmpty Set.empty []
-  |> List.groupBy fst
-  |> List.map (fun (aid, values) -> aid, List.length values |> int64)
-  |> Map.ofList
+  perAidContributions
+  |> Map.map (fun _aidHash valuesSet ->
+    // keep low count values in sorted order to ensure the algorithm is deterministic
+    Set.toList (valuesSet - valuesPassingLowCount)
+  )
+  |> Map.filter (fun _aidHash values -> values.Length > 0)
+  |> Map.toList
+  |> List.sortBy (fun (aid, values) -> values.Length, aid)
+  |> distributeValues
+  |> List.countBy fst
+  |> List.map (fun (aid, count) -> aid, int64 count)
   |> aidFlattening anonParams
 
 let private anonymizedSum (byAidSum: AidCount list) =
@@ -222,7 +202,9 @@ let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<A
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->
-      let byAid = perAidContributions |> List.map (aidFlattening anonymizationParams)
+      let byAid =
+        perAidContributions
+        |> List.map (Map.toList >> aidFlattening anonymizationParams)
 
       // If any of the AIDs had insufficient data to produce a sensible flattening
       // we have to abort anonymization.
