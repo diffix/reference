@@ -135,7 +135,8 @@ let private countDistinctFlatteningByAid
   (perAidContributions: Map<AidHash, Set<Value>>)
   =
   perAidContributions
-  |> Map.map (fun _aidHash valuesSet -> // keep low count values in sorted order
+  |> Map.map (fun _aidHash valuesSet ->
+    // keep low count values in sorted order to ensure the algorithm is deterministic
     Set.toList (valuesSet - valuesPassingLowCount)
   )
   |> Map.filter (fun _aidHash values -> values.Length > 0)
