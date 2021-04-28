@@ -1,6 +1,29 @@
 # Why LED is so hard
 
-This documents the various designs we've looked at for LED, and why they fail.
+This documents the need for LED, and motivates a number of design decisions
+
+- [Glossary](#glossary)
+- [Computing noise](#computing-noise)
+- [Background (difference attacks)](#background-(difference-attacks))
+  - [Simple difference attack, static noise](simple-difference-attack,-static-noise)
+  - [First derivative difference attack, static noise](first-derivative-difference-attack,-static-noise)
+  -[First derivative difference attack, static and dynamic noise](first-derivative-difference-attack,-static-and-dynamic-noise)
+  -[Chaff attack](chaff-attack)
+- [Ideal solution](ideal-solution)
+  - [Definition of threshold for Low Effect (LE)](definition-of-threshold-for-low-effect-(le))
+  - [Higher noise levels for only LE conditions](higher-noise-levels-for-only-le-conditions)
+- [Solution space](solution-space)
+  - [Must sometimes override query execution plan to understand LE conditions](must-sometimes-override-query-execution-plan-to-understand-le-conditions)
+  - [Which LE conditions do we need to detect?](which-LE-conditions-do-we-need-to-detect?)
+  - [Is dynamic noise without column value adjustment enough?](is-dynamic-noise-without-column-value-adjustment-enough?)
+- [New attacks](new-attacks)
+  - [Multi-histogram (first derivative difference attack)](multi-histogram-(first-derivative-difference-attack))
+  - [Multi-sample difference attack using JOIN](multi-sample-difference-attack-using-join)
+- [Solution](solution)
+  - [Multi-sample JOIN attack](multi-sample-join-attack)
+  - [Multi-histogram attack](multi-histogram-attack)
+  - [LE noise layer with AIDVs (not as good)](le-noise-layer-with-aidvs-(not-as-good))
+- [Adjusting when LE = 1 only](adjusting-when-le-=-1-only)
 
 ## Glossary
 
@@ -277,7 +300,9 @@ In that case, the resulting table would be this:
 
 As required, the left and right buckets for any given row always differ (because of both the static and dynamic noise layers), and the difference between rows always differs because of the dynamic noise layers. In addition, the *amount* of noise difference is the same. This means that the chaff attack won't work.
 
-## Multi-histogram (first derivative difference attack)
+## New attacks
+
+### Multi-histogram (first derivative difference attack)
 
 Now, suppose that the attacker knows a number of attributes of the victim, K1, K2, K3, etc. The attacker can now make a *set of* histograms, one for each known attribute. 
 
@@ -325,8 +350,7 @@ In other words, if the attacker knows enough things about K1, K2 etc. about the 
 
 Let's call this the multi-histogram first derivative difference attack (or just multi-histogram for short).
 
-
-## Multi-sample difference attack using JOIN
+### Multi-sample difference attack using JOIN
 
 There is an attack whereby a JOIN is used to replicate the victim across many different buckets. This works when the ON condition allows the victim in (say) the left selectable to match with multiple entities in the right selectable. Following is an example:
 
@@ -442,10 +466,9 @@ The following is the result of summing the left and right query difference for e
 
 The `LEa`, `LEb`, etc. noise layers in each row effectively hide which bucket the victim is in.
 
-
 ### LE noise layer with AIDVs (not as good)
 
-Now, assume that the LE noise layer is applied to each nonLE condition, and is seeded as follows:
+Now, assume that the LE noise layer is applied to each non-LE condition, and is seeded as follows:
 
 `[non-LE_static_condition_materials, LE_static_condition_materials, LE_AIDVs]`
 
