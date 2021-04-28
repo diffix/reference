@@ -4,13 +4,13 @@ open OpenDiffix.Core
 
 type JoinType = ParserTypes.JoinType
 
-type SelectExpression =
+type TargetEntry =
   {
     Expression: Expression
     Alias: string
   }
-  static member Map(se: SelectExpression, f: Expression -> Expression) =
-    { se with Expression = Expression.Map(se.Expression, f) }
+  static member Map(te: TargetEntry, f: Expression -> Expression) =
+    { te with Expression = Expression.Map(te.Expression, f) }
 
 type GroupingSet =
   | GroupingSet of Expression list
@@ -23,8 +23,8 @@ type GroupingSet =
     function
     | GroupingSet expressions -> expressions
 
-type TargetTable = Table * string
-type TargetTables = TargetTable list
+type RangeTable = Table * string
+type TargetTables = RangeTable list
 
 type Query =
   | UnionQuery of distinct: bool * Query * Query
@@ -35,7 +35,7 @@ type Query =
     | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, Query.Map(q1, f), Query.Map(q2, f))
     | SelectQuery selectQuery -> SelectQuery(f selectQuery)
 
-  static member Map(query: Query, f: SelectFrom -> SelectFrom) : Query =
+  static member Map(query: Query, f: QueryRange -> QueryRange) : Query =
     Query.Map(query, (fun (selectQuery: SelectQuery) -> SelectQuery.Map(selectQuery, f)))
 
   static member Map(query: Query, f: Expression -> Expression) : Query =
@@ -43,8 +43,8 @@ type Query =
 
 and SelectQuery =
   {
-    Columns: SelectExpression list
-    From: SelectFrom
+    TargetList: TargetEntry list
+    From: QueryRange
     TargetTables: TargetTables
     Where: Expression
     GroupingSets: GroupingSet list
@@ -52,46 +52,45 @@ and SelectQuery =
     Having: Expression
   }
 
-  static member Map(query: SelectQuery, f: SelectFrom -> SelectFrom) =
-    { query with From = SelectFrom.Map(query.From, f) }
+  static member Map(query: SelectQuery, f: QueryRange -> QueryRange) =
+    { query with From = QueryRange.Map(query.From, f) }
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     { query with
-        Columns = List.map (fun column -> SelectExpression.Map(column, f)) query.Columns
-        From = SelectFrom.Map(query.From, f)
+        TargetList = List.map (fun column -> TargetEntry.Map(column, f)) query.TargetList
+        From = QueryRange.Map(query.From, f)
         Where = Expression.Map(query.Where, f)
         GroupingSets = List.map (fun groupingSet -> GroupingSet.Map(groupingSet, f)) query.GroupingSets
         OrderBy = OrderByExpression.Map(query.OrderBy, f)
         Having = Expression.Map(query.Having, f)
     }
 
-and SelectFrom =
-  | Query of query: Query
+and QueryRange =
+  | SubQuery of query: Query
   | Join of Join
-  | Table of TargetTable
+  | RangeTable of RangeTable
 
-  static member Map(selectFrom: SelectFrom, f: Query -> Query) =
-    match selectFrom with
-    | Query q -> Query(f q)
+  static member Map(range: QueryRange, f: Query -> Query) =
+    match range with
+    | SubQuery q -> SubQuery(f q)
     | other -> other
 
-  static member Map(selectFrom: SelectFrom, f: Table -> Table) =
-    match selectFrom with
-    | Table (table, alias) -> Table(f table, alias)
+  static member Map(range: QueryRange, f: Table -> Table) =
+    match range with
+    | RangeTable (table, alias) -> RangeTable(f table, alias)
     | other -> other
 
-  static member Map(selectFrom: SelectFrom, f: SelectFrom -> SelectFrom) = f selectFrom
+  static member Map(range: QueryRange, f: QueryRange -> QueryRange) = f range
 
-  static member Map(selectFrom: SelectFrom, f: Expression -> Expression) =
-    match selectFrom with
-    | Query q -> Query(Query.Map(q, f))
+  static member Map(range: QueryRange, f: Expression -> Expression) =
+    match range with
+    | SubQuery q -> SubQuery(Query.Map(q, f))
     | other -> other
 
 and Join =
   {
-    //
     Type: JoinType
-    Left: SelectFrom
-    Right: SelectFrom
+    Left: QueryRange
+    Right: QueryRange
     On: Expression
   }

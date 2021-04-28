@@ -75,7 +75,7 @@ let expressionName =
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 
-let rec mapSelectedExpression tables selectedExpression : Result<SelectExpression, string> =
+let rec mapSelectedExpression tables selectedExpression : Result<TargetEntry, string> =
   match selectedExpression with
   | ParserTypes.As (parsedExpression, parsedAlias) ->
       let alias = parsedAlias |> Option.defaultWith (fun () -> expressionName parsedExpression)
@@ -106,7 +106,7 @@ let transformGroupByIndex (expressions: Expression list) groupByExpression =
         expressions |> List.item (int index - 1) |> Ok
   | _ -> Ok groupByExpression
 
-let transformGroupByIndices (selectedExpressions: SelectExpression list) groupByExpressions =
+let transformGroupByIndices (selectedExpressions: TargetEntry list) groupByExpressions =
   let selectedExpressions =
     selectedExpressions
     |> List.map (fun selectedExpression -> selectedExpression.Expression)
@@ -115,15 +115,15 @@ let transformGroupByIndices (selectedExpressions: SelectExpression list) groupBy
 
 let rec private collectTargetTables =
   function
-  | Table (alias, table) -> [ alias, table ]
+  | RangeTable (alias, table) -> [ alias, table ]
   | Join join -> (collectTargetTables join.Left) @ (collectTargetTables join.Right)
-  | Query _ -> failwith "Unexpected subquery encountered while collecting tables"
+  | SubQuery _ -> failwith "Unexpected subquery encountered while collecting tables"
 
 let rec private transformFrom schema from =
   match from with
   | ParserTypes.Table (name, alias) ->
       let alias = alias |> Option.defaultWith (fun () -> name)
-      name |> Table.getI schema |> Result.map (fun table -> Table(table, alias))
+      name |> Table.getI schema |> Result.map (fun table -> RangeTable(table, alias))
   | ParserTypes.Join (joinType, left, right, on) ->
       result {
         let! left = transformFrom schema left
@@ -164,7 +164,7 @@ let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
 
     return
       {
-        Columns = selectedExpressions
+        TargetList = selectedExpressions
         Where = whereClause
         From = from
         TargetTables = targetTables
@@ -199,16 +199,16 @@ let selectColumnsFromQuery columnIndices innerQuery =
   let selectedColumns =
     columnIndices
     |> List.map (fun index ->
-      let column = innerQuery.Columns |> List.item index
+      let column = innerQuery.TargetList |> List.item index
       let columnType = column.Expression |> Expression.GetType |> Utils.unwrap
       { column with Expression = ColumnReference(index, columnType) }
     )
 
-  let queryTable = { Name = ""; Columns = List.map selectExpressionToColumn innerQuery.Columns }
+  let queryTable = { Name = ""; Columns = List.map selectExpressionToColumn innerQuery.TargetList }
 
   {
-    Columns = selectedColumns
-    From = Query(SelectQuery innerQuery)
+    TargetList = selectedColumns
+    From = SubQuery(SelectQuery innerQuery)
     TargetTables = [ queryTable, "dfx_virtual_query" ]
     Where = booleanTrueExpression
     GroupingSets = []
@@ -227,7 +227,7 @@ let addLowCountFilter aidColumnsExpression query =
 
       if selectQuery.GroupingSets = [ GroupingSet [] ] then
         let selectedExpressions =
-          selectQuery.Columns
+          selectQuery.TargetList
           |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
         if selectedExpressions |> List.forall scalarExpression then
@@ -237,7 +237,7 @@ let addLowCountFilter aidColumnsExpression query =
           let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
 
           { selectQuery with
-              Columns = { Expression = bucketExpand; Alias = "" } :: selectQuery.Columns
+              TargetList = { Expression = bucketExpand; Alias = "" } :: selectQuery.TargetList
               GroupingSets = [ GroupingSet selectedExpressions ]
               Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
           }

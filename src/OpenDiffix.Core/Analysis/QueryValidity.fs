@@ -39,9 +39,9 @@ let rec private validateSelectTarget query =
   Query.Map(
     query,
     function
-    | Query _ -> failwith "Subqueries are not supported at present"
+    | SubQuery _ -> failwith "Subqueries are not supported at present"
     | Join _ as j -> j
-    | Table _ as t -> t
+    | RangeTable _ as t -> t
   )
   |> ignore
 

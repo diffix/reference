@@ -22,7 +22,7 @@ let negativeExpression = Boolean false |> Constant
 
 let selectQuery =
   {
-    Columns = [ { Expression = expression; Alias = "col" } ]
+    TargetList = [ { Expression = expression; Alias = "col" } ]
     TargetTables = [ testTable, testTable.Name ]
     Where = expression
     From = Table(testTable, testTable.Name)
@@ -33,7 +33,7 @@ let selectQuery =
 
 let selectQueryNegative =
   {
-    Columns = [ { Expression = negativeExpression; Alias = "col" } ]
+    TargetList = [ { Expression = negativeExpression; Alias = "col" } ]
     TargetTables = [ testTable, testTable.Name ]
     Where = negativeExpression
     From = Table(testTable, testTable.Name)

@@ -22,7 +22,7 @@ let schema = [ testTable ]
 
 let defaultQuery =
   {
-    Columns = []
+    TargetList = []
     Where = Boolean true |> Constant
     From = Table(testTable, testTable.Name)
     TargetTables = [ testTable, testTable.Name ]
@@ -46,7 +46,7 @@ let ``Analyze count(*)`` () =
   testParsedQuery
     "SELECT count(*) from table"
     { defaultQuery with
-        Columns =
+        TargetList =
           [
             {
               Expression =
@@ -61,7 +61,7 @@ let ``Analyze count(distinct col)`` () =
   testParsedQuery
     "SELECT count(distinct int_col) from table"
     { defaultQuery with
-        Columns =
+        TargetList =
           [
             {
               Expression =
@@ -79,7 +79,7 @@ let ``Selecting columns from a table`` () =
   testParsedQuery
     "SELECT str_col, bool_col FROM table"
     { defaultQuery with
-        Columns =
+        TargetList =
           [
             { Expression = ColumnReference(0, StringType); Alias = "str_col" }
             { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
@@ -104,7 +104,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
     query
     {
       TargetTables = [ testTable, testTable.Name ]
-      Columns =
+      TargetList =
         [
           { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
           {
@@ -151,7 +151,7 @@ let ``Selecting columns from an aliased table`` () =
   testParsedQuery
     "SELECT t.str_col, T.bool_col FROM table AS t"
     { defaultQuery with
-        Columns =
+        TargetList =
           [
             { Expression = ColumnReference(0, StringType); Alias = "str_col" }
             { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
@@ -213,7 +213,7 @@ type Tests(db: DBFixture) =
     let expectedInTopQuery =
       [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
 
-    result.Columns |> should equal expectedInTopQuery
+    result.TargetList |> should equal expectedInTopQuery
 
     let expected = FunctionExpr(ScalarFunction Gt, [ countStar; 1L |> Integer |> Constant ])
 

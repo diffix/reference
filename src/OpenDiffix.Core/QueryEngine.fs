@@ -15,7 +15,7 @@ module QueryEngine =
   let rec private extractColumnNames =
     function
     | UnionQuery (_, query1, _query2) -> extractColumnNames query1
-    | SelectQuery query -> query.Columns |> List.map (fun column -> column.Alias)
+    | SelectQuery query -> query.TargetList |> List.map (fun column -> column.Alias)
 
   let run dataProvider statement anonParams =
     asyncResult {

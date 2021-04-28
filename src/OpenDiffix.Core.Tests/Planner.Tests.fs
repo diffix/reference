@@ -20,7 +20,7 @@ let table =
 
 let emptySelect =
   {
-    Columns = []
+    TargetList = []
     Where = constTrue
     From = Table(table, table.Name)
     TargetTables = [ table, table.Name ]
@@ -43,7 +43,7 @@ let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(I
 
 [<Fact>]
 let ``plan select`` () =
-  let select = { emptySelect with Columns = [ selectColumn 0; selectColumn 1 ] }
+  let select = { emptySelect with TargetList = [ selectColumn 0; selectColumn 1 ] }
 
   let expected = Plan.Project(Plan.Scan(table), [ column 0; column 1 ])
 
@@ -75,7 +75,7 @@ let ``plan aggregation`` () =
 
   let select =
     { emptySelect with
-        Columns = selectedColumns
+        TargetList = selectedColumns
         GroupingSets = [ GroupingSet groupingSet ]
     }
 
@@ -97,7 +97,7 @@ let ``plan all`` () =
 
   let select =
     { emptySelect with
-        Columns = selectedColumns
+        TargetList = selectedColumns
         GroupingSets = [ GroupingSet groupingSet ]
         Where = whereCondition
         OrderBy = orderBy
@@ -128,11 +128,11 @@ let ``plan all`` () =
 [<Fact>]
 let ``sub-query plan`` () =
   let selectedColumns = [ selectColumn 1 ]
-  let subQuery = { emptySelect with Columns = selectedColumns }
+  let subQuery = { emptySelect with TargetList = selectedColumns }
 
   let query =
     { subQuery with
-        Columns = [ selectColumn 0 ]
+        TargetList = [ selectColumn 0 ]
         From = Query <| SelectQuery subQuery
     }
 
@@ -161,7 +161,7 @@ let ``plan set select`` () =
   let setExpression = FunctionExpr((SetFunction GenerateSeries), [ column 0 ])
   let setSelect = { Expression = setExpression; Alias = "set" }
 
-  let select = { emptySelect with Columns = [ selectColumn 1; setSelect ] }
+  let select = { emptySelect with TargetList = [ selectColumn 1; setSelect ] }
 
   let expected =
     Plan.Project(

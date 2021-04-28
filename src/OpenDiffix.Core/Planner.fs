@@ -7,9 +7,9 @@ let private planJoin join = Plan.Join(planFrom join.Left, planFrom join.Right, j
 
 let private planFrom =
   function
-  | Table (table, _alias) -> Plan.Scan table
+  | RangeTable (table, _alias) -> Plan.Scan table
   | Join join -> planJoin join
-  | Query query -> plan query
+  | SubQuery query -> plan query
 
 let rec private extractSetFunctions expression =
   function
@@ -74,7 +74,7 @@ let rec private projectExpression columns expression =
     | Some i -> ColumnReference(i, getType expression)
 
 let private planSelect query =
-  let selectedExpressions = query.Columns |> List.map (fun column -> column.Expression)
+  let selectedExpressions = query.TargetList |> List.map (fun column -> column.Expression)
   let orderByExpressions = query.OrderBy |> List.map (fun (OrderBy (expression, _, _)) -> expression)
   let expressions = query.Having :: selectedExpressions @ orderByExpressions
 
