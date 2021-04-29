@@ -47,26 +47,26 @@ module Aggregator =
 
       member this.Final _ctx = sum
 
-  type private DiffixCount(perAidCounts: Map<AidHash, int64> list option) =
+  type private DiffixCount(perAidCounts: (Map<AidHash, int64> * int64) list option) =
     new() = DiffixCount(None)
 
-    member this.mapAidStructure callback defaultValue (aidValues: Value list) =
+    member this.mapAidStructure valueIncrease transition (aidValues: Value list) =
       perAidCounts
-      |> Option.defaultValue (List.replicate aidValues.Length defaultValue)
+      |> Option.defaultValue (List.replicate aidValues.Length (Map.empty, 0L))
       |> List.zip aidValues
-      |> List.map (fun (aidValue: Value, aidStructure) ->
-        if aidValue = Null then aidStructure else callback aidValue aidStructure
+      |> List.map (fun (aidValue: Value, (aidMap, unaccountedFor)) ->
+        if aidValue = Null then
+          aidMap, unaccountedFor + valueIncrease
+        else
+          Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some valueIncrease)) aidMap,
+          unaccountedFor
       )
       |> Some
 
-    member this.updateAidMaps<'T> (aidsArray: Value) initial transition =
+    member this.updateAidMaps<'T> (aidsArray: Value) valueIncrease transition =
       match aidsArray with
       | Value.List aidValues when List.forall ((=) Null) aidValues -> perAidCounts
-      | Value.List aidValues ->
-          let fn =
-            fun aidValue -> Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some initial))
-
-          this.mapAidStructure fn Map.empty aidValues
+      | Value.List aidValues -> this.mapAidStructure valueIncrease transition aidValues
       | _ -> failwith "Expecting an AID list as input"
 
     interface IAggregator with

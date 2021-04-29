@@ -52,6 +52,7 @@ type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoisePa
 
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
+  (unaccountedFor: int64)
   (aidContributions: (AidHash * int64) list)
   : AidCount option =
   let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
@@ -77,6 +78,7 @@ let private aidFlattening
 
     let summedContributions = sortedUserContributions |> List.sum
     let flattening = float outliersSummed - outlierReplacement
+    let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
     let flattenedAvg = flattenedSum / float sortedUserContributions.Length
 
@@ -85,7 +87,7 @@ let private aidFlattening
 
     Some
       {
-        FlattenedSum = flattenedSum
+        FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         noise = { anonymizationParams.Noise with StandardDev = noiseSD }
         Rnd = rnd
@@ -124,7 +126,7 @@ let private countDistinctFlatteningByAid anonParams (perAidContributions: Map<Ai
   |> distributeValues
   |> List.countBy fst
   |> List.map (fun (aid, count) -> aid, int64 count)
-  |> aidFlattening anonParams
+  |> aidFlattening anonParams 0L
 
 let private anonymizedSum (byAidSum: AidCount list) =
   let aidForFlattening =
@@ -176,13 +178,15 @@ let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anony
     |> Option.defaultValue 0.
     |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> list option) =
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, int64> * int64) list option) =
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->
       let byAid =
         perAidContributions
-        |> List.map (Map.toList >> aidFlattening anonymizationParams)
+        |> List.map (fun (aidMap, unaccountedFor) ->
+          aidMap |> Map.toList |> aidFlattening anonymizationParams unaccountedFor
+        )
 
       // If any of the AIDs had insufficient data to produce a sensible flattening
       // we have to abort anonymization.
