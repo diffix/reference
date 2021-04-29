@@ -262,3 +262,28 @@ let ``allows null-values for some of the AID rows`` () =
   rows
   |> TestHelpers.evaluateAggregator context distinctDiffixCount [ allAidsFlipped; value ]
   |> should equal (Integer 5L)
+
+[<Fact>]
+let ``account for values where AID-value is null`` () =
+  let rows =
+    [
+      // AID1; AID2; Fruit
+      [| String "Paul"; Null; Integer 1L |]
+      [| String "Felix"; Null; Integer 2L |]
+      [| String "Edon"; Null; Integer 3L |]
+      [| String "Cristian"; Null; Integer 4L |]
+      [| Null; String "Paul"; Integer 1L |]
+      [| Null; String "Felix"; Integer 2L |]
+      [| Null; String "Edon"; Integer 3L |]
+      [| Null; String "Cristian"; Integer 4L |]
+      [| Null; Null; Integer 5L |]
+    ]
+
+  let aid1 = ColumnReference(0, StringType)
+  let aid2 = ColumnReference(1, StringType)
+  let value = ColumnReference(2, IntegerType)
+  let allAidColumns = Expression.List [ aid1; aid2 ]
+
+  rows
+  |> TestHelpers.evaluateAggregator context diffixCount [ allAidColumns; value ]
+  |> should equal (Integer 8L)
