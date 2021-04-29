@@ -74,7 +74,7 @@ module Aggregator =
         match values with
         | [ aidValues; Null ] -> this.updateAidMaps aidValues 0L id |> DiffixCount
         | [ aidValues ]
-        | [ aidValues; _ ] -> this.updateAidMaps aidValues 1L (fun count -> count + 1L) |> DiffixCount
+        | [ aidValues; _ ] -> this.updateAidMaps aidValues 1L ((+) 1L) |> DiffixCount
         | _ -> invalidArgs values
         :> IAggregator
 
