@@ -7,24 +7,6 @@ type IAggregator =
 module Aggregator =
   let private invalidArgs (values: Value list) = failwith $"Invalid arguments for aggregator: {values}"
 
-  let private mapAidStructure callback aidMaps defaultValue (aidValues: Value list) =
-    aidMaps
-    |> Option.defaultValue (List.replicate aidValues.Length defaultValue)
-    |> List.zip aidValues
-    |> List.map (fun (aidValue: Value, aidStructure) ->
-      if aidValue = Null then aidStructure else callback aidValue aidStructure
-    )
-    |> Some
-
-  let private updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> list option) =
-    match aidsArray with
-    | Value.List aidValues ->
-        let fn =
-          fun aidValue -> Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some initial))
-
-        mapAidStructure fn aidMaps Map.empty aidValues
-    | _ -> failwith "Expecting an AID list as input"
-
   type private Count(counter) =
     new() = Count(0L)
 
@@ -68,14 +50,33 @@ module Aggregator =
   type private DiffixCount(perAidCounts: Map<AidHash, int64> list option) =
     new() = DiffixCount(None)
 
+    member this.mapAidStructure callback aidMaps defaultValue (aidValues: Value list) =
+      aidMaps
+      |> Option.defaultValue (List.replicate aidValues.Length defaultValue)
+      |> List.zip aidValues
+      |> List.map (fun (aidValue: Value, aidStructure) ->
+        if aidValue = Null then aidStructure else callback aidValue aidStructure
+      )
+      |> Some
+
+    member this.updateAidMaps<'T> (aidsArray: Value) initial transition (aidMaps: Map<AidHash, 'T> list option) =
+      match aidsArray with
+      | Value.List aidValues when List.forall ((=) Null) aidValues -> aidMaps
+      | Value.List aidValues ->
+          let fn =
+            fun aidValue -> Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some initial))
+
+          this.mapAidStructure fn aidMaps Map.empty aidValues
+      | _ -> failwith "Expecting an AID list as input"
+
     interface IAggregator with
       member this.Transition values =
         match values with
-        | [ aidValues; Null ] -> perAidCounts |> updateAidMaps aidValues 0L id |> DiffixCount
+        | [ aidValues; Null ] -> perAidCounts |> this.updateAidMaps aidValues 0L id |> DiffixCount
         | [ aidValues ]
         | [ aidValues; _ ] ->
             perAidCounts
-            |> updateAidMaps aidValues 1L (fun count -> count + 1L)
+            |> this.updateAidMaps aidValues 1L (fun count -> count + 1L)
             |> DiffixCount
         | _ -> invalidArgs values
         :> IAggregator
