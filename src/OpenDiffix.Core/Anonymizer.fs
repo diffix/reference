@@ -91,31 +91,15 @@ let private aidFlattening
         Rnd = rnd
       }
 
-let transposePerAidMapsToPerValue (valuesPerAid: Map<AidHash, Set<Value>>) : Map<Value, Set<AidHash>> =
-  valuesPerAid
-  |> Map.toList
-  |> List.collect (fun (aidHash, valuesSet) -> valuesSet |> Set.toList |> List.map (fun value -> value, aidHash))
-  |> List.fold
-    (fun acc (value, aidHash) ->
-      Map.change value (Option.map (Set.add aidHash) >> Option.orElse (Some(Set.singleton aidHash))) acc
-    )
-    Map.empty
+let mapValueSet value = Option.map (Set.add value) >> Option.orElse (Some(Set.singleton value))
 
-let transposeToPerValue (perAidTypeValueMap: Map<AidHash, Set<Value>> list) : Map<Value, Set<AidHash> list> =
-  perAidTypeValueMap
-  |> List.map transposePerAidMapsToPerValue
-  |> List.fold
-    (fun acc valueHashMap ->
-      valueHashMap
-      |> Map.fold
-        (fun valueAcc value aidHashSet ->
-          Map.change
-            value
-            (Option.map (fun existingAidSets -> existingAidSets @ [ aidHashSet ])
-             >> Option.orElse (Some [ aidHashSet ]))
-            valueAcc
-        )
-        acc
+let transposeToPerAid (aidsPerValue: Map<Value, Set<AidHash> list>) aidIndex =
+  aidsPerValue
+  |> Map.fold
+    (fun acc value aids ->
+      aids
+      |> List.item (aidIndex)
+      |> Set.fold (fun acc aidHash -> acc |> Map.change aidHash (mapValueSet value)) acc
     )
     Map.empty
 
@@ -129,17 +113,12 @@ let rec distributeValues valuesByAID =
 
       (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
-let private countDistinctFlatteningByAid
-  anonParams
-  valuesPassingLowCount
-  (perAidContributions: Map<AidHash, Set<Value>>)
-  =
+let private countDistinctFlatteningByAid anonParams (perAidContributions: Map<AidHash, Set<Value>>) =
   perAidContributions
   |> Map.map (fun _aidHash valuesSet ->
     // keep low count values in sorted order to ensure the algorithm is deterministic
-    Set.toList (valuesSet - valuesPassingLowCount)
+    Set.toList valuesSet
   )
-  |> Map.filter (fun _aidHash values -> values.Length > 0)
   |> Map.toList
   |> List.sortBy (fun (aid, values) -> values.Length, aid)
   |> distributeValues
@@ -169,34 +148,33 @@ let private anonymizedSum (byAidSum: AidCount list) =
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
   | _ -> None
 
-let countDistinct (perAidValuesByAidType: Map<AidHash, Set<Value>> list) (anonymizationParams: AnonymizationParams) =
+let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anonymizationParams: AnonymizationParams) =
   // These values are safe, and can be counted as they are
   // without any additional noise.
-  let valuesPassingLowCount =
-    perAidValuesByAidType
-    |> transposeToPerValue
-    |> Map.toList
-    |> List.filter (fun (_value, aidSets) -> not <| isLowCount aidSets anonymizationParams)
-    |> List.map fst
-    |> Set.ofList
-
-  let safeCount = Set.count valuesPassingLowCount
+  let lowCountValues, highCountValues =
+    aidsPerValue
+    |> Map.partition (fun _value aidSets -> isLowCount aidSets anonymizationParams)
 
   let byAid =
-    perAidValuesByAidType
-    |> List.map (countDistinctFlatteningByAid anonymizationParams valuesPassingLowCount)
+    [ 0 .. aidsCount - 1 ]
+    |> List.map (
+      transposeToPerAid lowCountValues
+      >> countDistinctFlatteningByAid anonymizationParams
+    )
+
+  let safeCount = int64 highCountValues.Count
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we can only report the count of values we already know to be safe as they
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
-    if safeCount > 0 then safeCount |> int64 |> Integer else Null
+    if safeCount > 0L then Integer safeCount else Null
   else
     byAid
     |> List.choose id
     |> anonymizedSum
     |> Option.defaultValue 0.
-    |> fun flattenedCount -> float safeCount + flattenedCount |> round |> max 0. |> int64 |> Integer
+    |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
 
 let count (anonymizationParams: AnonymizationParams) (perAidContributions: Map<AidHash, int64> list option) =
   match perAidContributions with

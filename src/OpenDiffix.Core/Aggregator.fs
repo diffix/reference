@@ -20,10 +20,7 @@ module Aggregator =
     match aidsArray with
     | Value.List aidValues ->
         let fn =
-          fun aidValue ->
-            Map.change
-              (aidValue.GetHashCode())
-              (Option.map transition >> Option.orElse (Some initial))
+          fun aidValue -> Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some initial))
 
         mapAidStructure fn aidMaps Map.empty aidValues
     | _ -> failwith "Expecting an AID list as input"
@@ -85,24 +82,36 @@ module Aggregator =
 
       member this.Final ctx = Anonymizer.count ctx.AnonymizationParams perAidCounts
 
-  type private DiffixCountDistinct(perAidValuesByAidType: Map<AidHash, Set<Value>> list option) =
-    new() = DiffixCountDistinct(None)
+  type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash> list>) =
+    new() = DiffixCountDistinct(0, Map.empty)
 
     interface IAggregator with
       member this.Transition values =
         match values with
         | [ _aidValues; Null ] -> this
-        | [ aidValues; value ] ->
-            perAidValuesByAidType
-            |> updateAidMaps aidValues (Set.singleton value) (fun set -> Set.add value set)
-            |> DiffixCountDistinct
+        | [ Value.List aidValues; value ] ->
+            let initialEntry =
+              fun () ->
+                aidValues
+                |> List.map (fun aidValue ->
+                  if aidValue = Null then Set.empty else aidValue.GetHashCode() |> Set.singleton
+                )
+                |> Some
+
+            let transitionEntry =
+              aidValues
+              |> List.map2 (fun aidValue hashSet ->
+                if aidValue = Null then hashSet else Set.add (aidValue.GetHashCode()) hashSet
+              )
+
+            DiffixCountDistinct(
+              aidValues.Length,
+              Map.change value (Option.map transitionEntry >> Option.orElseWith initialEntry) aidsPerValue
+            )
         | _ -> invalidArgs values
         :> IAggregator
 
-      member this.Final ctx =
-        match perAidValuesByAidType with
-        | None -> 0L |> Integer
-        | Some perAidValuesByAidType -> Anonymizer.countDistinct perAidValuesByAidType ctx.AnonymizationParams
+      member this.Final ctx = Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams
 
   type private DiffixLowCount(aidSets: Set<AidHash> list option) =
     new() = DiffixLowCount(None)
