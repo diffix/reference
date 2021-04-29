@@ -100,7 +100,7 @@ let transposeToPerAid (aidsPerValue: Map<Value, Set<AidHash> list>) aidIndex =
   |> Map.fold
     (fun acc value aids ->
       aids
-      |> List.item (aidIndex)
+      |> List.item aidIndex
       |> Set.fold (fun acc aidHash -> acc |> Map.change aidHash (mapValueSet value)) acc
     )
     Map.empty
