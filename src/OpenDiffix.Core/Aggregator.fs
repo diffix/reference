@@ -91,10 +91,12 @@ module Aggregator =
         | [ _aidValues; Null ] -> this
         | [ Value.List aidValues; value ] ->
             let initialEntry =
-              aidValues
-              |> List.map (fun aidValue ->
-                if aidValue = Null then Set.empty else aidValue.GetHashCode() |> Set.singleton
-              )
+              fun () ->
+                aidValues
+                |> List.map (fun aidValue ->
+                  if aidValue = Null then Set.empty else aidValue.GetHashCode() |> Set.singleton
+                )
+                |> Some
 
             let transitionEntry =
               aidValues
@@ -104,7 +106,7 @@ module Aggregator =
 
             DiffixCountDistinct(
               aidValues.Length,
-              Map.change value (Option.map (transitionEntry) >> Option.orElse (Some initialEntry)) aidsPerValue
+              Map.change value (Option.map transitionEntry >> Option.orElseWith initialEntry) aidsPerValue
             )
         | _ -> invalidArgs values
         :> IAggregator
