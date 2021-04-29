@@ -121,8 +121,13 @@ module Aggregator =
         match values with
         | [ Null ] -> this
         | [ Value.List aidValues ] ->
-            aidValues
-            |> mapAidStructure (fun aidValue -> aidValue.GetHashCode() |> Set.add) aidSets Set.empty
+            aidSets
+            |> Option.defaultWith (fun () -> List.replicate aidValues.Length Set.empty)
+            |> List.zip aidValues
+            |> List.map (fun (aidValue: Value, aidSet) ->
+              if aidValue = Null then aidSet else Set.add (aidValue.GetHashCode()) aidSet
+            )
+            |> Some
             |> DiffixLowCount
         | _ -> invalidArgs values
         :> IAggregator
