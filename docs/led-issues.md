@@ -561,9 +561,25 @@ Across a set of buckets with the same Ux, the `LIUx` or `LIvUx` buckets are stat
 
 ### Seeding LE noise layers properly
 
-Note in the above examples that the LE noise layer is the same for LE conditions with one entity or zero entities. We absolutely rely on this being the case.
+Note in the above examples that the LE noise layer is the same for LE conditions with one entity or zero entities. This is a bit tricky, because the seed material for the LE layer includes the isolating condition. An example would be `ssn <> '123-45-6789'`. Even when the condition matches nothing, we would like to be able to seed with the appropriate value (i.e. '123-45-6789').
 
-zzzz
+To do this, we need to over-ride the optimization of the query execution plan so that we learn the value being excluded. For instance, if the WHERE clause is:
+
+`WHERE age = 40 and ssn <> '123-45-6789'`
+
+Suppose the victim is age 41. When examining rows with `age=40`, the first condition returns True, and the second condition is evaluated. However, since the victim is age 41, the second condition never matches and we don't learn how to seed `ssn`. Likewise when examining rows with `age<>40`, the first condition returns False, and the second condition is never evaluated. Therefore we never learn how to seed `ssn <> '123-45-6789`.
+
+One way around this would be to over-ride the execution plan until we hit a row that returns False for `ssn <> '123-45-6789'`. This certainly raises the cost of the query.
+
+Another way would be to run a separate query with `ssn = '123-45-6789'` just to learn for which value the condition would return False. Also costly.
+
+The problem with both of the above approaches is that they fail with chaff conditions, since in those cases there is *never* a hit. The problem with this is that it could lead to an attack whereby the attacker can detect whether seeding succeeded or not. 
+
+> TODO: Need to think about this attack
+
+Another approach might be static analysis of the condition. Problem is that I'm not sure how to do this for complex string matching (`LIKE` for instance).
+
+> TODO: Need to think more about static analysis for seeding.
 
 ## Adjusting when LE = 1 only
 
