@@ -1,7 +1,6 @@
 ﻿module OpenDiffix.Core.Parser
 
-open OpenDiffix.Core
-open OpenDiffix.Core.ParserTypes
+open ParserTypes
 
 module QueryParser =
   open FParsec
@@ -12,7 +11,10 @@ module QueryParser =
 
   let simpleIdentifier =
     let isIdentifierFirstChar token = isLetter token
-    let isIdentifierChar token = isLetter token || isDigit token || token = '_'
+
+    let isIdentifierChar token =
+      isLetter token || isDigit token || token = '_'
+
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> spaces
 
   let identifier =
@@ -23,9 +25,11 @@ module QueryParser =
 
   let word word = pstringCI word >>. spaces
 
-  let words words = words |> List.map (word) |> List.reduce (>>.)
+  let words words =
+    words |> List.map word |> List.reduce (>>.)
 
-  let between c1 c2 p = pchar c1 >>. spaces >>. p .>> pchar c2 .>> spaces
+  let between c1 c2 p =
+    pchar c1 >>. spaces >>. p .>> pchar c2 .>> spaces
 
   let inParenthesis p = between '(' ')' p
 
@@ -197,12 +201,18 @@ module QueryParser =
 
   let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
+// ----------------------------------------------------------------
+// Public API
+// ----------------------------------------------------------------
+
 type SqlParserError = string
 
-let parse sql : Result<SelectQuery, SqlParserError> =
+let parseResult sql : Result<SelectQuery, SqlParserError> =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
       | SelectQuery selectQuery -> Ok selectQuery
-      | _ -> Error("Parse error: Expecting SELECT query")
+      | _ -> Error "Parse error: Expecting SELECT query"
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)
+
+let parse sql = sql |> parseResult |> Result.unwrap

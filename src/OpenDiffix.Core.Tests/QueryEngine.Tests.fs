@@ -2,8 +2,8 @@ module OpenDiffix.Core.QueryEngineTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.AnonymizerTypes
+
+open QueryEngine
 
 type Tests(db: DBFixture) =
   let anonParams =
@@ -22,8 +22,8 @@ type Tests(db: DBFixture) =
     }
 
   let runQueryWithCustomAnonParams anonymizationParams query =
-    QueryEngine.run db.DataProvider query anonymizationParams
-    |> Async.RunSynchronously
+    let context = ExecutionContext.make anonymizationParams db.DataProvider
+    run context query
 
   let runQuery = runQueryWithCustomAnonParams anonParams
 
@@ -69,7 +69,7 @@ type Tests(db: DBFixture) =
   /// Returns the aggregate result of a query such as `SELECT count(*) FROM ...`
   let runQueryToInteger query =
     runQuery query
-    |> Utils.unwrap
+    |> Result.unwrap
     |> fun result ->
          result.Rows
          |> List.head

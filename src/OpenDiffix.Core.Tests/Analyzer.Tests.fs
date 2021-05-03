@@ -2,9 +2,8 @@ module OpenDiffix.Core.AnalyzerTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.AnalyzerTypes
-open OpenDiffix.Core.AnonymizerTypes
+
+open AnalyzerTypes
 
 let testTable : Table =
   {
@@ -24,22 +23,22 @@ let defaultQuery =
   {
     TargetList = []
     Where = Boolean true |> Constant
-    From = Table(testTable, testTable.Name)
-    TargetTables = [ testTable, testTable.Name ]
+    From = RangeTable(testTable, testTable.Name)
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
   }
 
 let testParsedQuery queryString expected =
-  let testResult = queryString |> Parser.parse |> Result.bind (Analyzer.transformQuery schema)
-  assertOkEqual testResult expected
-
-let testQueryError queryString =
   queryString
   |> Parser.parse
-  |> Result.bind (Analyzer.transformQuery schema)
-  |> assertError
+  |> Analyzer.transformQuery schema
+  |> fst
+  |> should equal (SelectQuery expected)
+
+let testQueryError queryString =
+  (fun () -> queryString |> Parser.parse |> Analyzer.transformQuery schema |> ignore)
+  |> shouldFail
 
 [<Fact>]
 let ``Analyze count(*)`` () =
@@ -103,7 +102,6 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
   testParsedQuery
     query
     {
-      TargetTables = [ testTable, testTable.Name ]
       TargetList =
         [
           { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
@@ -126,7 +124,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
             FunctionExpr(ScalarFunction Lt, [ ColumnReference(1, IntegerType); Constant(Value.Integer 10L) ])
           ]
         )
-      From = Table(testTable, testTable.Name)
+      From = RangeTable(testTable, testTable.Name)
       GroupingSets =
         [
           GroupingSet [
@@ -156,19 +154,21 @@ let ``Selecting columns from an aliased table`` () =
             { Expression = ColumnReference(0, StringType); Alias = "str_col" }
             { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
           ]
-        From = Table(testTable, "t")
-        TargetTables = [ testTable, "t" ]
+        From = RangeTable(testTable, "t")
     }
 
 [<Fact>]
-let ``Selecting columns from invalid table`` () = testQueryError "SELECT t.str_col FROM table"
+let ``Selecting columns from invalid table`` () =
+  testQueryError "SELECT t.str_col FROM table"
 
 [<Fact>]
-let ``Selecting ambiguous table names`` () = testQueryError "SELECT count(*) FROM table, table AS Table"
+let ``Selecting ambiguous table names`` () =
+  testQueryError "SELECT count(*) FROM table, table AS Table"
 
 type Tests(db: DBFixture) =
-  let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
-  let getTable name = name |> Table.getI schema |> Utils.unwrap
+  let schema = db.DataProvider.GetSchema()
+
+  let getTable name = Schema.findTable schema name
 
   let anonParams =
     {
@@ -185,15 +185,16 @@ type Tests(db: DBFixture) =
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
+  let context = ExecutionContext.make anonParams db.DataProvider
+
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
-  let aidColumns = [ idColumn; companyColumn ] |> Expression.List
+  let aidColumns = [ idColumn; companyColumn ] |> ListExpr
 
   let analyzeQuery query =
     query
     |> Parser.parse
-    |> Result.bind (fun parseTree -> Analyzer.analyze db.DataProvider anonParams parseTree |> Async.RunSynchronously)
-    |> Utils.unwrap
+    |> Analyzer.analyze context
     |> function
     | SelectQuery s -> s
     | _other -> failwith "Expected a top-level SELECT query"
@@ -233,8 +234,8 @@ type Tests(db: DBFixture) =
       Join
         {
           Type = JoinType.InnerJoin
-          Left = Table(customers, customers.Name)
-          Right = Table(purchases, purchases.Name)
+          Left = RangeTable(customers, customers.Name)
+          Right = RangeTable(purchases, purchases.Name)
           On = condition
         }
 

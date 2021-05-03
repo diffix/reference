@@ -2,9 +2,9 @@ module OpenDiffix.Core.PlannerTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.PlannerTypes
-open OpenDiffix.Core.AnalyzerTypes
+
+open AnalyzerTypes
+open PlannerTypes
 
 let constTrue = Constant(Boolean true)
 
@@ -22,8 +22,7 @@ let emptySelect =
   {
     TargetList = []
     Where = constTrue
-    From = Table(table, table.Name)
-    TargetTables = [ table, table.Name ]
+    From = RangeTable(table, table.Name)
     GroupingSets = []
     Having = constTrue
     OrderBy = []
@@ -39,7 +38,8 @@ let selectColumn index =
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
-let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
+let plus1 expression =
+  FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
 [<Fact>]
 let ``plan select`` () =
@@ -133,7 +133,7 @@ let ``sub-query plan`` () =
   let query =
     { subQuery with
         TargetList = [ selectColumn 0 ]
-        From = Query <| SelectQuery subQuery
+        From = SubQuery(SelectQuery subQuery)
     }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
@@ -145,8 +145,8 @@ let ``plan join`` () =
   let join =
     {
       Type = JoinType.InnerJoin
-      Left = Table(table, table.Name)
-      Right = Table(table, table.Name)
+      Left = RangeTable(table, table.Name)
+      Right = RangeTable(table, table.Name)
       On = constTrue
     }
 

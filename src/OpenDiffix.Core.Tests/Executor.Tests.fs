@@ -2,13 +2,14 @@ module OpenDiffix.Core.ExecutorTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.PlannerTypes
+
+open CommonTypes
+open PlannerTypes
 
 type Tests(db: DBFixture) =
+  let schema = db.DataProvider.GetSchema()
 
-  let schema = db.DataProvider.GetSchema() |> Async.RunSynchronously |> Utils.unwrap
-  let getTable name = name |> Table.getI schema |> Utils.unwrap
+  let getTable name = name |> Schema.findTable schema
 
   let products = getTable "products"
 
@@ -16,7 +17,8 @@ type Tests(db: DBFixture) =
     let column = table.Columns |> List.item index
     ColumnReference(index, column.Type)
 
-  let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
+  let plus1 expression =
+    FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
   let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
   let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
@@ -24,9 +26,10 @@ type Tests(db: DBFixture) =
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
-  let context = EvaluationContext.Default
+  let context = { EvaluationContext.Default with DataProvider = db.DataProvider }
 
-  let execute plan = plan |> Executor.execute db.DataProvider context |> Seq.toList
+  let execute plan =
+    plan |> Executor.execute context |> Seq.toList
 
   [<Fact>]
   let ``execute scan`` () =
