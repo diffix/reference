@@ -28,7 +28,7 @@ module String =
     String.Equals(s1, s2, StringComparison.InvariantCultureIgnoreCase)
 
 module Result =
-  let unwrap (result: Result<'T, string>) : 'T =
+  let value (result: Result<'T, string>) : 'T =
     match result with
     | Ok result -> result
     | Error err -> failwith err

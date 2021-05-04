@@ -69,7 +69,7 @@ type Tests(db: DBFixture) =
   /// Returns the aggregate result of a query such as `SELECT count(*) FROM ...`
   let runQueryToInteger query =
     runQuery query
-    |> Result.unwrap
+    |> Result.value
     |> fun result ->
          result.Rows
          |> List.head

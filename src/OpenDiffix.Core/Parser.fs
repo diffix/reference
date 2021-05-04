@@ -215,4 +215,4 @@ let parseResult sql : Result<SelectQuery, SqlParserError> =
       | _ -> Error "Parse error: Expecting SELECT query"
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)
 
-let parse sql = sql |> parseResult |> Result.unwrap
+let parse sql = sql |> parseResult |> Result.value
