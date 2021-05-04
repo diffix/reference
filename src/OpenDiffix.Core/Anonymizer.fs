@@ -1,9 +1,9 @@
 module OpenDiffix.Core.Anonymizer
 
 open System
-open OpenDiffix.Core.AnonymizerTypes
 
-let private randomUniform (rnd: Random) (threshold: Threshold) = rnd.Next(threshold.Lower, threshold.Upper + 1)
+let private randomUniform (rnd: Random) (threshold: Threshold) =
+  rnd.Next(threshold.Lower, threshold.Upper + 1)
 
 let private randomNormal (rnd: Random) stdDev =
   let u1 = 1.0 - rnd.NextDouble()
@@ -26,7 +26,8 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
   |> max -absoluteCutoff
   |> min absoluteCutoff
 
-let private noiseValueInt rnd (noiseParam: NoiseParam) = noiseValue rnd noiseParam |> round |> int32
+let private noiseValueInt rnd (noiseParam: NoiseParam) =
+  noiseValue rnd noiseParam |> round |> int32
 
 let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
@@ -91,14 +92,15 @@ let private aidFlattening
         Rnd = rnd
       }
 
-let mapValueSet value = Option.map (Set.add value) >> Option.orElse (Some(Set.singleton value))
+let mapValueSet value =
+  Option.map (Set.add value) >> Option.orElse (Some(Set.singleton value))
 
 let transposeToPerAid (aidsPerValue: Map<Value, Set<AidHash> list>) aidIndex =
   aidsPerValue
   |> Map.fold
     (fun acc value aids ->
       aids
-      |> List.item (aidIndex)
+      |> List.item aidIndex
       |> Set.fold (fun acc aidHash -> acc |> Map.change aidHash (mapValueSet value)) acc
     )
     Map.empty

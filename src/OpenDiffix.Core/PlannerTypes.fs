@@ -1,7 +1,6 @@
-namespace OpenDiffix.Core.PlannerTypes
+module OpenDiffix.Core.PlannerTypes
 
-open OpenDiffix.Core
-open OpenDiffix.Core.AnalyzerTypes
+open AnalyzerTypes
 
 [<RequireQualifiedAccess>]
 type Plan =
@@ -9,20 +8,21 @@ type Plan =
   | Project of Plan * expressions: Expression list
   | ProjectSet of Plan * setGenerator: SetFunction * args: Expression list
   | Filter of Plan * condition: Expression
-  | Sort of Plan * OrderByExpression list
+  | Sort of Plan * OrderBy list
   | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list
   | Unique of Plan
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
 
-  member this.ColumnsCount() =
-    match this with
-    | Scan table -> table.Columns.Length
-    | Project (_, expressions) -> expressions.Length
-    | ProjectSet (plan, _, _) -> plan.ColumnsCount() + 1
-    | Filter (plan, _) -> plan.ColumnsCount()
-    | Sort (plan, _) -> plan.ColumnsCount()
-    | Aggregate (_, groupingLabels, aggregators) -> groupingLabels.Length + aggregators.Length
-    | Unique plan -> plan.ColumnsCount()
-    | Join (left, right, _, _) -> left.ColumnsCount() + right.ColumnsCount()
-    | Append (first, _) -> first.ColumnsCount()
+module Plan =
+  let rec columnsCount (plan: Plan) =
+    match plan with
+    | Plan.Scan table -> table.Columns.Length
+    | Plan.Project (_, expressions) -> expressions.Length
+    | Plan.ProjectSet (plan, _, _) -> (columnsCount plan) + 1
+    | Plan.Filter (plan, _) -> columnsCount plan
+    | Plan.Sort (plan, _) -> columnsCount plan
+    | Plan.Aggregate (_, groupingLabels, aggregators) -> groupingLabels.Length + aggregators.Length
+    | Plan.Unique plan -> columnsCount plan
+    | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
+    | Plan.Append (first, _) -> columnsCount first

@@ -2,7 +2,8 @@ module OpenDiffix.Core.ExpressionTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
+
+open CommonTypes
 
 let ctx = EvaluationContext.Default
 
@@ -197,7 +198,8 @@ module DefaultFunctionsTests =
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
-let makeRow strValue intValue floatValue = [| String strValue; Integer intValue; Real floatValue |]
+let makeRow strValue intValue floatValue =
+  [| String strValue; Integer intValue; Real floatValue |]
 
 let testRow = makeRow "Some text" 7L 0.25
 

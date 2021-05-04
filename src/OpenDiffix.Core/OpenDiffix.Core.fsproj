@@ -3,17 +3,17 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CommonTypes.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Value.fs" />
-    <Compile Include="Table.fs" />
-    <Compile Include="AnonymizerTypes.fs" />
-    <Compile Include="Anonymizer.fs" />
     <Compile Include="Expression.fs" />
+    <Compile Include="Anonymizer.fs" />
     <Compile Include="Aggregator.fs" />
     <Compile Include="ParserTypes.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="AnalyzerTypes.fs" />
-    <Compile Include="Analysis\QueryValidity.fs" />
+    <Compile Include="NodeUtils.fs" />
+    <Compile Include="QueryValidator.fs" />
     <Compile Include="Analyzer.fs" />
     <Compile Include="PlannerTypes.fs" />
     <Compile Include="Planner.fs" />

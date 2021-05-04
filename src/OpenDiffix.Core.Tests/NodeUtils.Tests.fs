@@ -1,9 +1,9 @@
-module OpenDiffix.Core.Tests.AnalyzerTypesTests
+module OpenDiffix.Core.NodeUtilsTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.AnalyzerTypes
+
+open AnalyzerTypes
 
 let testTable : Table =
   {
@@ -22,10 +22,9 @@ let negativeExpression = Boolean false |> Constant
 
 let selectQuery =
   {
-    Columns = [ { Expression = expression; Alias = "col" } ]
-    TargetTables = [ testTable, testTable.Name ]
+    TargetList = [ { Expression = expression; Alias = "col" } ]
     Where = expression
-    From = Table(testTable, testTable.Name)
+    From = RangeTable(testTable, testTable.Name)
     GroupingSets = [ GroupingSet [ expression ] ]
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
@@ -33,10 +32,9 @@ let selectQuery =
 
 let selectQueryNegative =
   {
-    Columns = [ { Expression = negativeExpression; Alias = "col" } ]
-    TargetTables = [ testTable, testTable.Name ]
+    TargetList = [ { Expression = negativeExpression; Alias = "col" } ]
     Where = negativeExpression
-    From = Table(testTable, testTable.Name)
+    From = RangeTable(testTable, testTable.Name)
     GroupingSets = [ GroupingSet [ negativeExpression ] ]
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
@@ -45,11 +43,10 @@ let selectQueryNegative =
 [<Fact>]
 let ``Map expressions`` () =
   let data =
-    SelectQuery.Map(
-      selectQuery,
-      (function
-      | Constant (Boolean true) -> Constant(Boolean false)
-      | other -> other)
-    )
+    selectQuery
+    |> NodeUtils.map
+         (function
+         | Constant (Boolean true) -> Constant(Boolean false)
+         | other -> other)
 
   should equal selectQueryNegative data

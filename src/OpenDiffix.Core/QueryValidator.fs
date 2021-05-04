@@ -1,20 +1,16 @@
-module OpenDiffix.Core.Analysis.QueryValidity
+module OpenDiffix.Core.QueryValidator
 
-open OpenDiffix.Core
-open OpenDiffix.Core.AnalyzerTypes
+open AnalyzerTypes
 
 let onAggregates (f: Expression -> unit) query =
-  Query.Map(
-    query,
-    (function
-    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
-        f aggregateExpression
-        aggregateExpression
-    | other -> other)
-  )
+  query
+  |> NodeUtils.map
+       (function
+       | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
+           f aggregateExpression
+           aggregateExpression
+       | other -> other)
   |> ignore
-
-let private assertEmpty query errorMsg seq = if Seq.isEmpty seq then Ok query else Error errorMsg
 
 let private validateOnlyCount query =
   query
@@ -36,22 +32,21 @@ let private allowedCountUsage query =
        | _ -> ())
 
 let rec private validateSelectTarget query =
-  Query.Map(
-    query,
-    function
-    | Query _ -> failwith "Subqueries are not supported at present"
-    | Join _ as j -> j
-    | Table _ as t -> t
-  )
+  query
+  |> NodeUtils.map
+       (function
+       | SubQuery _ -> failwith "Subqueries are not supported at present"
+       | Join _ as j -> j
+       | RangeTable _ as t -> t)
   |> ignore
 
-let private allowedAggregate (query: AnalyzerTypes.Query) =
+let private allowedAggregate (query: Query) =
   validateOnlyCount query
   allowedCountUsage query
   validateSelectTarget query
 
-let validateQuery (query: AnalyzerTypes.Query) : Result<unit, string> =
-  try
-    allowedAggregate query
-    Ok()
-  with exn -> Error exn.Message
+// ----------------------------------------------------------------
+// Public API
+// ----------------------------------------------------------------
+
+let validateQuery (query: Query) = allowedAggregate query

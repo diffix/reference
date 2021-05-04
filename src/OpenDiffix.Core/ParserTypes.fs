@@ -1,4 +1,4 @@
-namespace OpenDiffix.Core.ParserTypes
+module OpenDiffix.Core.ParserTypes
 
 type Constant =
   | Integer of int

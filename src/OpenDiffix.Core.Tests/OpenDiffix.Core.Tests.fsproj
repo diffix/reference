@@ -9,9 +9,9 @@
     <Compile Include="Value.Tests.fs" />
     <Compile Include="Expression.Tests.fs" />
     <Compile Include="Anonymizer.Tests.fs" />
-    <Compile Include="AnalyzerTypes.Tests.fs" />
+    <Compile Include="NodeUtils.Tests.fs" />
     <Compile Include="Analyzer.Tests.fs" />
-    <Compile Include="Analysis\QueryValidity.Tests.fs" />
+    <Compile Include="QueryValidator.Tests.fs" />
     <Compile Include="Parser.Tests.fs" />
     <Compile Include="Planner.Tests.fs" />
     <Compile Include="Executor.Tests.fs" />

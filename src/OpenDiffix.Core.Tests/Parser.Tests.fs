@@ -2,9 +2,9 @@ module OpenDiffix.Core.ParserTests
 
 open Xunit
 open FParsec.CharParsers
-open OpenDiffix.Core
-open OpenDiffix.Core.Parser.QueryParser
-open OpenDiffix.Core.ParserTypes
+
+open ParserTypes
+open Parser.QueryParser
 
 let defaultSelect =
   {
@@ -140,18 +140,18 @@ let ``Parses SELECT DISTINCT`` () =
       })
 
 [<Fact>]
-let ``Fails on unexpected input`` () = assertError (Parser.parse "Foo")
+let ``Fails on unexpected input`` () = assertError (Parser.parseResult "Foo")
 
 [<Fact>]
 let ``Parse SELECT query with columns and table`` () =
   assertOkEqual
-    (Parser.parse "SELECT col1, col2 FROM table")
+    (Parser.parseResult "SELECT col1, col2 FROM table")
     { defaultSelect with
         Expressions = [ As(Identifier(None, "col1"), None); As(Identifier(None, "col2"), None) ]
     }
 
   assertOkEqual
-    (Parser.parse "SELECT col1, col2 FROM table ;")
+    (Parser.parseResult "SELECT col1, col2 FROM table ;")
     { defaultSelect with
         Expressions = [ As(Identifier(None, "col1"), None); As(Identifier(None, "col2"), None) ]
     }
@@ -159,7 +159,7 @@ let ``Parse SELECT query with columns and table`` () =
 [<Fact>]
 let ``Multiline select`` () =
   assertOkEqual
-    (Parser.parse
+    (Parser.parseResult
       """
          SELECT
            col1
@@ -171,7 +171,7 @@ let ``Multiline select`` () =
 [<Fact>]
 let ``Parse aggregate query`` () =
   assertOkEqual
-    (Parser.parse
+    (Parser.parseResult
       """
          SELECT col1, count(distinct aid)
          FROM table
@@ -189,7 +189,7 @@ let ``Parse aggregate query`` () =
 [<Fact>]
 let ``Parse complex aggregate query`` () =
   assertOkEqual
-    (Parser.parse
+    (Parser.parseResult
       """
          SELECT col1 as colAlias, count(distinct aid)
          FROM table
@@ -280,7 +280,7 @@ let ``Rejects invalid JOINs`` () =
 [<Fact>]
 let ``Failed Paul attack query 1`` () =
   assertOkEqual
-    (Parser.parse
+    (Parser.parseResult
       """
         select count(distinct aid1)
         from tab where t1='y' and t2 = 'm'
@@ -294,7 +294,7 @@ let ``Failed Paul attack query 1`` () =
 [<Fact>]
 let ``Failed Paul attack query 2`` () =
   assertOkEqual
-    (Parser.parse
+    (Parser.parseResult
       """
         select count(distinct aid1)
         from tab where t1 = 'y' and not (i1 = 100 and t2 = 'x')

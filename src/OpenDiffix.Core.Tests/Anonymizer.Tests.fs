@@ -1,9 +1,9 @@
 module OpenDiffix.Core.AnonymizerTests
 
-open OpenDiffix.Core.AnonymizerTypes
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
+
+open CommonTypes
 
 let companies i =
   let names = [ "Alpha"; "Beta"; "Gamma"; "Delta" ]
@@ -20,10 +20,10 @@ let rows =
      ]
 
 let aidColumn = ColumnReference(0, IntegerType)
-let aidColumnList = Expression.List [ aidColumn ]
+let aidColumnList = ListExpr [ aidColumn ]
 let strColumn = ColumnReference(1, StringType)
 let companyColumn = ColumnReference(2, StringType)
-let allAidColumns = Expression.List [ aidColumn; companyColumn ]
+let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
 let context =
   { EvaluationContext.Default with
@@ -165,7 +165,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let fruit = ColumnReference(2, StringType)
-  let allAidColumns = Expression.List [ aid1; aid2 ]
+  let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
@@ -196,7 +196,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let fruit = ColumnReference(2, StringType)
-  let allAidColumns = Expression.List [ aid1; aid2 ]
+  let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
@@ -217,7 +217,7 @@ let ``counts with insufficient values for one AID return Null`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let value = ColumnReference(2, IntegerType)
-  let allAidColumns = Expression.List [ aid1; aid2 ]
+  let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext diffixCount [ allAidColumns; value ]
@@ -242,7 +242,7 @@ let ``allows null-values for some of the AID rows`` () =
   let aid1 = ColumnReference(0, StringType)
   let aid2 = ColumnReference(1, StringType)
   let value = ColumnReference(2, IntegerType)
-  let allAidColumns = Expression.List [ aid1; aid2 ]
+  let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
   |> TestHelpers.evaluateAggregator context diffixCount [ allAidColumns; value ]
@@ -253,7 +253,7 @@ let ``allows null-values for some of the AID rows`` () =
   |> should equal (Integer 5L)
 
   // The aggregate result should not be affected by the order of the AIDs
-  let allAidsFlipped = Expression.List [ aid2; aid1 ]
+  let allAidsFlipped = ListExpr [ aid2; aid1 ]
 
   rows
   |> TestHelpers.evaluateAggregator context diffixCount [ allAidsFlipped; value ]
