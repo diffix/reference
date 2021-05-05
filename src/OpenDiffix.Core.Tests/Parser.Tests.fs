@@ -48,9 +48,8 @@ let ``Parses expressions`` () =
   |> List.iter (fun (op, expected) -> assertOkEqual (parse expr $"1 %s{op} 1") (expected (Integer 1, Integer 1)))
 
   assertOkEqual (parse expr "not 1") (Expression.Not(Integer 1))
-  assertOkEqual (parse expr "value is null") (Equals(Identifier(None, "value"), Null))
-  assertOkEqual (parse expr "value is not null") (Not(Equals(Identifier(None, "value"), Null)))
-
+  assertOkEqual (parse expr "value is null") (IsNull(Identifier(None, "value")))
+  assertOkEqual (parse expr "value is not null") (Not(IsNull(Identifier(None, "value"))))
 
 [<Fact>]
 let ``Parses columns`` () =
@@ -87,7 +86,7 @@ let ``Precedence is as expected`` () =
     (parse expr "1 + 2 * 3^2 < 1 AND a or not b IS NULL")
     (And(
       Lt(Function("+", [ Integer 1; Function("*", [ Integer 2; Function("^", [ Integer 3; Integer 2 ]) ]) ]), Integer 1),
-      Or(Identifier(None, "a"), Not(Equals(Identifier(None, "b"), Null)))
+      Or(Identifier(None, "a"), Not(IsNull(Identifier(None, "b"))))
     ))
 
 [<Fact>]

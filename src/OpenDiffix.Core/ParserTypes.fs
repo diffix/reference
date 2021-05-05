@@ -37,6 +37,7 @@ and Expression =
   | Gt of left: Expression * right: Expression
   | GtE of left: Expression * right: Expression
   | Equals of left: Expression * right: Expression
+  | IsNull of expr: Expression
   | As of expr: Expression * alias: string option
   | Identifier of tableName: string option * columnName: string
   | Table of name: string * alias: string option

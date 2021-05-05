@@ -21,6 +21,7 @@ let typeOfScalarFunction fn args =
   | Not
   | And
   | Equals
+  | IsNull
   | Or
   | Lt
   | LtE
@@ -84,6 +85,7 @@ let rec evaluateScalarFunction fn args =
   | Subtract, [ Real r1; Real r2 ] -> Real(r1 - r2)
 
   | Equals, [ v1; v2 ] -> Boolean(v1 = v2)
+  | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
   | Lt, [ v1; v2 ] -> Boolean(v1 < v2)
   | LtE, [ v1; v2 ] -> Boolean(v1 <= v2)

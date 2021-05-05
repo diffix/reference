@@ -45,6 +45,7 @@ and mapExpression tables parsedExpression =
   | ParserTypes.And (left, right) -> functionExpression tables (ScalarFunction And) [ left; right ]
   | ParserTypes.Or (left, right) -> functionExpression tables (ScalarFunction Or) [ left; right ]
   | ParserTypes.Equals (left, right) -> functionExpression tables (ScalarFunction Equals) [ left; right ]
+  | ParserTypes.IsNull expr -> functionExpression tables (ScalarFunction IsNull) [ expr ]
   | ParserTypes.Function (name, args) ->
       let fn = Function.fromString name
       let fn, childExpressions = mapFunctionExpression tables fn args
@@ -254,7 +255,7 @@ let private addFiltersForMissingAIDs context query =
           let whereClause =
             findAids context.AnonymizationParams [ table, alias ]
             |> List.map (fun columnRef ->
-              FunctionExpr(ScalarFunction Not, [ FunctionExpr(ScalarFunction Equals, [ columnRef; Constant Null ]) ])
+              FunctionExpr(ScalarFunction Not, [ FunctionExpr(ScalarFunction IsNull, [ columnRef ]) ])
             )
             |> List.fold (fun a b -> FunctionExpr(ScalarFunction And, [ a; b ])) selectQuery.Where
 
