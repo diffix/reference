@@ -2,9 +2,9 @@ module OpenDiffix.Core.PlannerTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
-open OpenDiffix.Core.PlannerTypes
-open OpenDiffix.Core.AnalyzerTypes
+
+open AnalyzerTypes
+open PlannerTypes
 
 let constTrue = Constant(Boolean true)
 
@@ -20,10 +20,9 @@ let table =
 
 let emptySelect =
   {
-    Columns = []
+    TargetList = []
     Where = constTrue
-    From = Table(table, table.Name)
-    TargetTables = [ table, table.Name ]
+    From = RangeTable(table, table.Name)
     GroupingSets = []
     Having = constTrue
     OrderBy = []
@@ -39,11 +38,12 @@ let selectColumn index =
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
-let plus1 expression = FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
+let plus1 expression =
+  FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
 [<Fact>]
 let ``plan select`` () =
-  let select = { emptySelect with Columns = [ selectColumn 0; selectColumn 1 ] }
+  let select = { emptySelect with TargetList = [ selectColumn 0; selectColumn 1 ] }
 
   let expected = Plan.Project(Plan.Scan(table), [ column 0; column 1 ])
 
@@ -75,7 +75,7 @@ let ``plan aggregation`` () =
 
   let select =
     { emptySelect with
-        Columns = selectedColumns
+        TargetList = selectedColumns
         GroupingSets = [ GroupingSet groupingSet ]
     }
 
@@ -97,7 +97,7 @@ let ``plan all`` () =
 
   let select =
     { emptySelect with
-        Columns = selectedColumns
+        TargetList = selectedColumns
         GroupingSets = [ GroupingSet groupingSet ]
         Where = whereCondition
         OrderBy = orderBy
@@ -128,12 +128,12 @@ let ``plan all`` () =
 [<Fact>]
 let ``sub-query plan`` () =
   let selectedColumns = [ selectColumn 1 ]
-  let subQuery = { emptySelect with Columns = selectedColumns }
+  let subQuery = { emptySelect with TargetList = selectedColumns }
 
   let query =
     { subQuery with
-        Columns = [ selectColumn 0 ]
-        From = Query <| SelectQuery subQuery
+        TargetList = [ selectColumn 0 ]
+        From = SubQuery(SelectQuery subQuery)
     }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
@@ -145,8 +145,8 @@ let ``plan join`` () =
   let join =
     {
       Type = JoinType.InnerJoin
-      Left = Table(table, table.Name)
-      Right = Table(table, table.Name)
+      Left = RangeTable(table, table.Name)
+      Right = RangeTable(table, table.Name)
       On = constTrue
     }
 
@@ -161,7 +161,7 @@ let ``plan set select`` () =
   let setExpression = FunctionExpr((SetFunction GenerateSeries), [ column 0 ])
   let setSelect = { Expression = setExpression; Alias = "set" }
 
-  let select = { emptySelect with Columns = [ selectColumn 1; setSelect ] }
+  let select = { emptySelect with TargetList = [ selectColumn 1; setSelect ] }
 
   let expected =
     Plan.Project(

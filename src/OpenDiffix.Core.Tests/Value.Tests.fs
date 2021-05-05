@@ -2,10 +2,12 @@ module OpenDiffix.Core.ValueTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Core
+
+open CommonTypes
 
 module ComparerTests =
-  let sort direction nulls (values: seq<Value>) = values |> Seq.sortWith (Value.comparer direction nulls) |> Seq.toList
+  let sort direction nulls (values: seq<Value>) =
+    values |> Seq.sortWith (Value.comparer direction nulls) |> Seq.toList
 
   [<Fact>]
   let ``Sorts in ascending direction`` () =

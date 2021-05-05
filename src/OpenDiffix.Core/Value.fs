@@ -1,65 +1,47 @@
-namespace OpenDiffix.Core
+module OpenDiffix.Core.Value
 
-open System
+/// Converts a value to its string representation.
+let rec toString value =
+  match value with
+  | Null -> "NULL"
+  | Boolean b -> b.ToString()
+  | Integer i -> i.ToString()
+  | Real r -> r.ToString()
+  | String s -> s
+  | List values -> values |> List.map toString |> String.join ","
 
-type AidHash = int
+/// Resolves the type of a value.
+let rec typeOf value =
+  match value with
+  | Null -> NULL_TYPE
+  | Boolean _ -> BooleanType
+  | Integer _ -> IntegerType
+  | Real _ -> RealType
+  | String _ -> StringType
+  | List values -> values |> List.map typeOf |> ExpressionType.commonType
 
-type Value =
-  | Null
-  | Boolean of bool
-  | Integer of int64
-  | Real of float
-  | String of string
-  | List of Value list
+/// Attempts to convert a value to a boolean.
+let unwrapBoolean value =
+  match value with
+  | Null -> false
+  | Boolean value -> value
+  | _ -> failwith "Expecting boolean value or null."
 
-  static member ToString =
-    function
-    | Null -> "NULL"
-    | Boolean b -> b.ToString()
-    | Integer i -> i.ToString()
-    | Real r -> r.ToString()
-    | String s -> s
-    | List values -> values |> List.map Value.ToString |> fun values -> String.Join(",", values)
+/// Returns a value comparer with given direction and nulls behavior.
+let comparer direction nulls =
+  let directionValue =
+    match direction with
+    | Ascending -> 1
+    | Descending -> -1
 
-type Row = Value array
+  let nullsValue =
+    match nulls with
+    | NullsFirst -> -1
+    | NullsLast -> 1
 
-type ValueType =
-  | BooleanType
-  | IntegerType
-  | RealType
-  | StringType
-  | ListType of ValueType
-  | UnknownType of string
-
-type OrderByDirection =
-  | Ascending
-  | Descending
-
-type OrderByNullsBehavior =
-  | NullsFirst
-  | NullsLast
-
-module Value =
-  let comparer direction nulls =
-    let directionCoefficient =
-      match direction with
-      | Ascending -> 1
-      | Descending -> -1
-
-    let nullsValue =
-      match nulls with
-      | NullsFirst -> -1
-      | NullsLast -> 1
-
-    fun a b ->
-      match a, b with
-      | Null, Null -> 0
-      | Null, _ -> nullsValue
-      | _, Null -> -nullsValue
-      | x, y -> directionCoefficient * Operators.compare x y
-
-  let unwrapBoolean =
-    function
-    | Null -> false
-    | Boolean value -> value
-    | _ -> failwith "Expecting boolean value or null."
+  fun a b ->
+    match a, b with
+    | Null, Null -> 0
+    | Null, _ -> nullsValue
+    | _, Null -> -nullsValue
+    | x, y -> directionValue * Operators.compare x y

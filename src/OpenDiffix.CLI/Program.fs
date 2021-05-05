@@ -3,7 +3,6 @@ open System.IO
 open Argu
 open OpenDiffix.CLI
 open OpenDiffix.Core
-open OpenDiffix.Core.AnonymizerTypes
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
@@ -55,7 +54,8 @@ let executableName = "OpenDiffix.CLI"
 
 let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
 
-let failWithUsageInfo errorMsg = failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
+let failWithUsageInfo errorMsg =
+  failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
 let toThreshold =
   function
@@ -74,8 +74,8 @@ let private toTableSettings (aidColumns: string list) =
     | [| tableName; columnName |] -> (tableName, columnName)
     | _ -> failWithUsageInfo "Invalid request: AID doesn't have the format `table_name.column_name`"
   )
-  |> List.groupBy (fst)
-  |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map (snd) }))
+  |> List.groupBy fst
+  |> List.map (fun (tableName, fullAidColumnList) -> (tableName, { AidColumns = fullAidColumnList |> List.map snd }))
   |> Map.ofList
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
@@ -109,15 +109,16 @@ let dryRun query dbPath anonParams =
 
 let runQuery query dbPath anonParams =
   use dataProvider = new SQLite.DataProvider(dbPath)
-  QueryEngine.run dataProvider query anonParams |> Async.RunSynchronously
+  let context = ExecutionContext.make anonParams dataProvider
+  QueryEngine.run context query
 
 let anonymize query dbPath anonParams =
   match runQuery query dbPath anonParams with
   | Ok result ->
       let resultSet =
         result.Rows
-        |> List.map (fun row -> row |> Array.map Value.ToString |> Array.reduce (sprintf "%s;%s"))
-        |> List.fold (sprintf "%s\n%s") ""
+        |> List.map (fun row -> row |> Array.map Value.toString |> String.join ";")
+        |> String.join "\n"
 
       resultSet, 0
   | Error err -> $"ERROR: %s{err}", 1
@@ -141,12 +142,12 @@ let batchExecuteQueries (queriesPath: string) =
       try
         runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
         |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
-      with (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg (exn.Message)
+      with (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message
     )
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
   let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
-  printf "%s" resultJsonEncoded
+  printf $"%s{resultJsonEncoded}"
 
   0
 
@@ -172,9 +173,9 @@ let main argv =
 
       (processor query dbPath anonParams)
       |> fun (output, exitCode) ->
-           printfn "%s" output
+           printfn $"%s{output}"
            exitCode
 
   with e ->
-    printfn "%s" e.Message
+    printfn $"%s{e.Message}"
     1

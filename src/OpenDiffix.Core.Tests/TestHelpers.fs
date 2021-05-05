@@ -2,7 +2,6 @@
 module OpenDiffix.Core.TestHelpers
 
 open Xunit
-open OpenDiffix.Core
 
 type DBFixture() =
   member this.DataProvider =
@@ -25,7 +24,7 @@ let assertError (result: Result<'a, 'b>) =
 let assertOkEqual<'a, 'b> (result: Result<'a, 'b>) (expected: 'a) =
   match result with
   | Ok value -> Assert.Equal(expected, value)
-  | Error error -> failwith (sprintf "Did not expect error: %A" error)
+  | Error error -> failwith $"Did not expect error: %A{error}"
 
 let assertErrorEqual (result: Result<'a, 'b>) (expected: 'b) =
   assertError result
@@ -37,6 +36,7 @@ let assertErrorEqual (result: Result<'a, 'b>) (expected: 'b) =
   )
 
 let evaluateAggregator ctx fn args rows =
-  let processor = fun (agg: IAggregator) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Transition
+  let processor = fun (agg: Aggregator.T) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Transition
+
   let aggregator = List.fold processor (Aggregator.create ctx fn) rows
   aggregator.Final ctx
