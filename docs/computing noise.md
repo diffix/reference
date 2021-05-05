@@ -20,6 +20,8 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Extra steps for count and sum aggregators](#extra-steps-for-count-and-sum-aggregators)
       - [Additional processing](#additional-processing)
       - [Discussion about safety](#discussion-about-safety)
+        - [Dirty data](#dirty-data)
+        - [Insufficient flattening](#insufficient-flattening)
 - [Rationale](#rationale)
 
 # Computing Per-AID Contributions
@@ -451,22 +453,22 @@ To motivate the need for these extra steps, let us consider the following input 
 |          8 | Null       | 4          |     7 |
 |          9 | Null       | Null       |     6 |
 
-Such a table can occur for multiple reasons:
-- the data might be dirty or incomplete
-- the data is a result of an OUTER JOIN where one of the sides of the JOIN was empty
-  (and in the case of the example table above which is a FULL OUTER JOIN, we aggregate over a column which is a result of
-  some query construct taking a value from the non-empty side of the JOIN)
+Such a table can occur as the result of an outer join.
+The table above could result from a full outer join combined with
+some construct that picks `Value` from whichever side of the join that is not null.
 
 If the extra steps we are about to describe did not exist, aggregating by AID instance individually would
 yield a count of 4 for each AID instance individually (or a sum of `7.5 + 7.5 + 8 + 7 = 30`) instead of
 8 (or 60), which would reflect reality much better.
 
+For this to be safe, tables with multiple AIDs must have a filter applied to them
+that removes any row with one or more missing AID values. More about this later.
+
 #### Additional processing
 
 During the per AID aggregation step (ahead of anonymization), whenever the AID value or AID value set is `null`
-(but not `null` across all AID instances - for example row 9), assign the value to a special `unaccounted for` AID value equivalent.
-"Assigning" in this case means increasing a count by 1 in the case of the count aggregator or adding a number to
-a sum in the case of the `sum` aggregator.
+(but not `null` across all AID instances like is the case in row 9), assign the value to a special `unaccounted for` AID value equivalent.
+"Assigning" means increasing a count by one or adding the value to a sum.
 
 When determining the amount of flattening and noise (i.e. the regular [algorithm](#algorithm) phase),
 the `unaccounted for` value is set aside and ignored, but the final flattened aggregate from the per AID instance results
@@ -493,6 +495,13 @@ The values we return from the AID instance processing for AID instance AID1 are:
 
 
 #### Discussion about safety
+
+##### Dirty data
+
+[Pre-filtering as described in the multi-aid document](./multiple-aid.md#pre-filtering) is a requirement
+for this optimization to be safe. The reasons are the same as for flattening in general.
+
+##### Insufficient flattening
 
 There is a risk that the unaccounted for values contain extreme outliers that are insufficiently flattened.
 This risk is mitigated by using the largest overall flattening across all AID instances.
