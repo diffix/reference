@@ -242,7 +242,26 @@ let rec private collectAids (anonParams: AnonymizationParams) (tables: RangeTabl
           let otherColumns = remainingTablesAidColumns
           currentTableAidColumns @ otherColumns
 
-let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables) = collectAids anonParams tables 0
+let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables) =
+  collectAids anonParams tables 0
+  |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
+
+let private addFiltersForMissingAIDs context query =
+  map
+    (fun selectQuery ->
+      match selectQuery.From with
+      | RangeTable (table, alias) ->
+          let whereClause =
+            findAids context.AnonymizationParams [ table, alias ]
+            |> List.map (fun columnRef ->
+              FunctionExpr(ScalarFunction Not, [ FunctionExpr(ScalarFunction Equals, [ columnRef; Constant Null ]) ])
+            )
+            |> List.fold (fun a b -> FunctionExpr(ScalarFunction And, [ a; b ])) selectQuery.Where
+
+          { selectQuery with Where = whereClause }
+      | _other -> selectQuery
+    )
+    query
 
 // ----------------------------------------------------------------
 // Public API
@@ -258,11 +277,9 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   else
     QueryValidator.validateQuery query
 
-    let aidColumnsExpression =
-      aidColumns
-      |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
-      |> ListExpr
+    let aidColumnsExpression = aidColumns |> ListExpr
 
     query
+    |> addFiltersForMissingAIDs context
     |> rewriteToDiffixAggregate aidColumnsExpression
     |> addLowCountFilter aidColumnsExpression
