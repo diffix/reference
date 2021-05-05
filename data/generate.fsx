@@ -157,6 +157,7 @@ let customersSmall =
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
+        [ Null; Text "Bob"; Text "Regular"; Integer 25L; cities |> List.head; companyNames |> List.head ]
       ]
   }
 
@@ -191,6 +192,7 @@ let customers =
         [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris"; Text "Outlier Inc." ]
         [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin"; Text "Outlier Inc." ]
         [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin"; Text "Outlier Inc." ]
+        [ Null; firstNames |> List.head; lastNames |> List.head; Integer 25L; cities |> List.head; companyNames |> List.head ]
       ]
   }
 
