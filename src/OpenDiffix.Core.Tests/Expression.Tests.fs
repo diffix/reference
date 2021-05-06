@@ -89,6 +89,15 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let IsNull () =
+    runsUnary
+      IsNull
+      [ //
+        String "abc", Boolean false
+        Null, Boolean true
+      ]
+
+  [<Fact>]
   let Length () =
     runsUnary
       Length
