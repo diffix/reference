@@ -64,6 +64,8 @@ let cities =
   [ "Berlin"; "Berlin"; "Berlin"; "Rome"; "Rome"; "Paris"; "Madrid"; "London" ]
   |> List.map Field.Text
 
+let city = List.head cities
+
 let firstNames =
   [
     "James"
@@ -80,6 +82,8 @@ let firstNames =
     "Susan"
   ]
   |> List.map Field.Text
+
+let firstName = List.head firstNames
 
 let lastNames =
   [
@@ -99,6 +103,8 @@ let lastNames =
   ]
   |> List.map Field.Text
 
+let lastName = List.head lastNames
+
 let companyNames =
   [
     "Alpha Centauri Inc."
@@ -117,6 +123,8 @@ let companyNames =
     "Gamma Centauri GmbH"
   ]
   |> List.map Field.Text
+
+let companyName = List.head companyNames
 
 let customersSmall =
   {
@@ -157,7 +165,7 @@ let customersSmall =
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
         [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Null; Text "Bob"; Text "Regular"; Integer 25L; cities |> List.head; companyNames |> List.head ]
+        [ Null; Text "Bob"; Text "Regular"; Integer 25L; city; companyName ]
       ]
   }
 
@@ -192,7 +200,7 @@ let customers =
         [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris"; Text "Outlier Inc." ]
         [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin"; Text "Outlier Inc." ]
         [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin"; Text "Outlier Inc." ]
-        [ Null; firstNames |> List.head; lastNames |> List.head; Integer 25L; cities |> List.head; companyNames |> List.head ]
+        [ Null; firstName; lastName; Integer 25L; city; companyName ]
       ]
   }
 
