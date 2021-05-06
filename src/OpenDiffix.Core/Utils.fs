@@ -17,7 +17,10 @@ module ExpressionType =
 
 module ExecutionContext =
   let make anonParams dataProvider =
-    { AnonymizationParams = anonParams; DataProvider = dataProvider }
+    {
+      AnonymizationParams = anonParams
+      DataProvider = dataProvider
+    }
 
 module String =
   open System

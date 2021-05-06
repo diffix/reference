@@ -32,7 +32,9 @@ type NodeFunctions =
     NodeFunctions.Map(query, (fun (selectQuery: SelectQuery) -> NodeFunctions.Map(selectQuery, f)))
 
   static member Map(query: SelectQuery, f: QueryRange -> QueryRange) =
-    { query with From = NodeFunctions.Map(query.From, f) }
+    { query with
+        From = NodeFunctions.Map(query.From, f)
+    }
 
   static member Map(groupingSet: GroupingSet, f: Expression -> Expression) =
     groupingSet
@@ -41,7 +43,9 @@ type NodeFunctions =
     |> GroupingSet
 
   static member Map(te: TargetEntry, f: Expression -> Expression) =
-    { te with Expression = NodeFunctions.Map(te.Expression, f) }
+    { te with
+        Expression = NodeFunctions.Map(te.Expression, f)
+    }
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     { query with
