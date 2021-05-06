@@ -67,6 +67,8 @@ let rec evaluateScalarFunction fn args =
   | Or, [ Boolean true; _ ] -> Boolean true
   | Or, [ _; Boolean true ] -> Boolean true
 
+  | IsNull, [ v1 ] -> Boolean(v1 = Null)
+
   // From now on, if the unary or binary function gets a `Null` argument, we return `Null` directly.
   | _, [ Null ] -> Null
   | _, [ Null; _ ] -> Null
@@ -85,7 +87,6 @@ let rec evaluateScalarFunction fn args =
   | Subtract, [ Real r1; Real r2 ] -> Real(r1 - r2)
 
   | Equals, [ v1; v2 ] -> Boolean(v1 = v2)
-  | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
   | Lt, [ v1; v2 ] -> Boolean(v1 < v2)
   | LtE, [ v1; v2 ] -> Boolean(v1 <= v2)
