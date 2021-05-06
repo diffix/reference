@@ -17,7 +17,7 @@ If the table additionally contains a second AID column `recipient_email` then th
 If a table is joined with itself, then the AIDs from the left and right side of the join are treated as distinct.
 You might therefore end up with `[send_emailL[sue1@gmail.com]; send_emailR[sue1@gmail.com]]` for the same row. While both refer to the same entity, our system still treats them as separate AIDs.
 
-Through aggregation, a row might be associated with multiple AID values for a single AID instance. Should we aggregate the aforementioned email table by the day of the week, we might, for example, end up with an i-row for Mondays with an AID value set such as `send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
+Through aggregation a row might be associated with multiple AID values for a single AID instance. Should we aggregate the aforementioned email table by the day of the week, we might for example end up with an i-row for Mondays with an AID value set such as `send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
 
 
 ## Pre-filtering
