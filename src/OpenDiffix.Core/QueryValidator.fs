@@ -1,20 +1,19 @@
 module OpenDiffix.Core.QueryValidator
 
 open AnalyzerTypes
+open NodeUtils
 
-let onAggregates (f: Expression -> unit) query =
-  query
-  |> NodeUtils.map
-       (function
-       | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression ->
-           f aggregateExpression
-           aggregateExpression
-       | other -> other)
-  |> ignore
+let private visitAggregates f query =
+  let rec exprVisitor f expr =
+    match expr with
+    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression -> f aggregateExpression
+    | other -> other |> visit (exprVisitor f)
+
+  query |> visit (exprVisitor f)
 
 let private validateOnlyCount query =
   query
-  |> onAggregates
+  |> visitAggregates
        (function
        | FunctionExpr (AggregateFunction (Count, _), _) -> ()
        | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
@@ -22,7 +21,7 @@ let private validateOnlyCount query =
 
 let private allowedCountUsage query =
   query
-  |> onAggregates
+  |> visitAggregates
        (function
        | FunctionExpr (AggregateFunction (Count, _), args) ->
            match args with
@@ -31,14 +30,14 @@ let private allowedCountUsage query =
            | _ -> failwith "Only count(*) and count(distinct column) are supported"
        | _ -> ())
 
-let rec private validateSelectTarget query =
-  query
-  |> NodeUtils.map
-       (function
-       | SubQuery _ -> failwith "Subqueries are not supported at present"
-       | Join _ as j -> j
-       | RangeTable _ as t -> t)
-  |> ignore
+let private validateSelectTarget query =
+  let rec rangeVisitor range =
+    match range with
+    | SubQuery _ -> failwith "Subqueries are not supported at present"
+    | Join join -> join |> visit rangeVisitor
+    | RangeTable _ -> ()
+
+  query |> visit rangeVisitor
 
 let private allowedAggregate (query: Query) =
   validateOnlyCount query

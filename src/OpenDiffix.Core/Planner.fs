@@ -19,11 +19,12 @@ let rec private extractSetFunctions expression =
   | expr -> expr |> collect extractSetFunctions
 
 let private projectSetFunctions setColumn expression =
-  expression
-  |> map
-       (function
-       | FunctionExpr (SetFunction _, _) -> setColumn
-       | expression -> expression)
+  let rec exprMapper expr =
+    match expr with
+    | FunctionExpr (SetFunction _, _) -> setColumn
+    | other -> other |> map exprMapper
+
+  exprMapper expression
 
 let private planProject expressions plan =
   match expressions |> List.collect extractSetFunctions |> List.distinct with
