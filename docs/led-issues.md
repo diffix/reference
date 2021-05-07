@@ -30,13 +30,13 @@ This documents the need for LED, and motivates a number of design decisions. In 
 
 ## Noise layer notation
 
-Throughout this doc there are examples of the noise layers associated with conditions. These noise layers have a certain compact notation, described here.
+Throughout this doc there are examples of the noise layers associated with conditions (including implicit conditions defined by `SELECT ... GROUP BY`. These noise layers have a certain compact notation, described here.
 
 The first letter of a noise layer is S, D, or L (for Static, Dynamic, and LE noise). Static and dynamic noise is what we have used in the past. LE noise is something new.
 
 When followed by another letter or letters, that letter or letters denotes the condition that the noise layer is associated with. Our shorthand for conditions is one upper-case letter, optionally followed by a number or a lower-case letter:
 
-* A: The condition 'A' (where the condition is something like `column = value`).
+* A: The condition 'A' (where the condition is something like `column = value`, or `SELECT column ... GROUP BY`).
 * X1: The condition X1 (normally the first of a sequence of conditions of a certain type, like a chaff condition).
 * Xn: The condition Xn (normally the last of a sequence of n conditions of a certain type).
 
@@ -46,7 +46,7 @@ Examples are:
 * DXn: Dynamic noise layer for condition Xn
 * LC: LE noise layer for condition C
 
-Dynamic noise layers depend on the AID Value Set (AIDVS) for seeding material. As a result, different dynamic noise layers for the same condition but in different buckets will have different noise values. This is denoted with a digit after the D:
+Dynamic noise layers depend on the AID Value Sets (AIDVSs) for seeding material. As a result, different dynamic noise layers for the same condition but in different buckets will have different noise values. This is denoted with a digit after the D:
 
 * D1B and D2B: Two dynamic noise layers associated with condition B, but with different AIDVS in the seed (AIDVS1 and AIDVS2, effectively)
 
@@ -109,7 +109,7 @@ Note by the way that we need static noise to defend against some averaging attac
 
 ### First derivative difference attack, static and dynamic noise
 
-Now let's see what happens when we add dynamic noise layers. We can suppose for the sake of this discussion that the dynamic noise layers are seeded in part by the AIDVS in the bucket.
+Now let's see what happens when we add dynamic noise layers. We can suppose for the sake of this discussion that the dynamic noise layers are seeded in part by the AIDVSs in the bucket.
 
 | L query     | R query | L answer                  | R answer ex    | R answer in         | diff                      |
 |-------------|---------|---------------------------|----------------|---------------------|---------------------------|
@@ -194,7 +194,7 @@ Along the lines of increasing noise, another idea would be to increase the amoun
 
 ## Solution space
 
-There are two broad approaches we can take (one with two sub-approaches):
+There are two broad approaches we can take (one with three sub-approaches):
 
 1. Continue to use dynamic noise layers, but somehow manage them so that the chaff attack goes away
   a. Eliminate the effect of low-effect conditions on seeding so that the same dynamic noise layers are produced for left and right.
@@ -214,28 +214,28 @@ This is all complicated by a number of factors:
 
 ### Must sometimes override query execution plan to understand LE conditions
 
-Consider a first derivative diff attack where the attacker wants to learn the value for column `col` for a victim that can be isolated with I. `col` has values A, B, C, ...  Assume that the victim has value A, and that none of the values are low count.
+Consider a first derivative difference attack where the attacker wants to learn the value for column `col_attribute` for a victim that can be isolated with I. `col_attribute` has values A, B, C, ...  Assume that the victim has value A, and that none of the values are low count.
 
-The left-side query would be:
+The set of left-side queries would be:
 
 ```
-SELECT col_attribute,       -- A, B, C, ...
-       count(*)
+SELECT count(*)
 FROM tab
 WHERE col_isolate <> X      -- not I
-GROUP BY 1
+      AND col_attribute = X
 ```
 
-And the right side as:
+For X=A, X=B, X=C, etc.
+
+And the set of right side queries as:
 
 ```
-SELECT col_attribute,      -- A, B, C
-       count(*)
+SELECT count(*)
 FROM tab
-GROUP BY 1
+WHERE col_attribute = X
 ```
 
-The attacker is looking for the following histogram:
+The attacker is looking to construct the following histogram:
 
 | col | left  | right | diff      |
 |-----|-------|-------|-----------|
@@ -247,7 +247,7 @@ where none of the left buckets include the victim, and one of the right buckets 
 
 What we want to do here is make some kind of fix for the A bucket, but not fix for the other buckets.
 
-Assuming that the query plan is in the order [not I,`col_attribute`], the truth table for A is this:
+Assuming that the query plan is in the order [not I,`col_attribute`], the truth table for the left A query is this:
 
 | I | not I | A | out | status |
 |---|-------|---|-----|--------|
@@ -255,7 +255,7 @@ Assuming that the query plan is in the order [not I,`col_attribute`], the truth 
 | 0 | 1     | 1 | 1   | NLE    |
 | 0 | 1     | 0 | 0   | NLE    |
 
-and the truth table for B-etc. looks like this:
+and the truth table for left B query (and subsequent C, D, ... queries) looks like this:
 
 | I | not I | B | out | status |
 |---|-------|---|-----|--------|
@@ -263,9 +263,11 @@ and the truth table for B-etc. looks like this:
 | 0 | 1     | 1 | 1   | NLE    |
 | 0 | 1     | 0 | 0   | NLE    |
 
+The reason for the `-` in the first row is because the second WHERE clause is never evaluated: Once `not I` is found to be false, then the entire expression is false and the evaluation ends.
+
 For both A and B-etc., one cannot tell from these truth tables alone whether or not a fix is required. In both cases, the value for A/B is unknown, and so it is unknown whether or not the outcome would be different if the `not I` condition were dropped.
 
-In these cases, it is necessary to force the evaluation of A/B. This can be done by saving the rows associated with the LE combination, and evaluating the A/B condition. Alternatively, we could manipulate the plan so that all combinations execute fully at least once.
+In these cases, it is necessary to force the evaluation of A/B. This can be done by saving the rows associated with the LE combination, and separately evaluating the A/B condition after the query engine completes. Alternatively, we could manipulate the plan so that all combinations execute fully at least once.
 
 ### Which LE conditions do we need to detect?
 
@@ -337,15 +339,6 @@ In this section, we describe some new attacks that we recently thought of.
 
 Now, suppose that the attacker knows a number of attributes of the victim, K1, K2, K3, etc. The attacker can now make a *set of* histograms, one for each known attribute. 
 
-The right side answers for one histogram would be obtained with the query:
-
-```
-SELECT col, count(*)
-FROM tab
-WHERE Kn
-GROUP BY 1
-```
-
 The left side outputs are obtained with a sequence of queries like this:
 
 ```
@@ -353,6 +346,15 @@ SELECT count(*) FROM tab WHERE Kn and A and not I
 SELECT count(*) FROM tab WHERE Kn and B and not I
 SELECT count(*) FROM tab WHERE Kn and C and not I
 ...
+```
+
+The right side answers for one histogram would be obtained with the query:
+
+```
+SELECT col, count(*)
+FROM tab
+WHERE Kn
+GROUP BY 1
 ```
 
 The above sets of histograms would be repeated for n=1, n=2 etc.
@@ -365,7 +367,7 @@ The table showing how the answers are composed is then:
 | Kn and B and not I | Kn and B | cnt + SKn + SB + SI + D2nKn + D2nB + D2nI | cnt + SKn + SB + D2nKn + D2nB |                                     | SI + D2nI                              |
 | Kn and C and not I | Kn and C | cnt + SKn + SC + SI + D3nKn + D3nC + D3nI | cnt + SKn + SC + D3nKn + D3nC |                                     | SI + D3nI                              |
 
-Here DinKn is a dynamic noise layer for a query with condition Kn. Since each condition Kn for n=1,2,3..., the set of AIDs is different, so DinKn is different for n=1,2,3...
+Here D1nKn, D2nKn, ..., are dynamic noise layers for queries with condition Kn. Since each condition Kn for n=1,2,3..., the set of AIDs is different, so D1nKn, D2nKn, etc. are different for n=1,2,3...
 
 The above looks a bit of a mess, but effectively all of the dynamic noise layers in the difference column differ from each other. They also all have zero mean and so when summed are still zero mean, and so can be replaced with the phrase '0-mean-noise'.
 
@@ -430,7 +432,7 @@ There are examples of this attack at [https://github.com/diffix/experiments/tree
 
 ## Solution
 
-The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every condition.
+The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every non-LE condition.
 
 The LE noise layer is seeded as follows:
 
@@ -573,13 +575,13 @@ One way around this would be to over-ride the execution plan until we hit a row 
 
 Another way would be to run a separate query with `ssn = '123-45-6789'` just to learn for which value the condition would return False. Also costly.
 
-The problem with both of the above approaches is that they fail with chaff conditions, since in those cases there is *never* a hit. The problem with this is that it could lead to an attack whereby the attacker can detect whether seeding succeeded or not. 
+The problem with both of the above approaches is that they fail with chaff conditions, since in those cases there is *never* a hit. The problem with this is that it leads to an attack whereby the attacker can detect whether seeding succeeded or not. 
 
-> TODO: Need to think about this attack
+> TODO: Need to write down this attack
 
 Another approach might be static analysis of the condition. Problem is that I'm not sure how to do this for complex string matching (`LIKE` for instance).
 
-> TODO: Need to think more about static analysis for seeding.
+> TODO: Need to think more about static analysis for seeding. Though my current thinking is that indeed `=` and `<>` need to be done with static analysis, and we can deal with `LIKE` and `substring()` separately.
 
 ## Adjusting when LE = 1 only
 
