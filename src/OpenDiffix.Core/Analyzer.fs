@@ -181,7 +181,6 @@ let selectColumnsFromQuery columnIndices innerQuery =
     |> List.map (fun index ->
       let column = innerQuery.TargetList |> List.item index
       let columnType = Expression.typeOf column.Expression
-
       { column with Expression = ColumnReference(index, columnType) }
     )
 

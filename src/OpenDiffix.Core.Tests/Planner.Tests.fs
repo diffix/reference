@@ -34,7 +34,6 @@ let column index =
 
 let selectColumn index =
   let column = table.Columns |> List.item index
-
   { Expression = ColumnReference(index, column.Type); Alias = column.Name }
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
