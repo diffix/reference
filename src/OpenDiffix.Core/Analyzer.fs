@@ -155,12 +155,13 @@ let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
   rangeTables
 
 let rewriteToDiffixAggregate aidColumnsExpression query =
-  query
-  |> map
-       (function
-       | FunctionExpr (AggregateFunction (Count, opts), args) ->
-           FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
-       | expression -> expression)
+  let rec exprMapper expr =
+    match expr with
+    | FunctionExpr (AggregateFunction (Count, opts), args) ->
+        FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
+    | other -> other |> map exprMapper
+
+  query |> map exprMapper
 
 let rec scalarExpression =
   function

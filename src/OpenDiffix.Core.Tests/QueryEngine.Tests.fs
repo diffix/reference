@@ -117,6 +117,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``query 10`` () =
     let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
+
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected
 
