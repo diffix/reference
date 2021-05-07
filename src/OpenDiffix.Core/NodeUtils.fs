@@ -95,10 +95,10 @@ let inline map func node =
 /// Recursion can be achieved by calling `visit` again inside `func`.
 let inline visit func node =
   node
-  |> map
-       (fun x ->
-         func x
-         x)
+  |> map (fun x ->
+    func x
+    x
+  )
   |> ignore
 
 /// Maps immediate children of a node to a list and flattens the result.
