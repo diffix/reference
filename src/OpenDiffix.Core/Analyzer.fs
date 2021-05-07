@@ -120,13 +120,7 @@ let rec private transformFrom schema from =
       let rangeTables = (collectRangeTables left) @ (collectRangeTables right)
       let condition = transformExpressionOptionWithDefaultTrue rangeTables (Some on)
 
-      Join
-        {
-          Type = joinType
-          Left = left
-          Right = right
-          On = condition
-        }
+      Join { Type = joinType; Left = left; Right = right; On = condition }
   | _ -> failwith "Invalid `FROM` clause"
 
 let private validateRangeTables (tables: RangeTables) =
@@ -188,9 +182,7 @@ let selectColumnsFromQuery columnIndices innerQuery =
       let column = innerQuery.TargetList |> List.item index
       let columnType = Expression.typeOf column.Expression
 
-      { column with
-          Expression = ColumnReference(index, columnType)
-      }
+      { column with Expression = ColumnReference(index, columnType) }
     )
 
   {

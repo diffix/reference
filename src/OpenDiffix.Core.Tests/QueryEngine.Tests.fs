@@ -36,22 +36,14 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 2`` () =
-    let expected =
-      {
-        Columns = [ "c1"; "c2" ]
-        Rows = [ [| Integer 11L; Integer 4L |] ]
-      }
+    let expected = { Columns = [ "c1"; "c2" ]; Rows = [ [| Integer 11L; Integer 4L |] ] }
 
     let queryResult = runQuery "SELECT COUNT(*) AS c1, COUNT(DISTINCT length(name)) AS c2 FROM products"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 3`` () =
-    let expected =
-      {
-        Columns = [ "name"; "sum" ]
-        Rows = [ [| String "Chicken"; Real 12.81 |] ]
-      }
+    let expected = { Columns = [ "name"; "sum" ]; Rows = [ [| String "Chicken"; Real 12.81 |] ] }
 
     let queryResult = runQuery "SELECT name, SUM(price) FROM products GROUP BY 1 HAVING length(name) = 7"
     assertOkEqual queryResult expected

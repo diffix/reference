@@ -25,13 +25,7 @@ type QueryRange =
 
 type JoinType = ParserTypes.JoinType
 
-type Join =
-  {
-    Type: JoinType
-    Left: QueryRange
-    Right: QueryRange
-    On: Expression
-  }
+type Join = { Type: JoinType; Left: QueryRange; Right: QueryRange; On: Expression }
 
 type RangeTable = Table * string
 

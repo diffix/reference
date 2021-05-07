@@ -13,12 +13,7 @@ let private openConnection path =
   connection
 
 [<CLIMutable>]
-type private DbSchemaQueryRow =
-  {
-    TableName: string
-    ColumnName: string
-    ColumnType: string
-  }
+type private DbSchemaQueryRow = { TableName: string; ColumnName: string; ColumnType: string }
 
 let private loadSchema (connection: SQLiteConnection) =
   // Note: somewhat counterintuitively the order in which the columns are selected matter here.
@@ -102,12 +97,7 @@ type DataProvider(dbPath: string) =
       |> List.map (fun table ->
         let columns =
           table.Columns
-          |> List.map (fun column ->
-            {
-              Name = column.Name
-              Type = columnTypeFromString column.Type
-            }
-          )
+          |> List.map (fun column -> { Name = column.Name; Type = columnTypeFromString column.Type })
 
         { Name = table.Name; Columns = columns }
       )

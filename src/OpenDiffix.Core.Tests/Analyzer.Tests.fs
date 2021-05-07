@@ -80,14 +80,8 @@ let ``Selecting columns from a table`` () =
     { defaultQuery with
         TargetList =
           [
-            {
-              Expression = ColumnReference(0, StringType)
-              Alias = "str_col"
-            }
-            {
-              Expression = ColumnReference(3, BooleanType)
-              Alias = "bool_col"
-            }
+            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
           ]
     }
 
@@ -110,10 +104,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
     {
       TargetList =
         [
-          {
-            Expression = ColumnReference(1, IntegerType)
-            Alias = "colAlias"
-          }
+          { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
           {
             Expression =
               FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
@@ -160,14 +151,8 @@ let ``Selecting columns from an aliased table`` () =
     { defaultQuery with
         TargetList =
           [
-            {
-              Expression = ColumnReference(0, StringType)
-              Alias = "str_col"
-            }
-            {
-              Expression = ColumnReference(3, BooleanType)
-              Alias = "bool_col"
-            }
+            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
+            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
           ]
         From = RangeTable(testTable, "t")
     }

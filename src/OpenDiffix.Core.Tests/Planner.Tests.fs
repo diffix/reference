@@ -35,10 +35,7 @@ let column index =
 let selectColumn index =
   let column = table.Columns |> List.item index
 
-  {
-    Expression = ColumnReference(index, column.Type)
-    Alias = column.Name
-  }
+  { Expression = ColumnReference(index, column.Type); Alias = column.Name }
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
@@ -47,10 +44,7 @@ let plus1 expression =
 
 [<Fact>]
 let ``plan select`` () =
-  let select =
-    { emptySelect with
-        TargetList = [ selectColumn 0; selectColumn 1 ]
-    }
+  let select = { emptySelect with TargetList = [ selectColumn 0; selectColumn 1 ] }
 
   let expected = Plan.Project(Plan.Scan(table), [ column 0; column 1 ])
 
@@ -168,10 +162,7 @@ let ``plan set select`` () =
   let setExpression = FunctionExpr((SetFunction GenerateSeries), [ column 0 ])
   let setSelect = { Expression = setExpression; Alias = "set" }
 
-  let select =
-    { emptySelect with
-        TargetList = [ selectColumn 1; setSelect ]
-    }
+  let select = { emptySelect with TargetList = [ selectColumn 1; setSelect ] }
 
   let expected =
     Plan.Project(

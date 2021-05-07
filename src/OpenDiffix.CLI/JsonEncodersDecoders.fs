@@ -3,12 +3,7 @@ module OpenDiffix.CLI.JsonEncodersDecoders
 open OpenDiffix.Core
 open Thoth.Json.Net
 
-type QueryRequest =
-  {
-    Query: string
-    DbPath: string
-    AnonymizationParameters: AnonymizationParams
-  }
+type QueryRequest = { Query: string; DbPath: string; AnonymizationParameters: AnonymizationParams }
 
 let rec encodeValue =
   function

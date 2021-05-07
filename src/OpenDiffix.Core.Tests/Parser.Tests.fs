@@ -127,10 +127,7 @@ let ``Parses GROUP BY statement`` () =
 let ``Parses SELECT by itself`` () =
   assertOkEqual
     (parse selectQuery "SELECT col FROM table")
-    (SelectQuery
-      { defaultSelect with
-          Expressions = [ As(Identifier(None, "col"), None) ]
-      })
+    (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] })
 
 [<Fact>]
 let ``Parses SELECT DISTINCT`` () =
@@ -169,9 +166,7 @@ let ``Multiline select`` () =
          FROM
            table
          """)
-    { defaultSelect with
-        Expressions = [ As(Identifier(None, "col1"), None) ]
-    }
+    { defaultSelect with Expressions = [ As(Identifier(None, "col1"), None) ] }
 
 [<Fact>]
 let ``Parse aggregate query`` () =
@@ -318,10 +313,7 @@ let ``Failed Paul attack query 2`` () =
 
 [<Fact>]
 let ``Parse sub-query`` () =
-  let query =
-    { defaultSelect with
-        Expressions = [ As(Identifier(None, "col"), None) ]
-    }
+  let query = { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] }
 
   assertOkEqual (parse from "FROM (SELECT col FROM table) t") (SubQuery(query, "t"))
 

@@ -49,13 +49,7 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
   )
   |> List.reduce (||)
 
-type private AidCount =
-  {
-    FlattenedSum: float
-    Flattening: float
-    noise: NoiseParam
-    Rnd: Random
-  }
+type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoiseParam; Rnd: Random }
 
 let private aidFlattening
   (anonymizationParams: AnonymizationParams)
