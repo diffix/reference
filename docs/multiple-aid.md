@@ -1,7 +1,6 @@
 Please consult the [glossary](glossary.md) for definitions of terms used in this document.
 
 - [Multiple AIDs columns](#multiple-aids-columns)
-  - [Pre-filtering](#pre-filtering)
   - [Low count filter](#low-count-filter)
 - [How AIDs spread](#how-aids-spread)
   - [JOINing rows](#joining-rows)
@@ -19,49 +18,6 @@ You might therefore end up with `[send_emailL[sue1@gmail.com]; send_emailR[sue1@
 
 Through aggregation a row might be associated with multiple AID values for a single AID instance. Should we aggregate the aforementioned email table by the day of the week, we might for example end up with an i-row for Mondays with an AID value set such as `send_email[sue1@gmail.com, bob6@yahoo.com, liz@hey.com, esmeralda@icloud.com]` indicating that `sue1`, `bob`, `liz` as well as `esmeralda` sent one or more emails on that day.
 
-
-## Pre-filtering
-
-For outlier flattening to work properly it is important that we know the AID values a row belongs to.
-
-Take the following database table as a counter example:
-
-| AID1 value | AID2 value | Value |
-| ---------- | ---------- | ----: |
-| 1          | 1          |    10 |
-| 2          | 2          |    10 |
-| 3          | 3          |    10 |
-| 4          | 4          |    10 |
-| 5          | null       |    10 |
-| 6          | null       |    10 |
-| 7          | null       |    10 |
-| 8          | null       |    10 |
-
-This table has incomplete AID value related data, specifically a number of AID2 values are missing.
-If we knew that AID1 and AID2 were pseudonymous describing the same entity this would not be an issue,
-but we do not know this. It might in fact be that all the missing data stems from a single user,
-and the table should have looked like:
-
-| AID1 value | AID2 value | Value |
-| ---------- | ---------- | ----: |
-| 1          | 1          |    10 |
-| 2          | 2          |    10 |
-| 3          | 3          |    10 |
-| 4          | 4          |    10 |
-| 5          | 5          |    10 |
-| 6          | 5          |    10 |
-| 7          | 5          |    10 |
-| 8          | 5          |    10 |
-
-These two tables would result in very different outlier flattening, and in the case of the
-table with the missing data, insufficient flattening.
-
-I can think of two related solutions:
-
-1. when reading data from the database, filter out rows where any one of the AID values are `null`
-2. introduce the notion of what entity an AID column represents and thus the notion of AID column pseudonyms. If this feature existed it would be sufficient for at least one among the pseudonyms to be non-`null`.
-
-We are currently using solution 1.
 
 ## Low count filter
 

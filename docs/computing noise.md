@@ -20,8 +20,6 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Extra steps for count and sum aggregators](#extra-steps-for-count-and-sum-aggregators)
       - [Additional processing](#additional-processing)
       - [Discussion about safety](#discussion-about-safety)
-        - [Dirty data](#dirty-data)
-        - [Insufficient flattening](#insufficient-flattening)
 - [Rationale](#rationale)
 
 # Computing Per-AID Contributions
@@ -495,13 +493,6 @@ The values we return from the AID instance processing for AID instance AID1 are:
 
 
 #### Discussion about safety
-
-##### Dirty data
-
-[Pre-filtering as described in the multi-aid document](./multiple-aid.md#pre-filtering) is a requirement
-for this optimization to be safe. The reasons are the same as for flattening in general.
-
-##### Insufficient flattening
 
 There is a risk that the unaccounted for values contain extreme outliers that are insufficiently flattened.
 This risk is mitigated by using the largest overall flattening across all AID instances.
