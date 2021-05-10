@@ -2,7 +2,8 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
 
 - [Configuring AIDs](#configuring-aids)
   - [Multiple AID values per entity](#multiple-aid-values-per-entity)
-  - [Missing AID values](#missing-aid-values)
+    - [Missing AID values](#missing-aid-values)
+    - [Risk of too many AID columns](#risk-of-too-many-aid-columns)
 
 # Configuring AIDs
 
@@ -38,7 +39,7 @@ low count filtering and aggregate flattening:
 | 4                | 1235          |  0176 7777 1212 | Bob Fisher  |
 
 
-## Missing AID values
+### Missing AID values
 
 At times AID values are missing. This can lead to insufficient extreme value flattening as records
 cannot be tied back to an entity. By declaring multiple AIDs per entity, there is the chance that one of
@@ -54,3 +55,16 @@ using the `user_id` and `ssn` AIDs:
 | 1                 | 1234          |      10.0 | Cinema ticket        |
 | null              | 1234          |       540 | Airline ticket       |
 | 1                 | null          | 198999.99 | Space shuttle ticket |
+
+
+### Risk of too many AID columns
+
+One shouldn't go overboard when configuring AIDs. Columns that stand a good chance of not being unique
+(like a surname or [birth date](https://en.wikipedia.org/wiki/Birthday_problem)) could very well cause over-flattening,
+larger noise values than would be necessary, and unnecessary suppression of values.
+
+A database that is large enough might also encounter values being recycled. An example could be phone numbers
+which can see reuse if abandoned by a subscriber.
+
+While the strength of the anonymization is unlikely to be reduced by specifying too many AID columns,
+it is likely that both the data quality and runtime characteristics will suffer unnecessarily.
