@@ -456,8 +456,9 @@ The table above could result from a full outer join combined with
 some construct that picks `Value` from whichever side of the join that is not null.
 
 If the extra steps we are about to describe did not exist, aggregating by AID instance individually would
-yield a count of 4 for each AID instance individually (or a sum of `7.5 + 7.5 + 8 + 7 = 30`) instead of
-8 (or 60), which would reflect reality much better.
+yield a count of 4 (or sum of 30) for each AID instance individually instead of 8 (or 60).
+The latter count and sum are much better representations of the underlying dataset.
+How I get to the specific numbers (4 vs 8 and 30 vs 60) is shown in the worked examples below.
 
 #### Additional processing
 
