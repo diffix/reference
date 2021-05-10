@@ -459,9 +459,6 @@ If the extra steps we are about to describe did not exist, aggregating by AID in
 yield a count of 4 for each AID instance individually (or a sum of `7.5 + 7.5 + 8 + 7 = 30`) instead of
 8 (or 60), which would reflect reality much better.
 
-For this to be safe, tables with multiple AIDs must have a filter applied to them
-that removes any row with one or more missing AID values. More about this later.
-
 #### Additional processing
 
 During the per AID aggregation step (ahead of anonymization), whenever the AID value or AID value set is `null`
