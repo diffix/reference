@@ -1,39 +1,55 @@
 ----------
+- [Glossary and related documents](#glossary-and-related-documents)
+- [LED](#led)
+  - [Identifying LE conditions using combinations](#identifying-le-conditions-using-combinations)
+  - [Basic approach to LED](#basic-approach-to-led)
+  - [Adjusting aggregate values](#adjusting-aggregate-values)
+  - [Seeding materials](#seeding-materials)
+  - [Replaying rows](#replaying-rows)
+    - [Replay case 1, determining combination outcome](#replay-case-1-determining-combination-outcome)
+    - [Replay case 2, determining seed material](#replay-case-2-determining-seed-material)
+  - [Abstract logic examples](#abstract-logic-examples)
+  - [LE Implementation](#le-implementation)
+  - [GROUP BY aggregates](#group-by-aggregates)
+- [Dynamic noise layers](#dynamic-noise-layers)
+- [Seed Materials (equalities)](#seed-materials-equalities)
 
-# Glossary
+# Glossary and related documents
 
 In the following discussion of low effect detection we will be using the following terms:
 
-- **Bucket**: a single aggregate row in the output (or multiple rows in the case of implicit aggregation). [The definition can be found here](https://github.com/diffix/strategy/issues/6).
-- **Combination**: for each buckets, is a set of per-condition truth values. Condition `A` has two combinations: `A = true` and `A = false`. Either or both might exist for a bucket.
-- **Outcome**: the true/false result of either a condition or a combination. If a combination is false, the matching rows are not included in the answer and vice versa.
-- **Low effect (LE)**: a combination is LE when the number of distinct AIDs associated with the rows that match the condition falls below a threshold. (A combination that is not LE is labeled NLE.)
-- **Flip row**: A row is flipped if it changes from excluded from the answer to included in the answer or vice versa.
-- **Attackable condition**: a condition is attackable when forcing it to false or true flips the rows matching a LE combination, but not the rows of NLE combinations.
-- **Forcing a condition**: setting a condition to be always true or always false, for the purpose of determining if a condition is attackable.
 - **Attackable combination**: an LE combination with an associated attackable condition.
-- **Replay a row**: re-executing the query for a given row, normally with a forced condition in order to determine if the row is flipped.
+- **Attackable condition**: a condition is attackable when forcing it to false or true flips the rows matching a LE combination, but not the rows of NLE combinations.
+- **Bucket**: a single aggregate row in the output (or multiple rows in the case of implicit aggregation). [The definition can be found here](https://github.com/diffix/strategy/issues/6).
+- **Combination**: for each buckets, is a set of per-condition truth values. Condition `A` has two combinations (as used by LED): `A = true` and `A = false`. Either or both might exist for a bucket.
+- **Condition set**: One or more conditions. (Shorthand for "Condition or set of conditions".)
+- **Flip row**: A row is flipped if it changes from excluded from the answer to included in the answer or vice versa.
+- **Forcing a condition**: setting a condition to be always true or always false, for the purpose of determining if a condition is attackable.
+- **LE0, LE1, LEn**: Low effect combinations or conditions where the number of AIDs associated with the combination/condition is 0, 1, or more than one respectively. ("LE" alone refers to any of these.)
+- **LE noise layer**: A new type of noise layer that is added when LE conditions exist. (Note that dynamic noise layers, on the other hand, no longer exist in this proposal.)
+- **Low effect (LE)**: a combination is LE when the number of distinct AIDs associated with the rows that match the combination falls below a noisy threshold. (A combination that is not LE is labeled NLE.)
+- **Outcome**: the true/false result of either a condition or a combination. zzzz not sure I ever apply this to condition
+- **Replay a row**: re-executing the query for a given row, normally with a forced condition, in order to determine if the row is flipped.
+
+[Expression evaluation in Postgres](boolean-evaluation.md) describes the PostgreSQL query plan. This LED document relies on the capabilities described in [Expression evaluation in Postgres](boolean-evaluation.md).
+
+[zzzz](led-issues.md) provides the rationale for the LED design. It describes the attacks that LED defends against, and looks at various alternative proposals and why they don't work.
 
 # LED
 
-Low-Effect Detection (LED) finds conditions or groups of conditions where the rows affected by those conditions are comprised of very few distinct AIDs. LED then removes the effect of those conditions. LED works on a per-bucket basis because conditions that may be LE for some buckets are not LE for others.
+Low-Effect Detection (LED) finds conditions or groups of conditions (condition set) where the rows affected by the condition set are comprised of very few distinct AIDs. These kind of condition sets can be used in difference attacks. LED then adds distortion to the answer to mitigate the difference attacks. The distortion consists of additional noise layers, and optionally an adjustment of true underlying aggregate. LED works on a per-bucket basis because condition sets that may be LE for some buckets are not LE for others.
 
-LED defends against difference attacks that operate by removing conditions from a query (and comparing the answer with the query that includes the conditions). The effect of removing a condition or set of conditions from a query is that of forcing the conditions to be always true or always false. Removing a positive OR (por) has the effect of setting the condition to false, and removing a positive AND (pand) has the effect of setting the condition to true. Although only certain combinations of condition-to-boolean make sense in an attack, the LED mechanism itself doesn't explicitly need to check for this. As such, the LED mechanism doesn't need to understand the query condition logic per se.
+LED defends against difference attacks that operate by removing conditions from a query (and comparing the answer with the query that includes the conditions). The effect of removing a condition or set of conditions (i.e. a condition set) from a query is that of forcing the conditions to be always true or always false. Removing a positive OR (por) has the effect of setting the condition to false, and removing a positive AND (pand) has the effect of setting the condition to true.
 
-LED works in two steps. First, it finds combinations of condition booleans where the rows included or excluded by that combination pertain to very few AIDs (fewer than some threshold). If such combinations exist, then LED emulates what would happen if an analyst forced any given condition or set of conditions to be always true or always false. If doing so affects only the rows associated with the combination (i.e. causes them to be included instead of excluded or vice versa), and no other rows, then LED emulates the inclusion/exclusion of those rows, and modifies the aggregates accordingly.
+Although only certain combinations of condition-to-boolean make sense in an attack, the LED mechanism itself doesn't explicitly need to check for this. As such, the LED mechanism doesn't need to understand the query condition logic per se. Having said that, there may be performance advantages to understanding the query condition logic, and these are pointed out where relevant.
 
-## Dynamic noise layers
+(Note that difference attacks that involve changing condition values, rather than dropping conditions per se, will be handled elsewhere. Examples include minor changes to range values, or changes to the the regex of LIKE conditions.)
 
-Even with LED, there is still a need for dynamic noise layers (in addition to static noise layers). See section [Dynamic noise layers](#dynamic-noise-layers) for an explanation for why. (Though note that Publish does not need dynamic noise layers.)
+Discovering LE condition sets works in two steps. First, it finds combinations of condition result booleans where the rows included or excluded by that combination pertain to very few AIDs (fewer than some noisy threshold). Second, if such combinations exist, then LED computes what would happen if an analyst forced any given condition set (one or more conditions) to be always true or always false. If doing so affects only the rows associated with the combination (i.e. causes them to be included instead of excluded or vice versa), and no other rows, then the condition set is determined to be LE.
 
-The basic rules for dynamic noise layers are:
+Once a condition set is determined to be LE (for a given bucket), then the aggregate output is distorted in one or two ways. First, additional noise layers associated with the LE condition sets are added. Second, if only one AID is affected by the LE condition set (i.e. the condition set is LE1), then the underlying true value is adjusted to emulate what the answer would have been if the condition were removed.
 
-1. Every condition has a dynamic noise layer. This is true even when the condition is LE (including zero effect).
-2. The seed material for dynamic noise layers is generated on conditions *after* LED is executed. In other words, on the conditions that exist after rows have been flipped.
-
-Note that this document proposes seeding dynamic noise layers from the combined seed material of the conditions. This is in contrast to the old method of using the set of distinct AIDs. The reason for this proposed change is because it may be complex or costly to determine the set of distinct AIDs after flipping rows (again, see [Dynamic noise layers](#dynamic-noise-layers)).
-
-> TODO: Make sure it is the case that dynamic noise seed materials can be based on conditions evaluated individually and not in groups. Or indeed whether this matters at all.
+This additional noise layer is a new type of noise layer that we call LE noise layers. LE noise layers are only used when there is an LE combination set. Furthermore, we no longer need dynamic (so-called UID) noise layers, so this represents an overall reduction in the number of noise layers (see zzzz).
 
 ## Identifying LE conditions using combinations
 
@@ -43,12 +59,12 @@ The basic idea to identifying LE combinations is to build a truth table for each
 
 Here is an example of such a truth table with the four combinations (C1, C2, C3, and C4):
 
-|    | A     | B          | C          | outcome | AID1 | AID2 |
-| -- | ----- | ---------- | ---------- | ------- | ---- | ---- |
-| C1 | false | ---------- | ---------- | false   | NLE  | NLE  |
-| C2 | true  | true       | ---------- | true    | NLE  | NLE  |
-| C3 | true  | false      | true       | true    | LE   | NLE  |
-| C4 | true  | false      | false      | false   | NLE  | NLE  |
+|     | A     | B          | C          | outcome | AID1 | AID2 |
+| --- | ----- | ---------- | ---------- | ------- | ---- | ---- |
+| C1  | false | ---------- | ---------- | false   | NLE  | NLE  |
+| C2  | true  | true       | ---------- | true    | NLE  | NLE  |
+| C3  | true  | false      | true       | true    | LE   | NLE  |
+| C4  | true  | false      | false      | false   | NLE  | NLE  |
 
 (Note here that the first five columns are the truth table itself, and the last two are the indicators as to whether the two AIDs are each LE or NLE for each combination.)
 
@@ -68,12 +84,12 @@ If any combination is LE, then it may be that we need to adjust the aggregate ou
 
 > One idea would be to store a per-combination aggregation. Will we always include or exclude complete "combination groups"? For example:
 
-combination_id | outcome | count
--|-|-
-1 | true | 10
-2 | true | 2
-3 | false | 7
-4 | false | 1
+| combination_id | outcome | count |
+| -------------- | ------- | ----- |
+| 1              | true    | 10    |
+| 2              | true    | 2     |
+| 3              | false   | 7     |
+| 4              | false   | 1     |
 
 > We can hold the partially aggregated count for each combination, and calculate the final at the last step of an aggregate after we know what is flipped and what is not. Say we want to include combination 4, the count would be `10 + 2 + 1 = 13`.
 
@@ -87,22 +103,22 @@ Let's look at the truth table for the logic `A or (B and C and D)`, evaluated in
 
 In the case where the AID does *not* have attribute A, we might get this:
 
-|    | A     | B          | C          | D          | outcome | AID |
-| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
-| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
-| C2 | false | false      | ---------- | ---------- | false   | NLE |
-| C3 | false | true       | false      | ---------- | false   | NLE |
-| C4 | false | true       | true       | false      | false   | NLE |
-| C5 | false | true       | true       | true       | true    | LE  |
+|     | A     | B          | C          | D          | outcome | AID |
+| --- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1  | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C2  | false | false      | ---------- | ---------- | false   | NLE |
+| C3  | false | true       | false      | ---------- | false   | NLE |
+| C4  | false | true       | true       | false      | false   | NLE |
+| C5  | false | true       | true       | true       | true    | LE  |
 
 In the case where the AID *does* have attribute A, we might get this:
 
-|    | A     | B          | C          | D          | outcome | AID |
-| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
-| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
-| C2 | false | false      | ---------- | ---------- | false   | NLE |
-| C3 | false | true       | false      | ---------- | false   | NLE |
-| C4 | false | true       | true       | false      | false   | NLE |
+|     | A     | B          | C          | D          | outcome | AID |
+| --- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1  | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C2  | false | false      | ---------- | ---------- | false   | NLE |
+| C3  | false | true       | false      | ---------- | false   | NLE |
+| C4  | false | true       | true       | false      | false   | NLE |
 
 In both cases, we want to recognize `(B and C and D)` as low effect. In the first case, we want to adjust to remove its effect, and in both cases we want to exclude B, C, and D from the 
 
@@ -225,12 +241,12 @@ One case is where we cannot determine the outcome of forcing a condition by insp
 
 For example, take the following truth table:
 
-|    | A     | B          | C          | D          | outcome | AID |
-| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
-| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
-| C3 | false | true       | false      | ---------- | false   | NLE |
-| C4 | false | true       | true       | false      | false   | NLE |
-| C5 | false | true       | true       | true       | true    | LE  |
+|     | A     | B          | C          | D          | outcome | AID |
+| --- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1  | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C3  | false | true       | false      | ---------- | false   | NLE |
+| C4  | false | true       | true       | false      | false   | NLE |
+| C5  | false | true       | true       | true       | true    | LE  |
 
 This is the same as a prior example (with logic `A or (B and C and D)`), except supposing that C2 never occurred during query execution. Now suppose we want to evaluate forcing B=false to determine if the outcome of C5 would change as a result. Since there is no example of that in the truth table, we need to re-execute the query engine using rows that produce the desired condition outcomes.
 
@@ -240,11 +256,11 @@ Anyway, supposing we can force the outcome of a condition evaluation, then to te
 
 Now lets consider another case where the truth table after query execution is this (I'm not sure what logic generates this table, but it doesn't matter for this example):
 
-|    | A     | B          | C          | D          | outcome | AID |
-| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
-| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
-| C2 | false | false      | ---------- | ---------- | false   | NLE |
-| C3 | false | true       | false      | ---------- | false   | LE  |
+|     | A     | B          | C          | D          | outcome | AID |
+| --- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1  | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C2  | false | false      | ---------- | ---------- | false   | NLE |
+| C3  | false | true       | false      | ---------- | false   | LE  |
 
 Since C3 is LE, we want to individually test forcing A=true, B=false, and C=true. The truth table has examples for A=true and B=false, but not for C=true. Thus we want to replay A=false, B=true, C=true, but the question remains what to do for D. If execution ends after evaluating, then we don't care about D. If not, there there are two possible approaches. One is to try both D=false and D=true. The other, however, is to replay the values of D that are stored with the rows associated with C3 (but still with A=false, B=true, C=true). If an outcome of true results for any row, then we know that C could be an attack condition. If not, then C is not an attack condition.
 
@@ -260,12 +276,12 @@ These examples cover how the LED logic works, and assume that each condition is 
 
 **Example 1**: `A and B`, Evaluation order A-->B
 
-|       | A    | B          | out    | case 1     | case 2 | case 3 | case 4 | case 5 |
-| ----- | ---- | ---------- | ------ | ---------- | ------ | ------ | ------ | ------ |
-| C1    | 0    | ---------- | 0      | NLE        | NLE    | NLE    | LE     | LE     |
-| C2    | 1    | 1          | 1      | NLE        | NLE    | NLE    | NLE    | NLE    |
-| C3    | 1    | 0          | 0      | NLE        | LE     | 0      | LE     | 0      |
-|       |      |            |        | ---------- | B1     | B1     | A1,B1  | A1,B1  |
+|     | A   | B          | out | case 1     | case 2 | case 3 | case 4 | case 5 |
+| --- | --- | ---------- | --- | ---------- | ------ | ------ | ------ | ------ |
+| C1  | 0   | ---------- | 0   | NLE        | NLE    | NLE    | LE     | LE     |
+| C2  | 1   | 1          | 1   | NLE        | NLE    | NLE    | NLE    | NLE    |
+| C3  | 1   | 0          | 0   | NLE        | LE     | 0      | LE     | 0      |
+|     |     |            |     | ---------- | B1     | B1     | A1,B1  | A1,B1  |
 
 **How to read the above table:** The left-most column (containing `C1`, `C2`, ...) are the combination labels. The subsequent columns headed `A`, `B`, ..., is the per-conditions boolean outputs. The column headed `out` is the boolean result of the complete expression (0 means exclude the matching rows, 1 means include the rows). Columns headed `case 1`, `case 2`, ..., represent distinct scenarios, and indicate whether each combination is LE, NLE, or zero-effect (special case of LE). (Note that the zero-effect combinations would not explicitly appear in the truth table generated from query execution. We show them here just to be clear.) Finally, the last row in the table shows which conditions are attackable for each case. 'B1' means "B=true is an attack condition".
 
@@ -302,12 +318,12 @@ Case 5:
 
 **Example 2**: `A or B`, evaluation order A-->B
 
-|       | A    | B          | out   | case 1     | case 2 | case 3 | case 4 | case 5 |
-| ----- | ---- | ---------- | ----- | ---------- | ------ | ------ | ------ | ------ |
-| C1    | 1    | ---------- | 1     | NLE        | NLE    | NLE    | LE     | NLE    |
-| C2    | 0    | 0          | 0     | NLE        | NLE    | NLE    | NLE    | LE     |
-| C3    | 0    | 1          | 1     | NLE        | LE     | 0      | LE     | 0      |
-|       |      |            |       | ---------- | B0     | B0     | A0,B0  | B0     |
+|     | A   | B          | out | case 1     | case 2 | case 3 | case 4 | case 5 |
+| --- | --- | ---------- | --- | ---------- | ------ | ------ | ------ | ------ |
+| C1  | 1   | ---------- | 1   | NLE        | NLE    | NLE    | LE     | NLE    |
+| C2  | 0   | 0          | 0   | NLE        | NLE    | NLE    | NLE    | LE     |
+| C3  | 0   | 1          | 1   | NLE        | LE     | 0      | LE     | 0      |
+|     |     |            |     | ---------- | B0     | B0     | A0,B0  | B0     |
 
 Case 1:
 
@@ -340,13 +356,13 @@ Dropping B (set to false) only affects C3, so can be used as an attack. Dropping
 
 **Example 3:** `A and (B or C)`, evaluation `A-->B-->C`
 
-|    | A | B          | C          | out  | case 1 | case 2 | case 3 | case 4 |
-| -- | - | ---------- | ---------- | ---- | ------ | ------ | ------ | ------ |
-| C1 | 0 | ---------- | ---------- | 0    | NLE    | LE     | LE     | NLE    |
-| C2 | 1 | 1          | ---------- | 1    | NLE    | NLE    | LE     | LE     |
-| C3 | 1 | 0          | 1          | 1    | NLE    | NLE    | NLE    | LE     |
-| C4 | 1 | 0          | 0          | 0    | NLE    | NLE    | NLE    | NLE    |
-|    |   |            |            | DROP |        | A      | A, B   | B, C   |
+|     | A   | B          | C          | out  | case 1 | case 2 | case 3 | case 4 |
+| --- | --- | ---------- | ---------- | ---- | ------ | ------ | ------ | ------ |
+| C1  | 0   | ---------- | ---------- | 0    | NLE    | LE     | LE     | NLE    |
+| C2  | 1   | 1          | ---------- | 1    | NLE    | NLE    | LE     | LE     |
+| C3  | 1   | 0          | 1          | 1    | NLE    | NLE    | NLE    | LE     |
+| C4  | 1   | 0          | 0          | 0    | NLE    | NLE    | NLE    | NLE    |
+|     |     |            |            | DROP |        | A      | A, B   | B, C   |
 
 Case 1:
 
@@ -371,14 +387,14 @@ Case 4:
 
 **Example 4:** `A and (B or C)`, evaluation `B-->C-->A` (Note same logic as example 3, but different evaluation order.)
 
-|    | A          | B | C          | out  | case 1 | case 2 | case 3 | case 4 |
-| -- | ---------- | - | ---------- | ---- | ------ | ------ | ------ | ------ |
-| C1 | 0          | 1 | ---------- | 0    | NLE    | LE     | LE     | NLE    |
-| C2 | 1          | 1 | ---------- | 1    | NLE    | NLE    | LE     | LE     |
-| C3 | ---------- | 0 | 0          | 0    | LE     | LE     | LE     | LE     |
-| C4 | 0          | 0 | 1          | 0    | LE     | LE     | LE     | NLE    |
-| C5 | 1          | 0 | 1          | 1    | NLE    | NLE    | NLE    | LE     |
-|    |            |   |            | DROP |        | (A)    | (A), B | B, C   |
+|     | A          | B   | C          | out  | case 1 | case 2 | case 3 | case 4 |
+| --- | ---------- | --- | ---------- | ---- | ------ | ------ | ------ | ------ |
+| C1  | 0          | 1   | ---------- | 0    | NLE    | LE     | LE     | NLE    |
+| C2  | 1          | 1   | ---------- | 1    | NLE    | NLE    | LE     | LE     |
+| C3  | ---------- | 0   | 0          | 0    | LE     | LE     | LE     | LE     |
+| C4  | 0          | 0   | 1          | 0    | LE     | LE     | LE     | NLE    |
+| C5  | 1          | 0   | 1          | 1    | NLE    | NLE    | NLE    | LE     |
+|     |            |     |            | DROP |        | (A)    | (A), B | B, C   |
 
 `A and (B or C)`, evaluation `B-->C-->A`
 
@@ -410,13 +426,13 @@ Case 4:
 **Example 5:** `(A and B) or (A' and C)`, evaluation `A-->B-->A'-->C`
 Note that in this example A and A' are fully redundant (semantically identical). It is equivalent to `A and (B or C)`. The cases correspond to those of Example 3.
 
-|    | A | B          | A'         | C          | out  | case 1     | case 2   | case 3              | case 4                |
-| -- | - | ---------- | ---------- | ---------- | ---- | ---------- | -------- | ------------------- | --------------------- |
-| C1 | 0 | ---------- | 0          | ---------- | 0    | NLE        | LE       | LE                  | NLE                   |
-| C2 | 1 | 1          | ---------- | ---------- | 1    | NLE        | NLE      | LE                  | LE                    |
-| C3 | 1 | 0          | 1          | 1          | 1    | NLE        | NLE      | NLE                 | LE                    |
-| C4 | 1 | 0          | 1          | 0          | 0    | NLE        | NLE      | NLE                 | NLE                   |
-|    |   |            |            |            | DROP | ---------- | A and A' | A and A', (A and B) | (A and B), (A' and C) |
+|     | A   | B          | A'         | C          | out  | case 1     | case 2   | case 3              | case 4                |
+| --- | --- | ---------- | ---------- | ---------- | ---- | ---------- | -------- | ------------------- | --------------------- |
+| C1  | 0   | ---------- | 0          | ---------- | 0    | NLE        | LE       | LE                  | NLE                   |
+| C2  | 1   | 1          | ---------- | ---------- | 1    | NLE        | NLE      | LE                  | LE                    |
+| C3  | 1   | 0          | 1          | 1          | 1    | NLE        | NLE      | NLE                 | LE                    |
+| C4  | 1   | 0          | 1          | 0          | 0    | NLE        | NLE      | NLE                 | NLE                   |
+|     |     |            |            |            | DROP | ---------- | A and A' | A and A', (A and B) | (A and B), (A' and C) |
 
 
 
@@ -447,16 +463,16 @@ Case 4:
 
 **Example** **6****:** `(A and B) or (C and D)`: Evaluation  `A-->B-->C-->D`
 
-|    | A | B          | C          | D          | out  | case 1     | case 2     | case 3    |
-| -- | - | ---------- | ---------- | ---------- | ---- | ---------- | ---------- | --------- |
-| C1 | 1 | 1          | ---------- | ---------- | 1    | NLE        | NLE        | LE        |
-| C2 | 1 | 0          | 1          | 1          | 1    | NLE        | NLE        | NLE       |
-| C3 | 1 | 0          | 1          | 0          | 0    | NLE        | NLE        | NLE       |
-| C4 | 1 | 0          | 0          | ---------- | 0    | NLE        | NLE        | NLE       |
-| C5 | 0 | ---------- | 1          | 1          | 1    | NLE        | NLE        | NLE       |
-| C6 | 0 | ---------- | 1          | 0          | 0    | NLE        | NLE        | NLE       |
-| C7 | 0 | ---------- | 0          | ---------- | 0    | NLE        | LE         | NLE       |
-|    |   |            |            |            | DROP | ---------- | ---------- | (A and B) |
+|     | A   | B          | C          | D          | out  | case 1     | case 2     | case 3    |
+| --- | --- | ---------- | ---------- | ---------- | ---- | ---------- | ---------- | --------- |
+| C1  | 1   | 1          | ---------- | ---------- | 1    | NLE        | NLE        | LE        |
+| C2  | 1   | 0          | 1          | 1          | 1    | NLE        | NLE        | NLE       |
+| C3  | 1   | 0          | 1          | 0          | 0    | NLE        | NLE        | NLE       |
+| C4  | 1   | 0          | 0          | ---------- | 0    | NLE        | NLE        | NLE       |
+| C5  | 0   | ---------- | 1          | 1          | 1    | NLE        | NLE        | NLE       |
+| C6  | 0   | ---------- | 1          | 0          | 0    | NLE        | NLE        | NLE       |
+| C7  | 0   | ---------- | 0          | ---------- | 0    | NLE        | LE         | NLE       |
+|     |     |            |            |            | DROP | ---------- | ---------- | (A and B) |
 
 Case 1:
 
@@ -478,16 +494,16 @@ Case 3:
 
 **Example** **7****:** `(A or B) and (C or D)`: Evaluation  `A-->B-->C-->D`
 
-|    | A | B          | C          | D          | out  | case 1     |
-| -- | - | ---------- | ---------- | ---------- | ---- | ---------- |
-| C1 | 1 | ---------- | 1          | ---------- | 1    | NLE        |
-| C2 | 1 | ---------- | 0          | 1          | 1    | NLE        |
-| C3 | 1 | ---------- | 0          | 0          | 0    | NLE        |
-| C4 | 0 | 1          | 1          | ---------- | 1    | NLE        |
-| C5 | 0 | 1          | 0          | 1          | 1    | NLE        |
-| C6 | 0 | 1          | 0          | 0          | 0    | LE         |
-| C7 | 0 | 0          | ---------- | ---------- | 0    | NLE        |
-|    |   |            |            |            | DROP | ---------- |
+|     | A   | B          | C          | D          | out  | case 1     |
+| --- | --- | ---------- | ---------- | ---------- | ---- | ---------- |
+| C1  | 1   | ---------- | 1          | ---------- | 1    | NLE        |
+| C2  | 1   | ---------- | 0          | 1          | 1    | NLE        |
+| C3  | 1   | ---------- | 0          | 0          | 0    | NLE        |
+| C4  | 0   | 1          | 1          | ---------- | 1    | NLE        |
+| C5  | 0   | 1          | 0          | 1          | 1    | NLE        |
+| C6  | 0   | 1          | 0          | 0          | 0    | LE         |
+| C7  | 0   | 0          | ---------- | ---------- | 0    | NLE        |
+|     |     |            |            |            | DROP | ---------- |
 
 Case 1:
 
@@ -534,20 +550,20 @@ What we need to do here is, during query processing of the inner `SELECT`, for e
 Following is an example from Seb that demonstrates that the above idea may not be so simple:
 
 
-| trans_date | cnt | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| trans_date          | cnt     | combinations  state                                                                       |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------- |
 | trans_date = 194800 | cnt = 5 | A=false: AIDs = [0], rows = [R1, R2]<br>A=true:  AIDs=[1, 3], rows = [R3, R4, R5, R6, R7] |
-| trans_date = 193898 | cnt = 5 | A=false: AIDs = [0], rows = [R8]<br>A=true:  AIDs=[2, 4], rows = [R9, R10, R11, R12, R13]         |
-| ...                   | ...       | ...                                                                                |
+| trans_date = 193898 | cnt = 5 | A=false: AIDs = [0], rows = [R8]<br>A=true:  AIDs=[2, 4], rows = [R9, R10, R11, R12, R13] |
+| ...                 | ...     | ...                                                                                       |
 
 In this new table, we are in fact excluding a low count number of AIDs (i.e. `AID = 0`).
 We would therefore have to adjust for the effect of dropping the `A`-condition here, and would end up with
 
-| cnt | count | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt     | count        | combinations  state                                                                   |
+| ------- | ------------ | ------------------------------------------------------------------------------------- |
 | cnt = 7 | count(*) = 1 | AIDs=[0, 1, 3, 2, 4], rows = [R1, R2, R8, R3, R4, R5, R6, R7, R9, R10, R11, R12, R13] |
 | cnt = 6 | count(*) = 1 | AIDs=[0, 1, 3, 2, 4], rows = [R1, R2, R8, R3, R4, R5, R6, R7, R9, R10, R11, R12, R13] |
-| ...                   | ...       | ...                                                                                |
+| ...     | ...          | ...                                                                                   |
 
 However I am not sure if this works either!
 The reason is that we somehow need to account for the per-AID contributions too. Otherwise we cannot suppress extreme outlier users!
@@ -556,30 +572,30 @@ In what follows I'll model user contributions as `(AID, number of rows)`.
 
 For example, take the following scenario (where I simplify things dramatically by not considering LED, only the handling of multi-level aggregations. LED can be added in later, but first we need to understand the basecase):
 
-| trans_date | cnt | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
-| trans_date = 194800 | cnt = 1015 | Contributions = [(0, 1000); (1, 2); (2, 2); (3, 1)]] |
+| trans_date          | cnt        | combinations  state                                          |
+| ------------------- | ---------- | ------------------------------------------------------------ |
+| trans_date = 194800 | cnt = 1015 | Contributions = [(0, 1000); (1, 2); (2, 2); (3, 1)]]         |
 | trans_date = 193898 | cnt = 1004 | Contributions = [(1, 1000); (2, 2); (3, 1); (4, 1); (5, 1)]] |
-| ...                   | ...       | ...                                                                                |
+| ...                 | ...        | ...                                                          |
 
 
 We need to account for the fact that the distribution of contributions is all skewed!
 
 Basically we could think of it as follows (where something akin to how we suppress outliers in regular aggregates is applied):
 
-| trans_date | cnt | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
-| trans_date = 194800 | cnt = **{1015 -> 7}** | Contributions = [(0, **{1000 -> 2}**); (1, 2); (2, 2); (3, 1)]] |
+| trans_date          | cnt                   | combinations  state                                                     |
+| ------------------- | --------------------- | ----------------------------------------------------------------------- |
+| trans_date = 194800 | cnt = **{1015 -> 7}** | Contributions = [(0, **{1000 -> 2}**); (1, 2); (2, 2); (3, 1)]]         |
 | trans_date = 193898 | cnt = **{1004 -> 7}** | Contributions = [(1, **{1000 -> 2}**); (2, 2); (3, 1); (4, 1); (5, 1)]] |
-| ...                   | ...       | ...                                                                                |
+| ...                 | ...                   | ...                                                                     |
 
 which means we could combine these rows during the final aggregation as follows:
 
 
-| cnt  | count(*) | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt     | count(*)     | combinations  state                                                                                               |
+| ------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
 | cnt = 7 | count(*) = 2 | Contributions = [(0, [**{1000 -> 2}**]); (1, [1; **{1000 -> 2}**]); (2, [2; 2]); (3, [1; 1]); (4, [1]); (5, [1])] |
-| ...                   | ...       | ...                                                                                |
+| ...     | ...          | ...                                                                                                               |
 
 which I guess can be interpreted as:
 - 4 AIDs with 2 occurrences of `cnt = 7`
@@ -590,34 +606,34 @@ Expanding this for low count, count then maybe look like this?
 
 A=false: AIDs = [0]<br>A=true:
 
-| trans_date | cnt | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
-| trans_date = 194800 | cnt = 5 | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
-| trans_date = 193898 | cnt = 23 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
-| ...                   | ...       | ...                                                                                |
+| trans_date          | cnt      | combinations  state                                                                                 |
+| ------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| trans_date = 194800 | cnt = 5  | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
+| trans_date = 193898 | cnt = 23 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]                 |
+| ...                 | ...      | ...                                                                                                 |
 
 which then in the second phase becomes
 
-| cnt | count(*) | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
-| cnt = 5 | count(*) = 1 | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
-| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
-| ...                   | ...       | ...                                                                                |
+| cnt      | count(*)     | combinations  state                                                                                 |
+| -------- | ------------ | --------------------------------------------------------------------------------------------------- |
+| cnt = 5  | count(*) = 1 | A=false: Contributions = [(0, 10)]<br>A= true: Contributions = [(1, **{10 -> 2}**); (2, 2); (3, 1)] |
+| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]                 |
+| ...      | ...          | ...                                                                                                 |
 
 But here we see that `A = false` for `cnt = 5` is a low effect property, and hence it needs to be flipped which results in the contribution of user 1 no longer needing to be interpreted as 2 rather than 10 leading to the row becoming `cnt = 23`:
 
-| cnt | count(*) | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt      | count(*)     | combinations  state                                                                            |
+| -------- | ------------ | ---------------------------------------------------------------------------------------------- |
 | cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true: Contributions = [**(0, 10)**, (1, 10); (2, 2); (3, 1)] |
-| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]  |
-| ...                   | ...       | ...                                                                                |
+| cnt = 23 | count(*) = 1 | A=false: Contributions = []<br>A= true:  Contributions = [(4, 10); (5, 10); (6, 3)]            |
+| ...      | ...          | ...                                                                                            |
 
 which we can then merge with the other `cnt = 23` row:
 
-| cnt | count(*) | combinations  state |
-| ------------------- | ------- | -------------------------------------------------------------------------------- |
+| cnt      | count(*)     | combinations  state                                                                                                                    |
+| -------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | cnt = 23 | count(*) = 2 | A=false: Contributions = []<br>A= true: Contributions = [{(0, [10]), (1, [10]); (2, [2]); (3, [1])}; {(4, [10]); (5, [10]); (6, [3])}] |
-| ...                   | ...       | ...                                                                                |
+| ...      | ...          | ...                                                                                                                                    |
 
 which indeed now is showing us that there are two instances of `cnt = 23` where each instance has more than LCF users (assuming that is the criteria to go by).
 
