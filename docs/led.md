@@ -1,17 +1,3 @@
-# Dynamic noise layers
-
-In previous designs, the dynamic noise layers were based on AIDs (UIDs). The purpose of the dynamic noise layer is to defend against the first derivative difference attack. This is needed because the static noise layers constitute a predictable difference between the "left" and "right" queries in the attack pair. The dynamic layer is not predictable, because each bucket in the attack has a different set of AIDs, and therefore a different dynamic noise layer.
-
-One tricky point about the dynamic layer is that it must not be possible to generate many different dynamic noise layers for what is semantically the same query, thus averaging out the dynamic noise. To avoid this, we use the AIDs themselves in part to seed the dynamic noise layer. Queries with the same semantics will always produce the same set of AIDs.
-
-One of the difficulties with using AIDs with proxy Diffix was the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE).
-
-With DB Diffix it appears that we can use the conditions themselves as the basis of dynamic noise layers instead of AIDs. There are two reasons. First, if we are doing Low Effect Detection (LED), then an attacker would not be able to use chaff conditions to average away dynamic noise layers. Second, with tight DB integration, we can do a good job of determining the semantics of each condition, and therefore prevent conditions with different syntax but same semantics.
-
-This opens the possibility of using the seed material from the non-LE (NLE) conditions as the basis for the dynamic noise layers rather than the AIDs. Essentially we can used the combined seed material of all NLE conditions to replace the set of AIDs that we formerly used. This seed material is then added to each individual conditions seed material to compose the per-conditions dynamic noise layers (note both LE and NLE conditions still have dynamic noise layers, though the seed material itself comes only from NLE conditions).
-
-(Note that we still need per-condition dynamic noise layers. This is because in a difference attack, the condition that isolates the victim will always end up being LE, and so is ignored for the purpose of seeding dynamic noise layers. This would lead to the dynamic noise layer being identical on the left and right.)
-
 ----------
 
 # Glossary
@@ -19,24 +5,35 @@ This opens the possibility of using the seed material from the non-LE (NLE) cond
 In the following discussion of low effect detection we will be using the following terms:
 
 - **Bucket**: a single aggregate row in the output (or multiple rows in the case of implicit aggregation). [The definition can be found here](https://github.com/diffix/strategy/issues/6).
-- **Combination**: is a set of truth values associated with both conditions and a bucket. Condition `A` has two combinations: `A = true` and `A = false`. Either or both might exist for a bucket.
-- **Low effect**: the number of distinct AIDs associated with a bucket or combination is below a threshold.
-
+- **Combination**: for each buckets, is a set of per-condition truth values. Condition `A` has two combinations: `A = true` and `A = false`. Either or both might exist for a bucket.
+- **Outcome**: the true/false result of either a condition or a combination. If a combination is false, the matching rows are not included in the answer and vice versa.
+- **Low effect (LE)**: a combination is LE when the number of distinct AIDs associated with the rows that match the condition falls below a threshold. (A combination that is not LE is labeled NLE.)
+- **Flip row**: A row is flipped if it changes from excluded from the answer to included in the answer or vice versa.
+- **Attackable condition**: a condition is attackable when forcing it to false or true flips the rows matching a LE combination, but not the rows of NLE combinations.
+- **Forcing a condition**: setting a condition to be always true or always false, for the purpose of determining if a condition is attackable.
+- **Attackable combination**: an LE combination with an associated attackable condition.
+- **Replay a row**: re-executing the query for a given row, normally with a forced condition in order to determine if the row is flipped.
 
 # LED
 
-Low-Effect Detection is where we find conditions or groups of conditions that have very little effect on the AIDs that comprise the result of a query.
+Low-Effect Detection (LED) finds conditions or groups of conditions where the rows affected by those conditions are comprised of very few distinct AIDs. LED then removes the effect of those conditions. LED works on a per-bucket basis because conditions that may be LE for some buckets are not LE for others.
 
-In principle, LED can be used to defend against difference attacks by removing the effect of LE conditions on the answer. This would have the same effect as dropping the condition from the query. There are however two difficulties here. First, one can't entirely drop the condition from a query, because a given condition or condition combination can be LE for some answer buckets, and not LE (NLE) for others. This suggests that the mechanism for LED can't be dropping conditions per se, but rather adjusting answers to nullify the condition effect.
+LED defends against difference attacks that operate by removing conditions from a query (and comparing the answer with the query that includes the conditions). The effect of removing a condition or set of conditions from a query is that of forcing the conditions to be always true or always false. Removing a positive OR (por) has the effect of setting the condition to false, and removing a positive AND (pand) has the effect of setting the condition to true. Although only certain combinations of condition-to-boolean make sense in an attack, the LED mechanism itself doesn't explicitly need to check for this. As such, the LED mechanism doesn't need to understand the query condition logic per se.
 
-Second, it seems unlikely to me that we'll be able to perfectly eliminate the effect of a condition in all cases. Counts we can probably do alright, but there might be small errors do to machine precision or something for non-integer aggregates. Therefore we'll probably still need some kind of dynamic noise to protect against first derivative difference attacks. There may also be cases where we can't adjust aggregate outputs at all.
+LED works in two steps. First, it finds combinations of condition booleans where the rows included or excluded by that combination pertain to very few AIDs (fewer than some threshold). If such combinations exist, then LED emulates what would happen if an analyst forced any given condition or set of conditions to be always true or always false. If doing so affects only the rows associated with the combination (i.e. causes them to be included instead of excluded or vice versa), and no other rows, then LED emulates the inclusion/exclusion of those rows, and modifies the aggregates accordingly.
 
-> TODO: Note: Sebastian doesn't necessarily agree. We'll find out as we try things out.
+## Dynamic noise layers
 
-Given this, the basic idea now is to detect LE conditions using a noisy threshold, build dynamic layers as described above (use condition semantics of NLE conditions), and adjust aggregate outputs based on LE conditions.
+Even with LED, there is still a need for dynamic noise layers (in addition to static noise layers). See section [Dynamic noise layers](#dynamic-noise-layers) for an explanation for why. (Though note that Publish does not need dynamic noise layers.)
 
-> TODO: Determine whether adjusting the aggregate output allows us to eliminate the need for the AID noise layers, or reduce noise. This might be a good noise reduction technique for common cases.
+The basic rules for dynamic noise layers are:
 
+1. Every condition has a dynamic noise layer. This is true even when the condition is LE (including zero effect).
+2. The seed material for dynamic noise layers is generated on conditions *after* LED is executed. In other words, on the conditions that exist after rows have been flipped.
+
+Note that this document proposes seeding dynamic noise layers from the combined seed material of the conditions. This is in contrast to the old method of using the set of distinct AIDs. The reason for this proposed change is because it may be complex or costly to determine the set of distinct AIDs after flipping rows (again, see [Dynamic noise layers](#dynamic-noise-layers)).
+
+> TODO: Make sure it is the case that dynamic noise seed materials can be based on conditions evaluated individually and not in groups. Or indeed whether this matters at all.
 
 ## Identifying LE conditions using combinations
 
@@ -44,7 +41,7 @@ It is assumed that the identification of LE conditions takes place in the query 
 
 The basic idea to identifying LE combinations is to build a truth table for each bucket, where by *bucket* I mean the output rows of the query. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false (true means the associated rows will be included in the bucket, and false that they will be excluded). Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
 
-Here is an example of such a truth table with the four combinations (C1, C2, C3, and C4) corresponding to the logic `A and (B or C)` evaluated in the order `A-->B-->C` (where `A` represents a condition like `age <> 0`):
+Here is an example of such a truth table with the four combinations (C1, C2, C3, and C4):
 
 |    | A     | B          | C          | outcome | AID1 | AID2 |
 | -- | ----- | ---------- | ---------- | ------- | ---- | ---- |
@@ -53,11 +50,15 @@ Here is an example of such a truth table with the four combinations (C1, C2, C3,
 | C3 | true  | false      | true       | true    | LE   | NLE  |
 | C4 | true  | false      | false      | false   | NLE  | NLE  |
 
+(Note here that the first five columns are the truth table itself, and the last two are the indicators as to whether the two AIDs are each LE or NLE for each combination.)
+
+It so happens that the logic that produced this truth table is `A and (B or C)` evaluated in the order `A-->B-->C` (where `A` represents a condition like `age <> 0`), but the LED mechanism doesn't need to know this. (In subsequent examples, the underlying logic is given, but with the understanding that the mechanism doesn't need it.)
+
 At the end of query engine processing, we know if any combinations are LE for the given bucket. For instance, in the above example, the combination C3 is LE for AID1.
 
 > TODO: Note: Seb points out that we might know earlier, for instance after the sub-query in a `JOIN`, and there may be advantages to removing the effect earlier in the query. Something to keep in mind.
 
-If any combination is LE, then it may be that we need to adjust the aggregate output. We only want to do that, however, if the analyst could in fact generate an attack pair by removing one or more conditions. This is the case when dropping or negating the condition 1) changes the logical outcome of the LE combination, and 2) does not change the logical outcome for NLE combinations.
+If any combination is LE, then it may be that we need to adjust the aggregate output. We only want to do that, however, if the analyst could in fact generate an attack pair by removing one or more conditions (effectively setting the condition to always true or always false). This is the case when setting the condition outcome 1) changes the logical outcome of the LE combination, and 2) does not change the logical outcome for NLE combinations.
 
 > Note: The reason this assumes adjusting the aggregate output (versus adding or removing rows prior to aggregate computation) is that I'm presuming that the query engine may compute aggregates on the fly as it processes rows. For instance, the query engine may add a given row to a `count(*)` aggregate when it encounters the row, and only later might we decide that the row should be removed due to LE. In this case, we'd need to adjust the (already computed) aggregate rather than somehow compute the aggregate all over again.
 
@@ -76,11 +77,15 @@ combination_id | outcome | count
 
 > We can hold the partially aggregated count for each combination, and calculate the final at the last step of an aggregate after we know what is flipped and what is not. Say we want to include combination 4, the count would be `10 + 2 + 1 = 13`.
 
-In the above example, C3 is LE. Suppose the analyst were to drop or negate A. This would effectively result in A being set to true, which would (probably) change the outcome of many combination C1 rows to true, causing those rows to be added to the answer. In other words, the change would have a large effect and so can't be used by an attacker in a difference attack or a chaff attack. Therefore we can safely leave the C1 rows as is and keep the dynamic seeding material from A.
+In the above example, C3 is LE. Suppose the analyst were to drop A. This would effectively result in A being set to true, which would (probably) change the outcome of many combination C1 rows to true, causing those rows to be added to the answer. In other words, the change would have a large effect and so can't be used by an attacker in a difference attack or a chaff attack. Therefore we can safely leave the C1 rows as is and keep the dynamic seeding material from A.
 
 If however the analyst were to drop C, then the only logic effect this would have would be to change the rows associated with C3 from true (included in the answer) to false (excluded from the answer). Since therefore a difference attack is possible, we want to adjust for the C3 rows by 1) adjust the aggregate outputs to what they would be if the rows are excluded, and 2) remove C from the seed materials for dynamic noise layers.
 
-Here is another example of a truth table, this time with five combinations:
+As another example, suppose that the expression `B and C and D` is a pseudo-identifier for an AID. An attacker wants to learn if the AID has attribute A or not. The two queries of the difference attack would be `WHERE A` and `WHERE A or (B and C and D)`. If the AID does not have attribute A, then the count of the second query is one more than the count of the first query. If the AID has the attribute, the counts are the same.
+
+Let's look at the truth table for the logic `A or (B and C and D)`, evaluated in order `A-->B-->C-->D`.
+
+In the case where the AID does *not* have attribute A, we might get this:
 
 |    | A     | B          | C          | D          | outcome | AID |
 | -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
@@ -90,29 +95,50 @@ Here is another example of a truth table, this time with five combinations:
 | C4 | false | true       | true       | false      | false   | NLE |
 | C5 | false | true       | true       | true       | true    | LE  |
 
-This corresponds to the logic `A or (B and C and D)`, evaluated in order `A-->B-->C-->D`. This might be a setup for a difference attack where `(B and C and D)` comprise a pseudo-identifier for the victim. The paired query in the difference attack would exclude the pseudo-identifier. Combination C5 is the only LE combination.
+In the case where the AID *does* have attribute A, we might get this:
 
-Suppose we consider dropping condition D. That would cause D to be always true, which would change all of the C4 rows to true. Since C4 is NLE (has more than the threshold number of distinct AIDs) the attack would not work. The same holds for B and C (taken individually). Dropping A would cause A to stay false, and so would not change the C5 outcome (and as well would probably change many C1 rows from true to false).
+|    | A     | B          | C          | D          | outcome | AID |
+| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C2 | false | false      | ---------- | ---------- | false   | NLE |
+| C3 | false | true       | false      | ---------- | false   | NLE |
+| C4 | false | true       | true       | false      | false   | NLE |
+
+In both cases, we want to recognize `(B and C and D)` as low effect. In the first case, we want to adjust to remove its effect, and in both cases we want to exclude B, C, and D from the 
+
+the chaff attack builds a bunch of expressions that have no effect on the count, but a large effect on the noise *if* two buckets differ. 
 
 
-> TODO: Note that these truth tables are incomplete, in that database logic is ternary (True, False, NULL). I'm not sure that this has any practical impact on the mechanisms described here. Ultimately we want to know if dropping a condition will flip rows or not (i.e. cause excluded rows to be excluded and vice versa). Something to keep in mind.
+zzzz The paired query in the difference attack would exclude the pseudo-identifier. Combination C5 is the only LE combination.
 
-By dropping B, C, and D (or in other words, dropping the expression `(B and C and D)`, however, only the C5 rows change. This is because the expression essentially becomes false (because it is a por), which doesn't change the outcome of any other combinations. Therefore the aggregates would be adjusted to account for excluding the C5 rows, and B, C, and D would not be used for the dynamic noise seed material. (Though note that there would still be dynamic noise layers associated with B, C, and D.)
+From the point of view of the LED mechanism, we want to determine what would happen if the analyst were to force the outcome of the C5 combination conditions or sets of conditions to the opposite value. For instance, since condition A for combination C5 is false, we want to determine what happens if A is forced true. Examining the truth table, we see that setting A to true would match combination C1 with an outcome of true (because A=true for C1, and none of the other conditions matter for C1). This would not change the outcome of the rows that match C5 (which are also true and therefore included), and so this does not represent a viable attack for the analyst and the mechanism can ignore this possibility.
 
+Next lets consider what would happen if the analyst were to force condition B to be false. Examining the truth table, we see that this matches C2 (because A=false for C2, just as with C5, B=false for C2, and C and D don't matter for C2). The outcome of C2 is false, so forcing B to false changes the outcome of C5. Therefore it might be an attack. The next step is to see if this change causes rows from other combinations to change as well. If it does, then it won't work as a difference attack and we don't have to adjust for it.
 
-> TODO: work out the details of the algorithm for detecting LE condition expressions.
+First consider C4. It's outcome if false, and so it is not affected by forcing B=false. The same is true for C3. C2 also doesn't change because in any event B is already false. C1 doesn't change because it is not affected by B one way or the other. Therefore we conclude that forcing B=false does not affect any other combinations. As a result, setting B=false is a possible attack vector, and so we need to flip the rows that match C5 (i.e. change them from included to excluded).
+
+It is interesting to re-examine what it means to force B=false from the perspective of the condition logic `A or (B and C and D)`. The new logic is `A or (false and C and D)`. Now it so happens that this is equivalent to `A or (false)`, which is what the logic would have been if the attacker had dropped the `(B and C and D)` expression, which is the attack. In other words, we were able to adjust for the attack without literally knowing that `(B and C and D)` was the attack expression.
+
+> TODO: Note that these truth tables are incomplete, in that database logic is ternary (True, False, NULL). I'm not sure that this has any practical impact on the mechanisms described here. Ultimately we want to know if forcing a condition will flip rows or not (i.e. cause excluded rows to be excluded and vice versa). Something to keep in mind.
+
+Even though we will have this point have decided to flip the rows associated with C5, we won't know which conditions to exclude from the dynamic noise seed materials. We much therefore continue to test conditions to determine if they are LE. When we test C and D, we find that they can also be used as attack conditions, and therefore are not included in the dynamic noise seed materials.
+
+> Note that in the above example, we were able to determine the outcome of the expression if for instance B was forced to false by finding another combination in the truth table (C2) that showed that outcome. It could happen however that no such other combination exists after query processing. In this case, it would be necessary to replay one of the rows saved for C5, but forcing B=false (see [Replaying rows](#replaying-rows)). In other words, this replay ability is critical.
+
+## Basic approach to LED
 
 A basic approach to LED, then is:
-
-1. Determine if any combinations are LE. If not, then done.
-2. If so, determine if dropping one or more conditions leads to a situation where only an LE number of rows are affected. If not, then done.
-3. If so, emulate "dropping" those conditions by changing OR'd conditions or expressions to false, and changing AND'd conditions or expressions to true.
-4. Re-evaluate the LE rows under emulated dropping. If any rows are flipped (changed from included to excluded or vice versa), then adjust aggregate values to reflect that.
-5. Remove dropped conditions from dynamic seeding material.
+1. From query execution determine the combinations and whether each is LE or NLE.
+2. If any conditions were never evaluated, or if they are only evaluated as either true or false, label them as attackable.
+3. If no combinations are LE and no conditions are attackable from step 2, then done. (Note that we don't care about combinations that have zero rows, and therefore don't appear after query processing.)
+4. For each LE combination, determine if forcing each condition to its opposite value identifies the condition as attackable (because the outcome of the LE combination is changed but the outcome of no other combinations are changed).
+5. For each attackable combination (i.e. LE combination with associated attackable conditions), determine which rows would be flipped by virtue of the forced condition, possibly with execution replay, and adjust each aggregate accordingly.
+6. Remove attackable conditions from the dynamic seeding material.
 
 Note that not only does this description assume that the query engine optimization doesn't evaluate conditions unnecessarily, it depends on it. If the query engine doesn't do this, then the LE logic has to be sophisticated enough to recognize when evaluated conditions in fact have no effect.
 
 > TODO: Reverse noise exploitation attack needs more thought.
+
 > TODO: Think how to seed noise layer when a condition has zero effect.
 
 ## Adjusting aggregate values
@@ -138,29 +164,97 @@ Recall from earlier versions of Diffix that the static seeding material for a gi
 2. The operator
 3. The values from the column that "match" the condition (where a match if the value of included rows for pands and pors, or excluded rows for nands and nors)
 
-We want to keep this approach, but with DB integration we can monitor which column values match during query execution. This in turn means that negative conditions no longer need to be clear. (Though we may have other reasons to limit math.)
+I don't believe that we need to keep the operator any more, but I think it makes sense to include a symbol indicating whether the boolean on which the value is recorded (true or false). Which means the static seeding material can be:
 
-Dynamic noise layers have the above seeding material, plus the seeding material taken from the conditions that are not droppable. This seeding material takes the place of the AID information used in prior Diffix versions. The additional seeding material for all dynamic noise layers comprises all of the static seeding material from all non-droppable conditions. Note that it is strictly speaking possible that all conditions are excluded from the dynamic seeding material. In this case, some default value is used (which has the effect of still making the dynamic layers different from the static layers).
+1. The column name
+2. The values from the column that "match" the condition
+3. 1 if value recorded when included, 0 if value recorded when excluded
 
-Unfortunately it can happen that a condition is never evaluated by the query engine, and yet we want to make noise layers and so need seeding material. I think in this case it should be safe to use some default value (i.e. `NULL`) in place of the column value.
+Modulo this change, we want to keep this basic approach, but there is an advantage with DB integration that we can monitor which column values match during query execution. This in turn means that negative conditions no longer need to be clear. (Though we may have other reasons to limit math.)
+
+Recall that dynamic noise layers (in the past sometimes called uid noise layers) have the same seed materials as static noise layers, plus some additional seed material derived from the output of the query. Formerly this output was from the AIDs. We can continue to use AIDs, in which case we need to be able to compute the set of distinct AIDs after flipping rows. I'm not sure how hard this will be. An alternative is to derive the dynamic seed material from the totality of the static seed material.
+
+The rationale goes as follows. Suppose the `WHERE` clause of a query is this:
+
+`WHERE zip = 12345 and gender = 'M' and aid <> 1234`
+
+In the AID-based approach, this `WHERE` clause would cause certain AIDs to be in the output. When the last expression is determined to be LE, then the AID=1234 would be added to the set of AIDs. If we instead use the totality of the static seed material, then the dynamic seed material would be:
+
+`zip, 12345, 1, gender, M, 1, aid, 1234, 0`
+
+Just as changing the `zip` in the `WHERE` clause to `54321` would generate a new set of AIDs and therefore new dynamic seed material, so would that change generate new dynamic seed material using the static seed material.
+
+When the last expression is determined to be LE, then the dynamic seed material would be changed to:
+
+`zip, 12345, 1, gender, M, 1`
+
+which is analogous with adding the AID 1234 to the list of AIDs.
+
+In what follows, I assume that we are using the static seed materials for the dynamic noise layers. Each dynamic noise layer therefore has the three elements from the static seeding material, plus the seeding material taken from the conditions that are not attackable:
+
+1. The column name
+2. The values from the column that "match" the condition
+3. 1 if value recorded when included, 0 if value recorded when excluded
+4. All of the above for all non-attackable conditions
+
+Note that it is strictly speaking possible that all conditions are excluded from the dynamic seeding material. In this case, some default value is used (which has the effect of still making the dynamic layers different from the static layers).
+
+Unfortunately it can happen that 1) a condition is never evaluated by the query engine, or 2) that no value of a positive condition evaluates to true, or that no value of a negative condition evaluates to false. In these cases, we don't know how to seed the noise layer associated with the condition because we don't have any values. Further, it may be very expensive or not even possible (in the case of chaff conditions) to find an appropriate value. I think in this case it should be safe to use some default value (i.e. `NULL`) in place of the column value.
 
 It probably makes sense to monitor the column values using a bloom filter, and then using the bloom filter directly as seeding material. Besides being compact and efficient, an advantage of the bloom filter is that it can be combined with other bloom filters, thus working in a distributed implementation. An important point is that the bloom filter doesn't have to be perfectly accurate when there are many different column values. The primary purpose of static noise layers is to prevent an attacker from learning an exact count for some attribute, and if the attribute has many different values, this is not useful for the attacker. Since the bloom filter doesn't have to be perfectly accurate, the size of the filter can be relatively small, and the hash function can favor efficiency over randomness.
 
 As an efficiency measure, we can still determine the column value of a clear condition from SQL inspection only. In this case, however, to generate the same seeding material that would have come from building a bloom filter, we can simply insert the inspected value into a bloom filter.
 
-Strictly speaking, we would want to remove column values from the bloom filters when rows are flipped (from included to excluded, or from excluded to included). To avoid having to use counting bloom filters for this, perhaps what we can do is hold off on inserting column values into bloom filters until it is determined that a given condition won't be dropped.
+Strictly speaking, we would want to remove column values from the bloom filters when rows are flipped (from included to excluded, or from excluded to included). To avoid having to use counting bloom filters for this, perhaps what we can do is hold off on inserting column values into bloom filters until it is determined that a given condition won't be attackable.
 
-> TODO: flesh this out with example ... Unlike the case with prior Diffix versions, we can now always have layers seeded by the column values, including for instance for ranges. This will allow us for instance to automatically prevent extra noise samples the case where a range is equivalent to an equality, i.e. `col BETWEEN 1 and 2` where `col` is an integer type. Note however that if we were to do this, then in the process we'd want to recognize that the operator is effective `=` and not `BETWEEN`, and generate the seed materials accordingly. Or perhaps not even use operator as part of the seed material.
+> TODO: flesh this out with example ... Unlike the case with prior Diffix versions, we can now always have layers seeded by the column values, including for instance for ranges. This will allow us for instance to automatically prevent extra noise samples the case where a range is equivalent to an equality, i.e. `col BETWEEN 1 and 2` where `col` is an integer type.
 
 **Seeding materials implementation**
 
 With DB integration it is no longer necessary to float values per se. Rather column values can be recorded as they occur in the query engine and stored in some data structure "on the side". We might have to do specialized things when dealing with DB indexes, for instance if using an index means that we no longer process every row.
 
-
 > TODO: Learn more about DB indexes.
 
+## Replaying rows
 
-## Abstract Logic Examples
+There are X cases where we need the ability to rerun a row evaluation through the query engine.
+
+### Replay case 1, determining combination outcome
+
+One case is where we cannot determine the outcome of forcing a condition by inspecting the truth table because there are no existing combinations that match the resulting combination.
+
+For example, take the following truth table:
+
+|    | A     | B          | C          | D          | outcome | AID |
+| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C3 | false | true       | false      | ---------- | false   | NLE |
+| C4 | false | true       | true       | false      | false   | NLE |
+| C5 | false | true       | true       | true       | true    | LE  |
+
+This is the same as a prior example (with logic `A or (B and C and D)`), except supposing that C2 never occurred during query execution. Now suppose we want to evaluate forcing B=false to determine if the outcome of C5 would change as a result. Since there is no example of that in the truth table, we need to re-execute the query engine using rows that produce the desired condition outcomes.
+
+To do this, we really need a way to ensure that B is false during the execution. We can't simply produce a row that has values that naturally generate the right results, because we have no example of a row that produced B=false. Therefore we need a way to force the outcome of a condition evaluation independent of the condition value. (The alternative would be to completely understand the expression logic, but it would seem good to avoid this if we don't need it. Or put another way, it would seem good to somehow exploit the fact that postgres itself already understands the expression logic.)
+
+Anyway, supposing we can force the outcome of a condition evaluation, then to test B=false on C5, we would replay the execution for one row. We set A=false, C=true, and D=true (because that is the case in C5), and B=false (because we are forcing that). The executor would evaluate A (as false), then evaluate B (as false), and stop there with an expression outcome of false. As such, we know that all rows matching C5 would be flipped.
+
+Now lets consider another case where the truth table after query execution is this (I'm not sure what logic generates this table, but it doesn't matter for this example):
+
+|    | A     | B          | C          | D          | outcome | AID |
+| -- | ----- | ---------- | ---------- | ---------- | ------- | --- |
+| C1 | true  | ---------- | ---------- | ---------- | true    | NLE |
+| C2 | false | false      | ---------- | ---------- | false   | NLE |
+| C3 | false | true       | false      | ---------- | false   | LE  |
+
+Since C3 is LE, we want to individually test forcing A=true, B=false, and C=true. The truth table has examples for A=true and B=false, but not for C=true. Thus we want to replay A=false, B=true, C=true, but the question remains what to do for D. If execution ends after evaluating, then we don't care about D. If not, there there are two possible approaches. One is to try both D=false and D=true. The other, however, is to replay the values of D that are stored with the rows associated with C3 (but still with A=false, B=true, C=true). If an outcome of true results for any row, then we know that C could be an attack condition. If not, then C is not an attack condition.
+
+### Replay case 2, determining seed material
+
+It can be the case that a condition is never evaluated during query execution, or that no value of a positive condition evaluates to true, or that no value of a negative condition evaluates to false. In this case, we don't know how to seed the noise layer associated with the condition because we don't have any values.
+
+(hmmmmm it might be very expensive or even impossible, in the case of chaff, to find an appropriate value.) zzzz
+
+## Abstract logic examples
 
 These examples cover how the LED logic works, and assume that each condition is independent (i.e. the outcome of one condition does not change the outcome of another condition).
 
@@ -171,35 +265,40 @@ These examples cover how the LED logic works, and assume that each condition is 
 | C1    | 0    | ---------- | 0      | NLE        | NLE    | NLE    | LE     | LE     |
 | C2    | 1    | 1          | 1      | NLE        | NLE    | NLE    | NLE    | NLE    |
 | C3    | 1    | 0          | 0      | NLE        | LE     | 0      | LE     | 0      |
-| drop- | able | cond-      | itions | ---------- | B      | B      | A, B   | A, B   |
+|       |      |            |        | ---------- | B1     | B1     | A1,B1  | A1,B1  |
+
+**How to read the above table:** The left-most column (containing `C1`, `C2`, ...) are the combination labels. The subsequent columns headed `A`, `B`, ..., is the per-conditions boolean outputs. The column headed `out` is the boolean result of the complete expression (0 means exclude the matching rows, 1 means include the rows). Columns headed `case 1`, `case 2`, ..., represent distinct scenarios, and indicate whether each combination is LE, NLE, or zero-effect (special case of LE). (Note that the zero-effect combinations would not explicitly appear in the truth table generated from query execution. We show them here just to be clear.) Finally, the last row in the table shows which conditions are attackable for each case. 'B1' means "B=true is an attack condition".
 
 Case 1:
 
-- No LE combinations, so no flipped rows. All seed material for A and B come from C2 rows.
+- No attackable conditions because 1) there are no LE combinations, and 2) all columns are evaluated at least once. As a result, there are no flipped rows. The dynamic seed material comes from both conditions A and B.
 
 Case 2:
 
 - (This represents attack where A is `dept='CS'` and B is `gender='M'` and there is one woman in the CS dept.)
-- C3 is LE. Dropping B (setting it to true) only changes C3, so the C3 rows can be included (flipped), and B is dropped from dynamic seed material.
+- C3 is LE, so we check the conditions. Forcing B to true only changes the outcome of C3, so B is attackable. Forcing A to false does not change the outcome of C3, so A is not attackable.
+- The C3 rows are therefore flipped (included), and B's seed material is not included in the dynamic seed material.
 
 Case 3:
 
-- (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is.)
-- Same outcome as case 2, but here there are no rows to flip.
-- Note that this example, among others, presumes that condition evaluation by the query engine always stops as soon as C1 is determined to be false. If this is not the case, then  most likely C1 would be split into two combinations, both NLE with `A=false`, and one with `B=true` and one with `B=false`. In this case, the LE logic would need to be smart enough to recognize that setting B to true would not change the outcome of combinations with `A=false`.
+- (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is. Note that in this case, combination C3 doesn't explicitly show up after query execution.)
+- From step 2 of the steps in [Basic approach to LED](#basic-approach-to-led), we would identify B=true as an attackable zero-effect condition because B is never evaluated as false. There are no rows to flip, but B is not included in the dynamic seed materials.
+- Note that this example, among others, presumes that condition evaluation by the query engine always stops as soon as C1 is determined to be false. If this is not the case, then most likely C1 would be split into two combinations, both NLE with `A=false`, and one with `B=true` and one with `B=false`. In this case, the LE logic would need to be smart enough to recognize that setting B to true would not change the outcome of combinations with `A=false`.
 
 Case 4:
 
 - (This represents a case where B and A mostly overlap, but neither is a subset of the other. Note this is extremely rare.)
-- Both C1 and C3 are LE. Dropping A would only change C1, and dropping B would only change C3. An attacker could make an attack with either. Note in particular that flipping the rows associated with C1 or C3 would cause those rows to fall under C2. Since C2 is already NLE, it would remain so after flipping, so we flip the rows for both C1 and C3.
-    - Note here that effectively we are evaluating what would happen if we drop A but not B, and separately evaluating what would happen if we drop B but not A. In other words, we don't evaluate what would happen if we were to drop both A and B together, which would in fact only produce the logic (`true AND true)`.
-- We drop both A and B from dynamic seeding. In this case, the dynamic seeding material is some default value.
+- Both C1 and C3 are LE.
+- Regarding C1, we want to know if forcing A=true changes the outcome. In this particular case, we can see from C2 that there may be cases where forcing A=true changes the expression outcome. Nevertheless we don't know if there are any rows matching C1 with B=true. To find out, we can replay the rows matching C1 while forcing A=true. If any of these rows have an outcome of true, then A=true is an attack condition because forcing A=true doesn't change C2 or C3.
+- Regarding C3, if we force A=false, then this changes C2's outcome and so can't be an attack condition. If we force B=true, the outcome for C3 does change, and no other combination changes, so B=true is an attack condition.
+- In this (extremely rare) case, both A and B are removed from dynamic seeding. In this case, there is no dynamic seeding material and so we can set it to some default value.
 
 Case 5:
 
-- (This represents the case where the rows matching B are a subset of the rows matching A. In other words, whenever A is true, B is also true.)
-- This similar to Case 4, with the exception that there is nothing to flip for C3. This means we include (flip) the rows associated with `C1` and consider neither `A` nor `B` for dynamic noise layer seeding.
-
+- (This represents the case where the rows matching B are a subset of the rows matching A. In other words, whenever A is true, B is also true. Note also that C3 would not explicitly appear in the truth table after query execution.)
+- As with case 3, from step 2 of the steps in [Basic approach to LED](#basic-approach-to-led), we would identify B=true as an attackable zero-effect condition because B is never evaluated as false.
+- Evaluating C1 is similar to that of case 4, so A=true is an attackable condition.
+- We therefore include (flip) the rows associated with `C1` and consider neither `A` nor `B` for dynamic noise layer seeding.
 
 **Example 2**: `A or B`, evaluation order A-->B
 
@@ -208,7 +307,7 @@ Case 5:
 | C1    | 1    | ---------- | 1     | NLE        | NLE    | NLE    | LE     | NLE    |
 | C2    | 0    | 0          | 0     | NLE        | NLE    | NLE    | NLE    | LE     |
 | C3    | 0    | 1          | 1     | NLE        | LE     | 0      | LE     | 0      |
-| drop- | able | cond-      | tions | ---------- | B      | B      | A, B   | B      |
+|       |      |            |       | ---------- | B0     | B0     | A0,B0  | B0     |
 
 Case 1:
 
@@ -216,22 +315,28 @@ Case 1:
 
 Case 2:
 
-- C3 is LE. Dropping B (setting it to false) only changes C3, so the C3 rows can be flipped, and B is dropped from dynamic seed material.
+- C3 is LE. Forcing A to true doesn't change the condition outcome. Forcing B to false changes C3 and no other combinations, so B=false is an attack condition, the C3 rows are flipped, and B is not included in the dynamic seed material.
 
 Case 3:
 
-- (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is.)
-- Dropping B only effect the C3 rows (of which there are none), so drop B from dynamic seeding.
+- (This represents the case where conditions A and B are semantically identical. An attacker might try this for instance to amplify the noise component and try to deduce what the noise is. Condition C3 would not exist in the truth table.)
+- Here B=false is an attack condition because B is never evaluated as true. B is therefore not included in the dynamic seed materials.
 
 Case 4:
 
-- (This represents a case where B and A mostly overlap, but neither is a subset of the other. Note that it is possible that the combined rows from C1 and C3 are enough to pass LCF, even though each combination individually is LE.)
-- Both A and B are droppable. Note that by flipping (excluding) their rows, the bucket in any event becomes LCF and is suppressed.
+- (This represents a rare case where B and A mostly overlap, but neither is a subset of the other. Note that it is possible that the combined rows from C1 and C3 are enough to pass LCF, even though each combination individually is LE.)
+- By a reasoning similar to that for case 4 in example 1, A=false and B=false are attack conditions. Note however that by flipping (excluding) the rows for C1 and C3, the bucket in any event becomes LCF and is suppressed.
 
 Case 5:
 
 - (This represents the case where B is a subset of A. In other words, whenever A is true, B is also true.)
-- Dropping B (set to false) only affects C3, so can be used as an attack. Dropping A affects C1, which is NLE, so can't be used in an attack. Note that the fact that C2 is LE doesn't lead to an attack.
+- Regarding C2 (LE), forcing A=true changes the outcome of C2, and does not change the outcome of other combinations. Therefore A=true is an attack condition. Forcing B=true likewise changes C2 and no other conditions, so B=true is an attack condition.
+- Regarding C3, we already established that A=true is an attack condition and don't need to re-evaluate it. (Nevertheless, in the context of C3 only, A=true is not an attack condition because forcing A=true doesn't change the outcome of C3.)
+zzzz
+
+Regarding forcing B=false, 
+
+Dropping B (set to false) only affects C3, so can be used as an attack. Dropping A affects C1, which is NLE, so can't be used in an attack. Note that the fact that C2 is LE doesn't lead to an attack.
 
 **Example 3:** `A and (B or C)`, evaluation `A-->B-->C`
 
@@ -522,6 +627,29 @@ which indeed now is showing us that there are two instances of `cnt = 23` where 
 
 > TODO: Think about whether an attack is actually possible with an inner select like this
 
+# Dynamic noise layers
+
+It would be very nice if we could eliminate the need for dynamic noise layers. Unfortunately I don't think that is possible. While LED alone solves the first derivative difference attack, which is the reason we needed dynamic noise in the first place, there are attacks against the LED mechanism itself that dynamic noise defends against.
+
+zzzz
+
+The purpose of the dynamic noise layer is to defend against the first derivative difference attack. This is needed because the static noise layers constitute a predictable difference between the "left" and "right" queries in the attack pair. In previous designs, the dynamic noise layers were based on AIDs (UIDs). The dynamic layer was not predictable, because each bucket in the attack has a different set of AIDs, and therefore a different dynamic noise layer.
+
+zzzz
+
+One tricky point about the dynamic layer is that it must not be possible to generate many different dynamic noise layers for what is semantically the same query, thus averaging out the dynamic noise. To avoid this, we use the AIDs themselves in part to seed the dynamic noise layer. Queries with the same semantics will always produce the same set of AIDs.
+
+One of the difficulties with using AIDs with proxy Diffix was the cost of recording them. In the stats-based noise approach, we were not able to collect all of the AIDs, and so used the work-around of recording the min, max, and count. With DB Diffix, it should be reasonable to collect per-AID data, but it may be costly to recompute the set of distinct AIDs when adjusting for Low Effect (LE).
+
+With DB Diffix it appears that we can use the conditions themselves as the basis of dynamic noise layers instead of AIDs. There are two reasons. First, if we are doing Low Effect Detection (LED), then an attacker would not be able to use chaff conditions to average away dynamic noise layers. Second, with tight DB integration, we can do a good job of determining the semantics of each condition, and therefore prevent conditions with different syntax but same semantics.
+
+This opens the possibility of using the seed material from the non-LE (NLE) conditions as the basis for the dynamic noise layers rather than the AIDs. Essentially we can used the combined seed material of all NLE conditions to replace the set of AIDs that we formerly used. This seed material is then added to each individual condition's seed material to compose the per-condition dynamic noise layers (note both LE and NLE conditions still have dynamic noise layers, though the seed material itself comes only from NLE conditions).
+
+Note that we still need per-condition dynamic noise layers with LED. This is because in a difference attack, the condition that isolates the victim will always end up being LE.
+zzzz
+
+ and so is ignored for the purpose of seeding dynamic noise layers. This would lead to the dynamic noise layer being identical on the left and right.)
+
 
 # Seed Materials (equalities)
 
@@ -531,10 +659,8 @@ What we want to do is record every value for every row that led to a row being i
 
 So basic idea is to add each value to the bloom filter when the row is first evaluated. In principle we have the problem of how to remove a value from the bloom filter if a row is removed during re-evaluation, but my guess is that we won't need to worry about it.
 
-
 > TODO: Think about whether an attack is enabled if we don't update the column value bloom filter with row removal.
 
 One good point of using a bloom filter is that they join together nicely with a logical OR operation, which makes it efficient for a distributed computation.
-
 
 > TODO: An open question is how to deal with column indexes. We can address this when we see what information is associated with indexes.
