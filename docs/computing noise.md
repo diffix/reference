@@ -265,10 +265,31 @@ intermediate aggregate is calculated or an anonymized aggregate
 
 #### Intermediate aggregate steps
 
-1. If there are `Ne` or less distinct entities in the group, then use the entity with the lowest absolute contribution as the top group
-2. If there are less than `Ne + Nt` distinct entities, then use the values in the top group (despite there being insufficiently many of them) and continue
+1. If there are less than `Ne` distinct entities in the extreme value group, then use the entity with the lowest absolute contribution as the top group, or
+2. If there are less than `Ne + Nt` distinct entities in total, then use the values that are in the top group and continue with them, despite there being insufficiently many of them
 
 Continue with the common steps below.
+
+Example 1 (`Ne = Nt = 2`):
+
+| AID value | Value |
+| --------- | ----: |
+| 1         |    10 |
+
+There is only a single entity in this set. As such we are in case #1 of there being less than `Ne` (recall `Ne = 2`)
+distinct entities in the extreme value group. We therefore continue using `10` as the top group average. This is assumed to be safe since
+either the value will be suppressed by the low count filter or become part of another aggregate value.
+
+Example 2 (`Ne = Nt = 2`):
+
+| AID value | Value |
+| --------- | ----: |
+| 1         |    10 |
+| 2         |    10 |
+| 3         |     9 |
+
+There are less than `Ne + Nt` (recall both `Ne + Nt = 4`) distinct entities in total. We there apply rule #2 and use the single
+value contributed by `AID[3]` as the top group average.
 
 
 #### Anonymized aggregate
