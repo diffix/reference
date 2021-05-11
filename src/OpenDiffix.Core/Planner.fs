@@ -45,11 +45,6 @@ let private planSort sortExpressions plan =
   | [] -> plan
   | _ -> Plan.Sort(plan, sortExpressions)
 
-let rec private extractAggregators expression =
-  match expression with
-  | FunctionExpr (AggregateFunction _, _) as aggregator -> [ aggregator ]
-  | expr -> expr |> collect extractAggregators
-
 let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) plan =
   if groupingLabels.IsEmpty && aggregators.IsEmpty then
     plan
@@ -78,7 +73,7 @@ let private planSelect query =
 
   let expressions = query.Having :: selectedExpressions @ orderByExpressions
 
-  let aggregators = expressions |> List.collect extractAggregators |> List.distinct
+  let aggregators = expressions |> collectAggregators |> List.distinct
 
   let groupingLabels = query.GroupingSets |> List.collect unwrap |> List.distinct
 
