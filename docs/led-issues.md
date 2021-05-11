@@ -2,31 +2,32 @@
 
 This documents the need for LED, and motivates a number of design decisions. In working through this, we developed the idea of LE noise layers (see [Solution](#solution)), which defends against several new and appears to replace the need for dynamic noise layers altogether.
 
-- [Noise layer notation](#noise-layer-notation)
-- [Background (difference attacks)](#background-difference-attacks)
-  - [Simple difference attack, static noise](#simple-difference-attack,-static-noise)
-  - [First derivative difference attack, static noise](#first-derivative-difference-attack-static-noise)
-  - [First derivative difference attack, static and dynamic noise](#first-derivative-difference-attack-static-and-dynamic-noise)
-  - [Chaff attack](#chaff-attack)
-- [Ideal solution](#ideal-solution)
-  - [Definition of threshold for Low Effect (LE)](#definition-of-threshold-for-low-effect-le)
-  - [Higher noise levels for only LE conditions](#higher-noise-levels-for-only-le-conditions)
-- [Solution space](#solution-space)
-  - [Must sometimes override query execution plan to understand LE conditions](#must-sometimes-override-query-execution-plan-to-understand-le-conditions)
-  - [Which LE conditions do we need to detect?](#which-LE-conditions-do-we-need-to-detect)
-  - [Is dynamic noise without column value adjustment enough?](#is-dynamic-noise-without-column-value-adjustment-enough)
-- [New attacks](#new-attacks)
-  - [Multi-histogram (first derivative difference attack)](#multi-histogram-first-derivative-difference-attack)
-  - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
-- [Solution](#solution)
-  - [Multi-sample JOIN attack](#multi-sample-join-attack)
-  - [Multi-histogram attack](#multi-histogram-attack)
-  - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
-  - [Seeding LE noise layers properly](#seeding-le-noise-layers-properly)
-- [Adjusting when LE = 1 only](#adjusting-when-le--1-only)
-- [Do we still need dynamic noise layers?](#do-we-still-need-dynamic-noise-layers)
-  - [First derivative difference attack, revisited](#first-derivative-difference-attack-revisited)
-  - [Chaff attack, revisited](#chaff-attack-revisited)
+- [Issues with LED](#issues-with-led)
+  - [Noise layer notation](#noise-layer-notation)
+  - [Background (difference attacks)](#background-difference-attacks)
+    - [Simple difference attack, static noise](#simple-difference-attack-static-noise)
+    - [First derivative difference attack, static noise](#first-derivative-difference-attack-static-noise)
+    - [First derivative difference attack, static and dynamic noise](#first-derivative-difference-attack-static-and-dynamic-noise)
+    - [Chaff attack](#chaff-attack)
+  - [Ideal solution](#ideal-solution)
+    - [Definition of threshold for Low Effect (LE)](#definition-of-threshold-for-low-effect-le)
+    - [Higher noise levels for only LE conditions](#higher-noise-levels-for-only-le-conditions)
+  - [Solution space](#solution-space)
+    - [Must sometimes override query execution plan to understand LE conditions](#must-sometimes-override-query-execution-plan-to-understand-le-conditions)
+    - [Which LE conditions do we need to detect?](#which-le-conditions-do-we-need-to-detect)
+    - [Is dynamic noise without column value adjustment enough?](#is-dynamic-noise-without-column-value-adjustment-enough)
+  - [New attacks](#new-attacks)
+    - [Multi-histogram (first derivative difference attack)](#multi-histogram-first-derivative-difference-attack)
+    - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
+  - [Solution](#solution)
+    - [Multi-sample JOIN attack](#multi-sample-join-attack)
+    - [Multi-histogram attack](#multi-histogram-attack)
+    - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
+    - [Seeding LE noise layers properly](#seeding-le-noise-layers-properly)
+  - [Adjusting when LE = 1 only](#adjusting-when-le--1-only)
+  - [Do we still need dynamic noise layers?](#do-we-still-need-dynamic-noise-layers)
+    - [First derivative difference attack, revisited](#first-derivative-difference-attack-revisited)
+    - [Chaff attack, revisited](#chaff-attack-revisited)
 
 ## Noise layer notation
 
@@ -44,7 +45,7 @@ Examples are:
 
 * SA: Static noise layer for condition A
 * DXn: Dynamic noise layer for condition Xn
-* LC: LE noise layer for condition C
+* LIC: LE noise layer for LE condition I and NLE condition C
 
 Dynamic noise layers depend on the AID Value Sets (AIDVSs) for seeding material. As a result, different dynamic noise layers for the same condition but in different buckets will have different noise values. This is denoted with a digit after the D:
 
@@ -589,6 +590,7 @@ By way of notation, *LE0* is an LE condition that matches nothing (i.e. a chaff 
 
 By and large the issue here is what we assign to the `LE_column_value`, especially for LE0. In the following, we refer to the `LE_column_value` as simply the value.
 
+Note that there may in fact not be an NLE column. In this case, we may use some default value (i.e. the same way that Insights adds a default noise layer for queries with no conditions or `GROUP BY`), or leave out the three NLE-associated tokens. In general, a query with no NLE conditions is not particularly interesting as an attack because it doesn't help the attacker learn any unknown attributes or the exact count of any attributes. It might in principle be used in a membership inference attack (where the only purpose is to determine if a given AIDV is present in the database), but the noise layer derived from the LE condition seed material prevents this (as does [adjusting LE1 AIDs](#adjusting-when-le--1-only)).
 
 **Design 1: Use NULL for column value for LE0 conditions**
 
@@ -617,13 +619,13 @@ WHERE aid_column + 2 <> 12347                -- not I
 ...
 ```
 
-If the victim is in the database, then all of these conditions will generate the same noise. If the victim is not in the database, then they will generate different noise.
+If the victim is in the database, then all of these conditions will generate the same noise. If the victim is not in the database, then they each get a uniquely distinct noise value due to the right hand side values all differing.
 
 **Design 3: Like design 2, but give LE+ conditions an additional naive static analysis layer:**
 
 The idea here is that we give LE+ conditions two noise layers, the one seeded from observed value, and another one seeded from a naive static analysis. In this case, the conditions from design 2 will all produce a different noise value, and so from casual observation behave just like LE0 conditions.
 
-Instead, the attack can take the average of the queries from design 2, and compare them with a query that has o condition. If the victim is in the table, then the answers to the queries are:
+Instead, the attack can take the average of the queries from design 2, and compare them with a query that has no condition. If the victim is in the table, then the answers to the queries are:
 
 ```
 cnt + 1 + LI + L1I
