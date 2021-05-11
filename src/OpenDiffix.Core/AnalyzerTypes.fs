@@ -19,7 +19,7 @@ type TargetEntry = { Expression: Expression; Alias: string }
 type GroupingSet = GroupingSet of Expression list
 
 type QueryRange =
-  | SubQuery of query: Query
+  | SubQuery of query: Query * alias: string
   | Join of Join
   | RangeTable of RangeTable
 

@@ -11,7 +11,7 @@ let private planFrom =
   function
   | RangeTable (table, _alias) -> Plan.Scan table
   | Join join -> planJoin join
-  | SubQuery query -> plan query
+  | SubQuery (query, _alias) -> plan query
 
 let rec private extractSetFunctions expression =
   match expression with

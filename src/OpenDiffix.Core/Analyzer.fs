@@ -187,7 +187,7 @@ let selectColumnsFromQuery columnIndices innerQuery =
 
   {
     TargetList = selectedColumns
-    From = SubQuery(SelectQuery innerQuery)
+    From = SubQuery(SelectQuery innerQuery, "innerQuery")
     Where = booleanTrueExpression
     GroupingSets = []
     OrderBy = []

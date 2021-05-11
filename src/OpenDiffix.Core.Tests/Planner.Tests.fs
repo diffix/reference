@@ -133,7 +133,7 @@ let ``sub-query plan`` () =
   let query =
     { subQuery with
         TargetList = [ selectColumn 0 ]
-        From = SubQuery(SelectQuery subQuery)
+        From = SubQuery(SelectQuery subQuery, "subQuery")
     }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
