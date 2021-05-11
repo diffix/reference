@@ -27,6 +27,8 @@ module String =
   let equalsI s1 s2 =
     String.Equals(s1, s2, StringComparison.InvariantCultureIgnoreCase)
 
+  let toLower (s: string) = s.ToLower()
+
 module Result =
   let value (result: Result<'T, string>) : 'T =
     match result with
@@ -72,3 +74,12 @@ module Table =
     |> function
     | Some column -> column
     | None -> failwith $"Could not find column `{columnName}` in table `{table.Name}`"
+
+module AnonymizationParams =
+  /// Returns whether the given column in the table is an AID column.
+  let isAidColumn anonParams tableName columnName =
+    anonParams.TableSettings
+    |> Map.tryFind tableName
+    |> function
+    | Some tableSettings -> tableSettings.AidColumns |> List.exists (String.equalsI columnName)
+    | None -> false
