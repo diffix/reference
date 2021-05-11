@@ -172,15 +172,16 @@ These steps are described individually below.
 For each d-row or i-row that is processed, the following steps are taken:
 
 - if **all AID instances** are `null` for a given row then it is discarded
-- rows where at least some AID instances have a value are processed per AID:
+- rows where at least one AID instance has a value are processed per AID:
   - if the AID value is `null`, then aggregate* the value into an `<unaccounted for>`
     variable, and continue
   - if the AID value has a value, then aggregate* the value into a variable for
     that particular AID value
   - if the AID value is set, but the value to be aggregated is `null`, then keep
     a record of the AID value for seeding purposes, but do not alter any aggregate value.
+    Note: we are unlikely to use AID values for seeding with Cloak and Knox.
 
-* aggregate: you increment a count by 1 in the case of a `count` aggregator and that you increase a sum by the given value in the case of a `sum` aggregator.
+* aggregate: increment a count by 1 in the case of a `count` aggregator; increase a sum by the given value in the case of a `sum` aggregator.
 
 As an example, if we have the following table:
 
@@ -197,7 +198,7 @@ Then the processing happens as follows for `AID1` when producing a `count` aggre
 - we discard the first row as both `AID1` and `AID2` have an AID value of `null`
 - We attribute `1` to `<unaccounted for>`
 - We attribute `1` to `AID1[1]`
-- We increase the contribution for `AID1[1]` by 1 to `2`
+- We increase the contribution for `AID1[1]` by `1` to `2`
 - We attribute `1` to `AID1[2]`
 
 For a `sum` aggregate, the same table would be processed as follows
@@ -205,7 +206,7 @@ For a `sum` aggregate, the same table would be processed as follows
 - we discard the first row as both `AID1` and `AID2` have an AID value of `null`
 - We attribute `20` to `<unaccounted for>`
 - We attribute `30` to `AID1[1]`
-- We increase the contribution for `AID1[1]` by 40 to `70`
+- We increase the contribution for `AID1[1]` by `40` to `70`
 - We attribute `50` to `AID1[2]`
 
 
@@ -253,15 +254,14 @@ we take the following steps per AID instance:
 
 #### Common steps
 
-1. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
-2. Set aside the `<unaccounted for>` value
-2. Sort the remaining AID value contributions in descending order by value
-3. Take the first `Ne` highest contributions as the extreme values.
-4. Take next `Nt` highest contributions as the top count.
-5. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aid_values` distinct AID values, then use that value as the top group average
+1. Set aside the `<unaccounted for>` value
+2. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
+3. Sort the remaining AID value contributions in descending order by value
+4. Take the first `Ne` highest contributions as the extreme values.
+5. Take the next `Nt` highest contributions as the top count.
 
-Then continue with the additional steps outlined below depending on whether an
-intermediate aggregate is calculated or an anonymized aggregate
+Continue with the additional steps outlined below depending on whether an
+intermediate or an anonymized aggregate is being calculated.
 
 #### Intermediate aggregate steps
 
