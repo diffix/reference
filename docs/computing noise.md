@@ -26,6 +26,14 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
       - [Unaccounted for values](#unaccounted-for-values)
         - [AID1](#aid1-1)
         - [AID2](#aid2-1)
+      - [Positive and negative values](#positive-and-negative-values)
+        - [AID1](#aid1-2)
+          - [Positive values for AID1](#positive-values-for-aid1)
+          - [Negative values for AID1](#negative-values-for-aid1)
+        - [AID2](#aid2-2)
+          - [Positive values for AID2](#positive-values-for-aid2)
+          - [Negative values for AID2](#negative-values-for-aid2)
+          - [Producing the flattened aggregate](#producing-the-flattened-aggregate)
     - [Discussion about safety for <unaccounted for> values](#discussion-about-safety-for-unaccounted-for-values)
 - [Rationale](#rationale)
 
@@ -139,6 +147,11 @@ The process for flattening extreme values is done separately for each AID instan
 dataset with AID instances `[email-1; email-2; company]`, the process is repeated three times, even though
 there are only two kinds of AIDs. For each AID instance, we calculate the absolute amount of flattening required.
 We use the highest flattening and noise parameters calculated across all the AID instances.
+
+Flattening is done for positive and negative values separately before the values are recombined.
+This way both positive and negative extreme values are flattened. The description provided below is for the positive values,
+but the same approach can be taken for negative values. Noise is added proportional to the largest noise scale across all
+AID instances (whether from the calculations of positive or negative values).
 
 We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with two significant
 differences:
@@ -592,6 +605,119 @@ The procedure and result is identical to AID1.
 
 The final aggregate is 60. If it is an anonymized aggregate then we additionally add noise proportional to `noise scale`.
 
+
+#### Positive and negative values
+
+| AID1 value sets | AID2 value sets | Value |
+| --------------- | --------------- | ----: |
+| AID1[1]         | AID2[1]         |  1000 |
+| AID1[1, 2, 3]   | AID2[2]         |   600 |
+| AID1[3]         | AID2[3]         |    10 |
+| AID1[3, 4]      | AID2[4]         |    10 |
+| AID1[5]         | AID2[5, 6]      |   -10 |
+| AID1[6]         | AID2[6]         |   -10 |
+| AID1[7]         | AID2[7, 8, 9]   |  -600 |
+| AID1[8]         | AID2[9]         | -1000 |
+
+We apply the process per AID (in all cases with `Ne = Nt = 2`)
+
+##### AID1
+
+| AID1 value | Value |
+| ---------- | ----: |
+| 1          |  1200 |
+| 3          |   215 |
+| 2          |   200 |
+| 4          |     5 |
+| 5          |   -10 |
+| 6          |   -10 |
+| 7          |  -500 |
+| 8          | -1000 |
+
+- We derive per AID value contributions
+- We now split the dataset in two by their sign and process them individually.
+
+###### Positive values for AID1
+
+| AID1 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 1          |  1200 |                  1097.5 |
+| 2          |   215 |                  112.50 |
+| 3          |   200 |                         |
+| 4          |     5 |                         |
+
+- Top group average is `102.5`, leading to a `flattening` of `1210` and a
+  `flattened aggregate` of 410
+- `noise scale` is 102.5
+
+###### Negative values for AID1
+
+| AID1 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 8          | -1000 |                     990 |
+| 7          |  -500 |                     490 |
+| 6          |   -10 |                         |
+| 5          |   -10 |                         |
+
+- Top group average is `-10`, leading to a `flattening` of `1480` and a
+  `flattened aggregate` of `-40`
+- `noise scale` is 10
+
+
+##### AID2
+
+| AID2 value | Value |
+| ---------- | ----: |
+| 1          |  1000 |
+| 2          |   600 |
+| 3          |    10 |
+| 4          |    10 |
+| 5          |    -5 |
+| 6          |   -15 |
+| 7          |  -200 |
+| 8          |  -200 |
+| 9          | -1200 |
+
+- We derive per AID value contributions
+- We now split the dataset in two by their sign and process them individually.
+
+###### Positive values for AID2
+
+| AID2 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 1          |  1000 |                     990 |
+| 2          |   600 |                     590 |
+| 3          |    10 |                         |
+| 4          |    10 |                         |
+
+- Top group average is `10`, leading to a `flattening` of `1580`
+  and a `flattened aggregate` of `40`
+- Noise scale is 10
+
+###### Negative values for AID2
+
+| AID2 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 9          | -1200 |                  1092.5 |
+| 8          |  -200 |                    92.5 |
+| 7          |  -200 |                         |
+| 6          |   -15 |                         |
+| 5          |    -5 |                         |
+
+- Top group average is `107.5`, leading to a `flattening` of `1185` and a
+  `flattened aggregate` of `-435`
+- The noise scale is `87`
+
+###### Producing the flattened aggregate
+
+- For the positive values, AID2 has the larger flattening (`1580` vs `1210`)
+  so we use the `flattened aggregate` of `410`
+- For the negative values, AID1 has the larger flattening (`1480` vs `1185`)
+  so we use the `flattened aggregate` of `-40`
+- The total flattened aggregate becomes `410 - 40 = 370`
+- In the case of an anonymizing aggregate, we use the noise scale of `102.5` from
+  the positive values of AID1 as it is the largest. The final aggregate
+  becomes `370 + noise proportional to 102.5`.
 
 ### Discussion about safety for <unaccounted for> values
 
