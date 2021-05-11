@@ -145,6 +145,23 @@ type private DiffixLowCount(aidSets: Set<AidHash> list option) =
       | None -> true |> Boolean
       | Some aidSets -> Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
 
+type private MergeAids(aidSet: Set<Value>) =
+  new() = MergeAids(Set.empty)
+
+  interface IAggregator with
+    member this.Transition values =
+      match values with
+      | [ Null ] -> this
+      | [ Value.List aidValues ] ->
+          aidValues //
+          |> List.fold (fun acc aid -> Set.add aid acc) aidSet
+          |> MergeAids
+      | [ aidValue ] -> aidSet |> Set.add aidValue |> MergeAids
+      | _ -> invalidArgs values
+      :> IAggregator
+
+    member this.Final ctx = aidSet |> Set.toList |> Value.List
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -159,4 +176,5 @@ let create _ctx fn : T =
   | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount() :> T
   | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct() :> T
   | AggregateFunction (DiffixLowCount, _) -> DiffixLowCount() :> T
+  | AggregateFunction (MergeAids, _) -> MergeAids() :> T
   | _ -> failwith "Invalid aggregator"

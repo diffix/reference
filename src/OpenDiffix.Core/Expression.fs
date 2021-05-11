@@ -44,6 +44,7 @@ let typeOfAggregate fn args =
       match typeOfList args with
       | ListType IntegerType -> IntegerType
       | _ -> RealType
+  | MergeAids -> ListType MIXED_TYPE
 
 /// Resolves the type of an expression.
 let rec typeOf expression =

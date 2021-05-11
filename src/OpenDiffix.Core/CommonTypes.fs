@@ -62,6 +62,7 @@ type AggregateFunction =
   | DiffixCount
   | DiffixLowCount
   | Sum
+  | MergeAids
 
 type AggregateOptions =
   {

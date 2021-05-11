@@ -51,8 +51,27 @@ let anonymizedAggregationContext =
 
 let evaluateAggregator = evaluateAggregator context
 
+let mergeAids = AggregateFunction(MergeAids, AggregateOptions.Default)
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
+
+[<Fact>]
+let ``merge bucket aids`` () =
+  rows
+  |> evaluateAggregator mergeAids [ aidColumn ]
+  |> should
+       equal
+       (Value.List [
+         Integer 1L
+         Integer 2L
+         Integer 3L
+         Integer 4L
+         Integer 5L
+         Integer 6L
+         Integer 7L
+         Integer 8L
+         Integer 9L
+        ])
 
 [<Fact>]
 let ``anon count distinct column`` () =
