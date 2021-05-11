@@ -163,7 +163,7 @@ The algorithm used for flattening consists of multiple phases.
 - aggregating values per AID instance
 - redistributing values
 - per AID instance flattening computation
-- applying flattening and potentially noise
+- applying flattening. For anonymizing aggregators additionally apply noise
 
 These steps are described individually below.
 
