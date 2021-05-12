@@ -153,6 +153,8 @@ This way both positive and negative extreme values are flattened. The descriptio
 but the same approach can be taken for negative values. Noise is added proportional to the largest noise scale across all
 AID instances (whether from the calculations of positive or negative values).
 
+> TODO: The flattening of positive vs negative is unlikely correct. It should not be implemented as is. See issue: https://github.com/diffix/reference/issues/153
+
 We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with two significant
 differences:
 
