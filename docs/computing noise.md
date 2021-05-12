@@ -272,8 +272,8 @@ we take the following steps per AID instance:
 1. Set aside the `<unaccounted for>` value
 2. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
 3. Sort the remaining AID value contributions in descending order by value
-4. Take the first `Ne` highest contributions as the extreme values.
-5. Take the next `Nt` highest contributions as the top count.
+4. Take the first `Ne` highest contributions as the extreme values
+5. Take the next `Nt` highest contributions as the top count
 
 Continue with the additional steps outlined below depending on whether an
 intermediate or an anonymized aggregate is being calculated.
@@ -315,7 +315,7 @@ If there are fewer than `Ne + Nt` distinct entities in the bucket, then abort th
 
 1. Calculate the average of the `Nt` values
 2. Calculate the `total flattening` as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
-3. Create `flattened aggregate` as the aggregate of all AID contributes less the `total flattening`.
+3. Create `flattened aggregate` as the aggregate of all AID contributes less the `total flattening`
 4. Calculate the `average contribution` as the `flattened aggregate` divided by the number of distinct AID values
 5. Calculate `noise scale` as the larger of `average contribution` and half of the top group average
 6. Take the `<unaccounted for>` value and reduce it by `total flattening`
