@@ -1,32 +1,33 @@
-# Why LED is so hard
+# Issues with LED
 
 This documents the need for LED, and motivates a number of design decisions. In working through this, we developed the idea of LE noise layers (see [Solution](#solution)), which defends against several new and appears to replace the need for dynamic noise layers altogether.
 
-- [Noise layer notation](#noise-layer-notation)
-- [Background (difference attacks)](#background-difference-attacks)
-  - [Simple difference attack, static noise](#simple-difference-attack,-static-noise)
-  - [First derivative difference attack, static noise](#first-derivative-difference-attack-static-noise)
-  - [First derivative difference attack, static and dynamic noise](#first-derivative-difference-attack-static-and-dynamic-noise)
-  - [Chaff attack](#chaff-attack)
-- [Ideal solution](#ideal-solution)
-  - [Definition of threshold for Low Effect (LE)](#definition-of-threshold-for-low-effect-le)
-  - [Higher noise levels for only LE conditions](#higher-noise-levels-for-only-le-conditions)
-- [Solution space](#solution-space)
-  - [Must sometimes override query execution plan to understand LE conditions](#must-sometimes-override-query-execution-plan-to-understand-le-conditions)
-  - [Which LE conditions do we need to detect?](#which-LE-conditions-do-we-need-to-detect)
-  - [Is dynamic noise without column value adjustment enough?](#is-dynamic-noise-without-column-value-adjustment-enough)
-- [New attacks](#new-attacks)
-  - [Multi-histogram (first derivative difference attack)](#multi-histogram-first-derivative-difference-attack)
-  - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
-- [Solution](#solution)
-  - [Multi-sample JOIN attack](#multi-sample-join-attack)
-  - [Multi-histogram attack](#multi-histogram-attack)
-  - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
-  - [Seeding LE noise layers properly](#seeding-le-noise-layers-properly)
-- [Adjusting when LE = 1 only](#adjusting-when-le--1-only)
-- [Do we still need dynamic noise layers?](#do-we-still-need-dynamic-noise-layers)
-  - [First derivative difference attack, revisited](#first-derivative-difference-attack-revisited)
-  - [Chaff attack, revisited](#chaff-attack-revisited)
+- [Issues with LED](#issues-with-led)
+  - [Noise layer notation](#noise-layer-notation)
+  - [Background (difference attacks)](#background-difference-attacks)
+    - [Simple difference attack, static noise](#simple-difference-attack-static-noise)
+    - [First derivative difference attack, static noise](#first-derivative-difference-attack-static-noise)
+    - [First derivative difference attack, static and dynamic noise](#first-derivative-difference-attack-static-and-dynamic-noise)
+    - [Chaff attack](#chaff-attack)
+  - [Ideal solution](#ideal-solution)
+    - [Definition of threshold for Low Effect (LE)](#definition-of-threshold-for-low-effect-le)
+    - [Higher noise levels for only LE conditions](#higher-noise-levels-for-only-le-conditions)
+  - [Solution space](#solution-space)
+    - [Must sometimes override query execution plan to understand LE conditions](#must-sometimes-override-query-execution-plan-to-understand-le-conditions)
+    - [Which LE conditions do we need to detect?](#which-le-conditions-do-we-need-to-detect)
+    - [Is dynamic noise without column value adjustment enough?](#is-dynamic-noise-without-column-value-adjustment-enough)
+  - [New attacks](#new-attacks)
+    - [Multi-histogram (first derivative difference attack)](#multi-histogram-first-derivative-difference-attack)
+    - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
+  - [Solution](#solution)
+    - [Multi-sample JOIN attack](#multi-sample-join-attack)
+    - [Multi-histogram attack](#multi-histogram-attack)
+    - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
+    - [Seeding LE noise layers properly](#seeding-le-noise-layers-properly)
+  - [Adjusting when LE = 1 only](#adjusting-when-le--1-only)
+  - [Do we still need dynamic noise layers?](#do-we-still-need-dynamic-noise-layers)
+    - [First derivative difference attack, revisited](#first-derivative-difference-attack-revisited)
+    - [Chaff attack, revisited](#chaff-attack-revisited)
 
 ## Noise layer notation
 
@@ -44,7 +45,7 @@ Examples are:
 
 * SA: Static noise layer for condition A
 * DXn: Dynamic noise layer for condition Xn
-* LC: LE noise layer for condition C
+* LIC: LE noise layer for LE condition I and NLE condition C
 
 Dynamic noise layers depend on the AID Value Sets (AIDVSs) for seeding material. As a result, different dynamic noise layers for the same condition but in different buckets will have different noise values. This is denoted with a digit after the D:
 
@@ -189,8 +190,6 @@ On the other hand, in this particular example there are 3x2=6 noise layers assoc
 ### Higher noise levels for only LE conditions
 
 Along the lines of increasing noise, another idea would be to increase the amount of noise for the noise layers associated with LE conditions.
-
-> TODO: run experiments to see how much noise is needed to deal with N/N+1 difference attacks
 
 ## Solution space
 
@@ -432,15 +431,17 @@ There are examples of this attack at [https://github.com/diffix/experiments/tree
 
 ## Solution
 
-The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every non-LE condition.
+The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every non-LE condition. (In other words, every LE condition has a separate noise layer for every NLE condition.)
+
+> TODO: Find ways to reduce the number of LE noise layers, otherwise we end up with a number of noise layers equal to the product of NLE and LE conditions.
 
 The LE noise layer is seeded as follows:
 
-`[static_condition_materials, LE_static_condition_materials]`
+`[NLE_static_condition_materials, LE_static_condition_materials]`
 
 Where:
 
-* The `static_condition_materials` are the same seed materials used for normal static conditions
+* The `NLE_static_condition_materials` are the same seed materials used for normal static conditions
 * The `LE_static_condition_materials` are the static seed materials for the LE condition itself
 
 ### Multi-sample JOIN attack
@@ -577,11 +578,86 @@ Another way would be to run a separate query with `ssn = '123-45-6789'` just to 
 
 The problem with both of the above approaches is that they fail with chaff conditions, since in those cases there is *never* a hit. The problem with this is that it leads to an attack whereby the attacker can detect whether seeding succeeded or not. 
 
-> TODO: Need to write down this attack
-
 Another approach might be static analysis of the condition. Problem is that I'm not sure how to do this for complex string matching (`LIKE` for instance).
 
 > TODO: Need to think more about static analysis for seeding. Though my current thinking is that indeed `=` and `<>` need to be done with static analysis, and we can deal with `LIKE` and `substring()` separately.
+
+In the following, we give some strawman examples of how LE noise layers could be seeded, and the problem with each approach.
+
+By way of notation, *LE0* is an LE condition that matches nothing (i.e. a chaff condition). *LE+* is an LE condition that matches at least one AID. Note that an LE-noise layer is seeded by at least as follows:
+
+```
+[NLE_column_name, operator, NLE_column_value, LE_column_name, operator, LE_column_value]
+```
+
+By and large the issue here is what we assign to the `LE_column_value`, especially for LE0. In the following, we refer to the `LE_column_value` as simply the value.
+
+Note that there may in fact not be an NLE column. In this case, we may use some default value (i.e. the same way that Insights adds a default noise layer for queries with no conditions or `GROUP BY`), or leave out the three NLE-associated tokens. In general, a query with no NLE conditions is not particularly interesting as an attack because it doesn't help the attacker learn any unknown attributes or the exact count of any attributes. It might in principle be used in a membership inference attack (where the only purpose is to determine if a given AIDV is present in the database), but the noise layer derived from the LE condition seed material prevents this (as does [adjusting LE1 AIDs](#adjusting-when-le--1-only)).
+
+**Design 1: Use NULL for column value for LE0 conditions**
+
+In this design, LE+ conditions are assigned the observed (`LE_column_value`) value, and LE0 conditions are assigned `NULL`. With this design, *every* LE0 condition is given the same noise value. This leads to a *membership inference attack* where we determine if a given user is in the database or not. The attack has a series of queries with the following WHERE clauses:
+
+```
+WHERE not X1
+WHERE not X2
+...
+WHERE not Xn
+WHERE not I
+```
+
+The Xn are chaff conditions. All the queries with Xn have the same noise layer, so literally all of the answers for those queries will be identical. If I is not in the database, then the last (`WHERE not I`) query will also produce the identical answer. If I is in the database, the last query will produce a different answer, thus revealing I's membership.
+
+**Design 2: LE0 conditions get a value from naive static analysis of the SQL:**
+
+The idea here is that LE+ conditions are assigned a value from observation, and LE0 conditions are assigned a value from a naive static analysis (i.e. merely use the right-hand-side (RHS) string). The reason that LE+ conditions are assigned a value from observation is to prevent a *seed averaging* attack, whereby the same conditions produces different seeds, and the noise is averaged out.
+
+The Design 1 attack no longer works because each query produces a different noise value. Instead, what the attack can do is to generate a series of conditions that all identify the same entity. For instance:
+
+```
+WHERE aid_column <> 12345                    -- not I
+WHERE aid_column + 1 <> 12346                -- not I
+WHERE aid_column + 2 <> 12347                -- not I
+...
+```
+
+If the victim is in the database, then all of these conditions will generate the same noise. If the victim is not in the database, then they each get a uniquely distinct noise value due to the right hand side values all differing.
+
+**Design 3: Like design 2, but give LE+ conditions an additional naive static analysis layer:**
+
+The idea here is that we give LE+ conditions two noise layers, the one seeded from observed value, and another one seeded from a naive static analysis. In this case, the conditions from design 2 will all produce a different noise value, and so from casual observation behave just like LE0 conditions.
+
+Instead, the attack can take the average of the queries from design 2, and compare them with a query that has no condition. If the victim is in the table, then the answers to the queries are:
+
+```
+cnt + 1 + LI + L1I
+cnt + 1 + LI + L2I
+...
+```
+
+Where LI is the LE layer from observation, and L1I, L2I etc. are the layers from naive static analysis.
+
+If the victim is not in the table, then we get:
+
+
+```
+cnt + L1I
+cnt + L2I
+...
+```
+
+Finally, the answer for the query without the condition is:
+
+```
+cnt + baseNoise
+```
+
+Unless LI is very close to zero, the average of the set of answers with the victim will be much different from the answer without the condition. By contrast, the average of the set of answers without the victim will be relatively close to the answer without the condition. (Note here that the above is not including all the noise layers, but the basic principle still holds.)
+
+**Design 4: Smarter static evaluation:**
+
+Perhaps the right answer is to do smarter static evaluation, or more to the point to limit ourselves to clean conditions (at least for now) while we work on smarter static evaluation. I'm convinced from work a couple years ago that we can do good static evaluation for math operations. For string operations we'll have to do more work, or in the worst case disallow string operations for all LE conditions.
+
 
 ## Adjusting when LE = 1 only
 
