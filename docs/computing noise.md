@@ -280,8 +280,8 @@ intermediate or an anonymized aggregate is being calculated.
 
 #### Intermediate aggregate steps
 
-1. If there are less than `Ne` distinct entities in the extreme value group, then use the entity with the lowest absolute contribution as the top group, or
-2. If there are less than `Ne + Nt` distinct entities in total, then use the values that are in the top group and continue with them, despite there being insufficiently many of them
+1. If there are fewer than `Ne` distinct entities in the extreme value group, then use the entity with the lowest absolute contribution as the top group, or
+2. If there are fewer than `Ne + Nt` distinct entities in total, then use the values that are in the top group and continue with them, despite there being insufficiently many of them
 
 Continue with the common steps below.
 
@@ -291,7 +291,7 @@ Example 1 (`Ne = Nt = 2`):
 | --------- | ----: |
 | 1         |    10 |
 
-There is only a single entity in this set. As such we are in case #1 of there being less than `Ne` (recall `Ne = 2`)
+There is only a single entity in this set. As such we are in case #1 of there being fewer than `Ne` (recall `Ne = 2`)
 distinct entities in the extreme value group. We therefore continue using `10` as the top group average. This is assumed to be safe since
 either the value will be suppressed by the low count filter or become part of another aggregate value.
 
@@ -303,13 +303,13 @@ Example 2 (`Ne = Nt = 2`):
 | 2         |    10 |
 | 3         |     9 |
 
-There are less than `Ne + Nt` (recall both `Ne + Nt = 4`) distinct entities in total. We there apply rule #2 and use the single
+There are fewer than `Ne + Nt` (recall both `Ne + Nt = 4`) distinct entities in total. We there apply rule #2 and use the single
 value contributed by `AID[3]` as the top group average.
 
 
 #### Anonymized aggregate
 
-If there are less than `Ne + Nt` many distinct entities in the bucket, then abort the algorithm and return `null` to indicate that there were was not enough data, otherwise continue.
+If there are fewer than `Ne + Nt` distinct entities in the bucket, then abort the algorithm and return `null` to indicate that there were was not enough data, otherwise continue.
 
 #### Common steps part #2
 
