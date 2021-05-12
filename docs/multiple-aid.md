@@ -8,9 +8,9 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
 
 # Multiple AIDs columns
 
-A table may have one or more AID columns (columns labeled as being AIDs). When there is more than one AID instance in a query (either because there are multiple AID columns in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly and is also robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
+A table may have one or more AID columns (columns labelled as being AIDs). When there is more than one AID instance in a query (either because there are multiple AID columns in a table or tables have been joined), by default, Diffix treats them as distinct. In other words, as though they refer to different entities. In so doing, Diffix handles AIDs of different types seamlessly and is also robust in cases where `JOIN` operations incorrectly mix AIDs together (i.e. a row for user1 is joined with a row for user2).
 
-We use the nomenclature `AIDX[Y1]` to describe that a row has AID column `AIDX` and that it belongs to the entity identified by AID value `Y1`. For example `AIDX` might be `send_email` and `Y1` might be `sue1@gmail.com`, in which case a row might have the AID `send_email[sue1@gmail.com]`.
+We use the nomenclature `AIDX[Y1]` to describe that a row has AID column `AIDX` and that it belongs to the entity identified by AID value `Y1`. For example, `AIDX` might be `send_email` and `Y1` might be `sue1@gmail.com`, in which case a row might have the AID `send_email[sue1@gmail.com]`.
 If the table additionally contains a second AID column `recipient_email` then the same row might be fully described through the pair of AIDs `[send_email[sue1@gmail.com]; recipient_email[bob6@yahoo.com]]`.
 
 If a table is joined with itself, then the AIDs from the left and right side of the join are treated as distinct.

@@ -21,6 +21,7 @@ let typeOfScalarFunction fn args =
   | Not
   | And
   | Equals
+  | IsNull
   | Or
   | Lt
   | LtE
@@ -65,6 +66,8 @@ let rec evaluateScalarFunction fn args =
   | And, [ _; Boolean false ] -> Boolean false
   | Or, [ Boolean true; _ ] -> Boolean true
   | Or, [ _; Boolean true ] -> Boolean true
+
+  | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
   // From now on, if the unary or binary function gets a `Null` argument, we return `Null` directly.
   | _, [ Null ] -> Null

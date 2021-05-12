@@ -43,6 +43,7 @@ type ScalarFunction =
   | Add
   | Subtract
   | Equals
+  | IsNull
   | Not
   | And
   | Or

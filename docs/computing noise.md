@@ -6,8 +6,14 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
     - [Pseudo-AIDs (or multi AID values)](#pseudo-aids-or-multi-aid-values)
     - [Configuration](#configuration)
   - [Flattening - Determining extreme and top values](#flattening---determining-extreme-and-top-values)
+    - [Aggregating values per AID instance](#aggregating-values-per-aid-instance)
     - [Redistribution of values](#redistribution-of-values)
-    - [Algorithm](#algorithm)
+    - [Per AID instance flattening computation](#per-aid-instance-flattening-computation)
+      - [Common steps](#common-steps)
+      - [Intermediate aggregate steps](#intermediate-aggregate-steps)
+      - [Anonymized aggregate](#anonymized-aggregate)
+      - [Common steps part #2](#common-steps-part-2)
+    - [Applying flattening and noise](#applying-flattening-and-noise)
     - [Examples](#examples)
       - [Early termination](#early-termination)
       - [Insufficient data](#insufficient-data)
@@ -17,6 +23,18 @@ Please consult the [glossary](glossary.md) for definitions of terms used in this
         - [AID1](#aid1)
         - [AID2](#aid2)
         - [AID3](#aid3)
+      - [Unaccounted for values](#unaccounted-for-values)
+        - [AID1](#aid1-1)
+        - [AID2](#aid2-1)
+      - [Positive and negative values](#positive-and-negative-values)
+        - [AID1](#aid1-2)
+          - [Positive values for AID1](#positive-values-for-aid1)
+          - [Negative values for AID1](#negative-values-for-aid1)
+        - [AID2](#aid2-2)
+          - [Positive values for AID2](#positive-values-for-aid2)
+          - [Negative values for AID2](#negative-values-for-aid2)
+          - [Producing the flattened aggregate](#producing-the-flattened-aggregate)
+    - [Discussion about safety for <unaccounted for> values](#discussion-about-safety-for-unaccounted-for-values)
 - [Rationale](#rationale)
 
 # Computing Per-AID Contributions
@@ -130,11 +148,18 @@ dataset with AID instances `[email-1; email-2; company]`, the process is repeate
 there are only two kinds of AIDs. For each AID instance, we calculate the absolute amount of flattening required.
 We use the highest flattening and noise parameters calculated across all the AID instances.
 
+Flattening is done for positive and negative values separately before the values are recombined.
+This way both positive and negative extreme values are flattened. The description provided below is for the positive values,
+but the same approach can be taken for negative values. Noise is added proportional to the largest noise scale across all
+AID instances (whether from the calculations of positive or negative values).
+
+> TODO: The flattening of positive vs negative is unlikely correct. It should not be implemented as is. See issue: https://github.com/diffix/reference/issues/153
+
 We flatten aggregates in subqueries as well in the final anonymization step. The process is identical with two significant
 differences:
 
 - for the final anonymized aggregate value, we report `null` when we do not have enough distinct entities to produce an anonymous aggregate. When aggregating i-rows this is not the case, and we follow an alternative approach described in more detail below
-- for the final anonymize aggregate value we add noise proportional to the top group average. No such noise is added to intermediate aggregate values
+- for the final anonymized aggregate value we add noise proportional to the top group average. No noise is added to intermediate aggregate values
 
 If the three AID instances in the example above resulted in the following flattening
 and top group averages:
@@ -148,13 +173,64 @@ top group average from `company` for the noise.
 The real aggregate value would be flattened by 4500 and in the case of a
 fully anonymize aggregate value we would additionally add noise value proportional to 500.
 
+The algorithm used for flattening consists of multiple phases.
+
+- aggregating values per AID instance
+- redistributing values
+- per AID instance flattening computation
+- applying flattening. For anonymizing aggregators additionally apply noise
+
+These steps are described individually below.
+
+### Aggregating values per AID instance
+
+For each d-row or i-row that is processed, the following steps are taken:
+
+- if **all AID instances** are `null` for a given row then it is discarded
+- rows where at least one AID instance has a value are processed per AID:
+  - if the AID value is `null`, then aggregate* the value into an `<unaccounted for>`
+    variable, and continue
+  - if the AID value has a value, then aggregate* the value into a variable for
+    that particular AID value
+  - if the AID value is set, but the value to be aggregated is `null`, then keep
+    a record of the AID value for seeding purposes, but do not alter any aggregate value.
+    Note: we are unlikely to use AID values for seeding with Cloak and Knox.
+
+* aggregate: increment a count by 1 in the case of a `count` aggregator; increase a sum by the given value in the case of a `sum` aggregator.
+
+As an example, if we have the following table:
+
+| AID1 value | AID2 value | Value |
+| ---------- | ---------- | ----: |
+| null       | null       |    10 |
+| null       | 1          |    20 |
+| 1          | 2          |    30 |
+| 1          | 3          |    40 |
+| 2          | 4          |    50 |
+
+Then the processing happens as follows for `AID1` when producing a `count` aggregate:
+
+- we discard the first row as both `AID1` and `AID2` have an AID value of `null`
+- We attribute `1` to `<unaccounted for>`
+- We attribute `1` to `AID1[1]`
+- We increase the contribution for `AID1[1]` by `1` to `2`
+- We attribute `1` to `AID1[2]`
+
+For a `sum` aggregate, the same table would be processed as follows
+
+- we discard the first row as both `AID1` and `AID2` have an AID value of `null`
+- We attribute `20` to `<unaccounted for>`
+- We attribute `30` to `AID1[1]`
+- We increase the contribution for `AID1[1]` by `40` to `70`
+- We attribute `50` to `AID1[2]`
+
 
 ### Redistribution of values
 
 When aggregating data the rows aggregated might either be d-rows (each row belongs to a single AID value per AID instance, such as `email[1]`) or
 i-rows that have already gone through one or more rounds of aggregation, in which case a row can belong to an AID value set (such as `email[1, 2, 3]`).
 
-In the case where we have AID value sets it can also happen that the same AID value (and hence entity) is present in multiple distinct AID value sets.
+In the case of AID value sets, it can also happen that the same AID value (and hence entity) is part of multiple distinct AID value sets.
 For example, you could have three rows such as:
 
 | Value | AID set               |
@@ -168,37 +244,93 @@ In the example table above AID value 1 has contributed to each of the three valu
 When calculating an individuals contributions we split their shared contributions proportionally with
 the other AID values.
 
-For a count or sum aggregate, the entity with email AID value 1 would end up with a contribution of: `1 + 2/2 + 3/4 = 2.75` (which could be interpreted as the entity having contributed 2.75 emails).
+For a count aggregate, the entity with email AID value 1 would end up with a contribution of: `1 + 1/2 + 1/4 = 1.75`. For a sum aggregate, the entity with email AID value 1 would end up with a contribution of: `1 + 2/2 + 3/4 = 2.75`.
 
-This approach to distributing contributions is not strictly speaking correct. That is to say that the resulting contributions after the redistribution
+The table above would, after redistribution for the `count` aggregate, become:
+
+| Value | AID value |
+| ----: | --------- |
+|  1.75 | 1         |
+|   0.5 | 2         |
+|  0.25 | 3         |
+|  0.25 | 4         |
+|  0.25 | 5         |
+
+This approach to distributing contributions is not strictly speaking "correct". That is to say that the resulting contributions after the redistribution
 do not reflect reality. However, as the only way an AID value set can arise is through
 aggregation, and as we always perform extreme value flattening when aggregating, it seems likely that this is not
 going to cause insufficient flattening for extreme contributions (note: this is an assumption that has not been tested).
 
 
-### Algorithm
+### Per AID instance flattening computation
 
-The process for suppressing extreme values is as follows:
+Once values have been aggregated and we have per-AID value contributions,
+we take the following steps per AID instance:
 
-1. Produce per-AID value contributions as per the aggregate being generated
-   (count of rows, sum of row contributions, min/max etc).
-   When a contribution is for an AID value set (such as `email[1, 2, 3]`), the
-   contribution is made proportional per AID value.
-2. Sort the contribution values to be flattened in descending order
-3. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
-4. Take the first `Ne` highest contributions as the extreme values.
-5. Take next `Nt` highest contributions as the top count.
-6. If there is a value within the `Ne + Nt` top values that appears for `minimum_allowed_aid_values` distinct AID values, then use that value as the the top group average
-7. (only for the final anonymizing aggregation) If there are less than `Ne + Nt` many distinct entities then stop and return `null` to indicate that
-  there were was not enough data
-8. (when intermediate aggregation) If there are less than `Ne + Nt` many distinct entities, then use:
-   1. If no entities were chosen for the top group, then use the entity with the lowest contribution as the top group and continue, or
-   2. If some values were chosen for the top group, but not quite `Nt` distinct ones, then use the values chosen and continue
-9. Calculate the average of the `Nt` values
-10. Calculate the **total distortion** as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
+#### Common steps
 
-Once the algorithm has been completed for each AID-instance, we continue based on the AID instance with the largest amount of flattening.
-In the case of the fully anonymizing aggregation in the top-most query we also add the noise proportional to the AID-instance with the largest top group average.
+1. Set aside the `<unaccounted for>` value
+2. Produce noisy extreme values count (`Ne`) and top count (`Nt`) values
+3. Sort the remaining AID value contributions in descending order by value
+4. Take the first `Ne` highest contributions as the extreme values
+5. Take the next `Nt` highest contributions as the top count
+
+Continue with the additional steps outlined below depending on whether an
+intermediate or an anonymized aggregate is being calculated.
+
+#### Intermediate aggregate steps
+
+1. If there are fewer than `Ne` distinct entities in the extreme value group, then use the entity with the lowest absolute contribution as the top group, or
+2. If there are fewer than `Ne + Nt` distinct entities in total, then use the values that are in the top group and continue with them, despite there being insufficiently many of them
+
+Continue with the common steps below.
+
+Example 1 (`Ne = Nt = 2`):
+
+| AID value | Value |
+| --------- | ----: |
+| 1         |    10 |
+
+There is only a single entity in this set. As such we are in case #1 of there being fewer than `Ne` (recall `Ne = 2`)
+distinct entities in the extreme value group. We therefore continue using `10` as the top group average. This is assumed to be safe since
+either the value will be suppressed by the low count filter or become part of another aggregate value.
+
+Example 2 (`Ne = Nt = 2`):
+
+| AID value | Value |
+| --------- | ----: |
+| 1         |    10 |
+| 2         |    10 |
+| 3         |     9 |
+
+There are fewer than `Ne + Nt` (recall both `Ne + Nt = 4`) distinct entities in total. We there apply rule #2 and use the single
+value contributed by `AID[3]` as the top group average.
+
+
+#### Anonymized aggregate
+
+If there are fewer than `Ne + Nt` distinct entities in the bucket, then abort the algorithm and return `null` to indicate that there were was not enough data, otherwise continue.
+
+#### Common steps part #2
+
+1. Calculate the average of the `Nt` values
+2. Calculate the `total flattening` as the sum of differences between the values of each entity in the `Ne` set with the `Nt`-average
+3. Create `flattened aggregate` as the aggregate of all AID contributes less the `total flattening`
+4. Calculate the `average contribution` as the `flattened aggregate` divided by the number of distinct AID values
+5. Calculate `noise scale` as the larger of `average contribution` and half of the top group average
+6. Take the `<unaccounted for>` value and reduce it by `total flattening`
+7. Set the `<unaccounted for>` value to 0 if it is negative
+8. Add the flattened `<unaccounted for>` value to the `flattened aggregate`
+
+### Applying flattening and noise
+
+Take the results from the per-AID instance flattening computation, and among these, choose the one with the largest `total flattening`. The `flattened aggregate` from this AID instance is used as the aggregate result.
+
+In the case of an anonymizing aggregator, you additionally find the result with the
+largest top group average among the per-AID instance results. Add noise to the `flattened aggregate` proportional to the largest returned `noise scale`.
+
+
+### Examples
 
 Below are concrete examples of the algorithm applied to data. The `minimum_allowed_aid_values` threshold is 2 across all AIDs unless otherwise stated.
 
@@ -215,7 +347,6 @@ For example, the following table should be read as AID value 1 contributing 6 to
 The `Value`s can be interpreted as an entity having contributed that number of rows in the case of a `count` aggregator, or it could
 the the per entity sum contribution in the case of a `sum` aggregator.
 
-### Examples
 
 #### Early termination
 
@@ -423,6 +554,222 @@ Even though we could have produced an aggregate from the perspectives of AID ins
 we cannot produce a final aggregate as we have insufficiently many AID values for AID instance AID3.
 Assuming there had been enough AID values for AID-Instance AID3 and that the total flattening due to AID-Instance AID3 had been 10,
 then we would have used the flattening by 25.5 due to AID Instance AID1 and added noise proportional to the top group average 6 of AID Instance AID2.
+
+
+#### Unaccounted for values
+
+| AID1 value sets | AID2 value sets | Value |
+| --------------- | --------------- | ----: |
+| AID1[1]         | Null            |    10 |
+| AID1[2]         | Null            |     9 |
+| AID1[3]         | Null            |     8 |
+| AID1[4]         | Null            |     7 |
+| Null            | AID2[1]         |    10 |
+| Null            | AID2[2]         |     9 |
+| Null            | AID2[3]         |     8 |
+| Null            | AID2[4]         |     7 |
+| Null            | Null            |     6 |
+
+The final row with an empty AID value sets for both AID1 and AID2 is discarded and otherwise aggregate the data as normal per AID.
+
+##### AID1
+
+| AID1 value sets   | Value |
+| ----------------- | ----: |
+| AID1[1]           |    10 |
+| AID1[2]           |     9 |
+| AID1[3]           |     8 |
+| AID1[4]           |     7 |
+| <unaccounted for> |    34 |
+
+- We produce per-AID value contributions.
+
+| AID1 value        | Value | Required flattening by AID value |
+| ----------------- | ----: | -------------------------------: |
+| 1                 |    10 |                              2.5 |
+| 2                 |     9 |                              1.5 |
+| 3                 |     8 |                                  |
+| 4                 |     7 |                                  |
+| <unaccounted for> |    34 |                    2.5 + 1.5 = 4 |
+
+- The rows are sorted in descending order of `Value`
+- `Ne = 2`, `Nt = 2`
+- We take the `Ne` first values as the extreme values
+- We try taking the `Nt` next rows for the top group
+- The top group average is `7.5` so we flatten the extreme value `10` by `2.5` and the extreme value `9` by `1.5` to bring them down to `7.5`
+-  The `<unaccounted for>` value of `34` is flattened by the total flattening of `4`. After flattening it is 30, and does not need to be set to 0 as it is positive.
+- The `flattened aggregate` for AID1 is `10 - 2.5 + 9 - 1.5 + 8 + 7 + max(0, 34 - 4) = 60`
+- The `noise scale` is `max (30/4, 0.5 * 7.5) = 7.5`
+
+##### AID2
+
+The procedure and result is identical to AID1.
+
+The final aggregate is 60. If it is an anonymized aggregate then we additionally add noise proportional to `noise scale`.
+
+
+#### Positive and negative values
+
+| AID1 value sets | AID2 value sets | Value |
+| --------------- | --------------- | ----: |
+| AID1[1]         | AID2[1]         |  1000 |
+| AID1[1, 2, 3]   | AID2[2]         |   600 |
+| AID1[3]         | AID2[3]         |    10 |
+| AID1[3, 4]      | AID2[4]         |    10 |
+| AID1[5]         | AID2[5, 6]      |   -10 |
+| AID1[6]         | AID2[6]         |   -10 |
+| AID1[7]         | AID2[7, 8, 9]   |  -600 |
+| AID1[8]         | AID2[9]         | -1000 |
+
+We apply the process per AID (in all cases with `Ne = Nt = 2`)
+
+##### AID1
+
+| AID1 value | Value |
+| ---------- | ----: |
+| 1          |  1200 |
+| 3          |   215 |
+| 2          |   200 |
+| 4          |     5 |
+| 5          |   -10 |
+| 6          |   -10 |
+| 7          |  -500 |
+| 8          | -1000 |
+
+- We derive per AID value contributions
+- We now split the dataset in two by their sign and process them individually.
+
+###### Positive values for AID1
+
+| AID1 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 1          |  1200 |                  1097.5 |
+| 2          |   215 |                  112.50 |
+| 3          |   200 |                         |
+| 4          |     5 |                         |
+
+- Top group average is `102.5`, leading to a `flattening` of `1210` and a
+  `flattened aggregate` of 410
+- `noise scale` is 102.5
+
+###### Negative values for AID1
+
+| AID1 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 8          | -1000 |                     990 |
+| 7          |  -500 |                     490 |
+| 6          |   -10 |                         |
+| 5          |   -10 |                         |
+
+- Top group average is `-10`, leading to a `flattening` of `1480` and a
+  `flattened aggregate` of `-40`
+- `noise scale` is 10
+
+
+##### AID2
+
+| AID2 value | Value |
+| ---------- | ----: |
+| 1          |  1000 |
+| 2          |   600 |
+| 3          |    10 |
+| 4          |    10 |
+| 5          |    -5 |
+| 6          |   -15 |
+| 7          |  -200 |
+| 8          |  -200 |
+| 9          | -1200 |
+
+- We derive per AID value contributions
+- We now split the dataset in two by their sign and process them individually.
+
+###### Positive values for AID2
+
+| AID2 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 1          |  1000 |                     990 |
+| 2          |   600 |                     590 |
+| 3          |    10 |                         |
+| 4          |    10 |                         |
+
+- Top group average is `10`, leading to a `flattening` of `1580`
+  and a `flattened aggregate` of `40`
+- Noise scale is 10
+
+###### Negative values for AID2
+
+| AID2 value | Value | Flattening by AID value |
+| ---------- | ----: | ----------------------: |
+| 9          | -1200 |                  1092.5 |
+| 8          |  -200 |                    92.5 |
+| 7          |  -200 |                         |
+| 6          |   -15 |                         |
+| 5          |    -5 |                         |
+
+- Top group average is `107.5`, leading to a `flattening` of `1185` and a
+  `flattened aggregate` of `-435`
+- The noise scale is `87`
+
+###### Producing the flattened aggregate
+
+- For the positive values, AID2 has the larger flattening (`1580` vs `1210`)
+  so we use the `flattened aggregate` of `410`
+- For the negative values, AID1 has the larger flattening (`1480` vs `1185`)
+  so we use the `flattened aggregate` of `-40`
+- The total flattened aggregate becomes `410 - 40 = 370`
+- In the case of an anonymizing aggregate, we use the noise scale of `102.5` from
+  the positive values of AID1 as it is the largest. The final aggregate
+  becomes `370 + noise proportional to 102.5`.
+
+### Discussion about safety for <unaccounted for> values
+
+For any given per-AID instance calculation, the flattening of the unaccounted for values might be insufficient. If it is insufficient, then the flattening done for one of the other AID instances will invariably be large enough.
+
+Here is a concrete example:
+
+| Row number | AID1 value | AID2 value | Value |
+| ---------: | ---------- | ---------- | ----: |
+|          1 | 1          | Null       |    10 |
+|          2 | 2          | Null       |     9 |
+|          3 | 3          | Null       |     8 |
+|          4 | 4          | Null       |     7 |
+|          5 | Null       | 1          |  1000 |
+|          6 | Null       | 2          |     9 |
+|          7 | Null       | 3          |     8 |
+|          8 | Null       | 4          |     7 |
+|          9 | Null       | Null       | 10000 |
+
+Row 9 is an extreme outlier, but is removed as none of the AID instances has an AID value associated with it.
+Row 5 is risky from the perspective of AID1 which considers it unaccounted for, but as we will see, this does
+not pose a risk, as AID2 will be used for flattening.
+
+For AID instance AID1 we get:
+
+| AID1 value        | Value | Flattening by AID value |
+| ----------------- | ----: | ----------------------: |
+| 1                 |    10 |                     2.5 |
+| 2                 |     9 |                     1.5 |
+| 3                 |     8 |                         |
+| 4                 |     7 |                         |
+| <unaccounted for> |  1024 |                       4 |
+
+For AID instance AID2 we get:
+
+| AID2 value        | Value | Flattening by AID value |
+| ----------------- | ----: | ----------------------: |
+| 1                 |  1000 |                   992.5 |
+| 2                 |     9 |                     1.5 |
+| 3                 |     8 |                         |
+| 4                 |     7 |                         |
+| <unaccounted for> |    34 |    min(34, 992.5 + 1.5) |
+
+Therefore for the final aggregate we would end up using the flattening from AID2 (`992.5 + 1.5 = 994`),
+and hence the flattened sum of `1000 - 992.5 + 9 - 1.5 + 8 + 7 + 34 - 34 = 30`.
+For the top group average we use `7.5`, which was same across the two AID instances.
+
+The final aggregate of `30 + noise proportional to 7.5` therefore does account for the outlier
+behavior of row 5, and by nature of the maximum flattening being used (and applied to the unaccounted for
+values too), we should always end up with sufficient flattening.
 
 
 # Rationale

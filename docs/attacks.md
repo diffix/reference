@@ -7,6 +7,8 @@ Contents:
       - [Attack query](#attack-query)
     - [AID value sets are column value properties and do not mix](#aid-value-sets-are-column-value-properties-and-do-not-mix)
       - [Attack query](#attack-query-1)
+  - [Missing AID data](#missing-aid-data)
+
 
 ## Wide then narrow
 
@@ -161,3 +163,33 @@ Since we are doing an inner join the join will either yield something if the vic
 or an empty result set if the victim does not exist with the given properties.
 
 Through this attack we can learn any property of any entity by asking a series of yes/no queries.
+
+## Missing AID data
+
+It is unclear whether this attack is exploitable, but here it is recorded for posterity.
+
+In a case where AID data is incomplete, say in a table like this where half of the AID values for one
+of the AID columns are missing:
+
+| AID1 value | AID2 value | Value |
+| ---------- | ---------- | ----: |
+| 1          | 1          |    10 |
+| 2          | 2          |    10 |
+| 3          | 3          |    10 |
+| 4          | 4          |    10 |
+| 5          | null       |    10 |
+| 6          | null       |    10 |
+| 7          | null       |    10 |
+| 8          | null       |    10 |
+
+We might end up with insufficient suppression when aggregating.
+This could happen if the data with the missing AID values really should have belonged
+to the same entity. We have seen this in the past at one of Aircloak's customers.
+An entity with outlier behavior had been poorly entered into the system and would therefore not be
+properly accounted for when flattening during aggregation.
+
+The question is whether this is exploitable at all. At present we do not know of a way to do so.
+
+One way to mitigate a situation like this would be to specify redundant AID columns per entity.
+These could act as pseudonyms of sorts. There is a chance that at least one of these will be non-null
+when the others are left blank.

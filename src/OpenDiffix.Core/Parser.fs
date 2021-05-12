@@ -183,8 +183,8 @@ module QueryParser =
   addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [ left; right ]))
   addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [ left; right ]))
   addPrefixOperator "not" spaces 7 false Expression.Not
-  addPostfixOperator "is null" spaces 8 false (fun expr -> Expression.Equals(expr, Expression.Null))
-  addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.Equals(expr, Expression.Null)))
+  addPostfixOperator "is null" spaces 8 false Expression.IsNull
+  addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.IsNull expr))
   addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [ left; right ]))
 
   opp.TermParser <-

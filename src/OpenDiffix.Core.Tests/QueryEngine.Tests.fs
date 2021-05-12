@@ -100,19 +100,20 @@ type Tests(db: DBFixture) =
   let ``query 9 - right join`` () =
     // The underlying data looks like this:
     //
-    // ID = null, CID = null, COUNT
-    //     false,      false,    73
-    //      true,      false,   445
-    //      true,       true,     1
+    // customer.ID = null, purchases.CID = null, COUNT
+    // false,              false,                73
+    // true,               false,                445
+    // true,               true,                 1
     //
     // The query should yield the 73 + 445 values,
-    // but only the 73 where neither column is null
-    // should be considered by the anonymizer.
-    // There is a flattening of 1 and noise proportional to
-    // the top group average of 7
+    // There are no flattening needed for purchases,
+    // and a flattening of 1 for the customers table.
+    // When anonymizing the customers table we have 445
+    // unaccounted for values
+    // This should give us: 73 - 1 + 445 - 1 = 516
     "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
     |> runQueryToInteger
-    |> should equal (Integer 72L)
+    |> should equal (Integer 516L)
 
   [<Fact>]
   let ``query 10`` () =

@@ -45,6 +45,7 @@ and mapExpression tables parsedExpression =
   | ParserTypes.And (left, right) -> functionExpression tables (ScalarFunction And) [ left; right ]
   | ParserTypes.Or (left, right) -> functionExpression tables (ScalarFunction Or) [ left; right ]
   | ParserTypes.Equals (left, right) -> functionExpression tables (ScalarFunction Equals) [ left; right ]
+  | ParserTypes.IsNull expr -> functionExpression tables (ScalarFunction IsNull) [ expr ]
   | ParserTypes.Function (name, args) ->
       let fn = Function.fromString name
       let fn, childExpressions = mapFunctionExpression tables fn args
@@ -243,7 +244,9 @@ let rec private collectAids (anonParams: AnonymizationParams) (tables: RangeTabl
           let otherColumns = remainingTablesAidColumns
           currentTableAidColumns @ otherColumns
 
-let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables) = collectAids anonParams tables 0
+let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables) =
+  collectAids anonParams tables 0
+  |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
 
 // ----------------------------------------------------------------
 // Public API
@@ -259,10 +262,7 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   else
     QueryValidator.validateQuery query
 
-    let aidColumnsExpression =
-      aidColumns
-      |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
-      |> ListExpr
+    let aidColumnsExpression = aidColumns |> ListExpr
 
     query
     |> rewriteToDiffixAggregate aidColumnsExpression
