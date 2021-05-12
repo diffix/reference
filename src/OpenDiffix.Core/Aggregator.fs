@@ -58,7 +58,7 @@ type private Sum(sum: Value) =
 type private DiffixCount(perAidCounts: (Map<AidHash, int64> * int64) list option) =
   new() = DiffixCount(None)
 
-  member this.mapAidStructure valueIncrease transition (aidValues: Value list) =
+  member private this.MapAidStructure valueIncrease transition (aidValues: Value list) =
     perAidCounts
     |> Option.defaultValue (List.replicate aidValues.Length (Map.empty, 0L))
     |> List.zip aidValues
@@ -71,18 +71,18 @@ type private DiffixCount(perAidCounts: (Map<AidHash, int64> * int64) list option
     )
     |> Some
 
-  member this.updateAidMaps<'T> (aidsArray: Value) valueIncrease transition =
+  member private this.UpdateAidMaps<'T> (aidsArray: Value) valueIncrease transition =
     match aidsArray with
     | Value.List aidValues when List.forall ((=) Null) aidValues -> perAidCounts
-    | Value.List aidValues -> this.mapAidStructure valueIncrease transition aidValues
+    | Value.List aidValues -> this.MapAidStructure valueIncrease transition aidValues
     | _ -> failwith "Expecting an AID list as input"
 
   interface IAggregator with
     member this.Transition values =
       match values with
-      | [ aidValues; Null ] -> this.updateAidMaps aidValues 0L id |> DiffixCount
+      | [ aidValues; Null ] -> this.UpdateAidMaps aidValues 0L id |> DiffixCount
       | [ aidValues ]
-      | [ aidValues; _ ] -> this.updateAidMaps aidValues 1L ((+) 1L) |> DiffixCount
+      | [ aidValues; _ ] -> this.UpdateAidMaps aidValues 1L ((+) 1L) |> DiffixCount
       | _ -> invalidArgs values
       :> IAggregator
 
