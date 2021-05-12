@@ -431,15 +431,17 @@ There are examples of this attack at [https://github.com/diffix/experiments/tree
 
 ## Solution
 
-The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every non-LE condition.
+The solution is to add a new type of noise layer that is used whenever a condition is determined to be LE. We'll call it the LE noise layer. The LE noise layer is applied to every non-LE condition. (In other words, every LE condition has a separate noise layer for every NLE condition.)
+
+> TODO: Find ways to reduce the number of LE noise layers, otherwise we end up with a number of noise layers equal to the product of NLE and LE conditions.
 
 The LE noise layer is seeded as follows:
 
-`[static_condition_materials, LE_static_condition_materials]`
+`[NLE_static_condition_materials, LE_static_condition_materials]`
 
 Where:
 
-* The `static_condition_materials` are the same seed materials used for normal static conditions
+* The `NLE_static_condition_materials` are the same seed materials used for normal static conditions
 * The `LE_static_condition_materials` are the static seed materials for the LE condition itself
 
 ### Multi-sample JOIN attack
