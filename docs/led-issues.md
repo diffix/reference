@@ -21,7 +21,8 @@ This documents the need for LED, and motivates a number of design decisions. In 
     - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
   - [Solution](#solution)
     - [Multi-sample JOIN attack](#multi-sample-join-attack)
-    - [Multi-histogram attack](#multi-histogram-attack)
+    - [Multi-histogram attack (LE noise layer per NLE condition)](#multi-histogram-attack-le-noise-layer-per-nle-condition)
+    - [Multi-histogram attack (single LE noise layer across all NLE conditions)](#multi-histogram-attack-single-le-noise-layer-across-all-nle-conditions)
     - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
     - [Seeding LE noise layers properly](#seeding-le-noise-layers-properly)
   - [Adjusting when LE = 1 only](#adjusting-when-le--1-only)
@@ -70,7 +71,7 @@ In this document we refer to 'static' and 'dynamic' noise layers (where 'dynamic
 Static noise by itself defends against a simple difference attack where there is only a single left and right bucket.
 
 | L query     | R query | L answer      | R answer ex | R answer in  |
-|-------------|---------|---------------|-------------|--------------|
+| ----------- | ------- | ------------- | ----------- | ------------ |
 | A and not I | A       | cnt + SA + SI | cnt + SA    | cnt + 1 + SA |
 
 In the above `A` and `I` represent conditions, like `age = 10`. By convention, conditions that isolate or help isolate the user are I, J, and K. So in the above, I could be `ssn = '123-45-6789'`. Or if we need two conditions to isolate a user, we could have `(I and J)`, where I is `dob = '1957-12-14'` and J is `zip = 12345`.
@@ -88,7 +89,7 @@ The goal of the attacker is to determine which of the right answers is the corre
 The problem comes with the first derivative difference attack, and is the reason why we introduced dynamic noise. In the first derivative different attack, the attacker generates a histogram of left and right buckets:
 
 | L query     | R query | L answer      | R answer ex | R answer in  | diff   |
-|-------------|---------|---------------|-------------|--------------|--------|
+| ----------- | ------- | ------------- | ----------- | ------------ | ------ |
 | A and not I | A       | cnt + SA + SI |             | cnt + 1 + SA | SI - 1 |
 | B and not I | B       | cnt + SB + SI | cnt + SB    |              | SI     |
 | C and not I | C       | cnt + SC + SI | cnt + SC    |              | SI     |
@@ -113,7 +114,7 @@ Note by the way that we need static noise to defend against some averaging attac
 Now let's see what happens when we add dynamic noise layers. We can suppose for the sake of this discussion that the dynamic noise layers are seeded in part by the AIDVSs in the bucket.
 
 | L query     | R query | L answer                  | R answer ex    | R answer in         | diff                      |
-|-------------|---------|---------------------------|----------------|---------------------|---------------------------|
+| ----------- | ------- | ------------------------- | -------------- | ------------------- | ------------------------- |
 | A and not I | A       | cnt + SA + SI + D1A + D1I |                | cnt + 1 + SA + D1vA | SI + D1A + D1I - 1 - D1vA |
 | B and not I | B       | cnt + SB + SI + D2B + D2I | cnt + SB + D2B |                     | SI + D2I                  |
 | C and not I | C       | cnt + SC + SI + D3C + D3I | cnt + SC + D3C |                     | SI + D3I                  |
@@ -133,7 +134,7 @@ In a chaff attack, the attacker adds a bunch of conditions that definitely have 
 The following table shows the result. (Here all of the right answers are in the same column. The victim is in the first row. The static noise layers are not shown because in any event they are canceled out by the left/right difference.)
 
 | L query                               | R query                     | L answer                            | R answer                              | diff                                                           |
-|---------------------------------------|-----------------------------|-------------------------------------|---------------------------------------|----------------------------------------------------------------|
+| ------------------------------------- | --------------------------- | ----------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
 | A and not I and not X1 ... and not Xn | A and not X1 ... and not Xn | cnt + D1a + D1I + D1X1 + ... + D1Xn | cnt + 1 + D1va  + D1vX1 + ... + D1vXn | D1a + D1I + D1X1 + ... + D1Xn - 1 - D1va - D1vX1 - ... - D1vXn |
 | B and not I and not X1 ... and not Xn | B and not X1 ... and not Xn | cnt + D2b + D2I + D2X1 + ... + D2Xn | cnt + D2b + D2X1 + ... + D2Xn         | D2I                                                            |
 | C and not I and not X1 ... and not Xn | C and not X1 ... and not Xn | cnt + D3c + D3I + D3X1 + ... + D3Xn | cnt + D3c + D3X1 + ... + D3Xn         | D3I                                                            |
@@ -237,7 +238,7 @@ WHERE col_attribute = X
 The attacker is looking to construct the following histogram:
 
 | col | left  | right | diff      |
-|-----|-------|-------|-----------|
+| --- | ----- | ----- | --------- |
 | A   | not I | has I | different |
 | B   | not I | not I | same      |
 | C   | not I | not I | same      |
@@ -248,19 +249,19 @@ What we want to do here is make some kind of fix for the A bucket, but not fix f
 
 Assuming that the query plan is in the order [not I,`col_attribute`], the truth table for the left A query is this:
 
-| I | not I | A | out | status |
-|---|-------|---|-----|--------|
-| 1 | 0     | - | 0   | LE     |
-| 0 | 1     | 1 | 1   | NLE    |
-| 0 | 1     | 0 | 0   | NLE    |
+| I   | not I | A   | out | status |
+| --- | ----- | --- | --- | ------ |
+| 1   | 0     | -   | 0   | LE     |
+| 0   | 1     | 1   | 1   | NLE    |
+| 0   | 1     | 0   | 0   | NLE    |
 
 and the truth table for left B query (and subsequent C, D, ... queries) looks like this:
 
-| I | not I | B | out | status |
-|---|-------|---|-----|--------|
-| 1 | 0     | - | 0   | LE     |
-| 0 | 1     | 1 | 1   | NLE    |
-| 0 | 1     | 0 | 0   | NLE    |
+| I   | not I | B   | out | status |
+| --- | ----- | --- | --- | ------ |
+| 1   | 0     | -   | 0   | LE     |
+| 0   | 1     | 1   | 1   | NLE    |
+| 0   | 1     | 0   | 0   | NLE    |
 
 The reason for the `-` in the first row is because the second WHERE clause is never evaluated: Once `not I` is found to be false, then the entire expression is false and the evaluation ends.
 
@@ -283,18 +284,18 @@ SELECT count(*) FROM tab WHERE C and not I
 
 The truth table for A now looks like this:
 
-| A | I | not I | out | status |
-|---|---|-------|-----|--------|
-| 1 | 1 | 0     | 0   | LE     |
-| 1 | 0 | 1     | 1   | NLE    |
-| 0 | - | -     | 0   | NLE    |
+| A   | I   | not I | out | status |
+| --- | --- | ----- | --- | ------ |
+| 1   | 1   | 0     | 0   | LE     |
+| 1   | 0   | 1     | 1   | NLE    |
+| 0   | -   | -     | 0   | NLE    |
 
 And for B etc. looks like this:
 
-| B | I | not I | out | status |
-|---|---|-------|-----|--------|
-| 1 | 0 | 1     | 1   | NLE    |
-| 0 | - | -     | 0   | NLE    |
+| B   | I   | not I | out | status |
+| --- | --- | ----- | --- | ------ |
+| 1   | 0   | 1     | 1   | NLE    |
+| 0   | -   | -     | 0   | NLE    |
 
 Note that in the case of B etc., no LE condition is detected, even though there is one. In this particular case it may be ok not to detect the LE condition, because at least for solutions 1a and 2, no fix is needed.
 
@@ -312,7 +313,7 @@ Let's revisit the first derivative attack with this idea.
 The table from that example is this:
 
 | L query     | R query | L answer                  | R answer ex    | R answer in         | diff                      |
-|-------------|---------|---------------------------|----------------|---------------------|---------------------------|
+| ----------- | ------- | ------------------------- | -------------- | ------------------- | ------------------------- |
 | A and not I | A       | cnt + SA + SI + D1A + D1I |                | cnt + 1 + SA + D1vA | SI + D1A + D1I - 1 - D1vA |
 | B and not I | B       | cnt + SB + SI + D2B + D2I | cnt + SB + D2B |                     | SI + D2I                  |
 | C and not I | C       | cnt + SC + SI + D3C + D3I | cnt + SC + D3C |                     | SI + D3I                  |
@@ -322,11 +323,11 @@ What we want to do is to seed dynamic noise layers so that there is no differenc
 In that case, the resulting table would be this:
 
 
-| L query     | R query | L answer                  | R answer ex    | R answer in         | diff                      |
-|-------------|---------|---------------------------|----------------|---------------------|---------------------------|
-| A and not I | A       | cnt + SA + SI + D1A + D1I |                | cnt + 1 + SA + D1vA | SI + D1I - 1              |
-| B and not I | B       | cnt + SB + SI + D2B + D2I | cnt + SB + D2B |                     | SI + D2I                  |
-| C and not I | C       | cnt + SC + SI + D3C + D3I | cnt + SC + D3C |                     | SI + D3I                  |
+| L query     | R query | L answer                  | R answer ex    | R answer in         | diff         |
+| ----------- | ------- | ------------------------- | -------------- | ------------------- | ------------ |
+| A and not I | A       | cnt + SA + SI + D1A + D1I |                | cnt + 1 + SA + D1vA | SI + D1I - 1 |
+| B and not I | B       | cnt + SB + SI + D2B + D2I | cnt + SB + D2B |                     | SI + D2I     |
+| C and not I | C       | cnt + SC + SI + D3C + D3I | cnt + SC + D3C |                     | SI + D3I     |
 
 As required, the left and right buckets for any given row always differ (because of both the static and dynamic noise layers), and the difference between rows always differs because of the dynamic noise layers. In addition, the *amount* of noise difference is the same. This means that the chaff attack won't work.
 
@@ -361,7 +362,7 @@ The above sets of histograms would be repeated for n=1, n=2 etc.
 The table showing how the answers are composed is then:
 
 | L query            | R query  | L answer                                  | R answer ex                   | R answer in                         | diff                                   |
-|--------------------|----------|-------------------------------------------|-------------------------------|-------------------------------------|----------------------------------------|
+| ------------------ | -------- | ----------------------------------------- | ----------------------------- | ----------------------------------- | -------------------------------------- |
 | Kn and A and not I | Kn and A | cnt + SKn + SA + SI + D1nKn + D1nA + D1nI |                               | cnt + 1 + SKn + SA + D1nvKn + D1nvA | SI + D1nKn - D1nvKn + D1nA - D1nvA - 1 |
 | Kn and B and not I | Kn and B | cnt + SKn + SB + SI + D2nKn + D2nB + D2nI | cnt + SKn + SB + D2nKn + D2nB |                                     | SI + D2nI                              |
 | Kn and C and not I | Kn and C | cnt + SKn + SC + SI + D3nKn + D3nC + D3nI | cnt + SKn + SC + D3nKn + D3nC |                                     | SI + D3nI                              |
@@ -373,7 +374,7 @@ The above looks a bit of a mess, but effectively all of the dynamic noise layers
 With that in mind, if we sum the difference from the Kn for each bucket A, B, C etc., we get:
 
 | Bucket | Sum                                                                                        |
-|--------|--------------------------------------------------------------------------------------------|
+| ------ | ------------------------------------------------------------------------------------------ |
 | A      | (Si + zero-mean-noise - 1) + (Si + zero-mean-noise - 1) + (Si + zero-mean-noise - 1) + ... |
 | B      | (Si + zero-mean-noise) + (Si + zero-mean-noise) + (Si + zero-mean-noise) + ...             |
 | C      | (Si + zero-mean-noise) + (Si + zero-mean-noise) + (Si + zero-mean-noise) + ...             |
@@ -411,7 +412,7 @@ In the above query, the columns are:
 The query will produce a table like this:
 
 | unknown_col | replicate_col | count |
-|-------------|---------------|-------|
+| ----------- | ------------- | ----- |
 | u1          | r1            | 22    |
 | u1          | r2            | 31    |
 | u1          | r3            | 19    |
@@ -485,12 +486,12 @@ etc.
 
 The LIUx hides the victim because they differ with each `unknown_col` group.
 
-### Multi-histogram attack
+### Multi-histogram attack (LE noise layer per NLE condition)
 
 The following table is a repeat of the example from the Multi-histogram attack above, but with the LE noise layers added.
 
-| L query            | R query  | L answer                                             | R answer ex (first row has victim)  | diff                                              |
-|--------------------|----------|------------------------------------------------------|-------------------------------------|---------------------------------------------------|
+| L query            | R query  | L answer                                               | R answer ex (first row has victim)  | diff                                                |
+| ------------------ | -------- | ------------------------------------------------------ | ----------------------------------- | --------------------------------------------------- |
 | Kn and A and not I | Kn and A | cnt + SKn + LIKn + SA + LIA + SI + D1nKn + D1nA + D1nI | cnt + 1 + SKn + SA + D1nvKn + D1nvA | SI + LIKn + LIA + D1nKn - D1nvKn + D1nA - D1nvA - 1 |
 | Kn and B and not I | Kn and B | cnt + SKn + LIKn + SB + LIB + SI + D2nKn + D2nB + D2nI | cnt + SKn + SB + D2nKn + D2nB       | SI + LIKn + LIB + D2nI                              |
 | Kn and C and not I | Kn and C | cnt + SKn + LIKn + SC + LIC + SI + D3nKn + D3nC + D3nI | cnt + SKn + SC + D3nKn + D3nC       | SI + LIKn + LIC + D3nI                              |
@@ -498,13 +499,58 @@ The following table is a repeat of the example from the Multi-histogram attack a
 
 The following is the result of summing the left and right query difference for each attribute A, B, C, etc.:
 
-| Bucket | Sum                                                                                                                         |
-|--------|-----------------------------------------------------------------------------------------------------------------------------|
-| A      | (Si + LIKn + LIA + zero-mean-noise - 1) + (Si + LIKn + LIA + zero-mean-noise - 1) + (Si + LIKn + LIA + zero-mean-noise - 1) + ... |
-| B      | (Si + LIKn + LIB + zero-mean-noise) + (Si + LIKn + LIB + zero-mean-noise) + (Si + LIKn + LIB + zero-mean-noise) + ...             |
-| C      | (Si + LIKn + LIC + zero-mean-noise) + (Si + LIKn + LIC + zero-mean-noise) + (Si + LIKn + LIC + zero-mean-noise) + ...             |
+| Bucket | Sum                                                                                                                               |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| A      | (Si + LIK1 + LIA + zero-mean-noise - 1) + (Si + LIK2 + LIA + zero-mean-noise - 1) + (Si + LIK3 + LIA + zero-mean-noise - 1) + ... |
+| B      | (Si + LIK1 + LIB + zero-mean-noise) + (Si + LIK2 + LIB + zero-mean-noise) + (Si + LIK3 + LIB + zero-mean-noise) + ...             |
+| C      | (Si + LIK1 + LIC + zero-mean-noise) + (Si + LIK2 + LIC + zero-mean-noise) + (Si + LIK3 + LIC + zero-mean-noise) + ...             |
 
-The `LIA`, `LIB`, etc. noise layers in each row effectively hide which bucket the victim is in.
+For the attack, we want to see which bucket sum has a substantially smaller value than the others. If we assume N expressions per sum, then the above table reduces to this:
+
+| Bucket | Sum                                                          |
+| ------ | ------------------------------------------------------------ |
+| A      | (N * Si) + sum(LIKn) + (N * zero-mean-noise) + (N * LIA) - N |
+| B      | (N * Si) + sum(LIKn) + (N * zero-mean-noise) + (N * LIB)     |
+| C      | (N * Si) + sum(LIKn) + (N * zero-mean-noise) + (N * LIC)     |
+
+The first two terms cancel out. The zero-mean-noise nearly cancels out. However, the `N * LIX` term hides the `-N` (or lack thereof), and so the attack failes.
+
+### Multi-histogram attack (single LE noise layer across all NLE conditions)
+
+The above multi-histogram attack assumes one LE noise layer for every LE/NLE combination. This leads to a potential explosion in noise layers, so let's look at the attack in the case where we have one LE noise layer per LE condition. The noise layer is seeded by *all* of the NLE conditions:
+
+```
+[seed material all NLE conditions, seed material LE condition]
+```
+
+Also, in these attacks, the dynamic noise layers turn out not to be helpful, so we assume here that they are not used.
+
+Following are the resulting tables:
+
+| L query            | R query  | L answer                    | R answer ex (first row has victim) | diff           |
+| ------------------ | -------- | --------------------------- | ---------------------------------- | -------------- |
+| Kn and A and not I | Kn and A | cnt + SKn + LIKnA + SA + SI | cnt + 1 + SKn + SA                 | SI + LIKnA - 1 |
+| Kn and B and not I | Kn and B | cnt + SKn + LIKnB + SB + SI | cnt + SKn + SB                     | SI + LIKnB     |
+| Kn and C and not I | Kn and C | cnt + SKn + LIKnC + SC + SI | cnt + SKn + SC                     | SI + LIKnC     |
+
+
+The following is the result of summing the left and right query difference for each attribute A, B, C, etc.:
+
+| Bucket | Sum                                                          |
+| ------ | ------------------------------------------------------------ |
+| A      | (Si + LIK1A - 1) + (Si + LIK2A - 1) + (Si + LIK3A - 1) + ... |
+| B      | (Si + LIK1B) + (Si + LIK2B) + (Si + LIK3B) + ...             |
+| C      | (Si + LIK1C) + (Si + LIK2C) + (Si + LIK3C) + ...             |
+
+In the above expression, each LIKxY term has different noise. So they reduce to zero-mean-noise. The above table can then be re-written as:
+
+| Bucket | Sum                                  |
+| ------ | ------------------------------------ |
+| A      | (N * Si) + (N * zero-mean-noise) - N |
+| B      | (N * Si) + (N * zero-mean-noise)     |
+| C      | (N * Si) + (N * zero-mean-noise)     |
+
+The first term cancels out, the second nearly does, leaving the `- N` term to dominate. In other words, this attack succeeds.
 
 ### LE noise layer with AIDVs (not as good)
 
@@ -674,15 +720,15 @@ Keeping in mind that the purpose of dynamic noise layers is to defend against di
 In [First derivative difference attack, static and dynamic noise](#first-derivative-difference-attack-static-and-dynamic-noise), we had this table:
 
 | L query     | R query | L answer                  | R answer ex    | R answer in         | diff                      |
-|-------------|---------|---------------------------|----------------|---------------------|---------------------------|
+| ----------- | ------- | ------------------------- | -------------- | ------------------- | ------------------------- |
 | A and not I | A       | cnt + SA + SI + D1A + D1I |                | cnt + 1 + SA + D1vA | SI + D1A + D1I - 1 - D1vA |
 | B and not I | B       | cnt + SB + SI + D2B + D2I | cnt + SB + D2B |                     | SI + D2I                  |
 | C and not I | C       | cnt + SC + SI + D3C + D3I | cnt + SC + D3C |                     | SI + D3I                  |
 
 With LE noise layers instead of dynamic noise layers, we would get this (where the victim is in the first bucket):
 
-| L query     | R query | L answer           | R answer     | diff        |
-|-------------|---------|--------------------|--------------|-------------|
+| L query     | R query | L answer            | R answer     | diff         |
+| ----------- | ------- | ------------------- | ------------ | ------------ |
 | A and not I | A       | cnt + SA + SI + LIA | cnt + 1 + SA | SI + LIA - 1 |
 | B and not I | B       | cnt + SB + SI + LIB | cnt + SB     | SI + LIB     |
 | C and not I | C       | cnt + SC + SI + LIC | cnt + SC     | SI + LIC     |
@@ -696,7 +742,7 @@ In the first derivative attack, the attacker is looking for the one bucket whose
 The [Chaff attack](#chaff-attack) with dynamic noise layers produced the following table:
 
 | L query                               | R query                     | L answer                            | R answer                              | diff                                                           |
-|---------------------------------------|-----------------------------|-------------------------------------|---------------------------------------|----------------------------------------------------------------|
+| ------------------------------------- | --------------------------- | ----------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
 | A and not I and not X1 ... and not Xn | A and not X1 ... and not Xn | cnt + D1a + D1I + D1X1 + ... + D1Xn | cnt + 1 + D1va  + D1vX1 + ... + D1vXn | D1a + D1I + D1X1 + ... + D1Xn - 1 - D1va - D1vX1 - ... - D1vXn |
 | B and not I and not X1 ... and not Xn | B and not X1 ... and not Xn | cnt + D2b + D2I + D2X1 + ... + D2Xn | cnt + D2b + D2X1 + ... + D2Xn         | D2I                                                            |
 | C and not I and not X1 ... and not Xn | C and not X1 ... and not Xn | cnt + D3c + D3I + D3X1 + ... + D3Xn | cnt + D3c + D3X1 + ... + D3Xn         | D3I                                                            |
@@ -704,7 +750,7 @@ The [Chaff attack](#chaff-attack) with dynamic noise layers produced the followi
 With LE layers instead of dynamic layers, we get this instead (leaving out static layers except in the difference):
 
 | L query                               | R query                     | L answer                      | R answer                    | diff         |
-|---------------------------------------|-----------------------------|-------------------------------|-----------------------------|--------------|
+| ------------------------------------- | --------------------------- | ----------------------------- | --------------------------- | ------------ |
 | A and not I and not X1 ... and not Xn | A and not X1 ... and not Xn | cnt + LIA + LX1A + ... + LXnA | cnt + 1 + LX1A + ... + LXnA | SI + LIA - 1 |
 | B and not I and not X1 ... and not Xn | B and not X1 ... and not Xn | cnt + LIB + LX1B + ... + LXnB | cnt + 1 + LX1B + ... + LXnB | SI + LIB     |
 | C and not I and not X1 ... and not Xn | C and not X1 ... and not Xn | cnt + LIC + LX1C + ... + LXnC | cnt + 1 + LX1C + ... + LXnC | SI + LIC     |
