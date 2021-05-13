@@ -131,3 +131,13 @@ let sortRows ctx orderings (rows: Row seq) =
         |> performSort tail
 
   performSort (List.rev orderings) rows
+
+// ----------------------------------------------------------------
+// Utils
+// ----------------------------------------------------------------
+
+let rec isScalar expr =
+  match expr with
+  | FunctionExpr (AggregateFunction _, _) -> false
+  | FunctionExpr (_, args) -> List.forall isScalar args
+  | _ -> true

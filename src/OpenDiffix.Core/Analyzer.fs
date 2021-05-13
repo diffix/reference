@@ -164,12 +164,6 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
 
   query |> map exprMapper
 
-let rec scalarExpression =
-  function
-  | FunctionExpr (AggregateFunction _, _) -> false
-  | FunctionExpr (_, args) -> List.forall scalarExpression args
-  | _ -> true
-
 let addLowCountFilter aidColumnsExpression query =
   query
   |> map (fun selectQuery ->
@@ -183,7 +177,7 @@ let addLowCountFilter aidColumnsExpression query =
         selectQuery.TargetList
         |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-      if selectedExpressions |> List.forall scalarExpression then
+      if selectedExpressions |> List.forall Expression.isScalar then
         let bucketCount =
           FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnsExpression ])
 
