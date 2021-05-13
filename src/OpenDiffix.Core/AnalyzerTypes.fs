@@ -18,7 +18,12 @@ type SelectQuery =
     Having: Expression
   }
 
-type TargetEntry = { Expression: Expression; Alias: string }
+type TargetEntry = { Expression: Expression; Alias: string; Tag: TargetEntryTag }
+
+type TargetEntryTag =
+  | RegularTargetEntry
+  | JunkTargetEntry
+  | AidTargetEntry
 
 type GroupingSet = GroupingSet of Expression list
 
@@ -44,3 +49,6 @@ module Query =
     match query with
     | SelectQuery selectQuery -> selectQuery
     | UnionQuery _ -> failwith "Union queries are not yet supported"
+
+module TargetEntry =
+  let isRegular targetEntry = targetEntry.Tag = RegularTargetEntry

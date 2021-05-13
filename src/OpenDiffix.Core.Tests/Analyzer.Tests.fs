@@ -51,6 +51,7 @@ let ``Analyze count(*)`` () =
               Expression =
                 FunctionExpr(AggregateFunction(Count, { AggregateOptions.Default with Distinct = false }), [])
               Alias = "count"
+              Tag = RegularTargetEntry
             }
           ]
     }
@@ -69,6 +70,7 @@ let ``Analyze count(distinct col)`` () =
                   [ ColumnReference(1, IntegerType) ]
                 )
               Alias = "count"
+              Tag = RegularTargetEntry
             }
           ]
     }
@@ -80,8 +82,16 @@ let ``Selecting columns from a table`` () =
     { defaultQuery with
         TargetList =
           [
-            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
-            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+            {
+              Expression = ColumnReference(0, StringType)
+              Alias = "str_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(3, BooleanType)
+              Alias = "bool_col"
+              Tag = RegularTargetEntry
+            }
           ]
     }
 
@@ -104,16 +114,22 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
     {
       TargetList =
         [
-          { Expression = ColumnReference(1, IntegerType); Alias = "colAlias" }
+          {
+            Expression = ColumnReference(1, IntegerType)
+            Alias = "colAlias"
+            Tag = RegularTargetEntry
+          }
           {
             Expression =
               FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
             Alias = "+"
+            Tag = RegularTargetEntry
           }
           {
             Expression =
               FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
             Alias = "count"
+            Tag = RegularTargetEntry
           }
         ]
       Where =
@@ -151,8 +167,16 @@ let ``Selecting columns from an aliased table`` () =
     { defaultQuery with
         TargetList =
           [
-            { Expression = ColumnReference(0, StringType); Alias = "str_col" }
-            { Expression = ColumnReference(3, BooleanType); Alias = "bool_col" }
+            {
+              Expression = ColumnReference(0, StringType)
+              Alias = "str_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(3, BooleanType)
+              Alias = "bool_col"
+              Tag = RegularTargetEntry
+            }
           ]
         From = RangeTable(testTable, "t")
     }
@@ -212,7 +236,10 @@ type Tests(db: DBFixture) =
       )
 
     let expectedInTopQuery =
-      [ { Expression = countStar; Alias = "count" }; { Expression = countDistinct; Alias = "count" } ]
+      [
+        { Expression = countStar; Alias = "count"; Tag = RegularTargetEntry }
+        { Expression = countDistinct; Alias = "count"; Tag = RegularTargetEntry }
+      ]
 
     result.TargetList |> should equal expectedInTopQuery
 

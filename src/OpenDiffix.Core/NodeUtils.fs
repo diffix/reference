@@ -116,7 +116,7 @@ let inline unwrap node =
   callUnwrap (Unchecked.defaultof<NodeFunctions>, node)
 
 /// Collects all aggregator expressions from a node.
-let inline collectAggregators node =
+let inline collectAggregates node =
   let rec exprAggregators expr =
     match expr with
     | FunctionExpr (AggregateFunction _, _) as aggregator -> [ aggregator ]

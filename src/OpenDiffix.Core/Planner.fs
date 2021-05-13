@@ -4,30 +4,52 @@ open AnalyzerTypes
 open PlannerTypes
 open NodeUtils
 
-let private planJoin join =
-  Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.On)
+// ----------------------------------------------------------------
+// Utils
+// ----------------------------------------------------------------
 
-let private planFrom =
-  function
-  | RangeTable (table, _alias) -> Plan.Scan table
-  | Join join -> planJoin join
-  | SubQuery (query, _alias) -> plan query
+/// Prepares an expression for use in a plan.
+/// If an expression is already computed in a child plan, the outer
+/// expression is mapped to a reference to its index in the inner plan.
+let rec private projectExpression innerExpressions outerExpression =
+  if List.isEmpty innerExpressions then
+    outerExpression
+  else
+    match innerExpressions |> List.tryFindIndex ((=) outerExpression) with
+    | None ->
+        match outerExpression with
+        | FunctionExpr (fn, args) ->
+            let args = args |> List.map (projectExpression innerExpressions)
+            FunctionExpr(fn, args)
+        | Constant _ -> outerExpression
+        | ColumnReference _ -> failwith "Expression projection failed"
+        | ListExpr values -> values |> List.map (projectExpression innerExpressions) |> ListExpr
+    | Some i -> ColumnReference(i, Expression.typeOf outerExpression)
 
-let rec private extractSetFunctions expression =
-  match expression with
-  | FunctionExpr (SetFunction fn, args) -> [ (fn, args) ]
-  | expr -> expr |> collect extractSetFunctions
-
-let private projectSetFunctions setColumn expression =
+/// Swaps set function expressions with a reference to their evaluated value in the child plan.
+let private projectSetFunctions evaluatedSetFunction expression =
   let rec exprMapper expr =
     match expr with
-    | FunctionExpr (SetFunction _, _) -> setColumn
+    | FunctionExpr (SetFunction _, _) -> evaluatedSetFunction
     | other -> other |> map exprMapper
 
   exprMapper expression
 
+/// Returns all set functions in an expression.
+let rec private collectSetFunctions expression =
+  match expression with
+  | FunctionExpr (SetFunction fn, args) -> [ (fn, args) ]
+  | expr -> expr |> collect collectSetFunctions
+
+// ----------------------------------------------------------------
+// Node planners
+// ----------------------------------------------------------------
+
+let private planJoin join =
+  Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.On)
+
 let private planProject expressions plan =
-  match expressions |> List.collect extractSetFunctions |> List.distinct with
+  match expressions |> List.collect collectSetFunctions |> List.distinct with
   | [] -> Plan.Project(plan, expressions)
   | [ setFn, args ] ->
       let setColumn = ColumnReference(Plan.columnsCount plan, Expression.typeOfSetFunction setFn args)
@@ -51,38 +73,21 @@ let private planAggregate (groupingLabels: Expression list) (aggregators: Expres
   else
     Plan.Aggregate(plan, groupingLabels, aggregators)
 
-let rec private projectExpression columns expression =
-  if List.isEmpty columns then
-    expression
-  else
-    match columns |> List.tryFindIndex (fun column -> column = expression) with
-    | None ->
-        match expression with
-        | FunctionExpr (fn, args) ->
-            let args = args |> List.map (projectExpression columns)
-            FunctionExpr(fn, args)
-        | Constant _ -> expression
-        | ColumnReference _ -> failwith "Expression projection failed"
-        | ListExpr values -> values |> List.map (projectExpression columns) |> ListExpr
-    | Some i -> ColumnReference(i, Expression.typeOf expression)
+let private planFrom queryRange =
+  match queryRange with
+  | RangeTable (table, _alias) -> Plan.Scan table
+  | Join join -> planJoin join
+  | SubQuery (query, _alias) -> query |> Query.assertSelectQuery |> planQuery
 
-let private planSelect query =
+let private planQuery query =
   let selectedExpressions = query.TargetList |> List.map (fun column -> column.Expression)
-
   let orderByExpressions = query.OrderBy |> List.map (fun (OrderBy (expression, _, _)) -> expression)
-
   let expressions = query.Having :: selectedExpressions @ orderByExpressions
-
-  let aggregators = expressions |> collectAggregators |> List.distinct
-
+  let aggregators = expressions |> collectAggregates |> List.distinct
   let groupingLabels = query.GroupingSets |> List.collect unwrap |> List.distinct
-
   let aggregatedColumns = groupingLabels @ aggregators
-
   let selectedExpressions = selectedExpressions |> List.map (projectExpression aggregatedColumns)
-
   let orderByExpressions = query.OrderBy |> map (projectExpression aggregatedColumns)
-
   let havingExpression = projectExpression aggregatedColumns query.Having
 
   planFrom query.From
@@ -92,11 +97,32 @@ let private planSelect query =
   |> planSort orderByExpressions
   |> planProject selectedExpressions
 
+let private filterJunk targetList plan =
+  let columns =
+    targetList
+    |> List.indexed
+    |> List.filter (fun (_i, col) ->
+      match col.Tag with
+      | RegularTargetEntry -> true
+      | JunkTargetEntry -> false
+      | AidTargetEntry -> failwith "AID target entries should never be exposed from a top-level query"
+    )
+    |> List.map fst
+
+  if List.length columns = List.length targetList then
+    // No junk, do nothing
+    plan
+  else
+    Plan.Project(
+      plan,
+      columns
+      |> List.map (fun i -> ColumnReference(i, Expression.typeOf targetList.[i].Expression))
+    )
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
 let plan query =
-  match query with
-  | SelectQuery query -> planSelect query
-  | UnionQuery _ -> failwith "Union planning not yet supported"
+  let query = Query.assertSelectQuery query
+  query |> planQuery |> filterJunk query.TargetList

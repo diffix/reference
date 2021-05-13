@@ -9,7 +9,10 @@ type Columns = ColumnName list
 let rec private extractColumnNames query =
   match query with
   | UnionQuery (_, query1, _query2) -> extractColumnNames query1
-  | SelectQuery query -> query.TargetList |> List.map (fun column -> column.Alias)
+  | SelectQuery query ->
+      query.TargetList
+      |> List.filter TargetEntry.isRegular
+      |> List.map (fun column -> column.Alias)
 
 // ----------------------------------------------------------------
 // Public API
