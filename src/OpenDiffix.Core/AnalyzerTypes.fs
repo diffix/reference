@@ -1,5 +1,9 @@
 module rec OpenDiffix.Core.AnalyzerTypes
 
+// ----------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------
+
 type Query =
   | UnionQuery of distinct: bool * Query * Query
   | SelectQuery of SelectQuery
@@ -30,3 +34,13 @@ type Join = { Type: JoinType; Left: QueryRange; Right: QueryRange; On: Expressio
 type RangeTable = Table * string
 
 type RangeTables = RangeTable list
+
+// ----------------------------------------------------------------
+// Functions
+// ----------------------------------------------------------------
+
+module Query =
+  let assertSelectQuery query =
+    match query with
+    | SelectQuery selectQuery -> selectQuery
+    | UnionQuery _ -> failwith "Union queries are not yet supported"

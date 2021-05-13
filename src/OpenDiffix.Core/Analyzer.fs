@@ -260,7 +260,7 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   if List.isEmpty aidColumns then
     query
   else
-    QueryValidator.validateQuery query
+    QueryValidator.validateQuery (Query.assertSelectQuery query)
 
     let aidColumnsExpression = aidColumns |> ListExpr
 

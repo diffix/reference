@@ -3,14 +3,6 @@ module OpenDiffix.Core.QueryValidator
 open AnalyzerTypes
 open NodeUtils
 
-let private visitAggregates f query =
-  let rec exprVisitor f expr =
-    match expr with
-    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression -> f aggregateExpression
-    | other -> other |> visit (exprVisitor f)
-
-  query |> visit (exprVisitor f)
-
 let private validateOnlyCount query =
   query
   |> visitAggregates
@@ -39,13 +31,12 @@ let private validateSelectTarget query =
 
   query |> visit rangeVisitor
 
-let private allowedAggregate (query: Query) =
-  validateOnlyCount query
-  allowedCountUsage query
-  validateSelectTarget query
-
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
-let validateQuery (query: Query) = allowedAggregate query
+/// Validates a top-level anonymizing query.
+let validateQuery (query: SelectQuery) =
+  validateOnlyCount query
+  allowedCountUsage query
+  validateSelectTarget query

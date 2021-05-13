@@ -61,6 +61,9 @@ type NodeFunctions =
   static member Map(query: Query, f: QueryRange -> QueryRange) =
     NodeFunctions.Map(query, (fun (selectQuery: SelectQuery) -> { selectQuery with From = f selectQuery.From }))
 
+  static member Map(selectQuery: SelectQuery, f: QueryRange -> QueryRange) =
+    { selectQuery with From = f selectQuery.From }
+
   static member Map(join: Join, f: QueryRange -> QueryRange) =
     { join with Left = f join.Left; Right = f join.Right }
 
@@ -120,3 +123,12 @@ let inline collectAggregators node =
     | expr -> expr |> collect exprAggregators
 
   node |> collect exprAggregators
+
+/// Visits all aggregate expressions in a node.
+let inline visitAggregates f node =
+  let rec exprVisitor f expr =
+    match expr with
+    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression -> f aggregateExpression
+    | other -> other |> visit (exprVisitor f)
+
+  node |> visit (exprVisitor f)
