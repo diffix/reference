@@ -34,7 +34,12 @@ let column index =
 
 let selectColumn index =
   let column = table.Columns |> List.item index
-  { Expression = ColumnReference(index, column.Type); Alias = column.Name }
+
+  {
+    Expression = ColumnReference(index, column.Type)
+    Alias = column.Name
+    Tag = RegularTargetEntry
+  }
 
 let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
 
@@ -71,7 +76,7 @@ let ``plan order by`` () =
 [<Fact>]
 let ``plan aggregation`` () =
   let groupingSet = [ column 1 ]
-  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = "" } ]
+  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
 
   let select =
     { emptySelect with
@@ -90,7 +95,13 @@ let ``plan aggregation`` () =
 [<Fact>]
 let ``plan all`` () =
   let groupingSet = [ column 0 ]
-  let selectedColumns = [ { Expression = plus1 (column 0); Alias = "" }; { Expression = countStar; Alias = "" } ]
+
+  let selectedColumns =
+    [
+      { Expression = plus1 (column 0); Alias = ""; Tag = RegularTargetEntry }
+      { Expression = countStar; Alias = ""; Tag = RegularTargetEntry }
+    ]
+
   let whereCondition = FunctionExpr(ScalarFunction Equals, [ column 1; Constant(String "abc") ])
   let havingCondition = FunctionExpr(ScalarFunction Equals, [ countStar; Constant(Integer 0L) ])
   let orderBy = [ OrderBy(plus1 countStar, Ascending, NullsFirst) ]
@@ -133,7 +144,7 @@ let ``sub-query plan`` () =
   let query =
     { subQuery with
         TargetList = [ selectColumn 0 ]
-        From = SubQuery(SelectQuery subQuery)
+        From = SubQuery(SelectQuery subQuery, "subQuery")
     }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
@@ -159,7 +170,7 @@ let ``plan join`` () =
 [<Fact>]
 let ``plan set select`` () =
   let setExpression = FunctionExpr((SetFunction GenerateSeries), [ column 0 ])
-  let setSelect = { Expression = setExpression; Alias = "set" }
+  let setSelect = { Expression = setExpression; Alias = "set"; Tag = RegularTargetEntry }
 
   let select = { emptySelect with TargetList = [ selectColumn 1; setSelect ] }
 
@@ -168,5 +179,15 @@ let ``plan set select`` () =
       Plan.ProjectSet(Plan.Scan(table), GenerateSeries, [ column 0 ]),
       [ column 1; ColumnReference(2, IntegerType) ]
     )
+
+  SelectQuery select |> Planner.plan |> should equal expected
+
+[<Fact>]
+let ``junk filter`` () =
+  let junkCol = { selectColumn 0 with Tag = JunkTargetEntry }
+
+  let select = { emptySelect with TargetList = [ junkCol; selectColumn 1 ] }
+
+  let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 0; column 1 ]), [ column 1 ])
 
   SelectQuery select |> Planner.plan |> should equal expected

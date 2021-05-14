@@ -23,6 +23,7 @@ let analyzeQuery queryString =
   |> Parser.parse
   |> Analyzer.transformQuery schema
   |> fst
+  |> AnalyzerTypes.Query.assertSelectQuery
   |> QueryValidator.validateQuery
 
 let ensureFailParsedQuery queryString (errorFragment: string) =

@@ -73,7 +73,7 @@ let rec mapSelectedExpression tables selectedExpression =
   | ParserTypes.As (parsedExpression, parsedAlias) ->
       let alias = parsedAlias |> Option.defaultWith (fun () -> expressionName parsedExpression)
       let expression = parsedExpression |> mapExpression tables
-      { Expression = expression; Alias = alias }
+      { Expression = expression; Alias = alias; Tag = RegularTargetEntry }
   | other -> failwith $"Unexpected expression selected '%A{other}'"
 
 let transformSelectedExpressions tables selectedExpressions =
@@ -164,36 +164,6 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
 
   query |> map exprMapper
 
-let rec scalarExpression =
-  function
-  | FunctionExpr (AggregateFunction _, _) -> false
-  | FunctionExpr (_, args) -> List.forall scalarExpression args
-  | _ -> true
-
-let selectExpressionToColumn selectExpression =
-  {
-    Name = selectExpression.Alias
-    Type = Expression.typeOf selectExpression.Expression
-  }
-
-let selectColumnsFromQuery columnIndices innerQuery =
-  let selectedColumns =
-    columnIndices
-    |> List.map (fun index ->
-      let column = innerQuery.TargetList |> List.item index
-      let columnType = Expression.typeOf column.Expression
-      { column with Expression = ColumnReference(index, columnType) }
-    )
-
-  {
-    TargetList = selectedColumns
-    From = SubQuery(SelectQuery innerQuery)
-    Where = booleanTrueExpression
-    GroupingSets = []
-    OrderBy = []
-    Having = booleanTrueExpression
-  }
-
 let addLowCountFilter aidColumnsExpression query =
   query
   |> map (fun selectQuery ->
@@ -207,18 +177,19 @@ let addLowCountFilter aidColumnsExpression query =
         selectQuery.TargetList
         |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-      if selectedExpressions |> List.forall scalarExpression then
+      if selectedExpressions |> List.forall Expression.isScalar then
         let bucketCount =
           FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnsExpression ])
 
         let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
 
         { selectQuery with
-            TargetList = { Expression = bucketExpand; Alias = "" } :: selectQuery.TargetList
+            TargetList =
+              { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
+              :: selectQuery.TargetList
             GroupingSets = [ GroupingSet selectedExpressions ]
             Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
         }
-        |> selectColumnsFromQuery [ 1 .. selectedExpressions.Length ]
       else
         selectQuery
     else
@@ -260,7 +231,7 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   if List.isEmpty aidColumns then
     query
   else
-    QueryValidator.validateQuery query
+    QueryValidator.validateQuery (Query.assertSelectQuery query)
 
     let aidColumnsExpression = aidColumns |> ListExpr
 

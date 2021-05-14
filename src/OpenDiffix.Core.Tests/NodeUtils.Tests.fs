@@ -22,7 +22,7 @@ let negativeExpression = Boolean false |> Constant
 
 let selectQuery =
   {
-    TargetList = [ { Expression = expression; Alias = "col" } ]
+    TargetList = [ { Expression = expression; Alias = "col"; Tag = RegularTargetEntry } ]
     Where = expression
     From = RangeTable(testTable, testTable.Name)
     GroupingSets = [ GroupingSet [ expression ] ]
@@ -32,7 +32,7 @@ let selectQuery =
 
 let selectQueryNegative =
   {
-    TargetList = [ { Expression = negativeExpression; Alias = "col" } ]
+    TargetList = [ { Expression = negativeExpression; Alias = "col"; Tag = RegularTargetEntry } ]
     Where = negativeExpression
     From = RangeTable(testTable, testTable.Name)
     GroupingSets = [ GroupingSet [ negativeExpression ] ]

@@ -44,6 +44,7 @@ let typeOfAggregate fn args =
       match typeOfList args with
       | ListType IntegerType -> IntegerType
       | _ -> RealType
+  | MergeAids -> ListType MIXED_TYPE
 
 /// Resolves the type of an expression.
 let rec typeOf expression =
@@ -130,3 +131,13 @@ let sortRows ctx orderings (rows: Row seq) =
         |> performSort tail
 
   performSort (List.rev orderings) rows
+
+// ----------------------------------------------------------------
+// Utils
+// ----------------------------------------------------------------
+
+let rec isScalar expr =
+  match expr with
+  | FunctionExpr (AggregateFunction _, _) -> false
+  | FunctionExpr (_, args) -> List.forall isScalar args
+  | _ -> true
