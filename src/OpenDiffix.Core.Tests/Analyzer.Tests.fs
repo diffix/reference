@@ -17,7 +17,8 @@ let testTable : Table =
       ]
   }
 
-let schema = [ testTable ]
+let dataProvider = dummyDataProvider [ testTable ]
+let context = EvaluationContext.make AnonymizationParams.Default dataProvider
 
 let defaultQuery =
   {
@@ -32,12 +33,11 @@ let defaultQuery =
 let testParsedQuery queryString expected =
   queryString
   |> Parser.parse
-  |> Analyzer.transformQuery schema
-  |> fst
+  |> Analyzer.analyze context
   |> should equal (SelectQuery expected)
 
 let testQueryError queryString =
-  (fun () -> queryString |> Parser.parse |> Analyzer.transformQuery schema |> ignore)
+  (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
   |> shouldFail
 
 [<Fact>]
@@ -209,19 +209,18 @@ type Tests(db: DBFixture) =
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
-  let context = ExecutionContext.make anonParams db.DataProvider
+  let context = EvaluationContext.make anonParams db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
-  let aidColumns = [ idColumn; companyColumn ] |> ListExpr
+  let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
     query
     |> Parser.parse
     |> Analyzer.analyze context
-    |> function
-    | SelectQuery s -> s
-    | _other -> failwith "Expected a top-level SELECT query"
+    |> Analyzer.rewrite context
+    |> Query.assertSelectQuery
 
   [<Fact>]
   let ``Analyze count transforms`` () =

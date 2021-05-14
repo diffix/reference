@@ -14,15 +14,16 @@ let testTable : Table =
       ]
   }
 
-let schema = [ testTable ]
+
+let dataProvider = dummyDataProvider [ testTable ]
+let context = EvaluationContext.make AnonymizationParams.Default dataProvider
 
 let aidColIndex = Table.findColumn testTable "int_col" |> fst
 
 let analyzeQuery queryString =
   queryString
   |> Parser.parse
-  |> Analyzer.transformQuery schema
-  |> fst
+  |> Analyzer.analyze context
   |> AnalyzerTypes.Query.assertSelectQuery
   |> QueryValidator.validateQuery
 

@@ -15,7 +15,7 @@ module ExpressionType =
     | [ t ] -> t
     | _ -> MIXED_TYPE
 
-module ExecutionContext =
+module EvaluationContext =
   let make anonParams dataProvider =
     { AnonymizationParams = anonParams; DataProvider = dataProvider }
 
