@@ -1,4 +1,4 @@
-module OpenDiffix.Core.QueryValidator
+module rec OpenDiffix.Core.QueryValidator
 
 open AnalyzerTypes
 open NodeUtils
@@ -22,21 +22,32 @@ let private allowedCountUsage query =
            | _ -> failwith "Only count(*) and count(distinct column) are supported"
        | _ -> ())
 
-let private validateSelectTarget query =
+let private validateSubQuery query =
+  let selectQuery = Query.assertSelectQuery query
+
+  selectQuery
+  |> visitAggregates (fun _ -> failwith "Aggregates in subqueries are not currently supported")
+
+  if selectQuery.GroupingSets <> [ GroupingSet [] ] then
+    failwith "Grouping in subqueries is not currently supported"
+
+  validateSelectTarget selectQuery
+
+let validateSelectTarget selectQuery =
   let rec rangeVisitor range =
     match range with
-    | SubQuery _ -> failwith "Subqueries are not supported at present"
+    | SubQuery (subQuery, _alias) -> validateSubQuery subQuery
     | Join join -> join |> visit rangeVisitor
     | RangeTable _ -> ()
 
-  query |> visit rangeVisitor
+  selectQuery |> visit rangeVisitor
 
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
 /// Validates a top-level anonymizing query.
-let validateQuery (query: SelectQuery) =
-  validateOnlyCount query
-  allowedCountUsage query
-  validateSelectTarget query
+let validateQuery (selectQuery: SelectQuery) =
+  validateOnlyCount selectQuery
+  allowedCountUsage selectQuery
+  validateSelectTarget selectQuery
