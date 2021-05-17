@@ -36,7 +36,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``query 2`` () =
     let expected = { Columns = [ "c1"; "c2" ]; Rows = [ [| Integer 11L; Integer 4L |] ] }
-    let queryResult = runQuery "SELECT COUNT(*) AS c1, COUNT(DISTINCT length(name)) AS c2 FROM products"
+    let queryResult = runQuery "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM products"
     assertOkEqual queryResult expected
 
   [<Fact>]
@@ -121,5 +121,24 @@ type Tests(db: DBFixture) =
 
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected
+
+  let equivalentQueries expectedQuery testQuery =
+    let testResult = runQuery testQuery |> Result.value
+    let expectedResult = runQuery expectedQuery |> Result.value
+    testResult |> should equal expectedResult
+
+  [<Fact>]
+  let ``Subquery wrappers produce consistent results`` () =
+    equivalentQueries
+      "SELECT p.name AS n FROM products AS p WHERE id = 1"
+      "SELECT n FROM (SELECT p.name AS n FROM products AS p WHERE id = 1) x"
+
+    equivalentQueries
+      "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM products"
+      "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM (SELECT name FROM products) x"
+
+    equivalentQueries
+      "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
+      "SELECT count(*) FROM (SELECT id, cid FROM customers_small LEFT JOIN purchases ON id = cid) x"
 
   interface IClassFixture<DBFixture>
