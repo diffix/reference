@@ -133,7 +133,23 @@ let sortRows ctx orderings (rows: Row seq) =
   performSort (List.rev orderings) rows
 
 // ----------------------------------------------------------------
-// Utils
+// Factory functions
+// ----------------------------------------------------------------
+
+let makeSetFunction setFunctionType args =
+  FunctionExpr(SetFunction(setFunctionType), args)
+
+let makeAggregate aggType args =
+  FunctionExpr(AggregateFunction(aggType, AggregateOptions.Default), args)
+
+let makeAnd left right =
+  FunctionExpr(ScalarFunction And, [ left; right ])
+
+let makeNot expr =
+  FunctionExpr(ScalarFunction Not, [ expr ])
+
+// ----------------------------------------------------------------
+// Misc
 // ----------------------------------------------------------------
 
 let rec isScalar expr =
@@ -141,3 +157,8 @@ let rec isScalar expr =
   | FunctionExpr (AggregateFunction _, _) -> false
   | FunctionExpr (_, args) -> List.forall isScalar args
   | _ -> true
+
+let unwrapListExpr expr =
+  match expr with
+  | ListExpr list -> list
+  | _ -> failwith "Expected a list expression"

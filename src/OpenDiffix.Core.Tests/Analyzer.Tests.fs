@@ -17,7 +17,8 @@ let testTable : Table =
       ]
   }
 
-let schema = [ testTable ]
+let dataProvider = dummyDataProvider [ testTable ]
+let context = EvaluationContext.make AnonymizationParams.Default dataProvider
 
 let defaultQuery =
   {
@@ -32,12 +33,11 @@ let defaultQuery =
 let testParsedQuery queryString expected =
   queryString
   |> Parser.parse
-  |> Analyzer.transformQuery schema
-  |> fst
+  |> Analyzer.analyze context
   |> should equal (SelectQuery expected)
 
 let testQueryError queryString =
-  (fun () -> queryString |> Parser.parse |> Analyzer.transformQuery schema |> ignore)
+  (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
   |> shouldFail
 
 [<Fact>]
@@ -182,6 +182,46 @@ let ``Selecting columns from an aliased table`` () =
     }
 
 [<Fact>]
+let ``Selecting columns from subquery`` () =
+  testParsedQuery
+    "SELECT int_col, x.aliased FROM (SELECT str_col AS aliased, int_col FROM table) x"
+    { defaultQuery with
+        TargetList =
+          [
+            {
+              Expression = ColumnReference(1, IntegerType)
+              Alias = "int_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(0, StringType)
+              Alias = "aliased"
+              Tag = RegularTargetEntry
+            }
+          ]
+        From =
+          SubQuery(
+            SelectQuery
+              { defaultQuery with
+                  TargetList =
+                    [
+                      {
+                        Expression = ColumnReference(0, StringType)
+                        Alias = "aliased"
+                        Tag = RegularTargetEntry
+                      }
+                      {
+                        Expression = ColumnReference(1, IntegerType)
+                        Alias = "int_col"
+                        Tag = RegularTargetEntry
+                      }
+                    ]
+              },
+            "x"
+          )
+    }
+
+[<Fact>]
 let ``Selecting columns from invalid table`` () =
   testQueryError "SELECT t.str_col FROM table"
 
@@ -209,19 +249,18 @@ type Tests(db: DBFixture) =
       Noise = { StandardDev = 1.; Cutoff = 0. }
     }
 
-  let context = ExecutionContext.make anonParams db.DataProvider
+  let context = EvaluationContext.make anonParams db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
-  let aidColumns = [ idColumn; companyColumn ] |> ListExpr
+  let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
     query
     |> Parser.parse
     |> Analyzer.analyze context
-    |> function
-    | SelectQuery s -> s
-    | _other -> failwith "Expected a top-level SELECT query"
+    |> Analyzer.rewrite context
+    |> Query.assertSelectQuery
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -267,5 +306,69 @@ type Tests(db: DBFixture) =
         }
 
     result.From |> should equal expectedFrom
+
+  [<Fact>]
+  let ``Analyze subqueries`` () =
+    analyzeQuery "SELECT count(*) FROM (SELECT 1 FROM customers_small JOIN purchases ON id = purchases.cid) x"
+    |> should
+         equal
+         { defaultQuery with
+             TargetList =
+               [
+                 {
+                   Expression =
+                     FunctionExpr(
+                       AggregateFunction(DiffixCount, AggregateOptions.Default),
+                       [
+                         ListExpr [
+                           ColumnReference(1, StringType)
+                           ColumnReference(2, IntegerType)
+                           ColumnReference(3, IntegerType)
+                         ]
+                       ]
+                     )
+                   Alias = "count"
+                   Tag = RegularTargetEntry
+                 }
+               ]
+             From =
+               SubQuery(
+                 SelectQuery
+                   { defaultQuery with
+                       TargetList =
+                         [
+                           { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
+                           {
+                             Expression = ColumnReference(2, StringType)
+                             Alias = "__aid_0"
+                             Tag = AidTargetEntry
+                           }
+                           {
+                             Expression = ColumnReference(4, IntegerType)
+                             Alias = "__aid_1"
+                             Tag = AidTargetEntry
+                           }
+                           {
+                             Expression = ColumnReference(7, IntegerType)
+                             Alias = "__aid_2"
+                             Tag = AidTargetEntry
+                           }
+                         ]
+                       From =
+                         Join
+                           {
+                             Type = JoinType.InnerJoin
+                             Left = RangeTable(getTable "customers_small", "customers_small")
+                             Right = RangeTable(getTable "purchases", "purchases")
+                             On =
+                               FunctionExpr(
+                                 ScalarFunction Equals,
+                                 [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
+                               )
+                           }
+                   },
+                 "x"
+               )
+         }
 
   interface IClassFixture<DBFixture>

@@ -109,7 +109,7 @@ let dryRun query dbPath anonParams =
 
 let runQuery query dbPath anonParams =
   use dataProvider = new SQLite.DataProvider(dbPath)
-  let context = ExecutionContext.make anonParams dataProvider
+  let context = EvaluationContext.make anonParams dataProvider
   QueryEngine.run context query
 
 let anonymize query dbPath anonParams =

@@ -40,3 +40,9 @@ let evaluateAggregator ctx fn args rows =
 
   let aggregator = List.fold processor (Aggregator.create ctx fn) rows
   aggregator.Final ctx
+
+let dummyDataProvider schema =
+  { new IDataProvider with
+      member _.OpenTable _table = failwith "Opening tables not supported"
+      member _.GetSchema() = schema
+  }

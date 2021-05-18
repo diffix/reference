@@ -1,92 +1,96 @@
-module OpenDiffix.Core.Analyzer
+module rec OpenDiffix.Core.Analyzer
 
 open AnalyzerTypes
 open NodeUtils
 
-let rec private mapUnqualifiedColumn (tables: RangeTables) indexOffset name =
-  match tables with
-  | [] -> failwith $"Column `{name}` not found in the list of target tables"
-  | (firstTable, _alias) :: nextTables ->
-      match Table.tryFindColumn firstTable name with
-      | None -> mapUnqualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) name
-      | Some (index, column) -> ColumnReference(index + indexOffset, column.Type)
+type private RangeColumn = { RangeName: string; ColumnName: string; Type: ExpressionType; IsAid: bool }
 
-let rec private mapQualifiedColumn (tables: RangeTables) indexOffset tableName columnName =
-  match tables with
-  | [] -> failwith $"Table `{tableName}` not found in the list of target tables"
-  | (firstTable, alias) :: _ when String.equalsI alias tableName ->
-      columnName
-      |> Table.findColumn firstTable
-      |> fun (index, column) -> ColumnReference(index + indexOffset, column.Type)
-  | (firstTable, _alias) :: nextTables ->
-      mapQualifiedColumn nextTables (indexOffset + firstTable.Columns.Length) tableName columnName
+/// Attempts to find a unique match for a given column name (and optional range name) in the query range.
+/// Returns a `RangeColumn` and its index in the range.
+let rec private resolveColumn rangeColumns tableName columnName =
+  let label, condition =
+    match tableName with
+    | Some tableName ->
+        $"%s{tableName}.%s{columnName}",
+        fun (_, col) ->
+          String.equalsI col.RangeName tableName
+          && String.equalsI col.ColumnName columnName
+    | None -> columnName, (fun (_, col) -> String.equalsI col.ColumnName columnName)
 
-let private mapColumn tables tableName columnName =
-  match tableName with
-  | Some tableName -> mapQualifiedColumn tables 0 tableName columnName
-  | None -> mapUnqualifiedColumn tables 0 columnName
+  let candidates = rangeColumns |> List.indexed |> List.filter condition
 
-let rec functionExpression tables fn children =
-  let args = children |> List.map (mapExpression tables)
-  FunctionExpr(fn, args)
+  match candidates with
+  | [ rangeColumn ] -> rangeColumn
+  | [] -> failwith $"Column %s{label} not found in query range"
+  | _ -> failwith $"Ambiguous reference to column %s{label} in query range"
 
-and mapExpression tables parsedExpression =
-  match parsedExpression with
-  | ParserTypes.Identifier (tableName, columnName) -> mapColumn tables tableName columnName
-  | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant
-  | ParserTypes.Expression.Float value -> Value.Real value |> Constant
-  | ParserTypes.Expression.String value -> Value.String value |> Constant
-  | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant
-  | ParserTypes.Not expr -> functionExpression tables (ScalarFunction Not) [ expr ]
-  | ParserTypes.Lt (left, right) -> functionExpression tables (ScalarFunction Lt) [ left; right ]
-  | ParserTypes.LtE (left, right) -> functionExpression tables (ScalarFunction LtE) [ left; right ]
-  | ParserTypes.Gt (left, right) -> functionExpression tables (ScalarFunction Gt) [ left; right ]
-  | ParserTypes.GtE (left, right) -> functionExpression tables (ScalarFunction GtE) [ left; right ]
-  | ParserTypes.And (left, right) -> functionExpression tables (ScalarFunction And) [ left; right ]
-  | ParserTypes.Or (left, right) -> functionExpression tables (ScalarFunction Or) [ left; right ]
-  | ParserTypes.Equals (left, right) -> functionExpression tables (ScalarFunction Equals) [ left; right ]
-  | ParserTypes.IsNull expr -> functionExpression tables (ScalarFunction IsNull) [ expr ]
-  | ParserTypes.Function (name, args) ->
-      let fn = Function.fromString name
-      let fn, childExpressions = mapFunctionExpression tables fn args
-      FunctionExpr(fn, childExpressions)
-  | other -> failwith $"The expression is not permitted in this context: %A{other}"
-
-and mapFunctionExpression table fn args =
-  match fn, args with
-  | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> AggregateFunction(Count, aggregateArgs), []
-  | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
-      let childArg = mapExpression table expr
-      AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ childArg ]
-  | _, _ ->
-      let childArgs = args |> List.map (mapExpression table)
-      fn, childArgs
-
-let expressionName expr =
-  match expr with
+let private expressionName parsedExpr =
+  match parsedExpr with
   | ParserTypes.Identifier (_, columnName) -> columnName
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 
-let rec mapSelectedExpression tables selectedExpression =
-  match selectedExpression with
+let private constTrue = Constant(Boolean true)
+
+// ----------------------------------------------------------------
+// Expression building
+// ----------------------------------------------------------------
+
+let private mapColumnReference rangeColumns tableName columnName =
+  let index, column = resolveColumn rangeColumns tableName columnName
+  ColumnReference(index, column.Type)
+
+let private mapFunctionExpression rangeColumns fn parsedArgs =
+  match fn, parsedArgs with
+  | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
+      AggregateFunction(Count, aggregateArgs), []
+  | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
+      let arg = mapExpression rangeColumns expr
+      AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
+  | _ ->
+      let args = parsedArgs |> List.map (mapExpression rangeColumns)
+      fn, args
+  |> FunctionExpr
+
+let private mapExpression rangeColumns parsedExpr =
+  match parsedExpr with
+  | ParserTypes.Identifier (tableName, columnName) -> mapColumnReference rangeColumns tableName columnName
+  | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant
+  | ParserTypes.Expression.Float value -> Value.Real value |> Constant
+  | ParserTypes.Expression.String value -> Value.String value |> Constant
+  | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant
+  | ParserTypes.Not expr -> mapFunctionExpression rangeColumns (ScalarFunction Not) [ expr ]
+  | ParserTypes.Lt (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Lt) [ left; right ]
+  | ParserTypes.LtE (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction LtE) [ left; right ]
+  | ParserTypes.Gt (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Gt) [ left; right ]
+  | ParserTypes.GtE (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction GtE) [ left; right ]
+  | ParserTypes.And (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction And) [ left; right ]
+  | ParserTypes.Or (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Or) [ left; right ]
+  | ParserTypes.Equals (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Equals) [ left; right ]
+  | ParserTypes.IsNull expr -> mapFunctionExpression rangeColumns (ScalarFunction IsNull) [ expr ]
+  | ParserTypes.Function (name, args) ->
+      let fn = Function.fromString name
+      mapFunctionExpression rangeColumns fn args
+  | other -> failwith $"The expression is not permitted in this context: %A{other}"
+
+let private mapFilterExpression rangeColumns optionalExpr =
+  optionalExpr
+  |> Option.map (mapExpression rangeColumns)
+  |> Option.defaultValue constTrue
+
+let private mapTargetEntry rangeColumns parsedExpr =
+  match parsedExpr with
   | ParserTypes.As (parsedExpression, parsedAlias) ->
-      let alias = parsedAlias |> Option.defaultWith (fun () -> expressionName parsedExpression)
-      let expression = parsedExpression |> mapExpression tables
+      let alias = parsedAlias |> Option.defaultValue (expressionName parsedExpression)
+      let expression = parsedExpression |> mapExpression rangeColumns
       { Expression = expression; Alias = alias; Tag = RegularTargetEntry }
   | other -> failwith $"Unexpected expression selected '%A{other}'"
 
-let transformSelectedExpressions tables selectedExpressions =
-  selectedExpressions |> List.map (mapSelectedExpression tables)
+// ----------------------------------------------------------------
+// Group by
+// ----------------------------------------------------------------
 
-let booleanTrueExpression = Boolean true |> Constant
-
-let transformExpressionOptionWithDefaultTrue rangeTables optionalExpression =
-  optionalExpression
-  |> Option.map (mapExpression rangeTables)
-  |> Option.defaultValue booleanTrueExpression
-
-let transformGroupByIndex (expressions: Expression list) groupByExpression =
+let private mapGroupByIndex (expressions: Expression list) groupByExpression =
   match groupByExpression with
   | Constant (Integer index) ->
       if index < 1L || index > int64 expressions.Length then
@@ -95,67 +99,137 @@ let transformGroupByIndex (expressions: Expression list) groupByExpression =
         expressions |> List.item (int index - 1)
   | _ -> groupByExpression
 
-let transformGroupByIndices (selectedExpressions: TargetEntry list) groupByExpressions =
-  let selectedExpressions =
-    selectedExpressions
-    |> List.map (fun selectedExpression -> selectedExpression.Expression)
+let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions =
+  let selectedExpressions = targetList |> List.map (fun targetEntry -> targetEntry.Expression)
+  groupByExpressions |> List.map (mapGroupByIndex selectedExpressions)
 
-  groupByExpressions |> List.map (transformGroupByIndex selectedExpressions)
+// ----------------------------------------------------------------
+// Query range
+// ----------------------------------------------------------------
 
-let rec private collectRangeTables range : RangeTables =
+/// Returns the `RangeColumn`s in scope of a query.
+let rec private collectRangeColumns anonParams range =
   match range with
-  | RangeTable (table, alias) -> [ table, alias ]
-  | Join join -> (collectRangeTables join.Left) @ (collectRangeTables join.Right)
-  | SubQuery _ -> failwith "Unexpected subquery encountered while collecting tables"
+  | SubQuery (query, queryAlias) ->
+      (Query.assertSelectQuery query).TargetList
+      |> List.map (fun targetEntry ->
+        {
+          RangeName = queryAlias
+          ColumnName = targetEntry.Alias
+          Type = Expression.typeOf targetEntry.Expression
+          IsAid = (targetEntry.Tag = AidTargetEntry)
+        }
+      )
+  | Join { Left = left; Right = right } -> //
+      collectRangeColumns anonParams left @ collectRangeColumns anonParams right
+  | RangeTable (table, alias) ->
+      table.Columns
+      |> List.map (fun col ->
+        {
+          RangeName = alias
+          ColumnName = col.Name
+          Type = col.Type
+          IsAid = AnonymizationParams.isAidColumn anonParams table.Name col.Name
+        }
+      )
 
-let rec private transformFrom schema from =
-  match from with
+let rec private mapQueryRange schema anonParams parsedRange =
+  match parsedRange with
   | ParserTypes.Table (name, alias) ->
-      let alias = alias |> Option.defaultWith (fun () -> name)
+      let alias = alias |> Option.defaultValue name
       let table = name |> Schema.findTable schema
       RangeTable(table, alias)
   | ParserTypes.Join (joinType, left, right, on) ->
-      let left = transformFrom schema left
-      let right = transformFrom schema right
+      let left = mapQueryRange schema anonParams left
+      let right = mapQueryRange schema anonParams right
 
-      let rangeTables = (collectRangeTables left) @ (collectRangeTables right)
-      let condition = transformExpressionOptionWithDefaultTrue rangeTables (Some on)
+      let rangeColumns = collectRangeColumns anonParams left @ collectRangeColumns anonParams right
+      let condition = mapFilterExpression rangeColumns (Some on)
 
       Join { Type = joinType; Left = left; Right = right; On = condition }
+  | ParserTypes.SubQuery (subQuery, alias) -> SubQuery(mapQuery schema anonParams true subQuery, alias)
   | _ -> failwith "Invalid `FROM` clause"
 
-let private validateRangeTables (tables: RangeTables) =
-  let aliases = tables |> List.map (fun (_table, alias) -> alias.ToLower())
+// ----------------------------------------------------------------
+// Query
+// ----------------------------------------------------------------
+
+/// Returns the list of all aliases in range.
+let private rangeEntries range =
+  match range with
+  | SubQuery (_query, alias) -> [ alias ]
+  | RangeTable (_table, alias) -> [ alias ]
+  | Join { Left = left; Right = right } -> rangeEntries left @ rangeEntries right
+
+/// Verifies that there are no duplicate names in range.
+let private validateRange range =
+  let aliases = range |> rangeEntries |> List.map String.toLower
 
   if aliases.Length <> (List.distinct aliases).Length then
     failwith "Ambiguous target names in `FROM` clause."
 
-  tables
+  range
 
-let transformQuery schema (selectQuery: ParserTypes.SelectQuery) =
-  let from = transformFrom schema selectQuery.From
-  let rangeTables = from |> collectRangeTables |> validateRangeTables
-  let selectedExpressions = transformSelectedExpressions rangeTables selectQuery.Expressions
-  let whereClause = transformExpressionOptionWithDefaultTrue rangeTables selectQuery.Where
-  let havingClause = transformExpressionOptionWithDefaultTrue rangeTables selectQuery.Having
+let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.SelectQuery) =
+  let range = mapQueryRange schema anonParams selectQuery.From |> validateRange
+  let rangeColumns = collectRangeColumns anonParams range
+  let targetList = selectQuery.Expressions |> List.map (mapTargetEntry rangeColumns)
+  let whereClause = mapFilterExpression rangeColumns selectQuery.Where
+  let havingClause = mapFilterExpression rangeColumns selectQuery.Having
 
   let groupBy =
     selectQuery.GroupBy
-    |> List.map (mapExpression rangeTables)
-    |> transformGroupByIndices selectedExpressions
+    |> List.map (mapExpression rangeColumns)
+    |> mapGroupByIndices targetList
+
+  let isAggregating = not (List.isEmpty groupBy && List.isEmpty (collectAggregates targetList))
+
+  let aidTargets =
+    if isSubQuery then
+      // Subqueries will export their AIDs to outer queries.
+      rangeColumns
+      |> List.indexed
+      |> List.filter (fun (_i, col) -> col.IsAid)
+      |> List.mapi (fun aidIndex (colIndex, col) ->
+        {
+          Expression =
+            if isAggregating then
+              FunctionExpr(
+                AggregateFunction(MergeAids, AggregateOptions.Default),
+                [ ColumnReference(colIndex, col.Type) ]
+              )
+            else
+              ColumnReference(colIndex, col.Type)
+          Alias = $"__aid_{aidIndex}"
+          Tag = AidTargetEntry
+        }
+      )
+    else
+      []
 
   SelectQuery
     {
-      TargetList = selectedExpressions
+      TargetList = targetList @ aidTargets
       Where = whereClause
-      From = from
+      From = range
       GroupingSets = [ GroupingSet groupBy ]
       Having = havingClause
       OrderBy = []
-    },
-  rangeTables
+    }
 
-let rewriteToDiffixAggregate aidColumnsExpression query =
+// ----------------------------------------------------------------
+// Rewriting
+// ----------------------------------------------------------------
+
+/// Builds a list expression which is used for accessing all AIDs in scope of a query.
+let private makeAidColumnsExpression rangeColumns =
+  rangeColumns
+  |> List.indexed
+  |> List.filter (fun (_i, col) -> col.IsAid)
+  |> List.map (fun (i, col) -> ColumnReference(i, col.Type))
+  |> ListExpr
+
+let private rewriteToDiffixAggregate aidColumnsExpression query =
   let rec exprMapper expr =
     match expr with
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
@@ -164,60 +238,50 @@ let rewriteToDiffixAggregate aidColumnsExpression query =
 
   query |> map exprMapper
 
-let addLowCountFilter aidColumnsExpression query =
-  query
-  |> map (fun selectQuery ->
-    let lowCountAggregate =
-      FunctionExpr(AggregateFunction(DiffixLowCount, AggregateOptions.Default), [ aidColumnsExpression ])
+let private addLowCountFilter aidColumnsExpression selectQuery =
+  let lowCountFilter =
+    Expression.makeAggregate DiffixLowCount [ aidColumnsExpression ]
+    |> Expression.makeNot
 
-    let lowCountFilter = FunctionExpr(ScalarFunction Not, [ lowCountAggregate ])
+  if selectQuery.GroupingSets = [ GroupingSet [] ] then
+    let selectedExpressions =
+      selectQuery.TargetList
+      |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-    if selectQuery.GroupingSets = [ GroupingSet [] ] then
-      let selectedExpressions =
-        selectQuery.TargetList
-        |> List.map (fun selectedColumn -> selectedColumn.Expression)
+    if selectedExpressions |> List.forall Expression.isScalar then
+      // Non-grouping & non-aggregating query; group implicitly and expand
+      let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
+      let bucketExpand = Expression.makeSetFunction GenerateSeries [ bucketCount ]
 
-      if selectedExpressions |> List.forall Expression.isScalar then
-        let bucketCount =
-          FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumnsExpression ])
-
-        let bucketExpand = FunctionExpr(SetFunction GenerateSeries, [ bucketCount ])
-
-        { selectQuery with
-            TargetList =
-              { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
-              :: selectQuery.TargetList
-            GroupingSets = [ GroupingSet selectedExpressions ]
-            Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
-        }
-      else
-        selectQuery
-    else
       { selectQuery with
-          Having = FunctionExpr(ScalarFunction And, [ lowCountFilter; selectQuery.Having ])
+          TargetList =
+            { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
+            :: selectQuery.TargetList
+          GroupingSets = [ GroupingSet selectedExpressions ]
+          Having = Expression.makeAnd lowCountFilter selectQuery.Having
       }
-  )
+    else
+      // Non-grouping aggregate query; do nothing
+      selectQuery
+  else
+    // Grouping query; add LCF to HAVING
+    { selectQuery with
+        Having = Expression.makeAnd lowCountFilter selectQuery.Having
+    }
 
-let rec private collectAids (anonParams: AnonymizationParams) (tables: RangeTables) indexOffset =
-  match tables with
-  | [] -> []
-  | (firstTable, _alias) :: nextTables ->
-      let remainingTablesAidColumns = collectAids anonParams nextTables (indexOffset + firstTable.Columns.Length)
+let private rewriteQuery anonParams (selectQuery: SelectQuery) =
+  let rangeColumns = collectRangeColumns anonParams selectQuery.From
+  let aidColumnsExpression = makeAidColumnsExpression rangeColumns
+  let isAnonymizing = aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
-      match anonParams.TableSettings.TryFind(firstTable.Name) with
-      | None -> remainingTablesAidColumns
-      | Some { AidColumns = aidColumns } ->
-          let currentTableAidColumns =
-            aidColumns
-            |> List.map (Table.findColumn firstTable)
-            |> List.map (fun (index, column) -> (index + indexOffset, column))
+  if isAnonymizing then
+    QueryValidator.validateQuery selectQuery
 
-          let otherColumns = remainingTablesAidColumns
-          currentTableAidColumns @ otherColumns
-
-let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables) =
-  collectAids anonParams tables 0
-  |> List.map (fun (index, column) -> ColumnReference(index, column.Type))
+    selectQuery
+    |> rewriteToDiffixAggregate aidColumnsExpression
+    |> addLowCountFilter aidColumnsExpression
+  else
+    selectQuery
 
 // ----------------------------------------------------------------
 // Public API
@@ -225,16 +289,9 @@ let rec private findAids (anonParams: AnonymizationParams) (tables: RangeTables)
 
 let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   let schema = context.DataProvider.GetSchema()
-  let query, rangeTables = transformQuery schema parseTree
-  let aidColumns = findAids context.AnonymizationParams rangeTables
+  let anonParams = context.AnonymizationParams
+  let query = mapQuery schema anonParams false parseTree
+  query
 
-  if List.isEmpty aidColumns then
-    query
-  else
-    QueryValidator.validateQuery (Query.assertSelectQuery query)
-
-    let aidColumnsExpression = aidColumns |> ListExpr
-
-    query
-    |> rewriteToDiffixAggregate aidColumnsExpression
-    |> addLowCountFilter aidColumnsExpression
+let rewrite context (query: Query) =
+  query |> map (rewriteQuery context.AnonymizationParams)

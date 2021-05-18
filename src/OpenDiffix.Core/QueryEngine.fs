@@ -24,7 +24,12 @@ type QueryError = string
 
 let run context statement : Result<QueryResult, QueryError> =
   try
-    let query = statement |> Parser.parse |> Analyzer.analyze context
+    let query =
+      statement
+      |> Parser.parse
+      |> Analyzer.analyze context
+      |> Analyzer.rewrite context
+
     let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
     let columns = extractColumnNames query
     Ok { Columns = columns; Rows = rows }
