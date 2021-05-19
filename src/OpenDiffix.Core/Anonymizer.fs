@@ -32,7 +32,7 @@ let private noiseValueInt rnd (noiseParam: NoiseParam) =
 let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
   |> List.map (fun aidSet ->
-    if aidSet.Count = 0 then
+    if aidSet.Count < anonymizationParams.MinimumAllowedAids then
       true
     else
       let rnd = newRandom anonymizationParams aidSet
