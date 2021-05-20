@@ -11,6 +11,8 @@ type IAggregator =
 let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
 
+let private hashAid (aidValue: Value) = aidValue.GetHashCode()
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
@@ -133,7 +135,12 @@ type private DiffixLowCount(aidSets: Set<AidHash> list option) =
           |> Option.defaultWith (fun () -> List.replicate aidInstances.Length Set.empty)
           |> List.zip aidInstances
           |> List.map (fun (aidValue: Value, aidSet) ->
-            if aidValue = Null then aidSet else Set.add (aidValue.GetHashCode()) aidSet
+            match aidValue with
+            | Null -> aidSet
+            | Value.List aidValues ->
+                let aidHashes = aidValues |> List.map hashAid
+                Set.addRange aidHashes aidSet
+            | aidValue -> Set.add (aidValue.GetHashCode()) aidSet
           )
           |> Some
           |> DiffixLowCount
@@ -152,10 +159,7 @@ type private MergeAids(aidSet: Set<Value>) =
     member this.Transition args =
       match args with
       | [ Null ] -> this
-      | [ Value.List aidValues ] ->
-          aidValues //
-          |> List.fold (fun acc aid -> Set.add aid acc) aidSet
-          |> MergeAids
+      | [ Value.List aidValues ] -> aidSet |> Set.addRange aidValues |> MergeAids
       | [ aidValue ] -> aidSet |> Set.add aidValue |> MergeAids
       | _ -> invalidArgs args
       :> IAggregator
