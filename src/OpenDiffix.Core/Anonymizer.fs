@@ -2,6 +2,10 @@ module OpenDiffix.Core.Anonymizer
 
 open System
 
+// ----------------------------------------------------------------
+// Random & noise
+// ----------------------------------------------------------------
+
 let private randomUniform (rnd: Random) (threshold: Threshold) =
   rnd.Next(threshold.Lower, threshold.Upper + 1)
 
@@ -29,6 +33,11 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
 let private noiseValueInt rnd (noiseParam: NoiseParam) =
   noiseValue rnd noiseParam |> round |> int32
 
+// ----------------------------------------------------------------
+// AID processing
+// ----------------------------------------------------------------
+
+/// Returns whether any of the AID value sets has a low count.
 let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
   |> List.map (fun aidSet ->
@@ -151,6 +160,10 @@ let private anonymizedSum (byAidSum: AidCount list) =
   match aidForFlattening, noise with
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
   | _ -> None
+
+// ----------------------------------------------------------------
+// Public API
+// ----------------------------------------------------------------
 
 let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anonymizationParams: AnonymizationParams) =
   // These values are safe, and can be counted as they are
