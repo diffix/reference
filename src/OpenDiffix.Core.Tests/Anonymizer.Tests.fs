@@ -306,3 +306,30 @@ let ``account for values where AID-value is null`` () =
   rows
   |> TestHelpers.evaluateAggregator context diffixCount [ allAidColumns; value ]
   |> should equal (Integer 8L)
+
+[<Fact>]
+let ``count accepts rows with shared contribution`` () =
+  let aidList names = names |> List.map String |> Value.List
+  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType) ]
+
+  let rows =
+    [
+      // AIDs
+      [| aidList [ "Paul"; "Felix"; "Edon" ] |]
+      [| aidList [ "Paul"; "Felix"; "Edon" ] |]
+      [| aidList [ "Sebastian"; "Felix"; "Edon" ] |]
+      [| aidList [ "Paul"; "Cristian" ] |]
+      [| aidList [ "Cristian" ] |]
+      [| aidList [ "Cristian" ] |]
+    ]
+
+  // Cristian:  1/2 + 1/1 + 1/1 = 2.5  (outlier)
+  // Paul:      1/3 + 1/3 + 1/2 = 1.16 (top)
+  // Felix:     1/3 + 1/3 + 1/3 = 1.0
+  // Edon:      1/3 + 1/3 + 1/3 = 1.0
+  // Sebastian: 1/3             = 0.33
+  // Total:                     = 6.0
+
+  rows
+  |> TestHelpers.evaluateAggregator context diffixCount [ aidColumn ]
+  |> should equal (Integer 5L)

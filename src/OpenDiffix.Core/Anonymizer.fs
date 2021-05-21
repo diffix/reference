@@ -60,10 +60,10 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
 
 type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoiseParam; Rnd: Random }
 
-let private aidFlattening
+let inline private aidFlattening
   (anonymizationParams: AnonymizationParams)
   (unaccountedFor: int64)
-  (aidContributions: (AidHash * int64) list)
+  (aidContributions: (AidHash * ^Contribution) list)
   : AidCount option =
   let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
 
@@ -193,7 +193,7 @@ let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anony
     |> Option.defaultValue 0.
     |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, int64> * int64) list option) =
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, float> * int64) list option) =
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->
