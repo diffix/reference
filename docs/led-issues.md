@@ -21,6 +21,7 @@ This documents the need for LED, and motivates a number of design decisions. In 
     - [Multi-sample difference attack using JOIN](#multi-sample-difference-attack-using-join)
   - [Solution](#solution)
     - [Multi-sample JOIN attack](#multi-sample-join-attack)
+      - [Limiting LE-NLE combinations](#limiting-le-nle-combinations)
     - [Multi-histogram attack (LE noise layer per NLE condition)](#multi-histogram-attack-le-noise-layer-per-nle-condition)
     - [Multi-histogram attack (single LE noise layer across all NLE conditions)](#multi-histogram-attack-single-le-noise-layer-across-all-nle-conditions)
     - [LE noise layer with AIDVs (not as good)](#le-noise-layer-with-aidvs-not-as-good)
@@ -460,7 +461,7 @@ Where:
 
 Now let's see how this protects against the multi-sample attack from above.
 
-Working with the query example in the multi-sample attack from above, a single bucket has:
+Working with the query example in the multi-sample attack from above, a single bucket from the left query has:
 
 * Static: `SU1, SR, SJ`
 * Dynamic: `D1U1, D1R, D1J`
@@ -496,6 +497,10 @@ etc.
 ```
 
 The LIUx hides the victim because they differ with each `unknown_col` group.
+
+#### Limiting LE-NLE combinations
+
+In the above example, we presumed an LE noise layer for each LE/NLE pair. It is, however, only the LIUx layer that is hiding the victim. With the multi-sample JOIN attack, it is only necessary to pair the LE condition with NLE conditions *in the same JOIN selectable*. (See [https://github.com/diffix/experiments/tree/master/join-lcf-noise](https://github.com/diffix/experiments/tree/master/join-lcf-noise) for an example of this.)
 
 ### Multi-histogram attack (LE noise layer per NLE condition)
 
@@ -786,7 +791,7 @@ We also consider three different LE noise layers:
 
 1. **Static one-per-LE noise layers (static):** This is a noise layer seeded by materials from the LE condition itself. There is one layer per LE condition. (Effectively, the LE noise layer is seeded the same for LE and NLE conditions.)
 2. **Dynamic one-per-LE noise layers (dynamic):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
-2. **Pairwise LE/NLE noise layers (pairwise):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
+2. **Pairwise LE/NLE noise layers (pairwise):** This is a noise layer seeded by materials from each LE condition plus materials from *each* NLE condition *in the same JOIN selectable*. In other words, there is one noise layer for each LE/NLE pair within the selectable (see [Limiting LE-NLE combinations](#limiting-le-nle-combinations)).
 
 In this section, we test this design against each of the attacks to see where we stand.  The goal is to see 1) if there are still vulnerabilities, and 2) which of the noise layers we need.
 
