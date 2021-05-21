@@ -2,6 +2,8 @@
 - [Glossary and related documents](#glossary-and-related-documents)
 - [LED](#led)
   - [Identifying LE conditions using combinations](#identifying-le-conditions-using-combinations)
+    - [Sub-queries](#sub-queries)
+    - [JOINs](#joins)
   - [Basic approach to LED](#basic-approach-to-led)
   - [Adjusting aggregate values](#adjusting-aggregate-values)
   - [Seeding materials](#seeding-materials)
@@ -25,7 +27,7 @@ In the following discussion of low effect detection we will be using the followi
 - **Condition set**: One or more conditions. (Shorthand for "Condition or set of conditions".)
 - **Flip row**: A row is flipped if it changes from excluded from the answer to included in the answer or vice versa.
 - **Forcing a condition**: setting a condition to be always true or always false, for the purpose of determining if a condition is attackable.
-- **LE0, LE1, LEn**: Low effect combinations or conditions where the number of AIDs associated with the combination/condition is 0, 1, or more than one respectively. ("LE" alone refers to any of these.)
+- **LE0, LE1, LEn**: Low effect combinations or conditions where the number of AIDs associated with the combination/condition is 0, exactly 1, or one or more respectively. ("LE" alone refers to any of these.)
 - **LE noise layer**: A new type of noise layer that is added when LE conditions exist. (Note that dynamic noise layers, on the other hand, no longer exist in this proposal.)
 - **Low effect (LE)**: a combination is LE when the number of distinct AIDs associated with the rows that match the combination falls below a noisy threshold. (A combination that is not LE is labeled NLE.)
 - **Outcome**: the true/false result of either a condition or a combination. zzzz not sure I ever apply this to condition
@@ -53,11 +55,25 @@ This additional noise layer is a new type of noise layer that we call LE noise l
 
 ## Identifying LE conditions using combinations
 
-It is assumed that the identification of LE conditions takes place in the query engine itself. Furthermore it is assumed that the query engine processes conditions in some order that the analyst cannot influence, and stops when a given row is determined to be true (include in the answer) or false. In other words, not all conditions are necessarily examined, in fact some conditions might never be examined.
+The identification of LE conditions takes place in the query engine itself (see [here](boolean-evaluation.md) for a description of how the query engine works). The query engine generates an execution tree: a set of routines that are executed in order to determine whether the given current row should be included in the answer or filtered out. The execution tree can skip steps (short-circuit a condition), and so not every condition gets evaluated for every row, and in fact some conditions may never be evaluated. This document assumes that it is possible dynamically over-ride short-circuits during query processing. In other words, to disable a short-circuit for a while, and later re-enable the short-circuit. (Alternatively, if we are missing needed information after query processing, we could force some additional "out-of-band" runs of the execution tree. This is an implementation detail we can sort out later.)
 
-The basic idea to identifying LE combinations is to build a truth table for each bucket, where by *bucket* I mean the output rows of the query. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false (true means the associated rows will be included in the bucket, and false that they will be excluded). Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
+The basic idea to identifying LE combinations is to build a truth table for each bucket. Each condition is labeled as true (1), false (0) or unknown (-), and the outcome of each combination is labeled as true or false (true means the associated rows will be included in the bucket, and false that they will be excluded). Each row in the truth table is a combination. For each combination encountered by the query engine, we keep track of the number of distinct AIDs for each AID column so long as the number of distinct AIDs is below the LE threshold.
 
 Here is an example of such a truth table with the four combinations (C1, C2, C3, and C4):
+
+|     | A     | B          | C          | outcome |
+| --- | ----- | ---------- | ---------- | ------- |
+| C1  | false | ---------- | ---------- | false   |
+| C2  | true  | true       | ---------- | true    |
+| C3  | true  | false      | true       | true    |
+| C4  | true  | false      | false      | false   |
+
+It so happens that the logic that produced this truth table is `A and (B or C)` evaluated in the order `A-->B-->C` (where `A` represents a condition like `age <> 0`), but the LED mechanism doesn't need to know this. (In subsequent examples, the underlying logic is given, but with the understanding that the mechanism doesn't need it.)
+
+The reason that some combinations have unknown ('-') booleans is because they weren't evaluated by the execution tree. For instance for combination C1, once condition A is found to be false, the outcome must be false, and so conditions B and C don't need to be evaluated. There are [cases where it is necessary to learn what the unknown booleans are](led-issues.md#must-sometimes-override-query-execution-plan-to-understand-le-conditions), and so either we need to over-ride short-circuits during query execution, or re-run the query execution for certain rows.
+
+At the end of query execution, for each AID, we need to know if the combination is Low Effect (LE), or Not Low Effect (NLE). zzzz
+
 
 |     | A     | B          | C          | outcome | AID1 | AID2 |
 | --- | ----- | ---------- | ---------- | ------- | ---- | ---- |
@@ -67,8 +83,6 @@ Here is an example of such a truth table with the four combinations (C1, C2, C3,
 | C4  | true  | false      | false      | false   | NLE  | NLE  |
 
 (Note here that the first five columns are the truth table itself, and the last two are the indicators as to whether the two AIDs are each LE or NLE for each combination.)
-
-It so happens that the logic that produced this truth table is `A and (B or C)` evaluated in the order `A-->B-->C` (where `A` represents a condition like `age <> 0`), but the LED mechanism doesn't need to know this. (In subsequent examples, the underlying logic is given, but with the understanding that the mechanism doesn't need it.)
 
 At the end of query engine processing, we know if any combinations are LE for the given bucket. For instance, in the above example, the combination C3 is LE for AID1.
 
@@ -140,6 +154,14 @@ It is interesting to re-examine what it means to force B=false from the perspect
 Even though we will have this point have decided to flip the rows associated with C5, we won't know which conditions to exclude from the dynamic noise seed materials. We much therefore continue to test conditions to determine if they are LE. When we test C and D, we find that they can also be used as attack conditions, and therefore are not included in the dynamic noise seed materials.
 
 > Note that in the above example, we were able to determine the outcome of the expression if for instance B was forced to false by finding another combination in the truth table (C2) that showed that outcome. It could happen however that no such other combination exists after query processing. In this case, it would be necessary to replay one of the rows saved for C5, but forcing B=false (see [Replaying rows](#replaying-rows)). In other words, this replay ability is critical.
+
+### Sub-queries
+
+zzzz
+
+### JOINs
+
+zzzz
 
 ## Basic approach to LED
 
