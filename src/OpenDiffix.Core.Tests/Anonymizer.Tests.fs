@@ -54,6 +54,7 @@ let evaluateAggregator = evaluateAggregator context
 let mergeAids = AggregateFunction(MergeAids, AggregateOptions.Default)
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
 let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
+let diffixLowCount = AggregateFunction(DiffixLowCount, AggregateOptions.Default)
 
 [<Fact>]
 let ``merge bucket aids`` () =
@@ -306,6 +307,22 @@ let ``account for values where AID-value is null`` () =
   rows
   |> TestHelpers.evaluateAggregator context diffixCount [ allAidColumns; value ]
   |> should equal (Integer 8L)
+
+[<Fact>]
+let ``low count accepts rows with shared contribution`` () =
+  let aidList names = names |> List.map String |> Value.List
+  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType) ]
+
+  let lowUserRows = [ [| aidList [ "Sebastian" ] |] ]
+  let highUserRows = [ [| aidList [ "Paul"; "Cristian"; "Felix"; "Edon" ] |] ]
+
+  lowUserRows
+  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidColumn ]
+  |> should equal (Boolean true)
+
+  highUserRows
+  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidColumn ]
+  |> should equal (Boolean false)
 
 [<Fact>]
 let ``count accepts rows with shared contribution`` () =
