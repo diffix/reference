@@ -779,43 +779,41 @@ We could for instance make the latter design a configurable option for users tha
 
 In this section, we consider a design with the following attributes:
 
+1. **Wide LE noisy threshold range:** The range of noisy threshold values is at least 2 - 6 (with average threshold in the middle).
+2. **Adjust for a single AIDV only:** When a condition is determined to be LE, we adjust only a single AIDV. For instance, if there are three AIDV's associated with a given LE condition, we would adjust for only one of them. Note that the AIDV that gets adjusted for may not be the victim per se.
+
+We also consider three different LE noise layers:
+
 1. **Static one-per-LE noise layers (static):** This is a noise layer seeded by materials from the LE condition itself. There is one layer per LE condition. (Effectively, the LE noise layer is seeded the same for LE and NLE conditions.)
 2. **Dynamic one-per-LE noise layers (dynamic):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
-3. **Wide LE noisy threshold range:** The range of noisy threshold values is at least 2 - 6 (with average threshold in the middle).
-4. **Adjust for a single AIDV only:** When a condition is determined to be LE, we adjust only a single AIDV. For instance, if there are three AIDV's associated with a given LE condition, we would adjust for only one of them. Note that the AIDV that gets adjusted for may not be the victim per se.
+2. **Pairwise LE/NLE noise layers (pairwise):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
 
-In this section, we test this design against each of the attacks to see where we stand.  The goal is to see 1) if there are still vulnerabilities, and 2) if we need both of the noise layers.
+In this section, we test this design against each of the attacks to see where we stand.  The goal is to see 1) if there are still vulnerabilities, and 2) which of the noise layers we need.
 
 ### Summary Table
 
-The following table provides a summary. After that are the individual analyses. In the following table as well as the subsequent individual analyses, static LE noise layers start with 'LS', dynamic LE noise layers start with 'LD'.
+The following table provides a summary. After that are the individual analyses.
 
-| Attack                                                                 | LE Layer | Defends | Notes                       |
-| ---------------------------------------------------------------------- | -------- | ------- | --------------------------- |
-| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LS       | yes     |                             |
-| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LD       | yes     |                             |
-| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LS+LD    | yes     |                             |
-| Simple 2/1 diff, count(DISTINCT AIDV)                                  | LD       | yes     |                             |
-| Simple 2/1 diff, count(*), victim selected                             | LD       | yes     |                             |
-| Simple 2/1 diff, count(*), plant selected                              | LD       | yes     |                             |
-| [1st Deriv 1/0 diff](#first-derivative-difference-attack-static-noise) | LS       | yes     | From adjust only            |
-| 1st Deriv 1/0 diff                                                     | LD       | yes     |                             |
-| 1st Deriv 2/1 diff                                                     | LS       | **NO!** |                             |
-| 1st Deriv 2/1 diff                                                     | LD       | yes     |                             |
-| [1/0 Chaff Attack](#chaff-attack)                                      | LD       | yes     |                             |
-| Multi-histogram 1st deriv 1/0 diff                                     | LD       | yes     |                             |
-| Multi-histogram 1st deriv 2/1 diff                                     | LD       | **NO!** | Conditions very rare        |
-| Multi-sample 1/0 JOIN                                                  | LD       | yes     |                             |
-| Multi-sample 2/0 JOIN                                                  | LD       | **NO!** | Can use pair-wise LE layers |
+| Attack                                                                 | LE Layer | Defends | Notes                   |
+| ---------------------------------------------------------------------- | -------- | ------- | ----------------------- |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | static   | yes     |                         |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | dynamic  | yes     |                         |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | both     | yes     |                         |
+| Simple 2/1 diff, count(DISTINCT AIDV)                                  | dynamic  | yes     |                         |
+| Simple 2/1 diff, count(*), victim selected                             | dynamic  | yes     |                         |
+| Simple 2/1 diff, count(*), plant selected                              | dynamic  | yes     |                         |
+| [1st Deriv 1/0 diff](#first-derivative-difference-attack-static-noise) | static   | yes     | Though from adjust only |
+| 1st Deriv 1/0 diff                                                     | dynamic  | yes     |                         |
+| 1st Deriv 2/1 diff                                                     | static   | **NO!** |                         |
+| 1st Deriv 2/1 diff                                                     | dynamic  | yes     |                         |
+| [1/0 Chaff Attack](#chaff-attack)                                      | dynamic  | yes     |                         |
+| Multi-histogram 1st deriv 1/0 diff                                     | dynamic  | yes     |                         |
+| Multi-histogram 1st deriv 2/1 diff                                     | dynamic  | **NO!** | Conditions very rare    |
+| Multi-sample 1/0 JOIN                                                  | dynamic  | yes     |                         |
+| Multi-sample 2/0 JOIN                                                  | dynamic  | **NO!** |                         |
+| [Multi-sample 2/0 JOIN](#multi-sample-difference-attack-using-join)    | pairwise | yes     |                         |
 
-
-
-
-[Simple diff](#simple-difference-attack-static-noise)
-[1st deriv diff](#first-derivative-difference-attack-static-noise)
-[chaff](#chaff-attack)
-[multi-histogram](#multi-histogram-first-derivative-difference-attack)
-[multi-sample join](#multi-sample-difference-attack-using-join)
+The conclusion from the above table (and following analyses) is that we don't need static LE noise layers (they never help), and we only need pairwise LE noise layers for certain JOINs. In other words, for most legitimate JOINs, we can detect that the JOIN is legitimate and avoid the extra noise layers (see [here](#multi-sample-join)).
 
 ### Individual Analyses
 
@@ -1132,8 +1130,9 @@ ON left.join_col = right.join_col
 
 Multiple versions of the second query (with different `uval` and `rval`) can be used to replicate the first query. We refer to `isolating_col` and `replicate_col` as filters.
 
-1. A JOIN with no LE conditions greater than LE1.
-2. A JOIN where each row in the left and right selectables contributes no more than one row to the JOIN result (safe because no AIDVs from one selectable are spread over values in the other). Note that this is satisfied by legitimate JOINs of personal with non-personal tables, for instance `ON purchases.product_id = product_descriptions.product_id`.
-3. A JOIN where filters are taken only from the selectable where the LE condition is (i.e. if the LE is in the left selectable, then no bucket values or WHERE clauses are taken from the right selectable).
-4. A JOIN where, for each AID in each selectable, there is an AID in the other selectable where every value matches in each JOIN row (an analyst can force this by doing `ON l.aid1 = r.aid1 AND l.aid2 = r.aid2`).
-5. A JOIN where, for each AIDV affected by the LE condition, the AIDV matches only one value of the filter column values in the other selectable (though this seems impractical to validate for queries like the second one above, where the filtering occurs before the JOIN).
+1. A JOIN where each row in the left and right selectables contributes no more than one row to the JOIN result (safe because no AIDVs from one selectable are spread over values in the other). Note that this is satisfied by legitimate JOINs of personal with non-personal tables, for instance `ON purchases.product_id = product_descriptions.product_id`.
+2. A JOIN where filters are taken only from the selectable where the LE condition is (i.e. if the LE is in the left selectable, then no bucket values or WHERE clauses are taken from the right selectable).
+3. A JOIN where, for each AID in each selectable, there is an AID in the other selectable where every value matches in each JOIN row (an analyst can force this by doing `ON l.aid1 = r.aid1 AND l.aid2 = r.aid2`).
+4. A JOIN where, for each AIDV affected by the LE condition, the AIDV matches only one value of the filter column values in the other selectable (though this seems impractical to validate for queries like the second one above, where the filtering occurs before the JOIN).
+
+Note that strictly speaking, a JOIN with an LE condition with zero or one AIDV is safe, but we would still need to add pairwise noise layers because otherwise an analyst could determine whether the isolating condition had one or more than one AIDV.
