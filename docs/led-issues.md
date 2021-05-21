@@ -29,6 +29,17 @@ This documents the need for LED, and motivates a number of design decisions. In 
   - [Do we still need dynamic noise layers?](#do-we-still-need-dynamic-noise-layers)
     - [First derivative difference attack, revisited](#first-derivative-difference-attack-revisited)
     - [Chaff attack, revisited](#chaff-attack-revisited)
+  - [Attacks and defenses for design X](#attacks-and-defenses-for-design-x)
+    - [Summary Table](#summary-table)
+    - [Individual Analyses](#individual-analyses)
+      - [Simple 1/0 diff](#simple-10-diff)
+      - [Simple 2/1 diff, count(DISTINCT AIDV)](#simple-21-diff-countdistinct-aidv)
+      - [Simple 2/1 diff, count(*)](#simple-21-diff-count)
+      - [First Derivative 1/0 Difference Attack](#first-derivative-10-difference-attack)
+      - [First Derivative 2/1 Difference Attack, count(DISTINCT AIDV)](#first-derivative-21-difference-attack-countdistinct-aidv)
+      - [Chaff attack](#chaff-attack-1)
+      - [Multi-histogram first derivative difference attack](#multi-histogram-first-derivative-difference-attack-1)
+      - [Multi-sample JOIN](#multi-sample-join)
 
 ## Noise layer notation
 
@@ -756,3 +767,373 @@ With LE layers instead of dynamic layers, we get this instead (leaving out stati
 | C and not I and not X1 ... and not Xn | C and not X1 ... and not Xn | cnt + LIC + LX1C + ... + LXnC | cnt + 1 + LX1C + ... + LXnC | SI + LIC     |
 
 As expected, the chaff attack doesn't work at all, because the chaff attack relies entirely on the effect of different AIDVS's, which with LE layers no longer affect the answer. In fact, this attack boils down to the same thing as the first derivative difference attack from above.
+
+## Attacks and defenses for design X
+
+We have two designs that appear effective but that have too much distortion. They are:
+
+1. Adjust all AIDV's for all LE levels (1, 2, ..., N), using a wide threshold range.
+2. Add pair-wise LE noise layers for all LE conditions, adjust only for LE1.
+
+We could for instance make the latter design a configurable option for users that want more security, but otherwise we are still looking for an effective solution with minimal distortion.
+
+In this section, we consider a design with the following attributes:
+
+1. **Static one-per-LE noise layers (static):** This is a noise layer seeded by materials from the LE condition itself. There is one layer per LE condition. (Effectively, the LE noise layer is seeded the same for LE and NLE conditions.)
+2. **Dynamic one-per-LE noise layers (dynamic):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
+3. **Wide LE noisy threshold range:** The range of noisy threshold values is at least 2 - 6 (with average threshold in the middle).
+4. **Adjust for a single AIDV only:** When a condition is determined to be LE, we adjust only a single AIDV. For instance, if there are three AIDV's associated with a given LE condition, we would adjust for only one of them. Note that the AIDV that gets adjusted for may not be the victim per se.
+
+In this section, we test this design against each of the attacks to see where we stand.  The goal is to see 1) if there are still vulnerabilities, and 2) if we need both of the noise layers.
+
+### Summary Table
+
+The following table provides a summary. After that are the individual analyses. In the following table as well as the subsequent individual analyses, static LE noise layers start with 'LS', dynamic LE noise layers start with 'LD'.
+
+| Attack                                                                 | LE Layer | Defends | Notes                       |
+| ---------------------------------------------------------------------- | -------- | ------- | --------------------------- |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LS       | yes     |                             |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LD       | yes     |                             |
+| [Simple 1/0 diff](#simple-difference-attack-static-noise)              | LS+LD    | yes     |                             |
+| Simple 2/1 diff, count(DISTINCT AIDV)                                  | LD       | yes     |                             |
+| Simple 2/1 diff, count(*), victim selected                             | LD       | yes     |                             |
+| Simple 2/1 diff, count(*), plant selected                              | LD       | yes     |                             |
+| [1st Deriv 1/0 diff](#first-derivative-difference-attack-static-noise) | LS       | yes     | From adjust only            |
+| 1st Deriv 1/0 diff                                                     | LD       | yes     |                             |
+| 1st Deriv 2/1 diff                                                     | LS       | **NO!** |                             |
+| 1st Deriv 2/1 diff                                                     | LD       | yes     |                             |
+| [1/0 Chaff Attack](#chaff-attack)                                      | LD       | yes     |                             |
+| Multi-histogram 1st deriv 1/0 diff                                     | LD       | yes     |                             |
+| Multi-histogram 1st deriv 2/1 diff                                     | LD       | **NO!** | Conditions very rare        |
+| Multi-sample 1/0 JOIN                                                  | LD       | yes     |                             |
+| Multi-sample 2/0 JOIN                                                  | LD       | **NO!** | Can use pair-wise LE layers |
+
+
+
+
+[Simple diff](#simple-difference-attack-static-noise)
+[1st deriv diff](#first-derivative-difference-attack-static-noise)
+[chaff](#chaff-attack)
+[multi-histogram](#multi-histogram-first-derivative-difference-attack)
+[multi-sample join](#multi-sample-difference-attack-using-join)
+
+### Individual Analyses
+
+In the following examples:
+
+* I, J, and K are the isolating attributes
+* X, Y, and Z are the known attributes (attacker knows what values for these attributes the victim has)
+* U, A, B, and C are the unknown attributes (attacker is trying to learn this value)
+
+In these examples, we consider "N/N-1 difference attacks" where the attacker can 1) isolate N AIDVs, and 2) knows that N-1 of them have given known attributes (the plants), and wants to determine the Nth AIDV (the victim) has the same known attributes. Note that these attacks get exponentially harder to carry out with increasing N, since the necessary conditions for the attack become rarer. (Note that most of the attacks we have been looking at are "1/0 difference attacks".)
+
+#### Simple 1/0 diff
+
+See [here](#simple-difference-attack-static-noise) for a description of the attack. Below we look at three cases, static noise, dynamic noise, and both.
+
+**LS (static noise only)**
+
+|               | Left                        | Right         | Diff |
+| ------------- | --------------------------- | ------------- | ---- |
+| Query         | X and U and not I           | X and U       |      |
+| Answer (R in) | cnt - 1 + 1 + SX + SU + LSI | cnt + SX + SU | LSI  |
+| Answer (R ex) | cnt + SX + SU + LSI         | (same)        | LSI  |
+
+Here "(same)" means same as the entry immediately above. The `- 1 + 1` expression indicates that the victim would be excluded from the answer (`- 1`), but then adjusted for and added in (`+ 1`).
+
+The attack fails because there is no difference in answers that natively include or exclude the victim.
+
+**LD (dynamic noise only)**
+
+|               | Left                     | Right         | Diff  |
+| ------------- | ------------------------ | ------------- | ----- |
+| Query         | X and U and not I        | X and U       |       |
+| Answer (R in) | cnt -1+1 SX + SU + LDXUI | cnt + SX + SU | LDXUI |
+| Answer (R ex) | cnt + SX + SU + LDXUI    | (same)        | LDXUI |
+
+(Note that we removed the spaces on the `- 1 + 1` expression just for compactness.)
+
+The term `LDXUI` means a dynamic LE noise layer with seed material from X, U, and I.
+
+The attack again fails for the same reason: because there is no difference in answers that natively include or exclude the victim.
+
+**LS+LD (static and dynamic noise)**
+
+|               | Left                             | Right         | Diff        |
+| ------------- | -------------------------------- | ------------- | ----------- |
+| Query         | X and U and not I                | X and U       |             |
+| Answer (R in) | cnt -1+1 + SX + SU + LSI + LDXUI | cnt + SX + SU | LSI + LDXUI |
+| Answer (R ex) | cnt + SX + SU + LSI + LDXUI      | (same)        | LSI + LDXUI |
+
+The attack again fails for the same reason.
+
+**Discussion**
+
+In all these attacks, either or both noise layers works. In fact, in this specific case, no noise layers at all are needed, because of the adjustment. 
+
+#### Simple 2/1 diff, count(DISTINCT AIDV)
+
+Here we consider the case for `count(DISTINCT AIDV)`. Here we look at just LD noise layer, because the other two cases will be the same.
+
+**LD (dynamic noise only)**
+
+|               | Left                       | Right         | Diff      |
+| ------------- | -------------------------- | ------------- | --------- |
+| Query         | X and U and not I          | X and U       |           |
+| Answer (R in) | cnt + -2+1 SX + SU + LDXUI | cnt + SX + SU | LDXUI - 1 |
+| Answer (R ex) | cnt + -1+1 SX + SU + LDXUI | (same)        | LDXUI     |
+
+The `- 2` in the expression `- 2 + 1` for 'Answer (R in)' denotes the fact that both the plant and the victim are excluded by not I. The `+1` adjusts for one of the two isolated AIDVs (either the plant or the victim).
+
+Here the attack fails because the LE dynamic noise layer hides the difference in answers between when the victim is included or excluded.
+
+#### Simple 2/1 diff, count(*)
+
+In this attack we assume that different entities contribute differently to the count. The count for the victim is denoted 'v', and the count for the plant is 'p'.
+
+Note that when selecting an AIDV to adjust, either the victim or one of the plants is selected. In the following we look at both cases.
+
+**LD, victim is adjusted:**
+
+|               | Left                         | Right         | Diff      |
+| ------------- | ---------------------------- | ------------- | --------- |
+| Query         | X and U and not I            | X and U       |           |
+| Answer (R in) | cnt -p-v+v + SX + SU + LDXUI | cnt + SX + SU | LDXUI - p |
+| Answer (R ex) | cnt -p+p + SX + SU + LDXUI   | (same)        | LDXUI     |
+
+Here the LE dynamic noise layer hides the difference in the underlying count.
+
+**LD, plant is adjusted:**
+
+|               | Left                  | Right                | Diff      |
+| ------------- | --------------------- | -------------------- | --------- |
+| Query         | X and U and not I     | X and U              |           |
+| Answer (R in) | cnt + SX + SU + LDXUI | cnt +p+v-p + SX + SU | LDXUI - v |
+| Answer (R ex) | (same)                | cnt +p-p + SX + SU   | LDXUI     |
+
+Here the LE dynamic noise layer hides the difference in the underlying count.
+
+**Discussion:**
+
+Because noise is proportional to extreme entity contribution, the noise is enough to hide the victim's presence or absence regardless of how much the victim or plant contributes.
+
+#### First Derivative 1/0 Difference Attack
+
+Basic description of the attack can be found [here](#first-derivative-difference-attack-static-noise).
+
+**LS (static noise only):**
+
+|               | Left                 | Right     | Diff |
+| ------------- | -------------------- | --------- | ---- |
+| Query         | A and not I          | A         |      |
+| Answer (R in) | cntA + -1+1 SA + LSI | cntA + SA | LSI  |
+| Query         | B and not I          | B         |      |
+| Answer (R ex) | cntB + SB + LSI      | cntB + SB | LSI  |
+| Query         | C and not I          | C         |      |
+| Answer (R ex) | cntC + SC + LSI      | cntC + SC | LSI  |
+
+The attack here fails, but only by virtue of the adjustment of the victim.
+
+**LD (dynamic noise only):**
+
+|               | Left                  | Right     | Diff |
+| ------------- | --------------------- | --------- | ---- |
+| Query         | A and not I           | A         |      |
+| Answer (R in) | cntA -1+1 + SA + LDAI | cntA + SA | LDAI |
+| Query         | B and not I           | B         |      |
+| Answer (R ex) | cntB + SB + LDBI      | cntB + SB | LDBI |
+| Query         | C and not I           | C         |      |
+| Answer (R ex) | cntC + SC + LDCI      | cntC + SC | LDCI |
+
+The attack here fails as well, but this tie there is different noise at each bucket, which somehow feels more robust.
+
+#### First Derivative 2/1 Difference Attack, count(DISTINCT AIDV)
+
+In these attacks, the plant entity is known to have attribute 'A' (is in the first bucket). The isolator `not I` operates on two entities (plant and victim).
+
+**LS (static noise only), victim has attribute A:**
+
+|               | Left                 | Right     | Diff    |
+| ------------- | -------------------- | --------- | ------- |
+| Query         | A and not I          | A         |         |
+| Answer (R in) | cntA -2+1 + SA + LSI | cntA + SA | LSI - 1 |
+| Query         | B and not I          | B         |         |
+| Answer (R ex) | cntB + SB + LSI      | cntB + SB | LSI     |
+| Query         | C and not I          | C         |         |
+| Answer (R ex) | cntC + SC + LSI      | cntC + SC | LSI     |
+
+Here we see that the attack succeeds because the victim is in the bucket that has a different difference!
+
+**LD (dynamic noise only), victim has attribute A:**
+
+|               | Left                  | Right     | Diff     |
+| ------------- | --------------------- | --------- | -------- |
+| Query         | A and not I           | A         |          |
+| Answer (R in) | cntA -2+1 + SA + LDAI | cntA + SA | LDAI - 1 |
+| Query         | B and not I           | B         |          |
+| Answer (R ex) | cntB + SB + LDBI      | cntB + SB | LDBI     |
+| Query         | C and not I           | C         |          |
+| Answer (R ex) | cntC + SC + LDCI      | cntC + SC | LDCI     |
+
+The attack fails here because the dynamic noise leads to a different noise difference for each bucket. Also the noise itself hides the smaller count (`- 1`).
+
+**LS (static noise only), victim has attribute B:**
+
+|               | Left                 | Right     | Diff |
+| ------------- | -------------------- | --------- | ---- |
+| Query         | A and not I          | A         |      |
+| Answer (R in) | cntA -1+1 + SA + LSI | cntA + SA | LSI  |
+| Query         | B and not I          | B         |      |
+| Answer (R ex) | cntB -1+1 + SB + LSI | cntB + SB | LSI  |
+| Query         | C and not I          | C         |      |
+| Answer (R ex) | cntC + SC + LSI      | cntC + SC | LSI  |
+
+Here we can tell that the victim is not in bucket A, but we don't know which bucket the victim is in.
+
+**LD (dynamic noise only), victim has attribute B:**
+
+|               | Left                  | Right     | Diff |
+| ------------- | --------------------- | --------- | ---- |
+| Query         | A and not I           | A         |      |
+| Answer (R in) | cntA -1+1 + SA + LDAI | cntA + SA | LDAI |
+| Query         | B and not I           | B         |      |
+| Answer (R ex) | cntB -1+1 + SB + LDBI | cntB + SB | LDBI |
+| Query         | C and not I           | C         |      |
+| Answer (R ex) | cntC + SC + LDCI      | cntC + SC | LDCI |
+
+Here the dynamic noise hides the presence or absence of the victim in bucket A.
+
+#### Chaff attack
+
+See [here](#chaff-attack) for basic description of chaff attack.
+
+**1/0 LD (dynamic noise only):**
+
+|               | Left                                        | Right                            | Diff |
+| ------------- | ------------------------------------------- | -------------------------------- | ---- |
+| Query         | A and not I and not X1 ... and not Xn       | A and not X1 ... and not Xn      |      |
+| Answer (R in) | cntA -1+1 + SA + LDAI + LDAX1 + ... + LDAXn | cntA + SA +  LDAX1 + ... + LDAXn | LDAI |
+| Answer (R ex) | cntA + SA + LDAI + LDAX1 + ... + LDAXn      | (same)                           | LDAI |
+
+The chaff attack no longer works because we are no longer using AIDVs as the seed material for the dynamic layers. As a result, the dynamic layers no longer differ as a result of the AIDVs in the buckets.
+
+Note, by the way, that because of the adjustment, the chaff attack would have failed for another reason ... namely that the adjustment would have made the AIDV's the same right and left, and so the dynamic noise layers would also have been the same.
+
+#### Multi-histogram first derivative difference attack
+
+The base attack can be found [here](#multi-histogram-first-derivative-difference-attack).
+
+**1/0 LD:**
+
+
+|               | Left                        | Right          | Diff  |
+| ------------- | --------------------------- | -------------- | ----- |
+| Query         | X and A and not I           | X and A        |       |
+| Answer (R in) | cntA -1+1 + SX + SA + LDXAI | cntA + SX + SA | LDXAI |
+| Query         | X and B and not I           | X and B        |       |
+| Answer (R ex) | cntB + SX + SB + LDXBI      | cntB + SX + SB | LDXBI |
+| Query         | X and C and not I           | X and C        |       |
+| Answer (R ex) | cntC + SX + SC + LDXCI      | cntC + SX + SC | LDXCI |
+|               |                             |                |       |
+| Query         | Y and A and not I           | Y and A        |       |
+| Answer (R in) | cntA -1+1 + SY + SA + LDYAI | cntA + SY + SA | LDYAI |
+| Query         | Y and B and not I           | Y and B        |       |
+| Answer (R ex) | cntB + SY + SB + LDYBI      | cntB + SY + SB | LDYBI |
+| Query         | Y and C and not I           | Y and C        |       |
+| Answer (R ex) | cntC + SY + SC + LDYCI      | cntC + SY + SC | LDYCI |
+|               |                             |                |       |
+| Query         | Z and A and not I           | Z and A        |       |
+| Answer (R in) | cntA -1+1 + SZ + SA + LDZAI | cntA + SZ + SA | LDZAI |
+| Query         | Z and B and not I           | Z and B        |       |
+| Answer (R ex) | cntB + SZ + SB + LDZBI      | cntB + SZ + SB | LDZBI |
+| Query         | Z and C and not I           | Z and C        |       |
+| Answer (R ex) | cntC + SZ + SC + LDZCI      | cntC + SZ + SC | LDZCI |
+
+This attack fails for the simple reason that the adjustment removes any difference in the outputs.
+
+(Note that in the earlier example of this attack, we used K1, K2, K3 etc. instead of X, Y, Z.)
+
+**2/1 LD:**
+
+First we look at the attack on the assumption that the needed isolators etc. can be found
+
+|               | Left                        | Right          | Diff      |
+| ------------- | --------------------------- | -------------- | --------- |
+| Query         | X and A and not I           | X and A        |           |
+| Answer (R in) | cntA -2+1 + SX + SA + LDXAI | cntA + SX + SA | LDXAI - 1 |
+| Query         | X and B and not I           | X and B        |           |
+| Answer (R ex) | cntB + SX + SB + LDXBI      | cntB + SX + SB | LDXBI     |
+| Query         | X and C and not I           | X and C        |           |
+| Answer (R ex) | cntC + SX + SC + LDXCI      | cntC + SX + SC | LDXCI     |
+|               |                             |                |           |
+| Query         | Y and A and not I           | Y and A        |           |
+| Answer (R in) | cntA -2+1 + SY + SA + LDYAI | cntA + SY + SA | LDYAI - 1 |
+| Query         | Y and B and not I           | Y and B        |           |
+| Answer (R ex) | cntB + SY + SB + LDYBI      | cntB + SY + SB | LDYBI     |
+| Query         | Y and C and not I           | Y and C        |           |
+| Answer (R ex) | cntC + SY + SC + LDYCI      | cntC + SY + SC | LDYCI     |
+|               |                             |                |           |
+| Query         | Z and A and not I           | Z and A        |           |
+| Answer (R in) | cntA -2+1 + SZ + SA + LDZAI | cntA + SZ + SA | LDZAI - 1 |
+| Query         | Z and B and not I           | Z and B        |           |
+| Answer (R ex) | cntB + SZ + SB + LDZBI      | cntB + SZ + SB | LDZBI     |
+| Query         | Z and C and not I           | Z and C        |           |
+| Answer (R ex) | cntC + SZ + SC + LDZCI      | cntC + SZ + SC | LDZCI     |
+
+What we see from the above is that the attack will work *if it can be configured*. For each of the 'A' buckets, we have a difference of one AIDV. All of the LE noise layers are different and so average to zero when the buckets for X, Y, Z, etc. are summed together.
+
+However, I believe that getting this configuration is almost impossible. The attacker needs to
+
+1. Have an isolator that isolates the victim and one plant.
+2. The unknown attribute that we are trying to learn (here A) must be known for the plant, and must be the same value (A).
+3. For each known attribute histogram X, Y, Z, ..., the plant must share the known attribute with the victim, and this too must be known. Note however that a different plant can be used for each known attribute.
+
+> TODO: Make some measurements to confirm the above
+
+#### Multi-sample JOIN
+
+Base attack is [here](#multi-sample-difference-attack-using-join).
+
+This attack won't work with 1/0 because the victim will be adjusted for.
+
+With 2/1, the attack does work, because the `unknown_col` buckets with the victim will have a difference of one AIDV.
+
+Given that every other known case is handled by the proposed design X, one thought is to set JOIN as a special case, detect when an *unsafe* JOIN is taking place, and use LExNLE pairwise noise layers in that case.
+
+Which leads to the question, when is a JOIN safe (or unsafe)?
+
+Below are a list of conditions for safe JOINs. In this list, we refer to the following queries:
+
+```
+SELECT left.unknown_col, right.replicate_col, count(*)
+FROM (
+    SELECT * FROM table1
+    WHERE isolating_col <> 'victim'
+    ) left
+JOIN (
+    SELECT * from table2
+    ) right
+ON left.join_col = right.join_col
+```
+
+```
+SELECT count(*)
+FROM (
+    SELECT * FROM table1
+    WHERE isolating_col <> 'victim' AND
+          unknown_col = uval
+    ) left
+JOIN (
+    SELECT * from table2
+    WHERE replicate_col = rval
+    ) right
+ON left.join_col = right.join_col
+```
+
+Multiple versions of the second query (with different `uval` and `rval`) can be used to replicate the first query. We refer to `isolating_col` and `replicate_col` as filters.
+
+1. A JOIN with no LE conditions greater than LE1.
+2. A JOIN where each row in the left and right selectables contributes no more than one row to the JOIN result (safe because no AIDVs from one selectable are spread over values in the other). Note that this is satisfied by legitimate JOINs of personal with non-personal tables, for instance `ON purchases.product_id = product_descriptions.product_id`.
+3. A JOIN where filters are taken only from the selectable where the LE condition is (i.e. if the LE is in the left selectable, then no bucket values or WHERE clauses are taken from the right selectable).
+4. A JOIN where, for each AID in each selectable, there is an AID in the other selectable where every value matches in each JOIN row (an analyst can force this by doing `ON l.aid1 = r.aid1 AND l.aid2 = r.aid2`).
+5. A JOIN where, for each AIDV affected by the LE condition, the AIDV matches only one value of the filter column values in the other selectable (though this seems impractical to validate for queries like the second one above, where the filtering occurs before the JOIN).
