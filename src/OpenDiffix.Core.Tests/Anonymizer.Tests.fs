@@ -311,23 +311,23 @@ let ``account for values where AID-value is null`` () =
 [<Fact>]
 let ``low count accepts rows with shared contribution`` () =
   let aidList names = names |> List.map String |> Value.List
-  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType) ]
+  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType) ]
 
   let lowUserRows = [ [| aidList [ "Sebastian" ] |] ]
   let highUserRows = [ [| aidList [ "Paul"; "Cristian"; "Felix"; "Edon" ] |] ]
 
   lowUserRows
-  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidColumn ]
+  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidsExpression ]
   |> should equal (Boolean true)
 
   highUserRows
-  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidColumn ]
+  |> TestHelpers.evaluateAggregator context diffixLowCount [ aidsExpression ]
   |> should equal (Boolean false)
 
 [<Fact>]
 let ``count accepts rows with shared contribution`` () =
   let aidList names = names |> List.map String |> Value.List
-  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType) ]
+  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType) ]
 
   let rows =
     [
@@ -338,17 +338,18 @@ let ``count accepts rows with shared contribution`` () =
       [| aidList [ "Paul"; "Cristian" ] |]
       [| aidList [ "Cristian" ] |]
       [| aidList [ "Cristian" ] |]
+      [| aidList [ "Cristian" ] |]
     ]
 
-  // Cristian:  1/2 + 1/1 + 1/1 = 2.5  (outlier)
+  // Cristian:  1/2 + 1 + 1 + 1 = 3.5  (outlier)
   // Paul:      1/3 + 1/3 + 1/2 = 1.16 (top)
   // Felix:     1/3 + 1/3 + 1/3 = 1.0
   // Edon:      1/3 + 1/3 + 1/3 = 1.0
   // Sebastian: 1/3             = 0.33
-  // Total:                     = 6.0
+  // Total:                     = 7.0
 
   rows
-  |> TestHelpers.evaluateAggregator context diffixCount [ aidColumn ]
+  |> TestHelpers.evaluateAggregator context diffixCount [ aidsExpression ]
   |> should equal (Integer 5L)
 
 [<Fact>]
@@ -356,7 +357,7 @@ let ``count distinct accepts rows with shared contribution`` () =
   let email values = values |> List.map String |> Value.List
   let firstName = email
 
-  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType); ColumnReference(1, ListType StringType) ]
+  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType); ColumnReference(1, ListType StringType) ]
   let dataColumn = ColumnReference(2, StringType)
 
   // See `docs/distinct pre-processing.md` for explanation.
@@ -376,5 +377,5 @@ let ``count distinct accepts rows with shared contribution`` () =
     ]
 
   rows
-  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ aidColumn; dataColumn ]
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ aidsExpression; dataColumn ]
   |> should equal (Integer 5L)
