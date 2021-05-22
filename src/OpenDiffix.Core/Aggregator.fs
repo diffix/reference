@@ -13,6 +13,8 @@ let private invalidArgs (values: Value list) =
 
 let private hashAid (aidValue: Value) = aidValue.GetHashCode()
 
+let private hashAidList (aidValues: Value list) = List.map hashAid aidValues
+
 let private missingAid (aidValue: Value) =
   match aidValue with
   | Null -> true
@@ -136,7 +138,7 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
                    (function
                    | Null
                    | Value.List [] -> Set.empty
-                   | Value.List aidValues -> failwith "Shared contribution not yet supported"
+                   | Value.List aidValues -> aidValues |> hashAidList |> Set.ofList
                    | aidValue -> aidValue |> hashAid |> Set.singleton)
               |> Some
 
@@ -146,7 +148,7 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
               match aidValue with
               | Null
               | Value.List [] -> hashSet
-              | Value.List aidValues -> failwith "Shared contribution not yet supported"
+              | Value.List aidValues -> Set.addRange (hashAidList aidValues) hashSet
               | aidValue -> Set.add (hashAid aidValue) hashSet
             )
 
@@ -175,9 +177,7 @@ type private DiffixLowCount(aidSets: Set<AidHash> list option) =
             match aidValue with
             | Null
             | Value.List [] -> aidSet
-            | Value.List aidValues ->
-                let aidHashes = aidValues |> List.map hashAid
-                Set.addRange aidHashes aidSet
+            | Value.List aidValues -> Set.addRange (hashAidList aidValues) aidSet
             | aidValue -> Set.add (hashAid aidValue) aidSet
           )
           |> Some

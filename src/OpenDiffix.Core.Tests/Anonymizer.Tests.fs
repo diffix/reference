@@ -350,3 +350,31 @@ let ``count accepts rows with shared contribution`` () =
   rows
   |> TestHelpers.evaluateAggregator context diffixCount [ aidColumn ]
   |> should equal (Integer 5L)
+
+[<Fact>]
+let ``count distinct accepts rows with shared contribution`` () =
+  let email values = values |> List.map String |> Value.List
+  let firstName = email
+
+  let aidColumn = ListExpr [ ColumnReference(0, ListType StringType); ColumnReference(1, ListType StringType) ]
+  let dataColumn = ColumnReference(2, StringType)
+
+  // See `docs/distinct pre-processing.md` for explanation.
+  let rows =
+    [
+      [| email [ "Paul"; "Sebastian" ]; firstName [ "Sebastian" ]; String "Apple" |]
+      [| email [ "Paul"; "Edon" ]; firstName [ "Sebastian" ]; String "Apple" |]
+      [| email [ "Sebastian" ]; firstName [ "Sebastian" ]; String "Apple" |]
+      [| email [ "Cristian" ]; firstName [ "Paul" ]; String "Apple" |]
+      [| email [ "Edon" ]; firstName [ "Paul" ]; String "Apple" |]
+      [| email [ "Edon" ]; firstName [ "Paul" ]; String "Pear" |]
+      [| email [ "Paul" ]; firstName [ "Paul" ]; String "Pineapple" |]
+      [| email [ "Cristian" ]; firstName [ "Paul" ]; String "Lemon" |]
+      [| email [ "Cristian" ]; firstName [ "Felix" ]; String "Orange" |]
+      [| email [ "Felix" ]; firstName [ "Edon" ]; String "Banana" |]
+      [| email [ "Edon" ]; firstName [ "Cristian" ]; String "Grapefruit" |]
+    ]
+
+  rows
+  |> TestHelpers.evaluateAggregator context distinctDiffixCount [ aidColumn; dataColumn ]
+  |> should equal (Integer 5L)
