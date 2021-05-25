@@ -26,7 +26,7 @@ Most noise layers are seeded with at least the following:
 
 Negative conditions add the symbol `<>` to the seed material. Note that `NOT IN` conditions are converted to their equivalent `<>` forms.
 
-The generic noise layer is seeded only with the secret salt.
+The generic noise layer is seeded with the names of the tables targeted by the query and the secret salt.
 
 ### Clear conditions
 
