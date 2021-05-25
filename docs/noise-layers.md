@@ -26,11 +26,11 @@ Most noise layers are seeded with at least the following:
 
 Negative conditions add the symbol `<>` to the seed material. Note that `NOT IN` conditions are converted to their equivalent `<>` forms.
 
-The generic noise layer is seeded with the `count(DISTINCT uid)` value and the secret salt.
+The generic noise layer is seeded only with the secret salt.
 
 ### Clear conditions
 
-The system may require that certain conditions are _clear_. The primary purpose of clear conditions is so that the system can seed noise layers through SQL inspection rather than by floating the column value.
+The system may require that certain conditions are _clear_. The primary purpose of clear conditions is so that the system can seed noise layers through SQL inspection rather than by column value inspection.
 
 The term "clear" implies that it is clear from SQL inspection alone what the semantics of the conditions are, and therefore how to seed the corresponding noise layers. Clear conditions also have the effect of reducing the attack surface since it gives an attacker fewer mechanisms to work with. 
 
