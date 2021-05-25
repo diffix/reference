@@ -148,7 +148,7 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
               match aidValue with
               | Null
               | Value.List [] -> hashSet
-              | Value.List aidValues -> Set.addRange (hashAidList aidValues) hashSet
+              | Value.List aidValues -> Set.addSeq (hashAidList aidValues) hashSet
               | aidValue -> Set.add (hashAid aidValue) hashSet
             )
 
@@ -162,7 +162,7 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
     member this.Final ctx =
       Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams
 
-type private DiffixLowCount(aidSets: Set<AidHash> list option) =
+type private DiffixLowCount(aidValueSets: Set<AidHash> list option) =
   new() = DiffixLowCount(None)
 
   interface IAggregator with
@@ -170,15 +170,15 @@ type private DiffixLowCount(aidSets: Set<AidHash> list option) =
       match args with
       | [ Null ] -> this
       | [ Value.List aidInstances ] ->
-          aidSets
+          aidValueSets
           |> Option.defaultWith (fun () -> List.replicate aidInstances.Length Set.empty)
           |> List.zip aidInstances
-          |> List.map (fun (aidValue: Value, aidSet) ->
+          |> List.map (fun (aidValue: Value, aidValueSet) ->
             match aidValue with
             | Null
-            | Value.List [] -> aidSet
-            | Value.List aidValues -> Set.addRange (hashAidList aidValues) aidSet
-            | aidValue -> Set.add (hashAid aidValue) aidSet
+            | Value.List [] -> aidValueSet
+            | Value.List aidValues -> Set.addSeq (hashAidList aidValues) aidValueSet
+            | aidValue -> Set.add (hashAid aidValue) aidValueSet
           )
           |> Some
           |> DiffixLowCount
@@ -186,23 +186,23 @@ type private DiffixLowCount(aidSets: Set<AidHash> list option) =
       :> IAggregator
 
     member this.Final ctx =
-      match aidSets with
+      match aidValueSets with
       | None -> true |> Boolean
-      | Some aidSets -> Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
+      | Some aidValueSets -> Anonymizer.isLowCount aidValueSets ctx.AnonymizationParams |> Boolean
 
-type private MergeAids(aidSet: Set<Value>) =
+type private MergeAids(aidValueSet: Set<Value>) =
   new() = MergeAids(Set.empty)
 
   interface IAggregator with
     member this.Transition args =
       match args with
       | [ Null ] -> this
-      | [ Value.List aidValues ] -> aidSet |> Set.addRange aidValues |> MergeAids
-      | [ aidValue ] -> aidSet |> Set.add aidValue |> MergeAids
+      | [ Value.List aidValues ] -> aidValueSet |> Set.addSeq aidValues |> MergeAids
+      | [ aidValue ] -> aidValueSet |> Set.add aidValue |> MergeAids
       | _ -> invalidArgs args
       :> IAggregator
 
-    member this.Final _ctx = aidSet |> Set.toList |> Value.List
+    member this.Final _ctx = aidValueSet |> Set.toList |> Value.List
 
 // ----------------------------------------------------------------
 // Public API

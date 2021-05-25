@@ -30,7 +30,7 @@ module String =
   let toLower (s: string) = s.ToLower()
 
 module Set =
-  let addRange items set =
+  let addSeq items set =
     items |> Seq.fold (fun acc item -> Set.add item acc) set
 
 module Result =
