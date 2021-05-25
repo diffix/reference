@@ -2,6 +2,10 @@ module OpenDiffix.Core.Anonymizer
 
 open System
 
+// ----------------------------------------------------------------
+// Random & noise
+// ----------------------------------------------------------------
+
 let private randomUniform (rnd: Random) (threshold: Threshold) =
   rnd.Next(threshold.Lower, threshold.Upper + 1)
 
@@ -29,6 +33,11 @@ let private noiseValue rnd (noiseParam: NoiseParam) =
 let private noiseValueInt rnd (noiseParam: NoiseParam) =
   noiseValue rnd noiseParam |> round |> int32
 
+// ----------------------------------------------------------------
+// AID processing
+// ----------------------------------------------------------------
+
+/// Returns whether any of the AID value sets has a low count.
 let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
   |> List.map (fun aidSet ->
@@ -51,10 +60,10 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
 
 type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoiseParam; Rnd: Random }
 
-let private aidFlattening
+let inline private aidFlattening
   (anonymizationParams: AnonymizationParams)
   (unaccountedFor: int64)
-  (aidContributions: (AidHash * int64) list)
+  (aidContributions: (AidHash * ^Contribution) list)
   : AidCount option =
   let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
 
@@ -152,6 +161,10 @@ let private anonymizedSum (byAidSum: AidCount list) =
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
   | _ -> None
 
+// ----------------------------------------------------------------
+// Public API
+// ----------------------------------------------------------------
+
 let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anonymizationParams: AnonymizationParams) =
   // These values are safe, and can be counted as they are
   // without any additional noise.
@@ -180,7 +193,7 @@ let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anony
     |> Option.defaultValue 0.
     |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, int64> * int64) list option) =
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, float> * int64) list option) =
   match perAidContributions with
   | None -> Null
   | Some perAidContributions ->

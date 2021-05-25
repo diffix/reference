@@ -11,6 +11,16 @@ type IAggregator =
 let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
 
+let private hashAid (aidValue: Value) = aidValue.GetHashCode()
+
+let private hashAidList (aidValues: Value list) = List.map hashAid aidValues
+
+let private missingAid (aidValue: Value) =
+  match aidValue with
+  | Null -> true
+  | Value.List [] -> true
+  | _ -> false
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
@@ -19,8 +29,8 @@ type private Count(counter) =
   new() = Count(0L)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
+    member this.Transition args =
+      match args with
       | [ Null ] -> this
       | _ -> Count(counter + 1L)
       :> IAggregator
@@ -31,11 +41,11 @@ type private CountDistinct(set: Set<Value>) =
   new() = CountDistinct(Set.empty)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
+    member this.Transition args =
+      match args with
       | [ Null ] -> this
       | [ value ] -> set |> Set.add value |> CountDistinct
-      | _ -> invalidArgs values
+      | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final _ctx = set.Count |> int64 |> Integer
@@ -44,46 +54,70 @@ type private Sum(sum: Value) =
   new() = Sum(Null)
 
   interface IAggregator with
-    member this.Transition values =
-      match sum, values with
+    member this.Transition args =
+      match sum, args with
       | _, [ Null ] -> this
       | Null, [ value ] -> Sum(value)
       | Integer oldValue, [ Integer value ] -> (oldValue + value) |> Integer |> Sum
       | Real oldValue, [ Real value ] -> (oldValue + value) |> Real |> Sum
-      | _ -> invalidArgs values
+      | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final _ctx = sum
 
-type private DiffixCount(perAidCounts: (Map<AidHash, int64> * int64) list option) =
-  let mapAidStructure valueIncrease transition (aidValues: Value list) =
+type private DiffixCount(perAidCounts: (Map<AidHash, float> * int64) list option) =
+  /// Initializes (if not already initialized) per aid counts with empty maps.
+  let initializeCounts aidInstances counts =
+    match counts with
+    | Some counts -> counts
+    | None -> List.replicate (List.length aidInstances) (Map.empty, 0L)
+
+  /// Increases contribution of a single AID value.
+  let increaseContribution valueIncrease aidValue aidMap =
+    Map.change
+      (hashAid aidValue)
+      (function
+      | Some count -> Some(count + valueIncrease)
+      | None -> Some(valueIncrease))
+      aidMap
+
+  /// Increases contribution of all AID instances.
+  let increaseContributions valueIncrease (aidInstances: Value list) =
     perAidCounts
-    |> Option.defaultValue (List.replicate aidValues.Length (Map.empty, 0L))
-    |> List.zip aidValues
+    |> initializeCounts aidInstances
+    |> List.zip aidInstances
     |> List.map (fun (aidValue: Value, (aidMap, unaccountedFor)) ->
-      if aidValue = Null then
-        aidMap, unaccountedFor + valueIncrease
-      else
-        Map.change (aidValue.GetHashCode()) (Option.map transition >> Option.orElse (Some valueIncrease)) aidMap,
-        unaccountedFor
+      match aidValue with
+      // No AIDs, add to unaccounted value
+      | Null
+      | Value.List [] -> aidMap, unaccountedFor + valueIncrease
+      // List of AIDs, distribute contribution evenly
+      | Value.List aidValues ->
+          let partialIncrease = (float valueIncrease) / (aidValues |> List.length |> float)
+
+          aidValues
+          |> List.fold (fun acc aidValue -> increaseContribution partialIncrease aidValue acc) aidMap,
+          unaccountedFor
+      // Single AID, add to its contribution
+      | aidValue -> increaseContribution (float valueIncrease) aidValue aidMap, unaccountedFor
     )
     |> Some
 
-  let updateAidMaps aidsArray valueIncrease transition =
-    match aidsArray with
-    | Value.List aidValues when List.forall ((=) Null) aidValues -> perAidCounts
-    | Value.List aidValues -> mapAidStructure valueIncrease transition aidValues
+  let updateAidMaps aidInstances valueIncrease =
+    match aidInstances with
+    | Value.List aidInstances when List.forall missingAid aidInstances -> perAidCounts
+    | Value.List aidInstances -> increaseContributions valueIncrease aidInstances
     | _ -> failwith "Expecting an AID list as input"
 
   new() = DiffixCount(None)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
-      | [ aidValues; Null ] -> updateAidMaps aidValues 0L id |> DiffixCount
-      | [ aidValues ]
-      | [ aidValues; _ ] -> updateAidMaps aidValues 1L ((+) 1L) |> DiffixCount
-      | _ -> invalidArgs values
+    member this.Transition args =
+      match args with
+      | [ aidInstances; Null ] -> updateAidMaps aidInstances 0L |> DiffixCount
+      | [ aidInstances ]
+      | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L |> DiffixCount
+      | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final ctx =
@@ -93,74 +127,82 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
   new() = DiffixCountDistinct(0, Map.empty)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
-      | [ _aidValues; Null ] -> this
-      | [ Value.List aidValues; value ] ->
+    member this.Transition args =
+      match args with
+      | [ _aidInstances; Null ] -> this
+      | [ Value.List aidInstances; value ] ->
           let initialEntry =
             fun () ->
-              aidValues
-              |> List.map (fun aidValue ->
-                if aidValue = Null then Set.empty else aidValue.GetHashCode() |> Set.singleton
-              )
+              aidInstances
+              |> List.map
+                   (function
+                   | Null
+                   | Value.List [] -> Set.empty
+                   | Value.List aidValues -> aidValues |> hashAidList |> Set.ofList
+                   | aidValue -> aidValue |> hashAid |> Set.singleton)
               |> Some
 
           let transitionEntry =
-            aidValues
+            aidInstances
             |> List.map2 (fun aidValue hashSet ->
-              if aidValue = Null then hashSet else Set.add (aidValue.GetHashCode()) hashSet
+              match aidValue with
+              | Null
+              | Value.List [] -> hashSet
+              | Value.List aidValues -> Set.addSeq (hashAidList aidValues) hashSet
+              | aidValue -> Set.add (hashAid aidValue) hashSet
             )
 
           DiffixCountDistinct(
-            aidValues.Length,
+            aidInstances.Length,
             Map.change value (Option.map transitionEntry >> Option.orElseWith initialEntry) aidsPerValue
           )
-      | _ -> invalidArgs values
+      | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final ctx =
       Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams
 
-type private DiffixLowCount(aidSets: Set<AidHash> list option) =
+type private DiffixLowCount(aidValueSets: Set<AidHash> list option) =
   new() = DiffixLowCount(None)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
+    member this.Transition args =
+      match args with
       | [ Null ] -> this
-      | [ Value.List aidValues ] ->
-          aidSets
-          |> Option.defaultWith (fun () -> List.replicate aidValues.Length Set.empty)
-          |> List.zip aidValues
-          |> List.map (fun (aidValue: Value, aidSet) ->
-            if aidValue = Null then aidSet else Set.add (aidValue.GetHashCode()) aidSet
+      | [ Value.List aidInstances ] ->
+          aidValueSets
+          |> Option.defaultWith (fun () -> List.replicate aidInstances.Length Set.empty)
+          |> List.zip aidInstances
+          |> List.map (fun (aidValue: Value, aidValueSet) ->
+            match aidValue with
+            | Null
+            | Value.List [] -> aidValueSet
+            | Value.List aidValues -> Set.addSeq (hashAidList aidValues) aidValueSet
+            | aidValue -> Set.add (hashAid aidValue) aidValueSet
           )
           |> Some
           |> DiffixLowCount
-      | _ -> invalidArgs values
+      | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final ctx =
-      match aidSets with
+      match aidValueSets with
       | None -> true |> Boolean
-      | Some aidSets -> Anonymizer.isLowCount aidSets ctx.AnonymizationParams |> Boolean
+      | Some aidValueSets -> Anonymizer.isLowCount aidValueSets ctx.AnonymizationParams |> Boolean
 
-type private MergeAids(aidSet: Set<Value>) =
+type private MergeAids(aidValueSet: Set<Value>) =
   new() = MergeAids(Set.empty)
 
   interface IAggregator with
-    member this.Transition values =
-      match values with
+    member this.Transition args =
+      match args with
       | [ Null ] -> this
-      | [ Value.List aidValues ] ->
-          aidValues //
-          |> List.fold (fun acc aid -> Set.add aid acc) aidSet
-          |> MergeAids
-      | [ aidValue ] -> aidSet |> Set.add aidValue |> MergeAids
-      | _ -> invalidArgs values
+      | [ Value.List aidValues ] -> aidValueSet |> Set.addSeq aidValues |> MergeAids
+      | [ aidValue ] -> aidValueSet |> Set.add aidValue |> MergeAids
+      | _ -> invalidArgs args
       :> IAggregator
 
-    member this.Final ctx = aidSet |> Set.toList |> Value.List
+    member this.Final _ctx = aidValueSet |> Set.toList |> Value.List
 
 // ----------------------------------------------------------------
 // Public API
