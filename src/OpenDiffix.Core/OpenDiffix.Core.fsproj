@@ -15,6 +15,7 @@
     <Compile Include="NodeUtils.fs" />
     <Compile Include="QueryValidator.fs" />
     <Compile Include="Analyzer.fs" />
+    <Compile Include="Normalizer.fs" />
     <Compile Include="PlannerTypes.fs" />
     <Compile Include="Planner.fs" />
     <Compile Include="Executor.fs" />

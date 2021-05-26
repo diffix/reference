@@ -15,6 +15,7 @@
     <Compile Include="Parser.Tests.fs" />
     <Compile Include="Planner.Tests.fs" />
     <Compile Include="Executor.Tests.fs" />
+    <Compile Include="Normalizer.Tests.fs" />
     <Compile Include="QueryEngine.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
