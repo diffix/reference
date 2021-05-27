@@ -11,6 +11,7 @@ let testTable =
         { Name = "id"; Type = IntegerType }
         { Name = "name"; Type = StringType }
         { Name = "age"; Type = IntegerType }
+        { Name = "valid"; Type = BooleanType }
       ]
   }
 
@@ -66,3 +67,27 @@ let ``normalize not (2)`` () =
   equivalentQueries //
     "SELECT NOT age > 3 FROM table"
     "SELECT age <= 3 FROM table"
+
+[<Fact>]
+let ``normalize boolean comparisons (1)`` () =
+  equivalentQueries //
+    "SELECT (NOT valid) = (NOT valid) FROM table"
+    "SELECT valid = valid FROM table"
+
+[<Fact>]
+let ``normalize boolean comparisons (2)`` () =
+  equivalentQueries //
+    "SELECT NOT ((NOT valid) = TRUE) AS b FROM table"
+    "SELECT valid = TRUE AS b FROM table"
+
+[<Fact>]
+let ``normalize boolean comparisons (3)`` () =
+  equivalentQueries //
+    "SELECT valid = TRUE AS b FROM table"
+    "SELECT valid AS b FROM table"
+
+[<Fact>]
+let ``normalize boolean comparisons (4)`` () =
+  equivalentQueries //
+    "SELECT valid = FALSE AS b FROM table"
+    "SELECT NOT valid AS b FROM table"
