@@ -28,6 +28,7 @@ let run context statement : Result<QueryResult, QueryError> =
       statement
       |> Parser.parse
       |> Analyzer.analyze context
+      |> Normalizer.normalize
       |> Analyzer.rewrite context
 
     let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
