@@ -58,11 +58,11 @@ let ``normalize inequalities`` () =
 [<Fact>]
 let ``normalize not (1)`` () =
   equivalentQueries //
-    "SELECT NOT (NOT (age = 3)) FROM table"
+    "SELECT NOT (NOT age = 3) FROM table"
     "SELECT age = 3 FROM table"
 
 [<Fact>]
 let ``normalize not (2)`` () =
   equivalentQueries //
-    "SELECT NOT (age > 3) FROM table"
+    "SELECT NOT age > 3 FROM table"
     "SELECT age <= 3 FROM table"
