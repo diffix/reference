@@ -3,11 +3,15 @@ module OpenDiffix.Core.Normalizer
 open AnalyzerTypes
 open NodeUtils
 
+let rec private mapSequence mapper expr =
+  let newExpr = mapper expr
+  if newExpr = expr then expr else mapSequence mapper newExpr
+
 let rec private mapBottomUp mapper expr =
   match expr with
   | FunctionExpr (fn, args) -> FunctionExpr(fn, args |> List.map (mapBottomUp mapper))
   | _ -> expr
-  |> mapper
+  |> mapSequence mapper
 
 let private normalizeConstant expr =
   match expr with
@@ -39,8 +43,17 @@ let private normalizeComparison expr =
       | _ -> expr
   | _ -> expr
 
-let normalizeNot expr =
+let private normalizeBooleanExpression expr =
   match expr with
+  | FunctionExpr (ScalarFunction Equals,
+                  [ FunctionExpr (ScalarFunction Not, [ arg1 ]); FunctionExpr (ScalarFunction Not, [ arg2 ]) ]) ->
+      FunctionExpr(ScalarFunction Equals, [ arg1; arg2 ])
+  | FunctionExpr (ScalarFunction Equals, [ FunctionExpr (ScalarFunction Not, [ arg1 ]); arg2 ]) ->
+      FunctionExpr(ScalarFunction Not, [ FunctionExpr(ScalarFunction Equals, [ arg1; arg2 ]) ])
+  | FunctionExpr (ScalarFunction Equals, [ arg1; FunctionExpr (ScalarFunction Not, [ arg2 ]) ]) ->
+      FunctionExpr(ScalarFunction Not, [ FunctionExpr(ScalarFunction Equals, [ arg1; arg2 ]) ])
+  | FunctionExpr (ScalarFunction Equals, [ arg; Constant (Boolean true) ]) -> arg
+  | FunctionExpr (ScalarFunction Equals, [ arg; Constant (Boolean false) ]) -> FunctionExpr(ScalarFunction Not, [ arg ])
   | FunctionExpr (ScalarFunction Not, [ FunctionExpr (ScalarFunction Not, [ expr ]) ]) -> expr
   | FunctionExpr (ScalarFunction Not, [ FunctionExpr (ScalarFunction fn, args) ]) when isInequality fn ->
       (fn |> invertComparison |> ScalarFunction, args) |> FunctionExpr
@@ -53,4 +66,4 @@ let rec normalize (query: Query) : Query =
   | _ -> query
   |> map (mapBottomUp normalizeConstant)
   |> map (mapBottomUp normalizeComparison)
-  |> map (mapBottomUp normalizeNot)
+  |> map (mapBottomUp normalizeBooleanExpression)
