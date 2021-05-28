@@ -111,7 +111,7 @@ let runQuery query dbPath anonParams =
   use dataProvider = new SQLite.DataProvider(dbPath)
   let context = EvaluationContext.make anonParams dataProvider
   query
-  |> Parser.parse
+  |> OpenDiffix.Parser.parse
   |> QueryEngine.run context
 
 let anonymize query dbPath anonParams =

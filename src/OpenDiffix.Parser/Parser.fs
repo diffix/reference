@@ -1,6 +1,6 @@
-﻿module OpenDiffix.Core.Parser
+﻿module OpenDiffix.Parser
 
-open ParserTypes
+open OpenDiffix.Core.ParserTypes
 
 module QueryParser =
   open FParsec
