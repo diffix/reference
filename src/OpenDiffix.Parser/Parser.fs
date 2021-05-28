@@ -206,14 +206,10 @@ module QueryParser =
 // Public API
 // ----------------------------------------------------------------
 
-type SqlParserError = string
-
-let parseResult sql : Result<SelectQuery, SqlParserError> =
+let parse sql : SelectQuery =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
-      | SelectQuery selectQuery -> Ok selectQuery
-      | _ -> Error "Parse error: Expecting SELECT query"
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)
-
-let parse sql = sql |> parseResult |> Result.value
+      | SelectQuery selectQuery -> selectQuery
+      | _ -> failwith "Parse error: Expecting SELECT query"
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> failwith $"Parse error: %s{errorMessage}"
