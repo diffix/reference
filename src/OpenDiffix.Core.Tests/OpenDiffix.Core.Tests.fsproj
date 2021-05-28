@@ -12,7 +12,6 @@
     <Compile Include="NodeUtils.Tests.fs" />
     <Compile Include="Analyzer.Tests.fs" />
     <Compile Include="QueryValidator.Tests.fs" />
-    <Compile Include="Parser.Tests.fs" />
     <Compile Include="Planner.Tests.fs" />
     <Compile Include="Executor.Tests.fs" />
     <Compile Include="Normalizer.Tests.fs" />

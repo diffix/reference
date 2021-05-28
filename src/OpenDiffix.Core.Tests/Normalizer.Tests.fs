@@ -19,7 +19,7 @@ let dataProvider = dummyDataProvider [ testTable ]
 let context = EvaluationContext.make AnonymizationParams.Default dataProvider
 
 let queryPlan statement =
-  statement |> Parser.parse |> Analyzer.analyze context |> Normalizer.normalize
+  statement |> OpenDiffix.Parser.parse |> Analyzer.analyze context |> Normalizer.normalize
 
 let equivalentQueries expectedQuery testQuery =
   let testPlan = queryPlan testQuery
