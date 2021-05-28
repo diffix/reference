@@ -25,5 +25,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\OpenDiffix.Core\OpenDiffix.Core.fsproj" />
+        <ProjectReference Include="..\OpenDiffix.Parser\OpenDiffix.Parser.fsproj" />
     </ItemGroup>
 </Project>
