@@ -791,7 +791,7 @@ We also consider three different LE noise layers:
 
 1. **Static one-per-LE noise layers (static):** This is a noise layer seeded by materials from the LE condition itself. There is one layer per LE condition. (Effectively, the LE noise layer is seeded the same for LE and NLE conditions.)
 2. **Dynamic one-per-LE noise layers (dynamic):** This is a noise layer seeded by materials from the LE condition plus materials from *all* NLE conditions. This effectively mimics "AID" noise layers, but uses seed material from NLE conditions rather than from AIDVs. We do it this way to avoid chaff attacks.
-2. **Pairwise LE/NLE noise layers (pairwise):** This is a noise layer seeded by materials from each LE condition plus materials from *each* NLE condition *in the same JOIN selectable*. In other words, there is one noise layer for each LE/NLE pair within the selectable (see [Limiting LE-NLE combinations](#limiting-le-nle-combinations)).
+2. **Pairwise LE/NLE noise layers (pairwise):** This is a noise layer seeded by materials from each LE condition plus materials from *each* NLE condition *in the same JOIN selectable*. In other words, there is one noise layer for each LE/NLE pair within the selectable (see [Limiting LE-NLE combinations](#limiting-le-nle-combinations)). (Note that these noise layers only needed for a subset of JOINs, namely those deemed to be "unsafe".)
 
 In this section, we test this design against each of the attacks to see where we stand.  The goal is to see 1) if there are still vulnerabilities, and 2) which of the noise layers we need.
 
@@ -918,7 +918,7 @@ Here the LE dynamic noise layer hides the difference in the underlying count.
 
 **Discussion:**
 
-Because noise is proportional to extreme entity contribution, the noise is enough to hide the victim's presence or absence regardless of how much the victim or plant contributes.
+Because noise is proportional to top-group average, and because flattening hides the most extreme user, the victim is protected no matter which AID (plant or victim) is chosen. For instance, suppose the victim is the only extreme user. If the victim is adjusted, then in any event the victim is not in the answer, so no flattening occurs and noise is proportional to the top group If the plant is adjusted, then the victim will be flattened to the top-group average, and the noise will hide the victim.
 
 #### First Derivative 1/0 Difference Attack
 
@@ -948,7 +948,7 @@ The attack here fails, but only by virtue of the adjustment of the victim.
 | Query         | C and not I           | C         |      |
 | Answer (R ex) | cntC + SC + LDCI      | cntC + SC | LDCI |
 
-The attack here fails as well, but this tie there is different noise at each bucket, which somehow feels more robust.
+The attack here fails as well, but this time there is different noise at each bucket, which somehow feels more robust.
 
 #### First Derivative 2/1 Difference Attack, count(DISTINCT AIDV)
 
