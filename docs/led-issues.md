@@ -41,6 +41,9 @@ This documents the need for LED, and motivates a number of design decisions. In 
       - [Chaff attack](#chaff-attack-1)
       - [Multi-histogram first derivative difference attack](#multi-histogram-first-derivative-difference-attack-1)
       - [Multi-sample JOIN](#multi-sample-join)
+  - [SELECT columns versus condition columns](#select-columns-versus-condition-columns)
+  - [Dealing with low-count buckets](#dealing-with-low-count-buckets)
+  - [When to evaluate and adjust](#when-to-evaluate-and-adjust)
 
 ## Noise layer notation
 
@@ -1141,3 +1144,242 @@ Multiple versions of the second query (with different `uval` and `rval`) can be 
 4. A JOIN where, for each AIDV affected by the LE condition, the AIDV matches only one value of the filter column values in the other selectable (though this seems impractical to validate for queries like the second one above, where the filtering occurs before the JOIN).
 
 Note that strictly speaking, a JOIN with an LE condition with zero or one AIDV is safe, but we would still need to add pairwise noise layers because otherwise an analyst could determine whether the isolating condition had one or more than one AIDV.
+
+## SELECT columns versus condition columns
+
+SELECTing a column is an implicit condition. In other words, the following two queries are equivalent with respect to the bucket with `col = 1`:
+
+```
+SELECT col, count(*)
+FROM table
+WHERE aid <> 12345
+```
+
+```
+SELECT count(*)
+FROM table
+WHERE aid <> 12345 AND col = 1
+```
+
+However, the truth tables generated in each case are somewhat different. Assuming that the victim has value `col=1`, then the truth table for the `col=1` bucket in the first query is:
+
+|     | aid<>12345 | out | AID |
+| --- | ---------- | --- | --- |
+| C01 | 0          | 0   | LE  |
+| C02 | 1          | 1   | NLE |
+
+whereas the truth table for the second query is:
+
+|     | col=1 | aid<>12345 | out | AID |
+| --- | ----- | ---------- | --- | --- |
+| C01 | 1     | 0          | 0   | LE  |
+| C02 | 1     | 1          | 1   | NLE |
+| C03 | 0     | 1          | 0   | NLE |
+
+In both cases, the LE condition is correctly identified as such, so I don't see an issue here. I guess just wanted to point out the difference.
+
+## Dealing with low-count buckets
+
+In all the LE examples until now, there are many AIDVs, and so combinations can be properly labeled as LE or NLE. If however a bucket has very few AIDVs, then every or nearly every combination may be labeled as LE.
+
+For instance, assume the expression `A OR I`, where I is the isolating condition and A is being learned. If A is relatively low count in any event, then you might get this truth table (I has attribute A):
+
+|     | A   | I   | out | AID    |
+| --- | --- | --- | --- | ------ |
+| C01 | 0   | 0   | 0   | NLE    |
+| C03 | 1   | 0   | 1   | LE (5) |
+| C04 | 1   | 1   | 1   | LE (1) |
+
+where combination C03 is LE only because there are not too many instances of A. At the same time, the bucket itself might not be LCF, because the noisy threshold falls at a different place.
+
+In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly.
+
+The following truth table is for when I does not have attribute A:
+
+|     | A   | I   | out | AID    |
+| --- | --- | --- | --- | ------ |
+| C01 | 0   | 0   | 0   | NLE    |
+| C02 | 0   | 1   | 0   | LE (1) |
+| C03 | 1   | 0   | 1   | LE (5) |
+
+Here there are four possibilities, forcing either A or I to either 1 or 0. Forcing A or I to 1 changes the outcome of C01, so is not LE. Forcing `I-->0` changes only C02, so I is an LE condition. Forcing `A-->0` changes only C03, and so is also labeled as LE. This is in fact not inappropriate. Two AIDV's get adjusted (that of the victim matching I, and one from the five matching A). The result is that an aggregate that would not have been suppressed is suppressed. But in any event the aggregate was borderline LCF, so this is not too bad.
+
+Following for `A AND NOT I`, I has attribute A:
+
+|     | A   | NOT I | out | AID    |
+| --- | --- | ----- | --- | ------ |
+| C02 | 0   | 1     | 0   | NLE    |
+| C03 | 1   | 0     | 0   | LE (1) |
+| C04 | 1   | 1     | 1   | LE (5) |
+
+Here A and I are determined to be LE. Oddly enough, we would add the victim in when we adjust, and remove one of the rows from C04, with zero net effect. Seems to me that a rule that says that if all combinations with outcome of true are LE, then LCF should kick in automatically.
+
+Following for `A AND NOT I`, I does not have attribute A:
+
+|     | A   | NOT I | out | AID    |
+| --- | --- | ----- | --- | ------ |
+| C01 | 0   | 0     | 0   | LE     |
+| C02 | 0   | 1     | 0   | NLE    |
+| C04 | 1   | 1     | 1   | LE (5) |
+
+In this case, forcing `A-->1` (by virtue of C01) leads to a combination that doesn't exist (and so can't have any effect). Forcing `A-->0` is LE because doing so only changes the outcome of C04, but it is also effectively removes all rows from the output. Again this suggests that if all combinations with an outcome of true are LE, then LCF automatically kicks in.
+
+
+## When to evaluate and adjust
+
+It would have been nice if we could evaluate LED and adjust entirely within each selectable, but that is not the case. For instance, the following two examples are the "lone woman" attack, whereby it is known that there is a single female in the CS dept, and she is effectively isolated with the expression `gender = 'M' AND dept = 'CS'`.
+
+In a simple sub-query like this:
+
+```
+SELECT salary, count(*) FROM
+    (SELECT * FROM table
+    WHERE gender = 'M') t1
+WHERE dept = 'CS'
+GROUP BY 1
+```
+
+the condition logic is identical to:
+
+```
+SELECT salary, count(*)
+FROM table
+WHERE gender = 'M' AND dept = 'CS'
+GROUP BY 1
+```
+
+In a simple JOIN like this:
+
+```
+SELECT salary, count(*) FROM
+    (SELECT * FROM table
+    WHERE gender = 'M') t1
+JOIN
+    (SELECT * FROM table
+    WHERE dept = 'CS') t2
+ON t1.aid = t2.aid
+GROUP BY 1
+```
+
+we can't reliably re-write the query as a non-JOIN, but in fact the condition logic is the same as:
+
+```
+WHERE gender = 'M' AND dept = 'CS'
+```
+
+In the above examples, we certainly cannot evaluate LED within the selectables. This is the case partly because the condition logic isn't fully expressed, and partly because in any event every row from the selectable is LE1.
+
+Now suppose that the expression `(I AND J)` is an isolator (but neither I nor J individually isolates). An attack expression is then `A OR (I AND J)`, which can be re-written as `(A OR I) AND (A OR J)`. This in turn can be expressed as:
+
+```
+SELECT count(*)
+FROM (SELECT * FROM table
+      WHERE (A OR I) ) t1
+WHERE (A OR J)
+```
+
+Truth table in case where victim with `(I AND J)` has attribute A (where A is A1 and A2):
+
+|     | A1  | A2  | I   | J   | out | AID1 |
+| --- | --- | --- | --- | --- | --- | ---- |
+| C01 | 0   | 0   | 0   | 0   | 0   |      |
+| C02 | 0   | 0   | 0   | 1   | 0   |      |
+| C03 | 0   | 0   | 1   | 0   | 0   |      |
+| C13 | 1   | 1   | 0   | 0   | 1   |      |
+| C14 | 1   | 1   | 0   | 1   | 1   |      |
+| C15 | 1   | 1   | 1   | 0   | 1   |      |
+| C16 | 1   | 1   | 1   | 1   | 1   | LE   |
+
+This is an interesting table, because if we for instance force `A1-->0`, we don't really know what happens because there are no combinations with `A1=0` and `A2=1` (which is impossible, but we don't know that from the above). So we have to presume that doing so would be disruptive to C13 - C15. Forcing either `I-->0` or `J-->0` (or both) has no effect anywhere, so we presume that I and J are LE.
+
+Truth table in case where victim with `(I AND J)` has attribute A (where A is A1 and A2):
+
+|     | A1  | A2  | I   | J   | out | AID1 |
+| --- | --- | --- | --- | --- | --- | ---- |
+| C01 | 0   | 0   | 0   | 0   | 0   |      |
+| C02 | 0   | 0   | 0   | 1   | 0   |      |
+| C03 | 0   | 0   | 1   | 0   | 0   |      |
+| C04 | 0   | 0   | 1   | 1   | 1   | LE   |
+| C13 | 1   | 1   | 0   | 0   | 1   |      |
+| C14 | 1   | 1   | 0   | 1   | 1   |      |
+| C15 | 1   | 1   | 1   | 0   | 1   |      |
+
+Here we can see that forcing `I-->0` only changes C04, and likewise for `J-->0`. So both are regarded as LE and the C04 rows are adjusted.
+
+In any event, here we also cannot evaluate LED in the inner selectable.
+
+
+Note the following two queries are identical:
+
+```
+SELECT count(*) FROM
+    (SELECT uid, max(acct_district_id) AS sum FROM accounts
+    WHERE ((acct_district_id = 1) OR (firstname = 'Uriah'))
+    GROUP BY uid ) t1
+JOIN
+    (SELECT uid, max(acct_district_id) AS sum FROM accounts
+    WHERE ((acct_district_id = 1) OR (lastname = 'Moore'))
+    GROUP BY uid ) t2
+ON t1.uid = t2.uid
+```
+
+```
+SELECT count(*) FROM accounts
+    WHERE (acct_district_id = 1) OR ((firstname = 'Uriah') AND (lastname = 'Moore'))
+```
+
+which suggests that even the presence of a `GROUP BY` in a selectable does not automatically mean that we can evaluate the conditions within the selectable in isolation from other conditions.
+
+The above JOIN has the characteristic that each row in the selectable pertains to a single AID. So in effect, the `GROUP BY` has no effect. This is in principle detectable because only one row contributes to a GROUP BY, or only one AID contributes to a GROUP BY.
+
+
+The attack is harder to carry out when the `GROUP BY` is really mixing different AIDs together in an i-row.
+
+For instance, consider the following query, where I and J are quasi-identifiers, and `(A OR I) AND (A OR J)` is the expression:
+
+```
+SELECT count(*) FROM
+    (SELECT join_col, FROM table
+    WHERE A OR I
+    GROUP BY join_col ) t1
+JOIN
+    (SELECT join_col, FROM table
+    WHERE A OR J
+    GROUP BY join_col ) t2
+ON t1.join_col = t2.join_col
+```
+
+Here `join_col` is some column whose JOIN leads to multiple different AIDVs being combined in the resulting i-row (i.e. not an AID column). The problem here, for the attacker, is that since I and J are quasi-identifiers, different AIDVs from I and J will be included in different join_col i-rows. The attacker loses the ability to distinguish which i-rows contain the victim `I AND J`, and which contain I or J from other AIDVs. (In fact, I'm not sure this query makes any sense at all as an attack...)
+
+This suggests to me that what we need to do is to evaluate LED at the point where a legitimate GROUP BY takes place, and that we can adjust at that point. In other words, we build a truth table for each i-row, evaluate LE, and assign noise layers
+
+Whether or not we also adjust before the i-row is used in the next layer of processing is an open question.  We need to take care that we don't unecessarily adjust on a lot of i-rows that will only get merged the next level up (i.e. the problem we had of losing information with intermediate anonymization in Insights).
+
+Consider the following difference attack queries:
+
+```
+SELECT cnt, count(*) FROM
+    (SELECT age, count(*) as cnt
+     FROM table
+     WHERE A AND NOT I
+     GROUP BY age) t
+GROUP BY cnt
+```
+
+```
+SELECT cnt, count(*) FROM
+    (SELECT age, count(*) as cnt
+     FROM table
+     WHERE A
+     GROUP BY age) t
+GROUP BY cnt
+```
+
+where I is an isolating condition. Even if the attacker knows the age of the victim, this attack is hard to pull off. The final `cnt` may have contributions from multiple different ages, so it would be hard to detect whether or not the victim is somewhere in the answer. This would argue that it isn't really necessary to adjust anywhere in a double `GROUP BY` like this --- the noise and flattening suffices to hide the presence or absence of the victim.
+
+**Discussion:**
+
+My conclusions from all of the above is:
+
+1. When building truth tables, we include everything prior to a GROUP BY that mixes AIDs in the aggregate.
+2. We adjust at an intermediate aggregate if the aggregate is not further mixed with other aggregates downstream. Otherwise we don't.
