@@ -1,5 +1,7 @@
 module OpenDiffix.Core.Value
 
+open System
+
 /// Converts a value to its string representation.
 let rec toString value =
   match value with
@@ -45,3 +47,13 @@ let comparer direction nulls =
     | Null, _ -> nullsValue
     | _, Null -> -nullsValue
     | x, y -> directionValue * Operators.compare x y
+
+/// Computes a 32 bit hash of the given value.
+let hash value =
+  match value with
+  | Null -> 0
+  | Boolean b -> b |> BitConverter.GetBytes |> Hash.bytes
+  | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
+  | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
+  | String s -> Hash.string s
+  | List l -> l |> List.map hash |> List.fold (^^^) 0
