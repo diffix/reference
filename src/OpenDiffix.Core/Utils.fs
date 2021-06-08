@@ -101,6 +101,3 @@ module Hash =
       hash <- hash * fnvPrime
 
     int32 hash
-
-  let string (str: string) =
-    hash (System.Text.Encoding.UTF8.GetBytes(str))

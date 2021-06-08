@@ -55,5 +55,5 @@ let hash value =
   | Boolean b -> b |> BitConverter.GetBytes |> Hash.bytes
   | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
   | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
-  | String s -> Hash.string s
+  | String s -> s |> Text.Encoding.UTF8.GetBytes |> Hash.bytes
   | List l -> l |> List.map hash |> List.fold (^^^) 0
