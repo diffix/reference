@@ -1192,7 +1192,7 @@ For instance, assume the expression `A OR I`, where I is the isolating condition
 
 where combination C03 is LE only because there are, in total, not too many instances that match condition A. At the same time, the bucket itself might not be LCF, because the noisy threshold falls at a different place.
 
-In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly. As a result, the victim would be 
+In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly.
 
 The following truth table is for when I does not have attribute A:
 
