@@ -921,7 +921,7 @@ Here the LE dynamic noise layer hides the difference in the underlying count.
 
 **Discussion:**
 
-Because noise is proportional to top-group average, and because flattening hides the most extreme user, the victim is protected no matter which AID (plant or victim) is chosen. For instance, suppose the victim is the only extreme user. If the victim is adjusted, then in any event the victim is not in the answer, so no flattening occurs and noise is proportional to the top group If the plant is adjusted, then the victim will be flattened to the top-group average, and the noise will hide the victim.
+Because noise is proportional to the top-group average, and because flattening hides the most extreme user, the victim is protected no matter which AID (plant or victim) is chosen even if the plant or victim are extreme entities. For instance, suppose the victim is the only extreme user. If the victim is adjusted, then in any event the victim is not in the answer, so no flattening occurs and noise is proportional to the top group. If the plant is adjusted, then the victim will be flattened to the top-group average, and the noise will hide the victim.
 
 #### First Derivative 1/0 Difference Attack
 
@@ -1180,7 +1180,7 @@ In both cases, the LE condition is correctly identified as such, so I don't see 
 
 ## Dealing with low-count buckets
 
-In all the LE examples until now, there are many AIDVs, and so combinations can be properly labeled as LE or NLE. If however a bucket has very few AIDVs, then every or nearly every combination may be labeled as LE.
+In all the LE examples until now, there are many AIDVs, and so combinations can be properly labeled as LE or NLE. If however a bucket has very few AIDVs, then every or nearly every combination may be labeled as LE. (The following examples assume that short-circuits are being over-ridden so as to learn all truth table values.)
 
 For instance, assume the expression `A OR I`, where I is the isolating condition and A is being learned. If A is relatively low count in any event, then you might get this truth table (I has attribute A):
 
@@ -1190,19 +1190,24 @@ For instance, assume the expression `A OR I`, where I is the isolating condition
 | C03 | 1   | 0   | 1   | LE (5) |
 | C04 | 1   | 1   | 1   | LE (1) |
 
-where combination C03 is LE only because there are not too many instances of A. At the same time, the bucket itself might not be LCF, because the noisy threshold falls at a different place.
+where combination C03 is LE only because there are, in total, not too many instances that match condition A. At the same time, the bucket itself might not be LCF, because the noisy threshold falls at a different place.
 
-In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly.
+In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly. As a result, the victim would be 
 
 The following truth table is for when I does not have attribute A:
 
 |     | A   | I   | out | AID    |
 | --- | --- | --- | --- | ------ |
 | C01 | 0   | 0   | 0   | NLE    |
-| C02 | 0   | 1   | 0   | LE (1) |
+| C02 | 0   | 1   | 1   | LE (1) |
 | C03 | 1   | 0   | 1   | LE (5) |
 
-Here there are four possibilities, forcing either A or I to either 1 or 0. Forcing A or I to 1 changes the outcome of C01, so is not LE. Forcing `I-->0` changes only C02, so I is an LE condition. Forcing `A-->0` changes only C03, and so is also labeled as LE. This is in fact not inappropriate. Two AIDV's get adjusted (that of the victim matching I, and one from the five matching A). The result is that an aggregate that would not have been suppressed is suppressed. But in any event the aggregate was borderline LCF, so this is not too bad.
+Here there are four possibilities, forcing either of A or I to either 1 or 0. Forcing `A-->1` or `I-->1` changes the outcome of C01, so is not LE. Forcing `I-->0` changes only C02, so I is an LE condition. Forcing `A-->0` changes only C03, and so is also labeled as LE.
+
+This is an interesting situation, because both conditions are labeled as LE, and yet it is possible that the resulting bucket would otherwise not be suppressed.
+
+> TODO: go through potential difference attacks on the suppression mechanism itself
+
 
 Following for `A AND NOT I`, I has attribute A:
 
@@ -1218,11 +1223,11 @@ Following for `A AND NOT I`, I does not have attribute A:
 
 |     | A   | NOT I | out | AID    |
 | --- | --- | ----- | --- | ------ |
-| C01 | 0   | 0     | 0   | LE     |
+| C01 | 0   | 0     | 0   | LE (1) |
 | C02 | 0   | 1     | 0   | NLE    |
 | C04 | 1   | 1     | 1   | LE (5) |
 
-In this case, forcing `A-->1` (by virtue of C01) leads to a combination that doesn't exist (and so can't have any effect). Forcing `A-->0` is LE because doing so only changes the outcome of C04, but it is also effectively removes all rows from the output. Again this suggests that if all combinations with an outcome of true are LE, then LCF automatically kicks in.
+In this case, forcing `A-->1` (by virtue of C01) changes all of the C02 rows, and so is NLE. Forcing `A-->0` is LE because doing so only changes the outcome of C04, but it is also effectively removes all rows from the output. Again this suggests that if all combinations with an outcome of true are LE, then LCF automatically kicks in.
 
 
 ## When to evaluate and adjust
@@ -1292,7 +1297,7 @@ Truth table in case where victim with `(I AND J)` has attribute A (where A is A1
 
 This is an interesting table, because if we for instance force `A1-->0`, we don't really know what happens because there are no combinations with `A1=0` and `A2=1` (which is impossible, but we don't know that from the above). So we have to presume that doing so would be disruptive to C13 - C15. Forcing either `I-->0` or `J-->0` (or both) has no effect anywhere, so we presume that I and J are LE.
 
-Truth table in case where victim with `(I AND J)` has attribute A (where A is A1 and A2):
+Truth table in case where victim with `(I AND J)` does not have attribute A (where A is A1 and A2):
 
 |     | A1  | A2  | I   | J   | out | AID1 |
 | --- | --- | --- | --- | --- | --- | ---- |
@@ -1313,11 +1318,11 @@ Note the following two queries are identical:
 
 ```
 SELECT count(*) FROM
-    (SELECT uid, max(acct_district_id) AS sum FROM accounts
+    (SELECT uid FROM accounts
     WHERE ((acct_district_id = 1) OR (firstname = 'Uriah'))
     GROUP BY uid ) t1
 JOIN
-    (SELECT uid, max(acct_district_id) AS sum FROM accounts
+    (SELECT uid FROM accounts
     WHERE ((acct_district_id = 1) OR (lastname = 'Moore'))
     GROUP BY uid ) t2
 ON t1.uid = t2.uid
@@ -1328,7 +1333,7 @@ SELECT count(*) FROM accounts
     WHERE (acct_district_id = 1) OR ((firstname = 'Uriah') AND (lastname = 'Moore'))
 ```
 
-which suggests that even the presence of a `GROUP BY` in a selectable does not automatically mean that we can evaluate the conditions within the selectable in isolation from other conditions.
+which suggests that even the presence of a `GROUP BY` in a selectable does not automatically mean that we can evaluate the conditions within the selectable in isolation from other conditions. (Note here `uid` is the AID column.)
 
 The above JOIN has the characteristic that each row in the selectable pertains to a single AID. So in effect, the `GROUP BY` has no effect. This is in principle detectable because only one row contributes to a GROUP BY, or only one AID contributes to a GROUP BY.
 
@@ -1339,17 +1344,17 @@ For instance, consider the following query, where I and J are quasi-identifiers,
 
 ```
 SELECT count(*) FROM
-    (SELECT join_col, FROM table
+    (SELECT join_col FROM table
     WHERE A OR I
     GROUP BY join_col ) t1
 JOIN
-    (SELECT join_col, FROM table
+    (SELECT join_col FROM table
     WHERE A OR J
     GROUP BY join_col ) t2
 ON t1.join_col = t2.join_col
 ```
 
-Here `join_col` is some column whose JOIN leads to multiple different AIDVs being combined in the resulting i-row (i.e. not an AID column). The problem here, for the attacker, is that since I and J are quasi-identifiers, different AIDVs from I and J will be included in different join_col i-rows. The attacker loses the ability to distinguish which i-rows contain the victim `I AND J`, and which contain I or J from other AIDVs. (In fact, I'm not sure this query makes any sense at all as an attack...)
+Here we are assuming that `join_col` is not an AID column, and when used as a JOIN column leads to multiple different AIDVs being combined in the resulting i-row. The problem here, for the attacker, is that since I and J are quasi-identifiers, different AIDVs from I and J will be included in different join_col i-rows. The attacker loses the ability to distinguish which i-rows contain the victim `I AND J`, and which contain I or J from other AIDVs. (In fact, I'm not sure this query makes any sense at all as an attack...)
 
 This suggests to me that what we need to do is to evaluate LED at the point where a legitimate GROUP BY takes place, and that we can adjust at that point. In other words, we build a truth table for each i-row, evaluate LE, and assign noise layers
 
@@ -1381,5 +1386,5 @@ where I is an isolating condition. Even if the attacker knows the age of the vic
 
 My conclusions from all of the above is:
 
-1. When building truth tables, we include everything prior to a GROUP BY that mixes AIDs in the aggregate.
+1. When building truth tables, we include everything prior to a GROUP BY that mixes AIDVs for a given AID in the aggregate.
 2. We adjust at an intermediate aggregate if the aggregate is not further mixed with other aggregates downstream. Otherwise we don't.
