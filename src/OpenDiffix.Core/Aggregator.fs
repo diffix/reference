@@ -11,7 +11,7 @@ type IAggregator =
 let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
 
-let private hashAid (aidValue: Value) = aidValue.GetHashCode()
+let private hashAid (aidValue: Value) = Value.hash aidValue
 
 let private hashAidList (aidValues: Value list) = List.map hashAid aidValues
 

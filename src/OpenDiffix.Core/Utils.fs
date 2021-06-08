@@ -87,3 +87,17 @@ module AnonymizationParams =
     |> function
     | Some tableSettings -> tableSettings.AidColumns |> List.exists (String.equalsI columnName)
     | None -> false
+
+module Hash =
+  let bytes (data: byte []) =
+    // Implementation of FNV-1a hash algorithm: http://www.isthe.com/chongo/tech/comp/fnv/index.html
+    let fnvPrime = 16777619u
+    let offsetBasis = 2166136261u
+
+    let mutable hash = offsetBasis
+
+    for octet in data do
+      hash <- hash ^^^ uint32 octet
+      hash <- hash * fnvPrime
+
+    int32 hash
