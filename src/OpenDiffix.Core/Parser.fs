@@ -1,6 +1,6 @@
-﻿module OpenDiffix.Parser
+﻿module OpenDiffix.Core.Parser
 
-open OpenDiffix.Core.ParserTypes
+open ParserTypes
 
 module QueryParser =
   open FParsec
@@ -206,10 +206,14 @@ module QueryParser =
 // Public API
 // ----------------------------------------------------------------
 
-let parse sql : SelectQuery =
+type SqlParserError = string
+
+let parseResult sql : Result<SelectQuery, SqlParserError> =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
-      | SelectQuery selectQuery -> selectQuery
-      | _ -> failwith "Parse error: Expecting SELECT query"
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> failwith $"Parse error: %s{errorMessage}"
+      | SelectQuery selectQuery -> Ok selectQuery
+      | _ -> Error "Parse error: Expecting SELECT query"
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)
+
+let parse sql = sql |> parseResult |> Result.value

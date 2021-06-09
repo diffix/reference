@@ -22,10 +22,11 @@ type QueryResult = { Columns: Columns; Rows: Row list }
 
 type QueryError = string
 
-let run context parsedQuery : Result<QueryResult, QueryError> =
+let run context statement : Result<QueryResult, QueryError> =
   try
     let query =
-      parsedQuery
+      statement
+      |> Parser.parse
       |> Analyzer.analyze context
       |> Normalizer.normalize
       |> Analyzer.rewrite context

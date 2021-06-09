@@ -22,7 +22,7 @@ let aidColIndex = Table.findColumn testTable "int_col" |> fst
 
 let analyzeQuery queryString =
   queryString
-  |> OpenDiffix.Parser.parse
+  |> Parser.parse
   |> Analyzer.analyze context
   |> AnalyzerTypes.Query.assertSelectQuery
   |> QueryValidator.validateQuery

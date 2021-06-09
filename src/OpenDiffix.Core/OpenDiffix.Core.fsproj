@@ -4,12 +4,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="CommonTypes.fs" />
-    <Compile Include="ParserTypes.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="Value.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="Anonymizer.fs" />
     <Compile Include="Aggregator.fs" />
+    <Compile Include="ParserTypes.fs" />
+    <Compile Include="Parser.fs" />
     <Compile Include="AnalyzerTypes.fs" />
     <Compile Include="NodeUtils.fs" />
     <Compile Include="QueryValidator.fs" />
@@ -24,5 +25,6 @@
     <PackageReference Include="Dapper" Version="2.0.78" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="2.1.2" />
     <PackageReference Include="Thoth.Json.Net" Version="5.0.0" />
+    <PackageReference Include="FParsec" Version="1.1.1" />
   </ItemGroup>
 </Project>
