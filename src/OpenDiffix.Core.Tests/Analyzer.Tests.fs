@@ -2,7 +2,6 @@ module OpenDiffix.Core.AnalyzerTests
 
 open Xunit
 open FsUnit.Xunit
-open OpenDiffix.Parser
 
 open AnalyzerTypes
 
@@ -33,12 +32,12 @@ let defaultQuery =
 
 let testParsedQuery queryString expected =
   queryString
-  |> parse
+  |> Parser.parse
   |> Analyzer.analyze context
   |> should equal (SelectQuery expected)
 
 let testQueryError queryString =
-  (fun () -> queryString |> parse |> Analyzer.analyze context |> ignore)
+  (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
   |> shouldFail
 
 [<Fact>]
@@ -258,7 +257,7 @@ type Tests(db: DBFixture) =
 
   let analyzeQuery query =
     query
-    |> parse
+    |> Parser.parse
     |> Analyzer.analyze context
     |> Analyzer.rewrite context
     |> Query.assertSelectQuery
