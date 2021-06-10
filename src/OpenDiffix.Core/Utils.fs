@@ -60,6 +60,7 @@ module Function =
     | "substring" -> ScalarFunction Substring
     | "||" -> ScalarFunction Concat
     | "width_bucket" -> ScalarFunction WidthBucket
+    | "cast" -> ScalarFunction Cast
     | other -> failwith $"Unknown function `{other}`"
 
 module Schema =

@@ -114,6 +114,14 @@ let ``Parses functions`` () =
        ]
 
 [<Fact>]
+let ``Parses casts`` () =
+  parseFragment expr "cast(1 as boolean)"
+  |> should equal (Function("cast", [ Integer 1L; String "boolean" ]))
+
+  parseFragment expr "cast('0' as real)"
+  |> should equal (Function("cast", [ String "0"; String "real" ]))
+
+[<Fact>]
 let ``Precedence is as expected`` () =
   parseFragment expr "1 + 2 * 3 % 2 < 1 AND a or not b IS NULL"
   |> should

@@ -40,6 +40,14 @@ let typeOfScalarFunction fn args =
   | Substring
   | Concat -> StringType
   | WidthBucket -> args |> List.head |> typeOf
+  | Cast ->
+      args
+      |> List.item 1
+      |> function
+      | Constant (String "integer") -> IntegerType
+      | Constant (String "real") -> RealType
+      | Constant (String "boolean") -> BooleanType
+      | _ -> failwith "Unsupported cast destination type name."
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -139,6 +147,17 @@ let rec evaluateScalarFunction fn args =
   | Upper, [ String s ] -> String(s.ToUpper())
   | Substring, [ String s; Integer start; Integer length ] -> String(s.Substring(int start, int length))
   | Concat, [ String s1; String s2 ] -> String(s1 + s2)
+
+  | Cast, [ String s; String "integer" ] -> s |> System.Int64.Parse |> Integer
+  | Cast, [ String s; String "real" ] -> s |> System.Double.Parse |> Real
+  | Cast, [ String s; String "boolean" ] -> s |> System.Boolean.Parse |> Boolean
+  | Cast, [ Integer i; String "real" ] -> i |> float |> Real
+  | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
+  | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
+  | Cast, [ Integer _; String "boolean" ] -> Boolean true
+  | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
+  | Cast, [ Real r; String "text" ] -> r.ToString() |> String
+  | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 

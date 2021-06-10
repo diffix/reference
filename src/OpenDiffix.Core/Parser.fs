@@ -24,7 +24,7 @@ module QueryParser =
     | name, None -> Expression.Identifier(None, name)
     | name1, Some name2 -> Expression.Identifier(Some name1, name2)
 
-  let word word = pstringCI word >>. spaces
+  let word word = pstringCI word .>> spaces
 
   let words words =
     words |> List.map word |> List.reduce (>>.)
@@ -63,6 +63,12 @@ module QueryParser =
   let functionExpression =
     simpleIdentifier .>>. inParenthesis expr .>> spaces
     |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
+
+  let typeName = word "text" <|> word "integer" <|> word "real" <|> word "boolean"
+
+  let castExpression =
+    word "cast" >>. inParenthesis (expr .>> word "as" .>>. typeName) .>> spaces
+    |>> fun (expr, typeName) -> Function("cast", [ expr; String typeName ])
 
   let selectedExpression = expr .>>. opt (word "AS" >>. simpleIdentifier) |>> As
 
@@ -190,6 +196,7 @@ module QueryParser =
   opp.TermParser <-
     choice [
       (attempt selectQuery)
+      (attempt castExpression)
       (attempt functionExpression)
       inParenthesis expr
       star

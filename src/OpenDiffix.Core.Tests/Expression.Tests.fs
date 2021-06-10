@@ -412,6 +412,27 @@ module DefaultFunctionsTests =
 
     fails WidthBucket [ [ Real 3.0; Real 1.0; Real 10.0; Real 10.0 ] ]
 
+  [<Fact>]
+  let Cast () =
+    runsBinary
+      Cast
+      [ //
+        String "  1 ", String "integer", Integer 1L
+        String "+0", String "integer", Integer 0L
+        String "-2", String "integer", Integer -2L
+        String "0.5", String "real", Real 0.5
+        String "-12.334", String "real", Real -12.334
+        String "true", String "boolean", Boolean true
+        Integer 100L, String "boolean", Boolean true
+        Integer 0L, String "boolean", Boolean false
+        Integer -1L, String "real", Real -1.
+        Real 0.7, String "integer", Integer 1L
+        Real 0.7, String "text", String "0.7"
+        Integer -2L, String "text", String "-2"
+        Boolean false, String "text", String "false"
+        Null, String "integer", Null
+      ]
+
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 

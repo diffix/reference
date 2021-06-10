@@ -64,6 +64,7 @@ type ScalarFunction =
   | Substring
   | Concat
   | WidthBucket
+  | Cast
 
 type ScalarArgs = Value list
 
