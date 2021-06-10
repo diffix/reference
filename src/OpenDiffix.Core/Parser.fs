@@ -36,11 +36,11 @@ module QueryParser =
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   let star = word "*" |>> fun _ -> Expression.Star
-  // This custom numbers parser is needed as both pint32 and pfloat are eager
-  // to the point of not being possible to combine. pint32 would parse 1.2 as 1,
+  // This custom numbers parser is needed as both pint64 and pfloat are eager
+  // to the point of not being possible to combine. pint64 would parse 1.2 as 1,
   // and pfloat would parse 1 as 1.0.
   let number =
-    pint32 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
+    pint64 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
     |>> fun (wholeValue, decimalPartOption) ->
           match decimalPartOption with
           | None -> Expression.Integer wholeValue
@@ -206,14 +206,10 @@ module QueryParser =
 // Public API
 // ----------------------------------------------------------------
 
-type SqlParserError = string
-
-let parseResult sql : Result<SelectQuery, SqlParserError> =
+let parse sql : SelectQuery =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
       match result with
-      | SelectQuery selectQuery -> Ok selectQuery
-      | _ -> Error "Parse error: Expecting SELECT query"
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> Error("Parse error: " + errorMessage)
-
-let parse sql = sql |> parseResult |> Result.value
+      | SelectQuery selectQuery -> selectQuery
+      | _ -> failwith "Parse error: Expecting SELECT query"
+  | FParsec.CharParsers.Failure (errorMessage, _, _) -> failwith ("Parse error: " + errorMessage)

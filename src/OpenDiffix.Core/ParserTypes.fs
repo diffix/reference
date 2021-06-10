@@ -24,7 +24,7 @@ type SelectQuery =
 and Expression =
   | Star
   | Null
-  | Integer of int32
+  | Integer of int64
   | Float of float
   | String of string
   | Boolean of bool
