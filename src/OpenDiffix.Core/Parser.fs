@@ -36,11 +36,11 @@ module QueryParser =
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   let star = word "*" |>> fun _ -> Expression.Star
-  // This custom numbers parser is needed as both pint32 and pfloat are eager
-  // to the point of not being possible to combine. pint32 would parse 1.2 as 1,
+  // This custom numbers parser is needed as both pint64 and pfloat are eager
+  // to the point of not being possible to combine. pint64 would parse 1.2 as 1,
   // and pfloat would parse 1 as 1.0.
   let number =
-    pint32 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
+    pint64 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
     |>> fun (wholeValue, decimalPartOption) ->
           match decimalPartOption with
           | None -> Expression.Integer wholeValue

@@ -47,7 +47,7 @@ let ``Parses simple identifiers`` () =
 [<Fact>]
 let ``Parses expressions`` () =
   [
-    "1", Integer 1
+    "1", Integer 1L
     "1.1", Float 1.1
     "1.01", Float 1.01
     "1.001", Float 1.001
@@ -60,16 +60,16 @@ let ``Parses expressions`` () =
   [ "+"; "-"; "*"; "/"; "^"; "%" ]
   |> List.iter (fun op ->
     parseFragment expr $"1 %s{op} 1"
-    |> should equal (Expression.Function(op, [ Integer 1; Integer 1 ]))
+    |> should equal (Expression.Function(op, [ Integer 1L; Integer 1L ]))
   )
 
   [ "and", And; "or", Or; "<", Lt; "<=", LtE; ">", Gt; ">=", GtE; "=", Equals; "<>", Not << Equals ]
   |> List.iter (fun (op, expected) ->
     parseFragment expr $"1 %s{op} 1"
-    |> should equal (expected (Integer 1, Integer 1))
+    |> should equal (expected (Integer 1L, Integer 1L))
   )
 
-  parseFragment expr "not 1" |> should equal (Expression.Not(Integer 1))
+  parseFragment expr "not 1" |> should equal (Expression.Not(Integer 1L))
 
   parseFragment expr "value is null"
   |> should equal (IsNull(Identifier(None, "value")))
@@ -117,8 +117,8 @@ let ``Precedence is as expected`` () =
        equal
        (And(
          Lt(
-           Function("+", [ Integer 1; Function("*", [ Integer 2; Function("^", [ Integer 3; Integer 2 ]) ]) ]),
-           Integer 1
+           Function("+", [ Integer 1L; Function("*", [ Integer 2L; Function("^", [ Integer 3L; Integer 2L ]) ]) ]),
+           Integer 1L
          ),
          Or(Identifier(None, "a"), Not(IsNull(Identifier(None, "b"))))
        ))
@@ -148,7 +148,7 @@ let ``Parses complex functions`` () =
 [<Fact>]
 let ``Parses WHERE clause conditions`` () =
   parseFragment whereClause "WHERE a = 1"
-  |> should equal (Equals(Identifier(None, "a"), Integer 1))
+  |> should equal (Equals(Identifier(None, "a"), Integer 1L))
 
   parseFragment whereClause "WHERE a = '1'"
   |> should equal (Equals(Identifier(None, "a"), String "1"))
@@ -248,12 +248,12 @@ let ``Parse complex aggregate query`` () =
            Where =
              Some(
                And(
-                 Equals(Identifier(None, "col1"), Integer 1),
-                 (Or(Equals(Identifier(None, "col2"), Integer 2), Equals(Identifier(None, "col2"), Integer 3)))
+                 Equals(Identifier(None, "col1"), Integer 1L),
+                 (Or(Equals(Identifier(None, "col2"), Integer 2L), Equals(Identifier(None, "col2"), Integer 3L)))
                )
              )
            GroupBy = [ Identifier(None, "col1") ]
-           Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1)
+           Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
        }
 
 [<Fact>]
@@ -351,7 +351,7 @@ let ``Failed Paul attack query 2`` () =
              Some(
                And(
                  Equals(Identifier(None, "t1"), String "y"),
-                 Not(And(Equals(Identifier(None, "i1"), Integer 100), Equals(Identifier(None, "t2"), String "x")))
+                 Not(And(Equals(Identifier(None, "i1"), Integer 100L), Equals(Identifier(None, "t2"), String "x")))
                )
              )
        }
