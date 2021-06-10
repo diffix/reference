@@ -37,11 +37,11 @@ let parseFragment parser fragment =
 
 [<Fact>]
 let ``Parses simple identifiers`` () =
-  (parseFragment expr "hello") |> should equal (Identifier(None, "hello"))
-  (parseFragment expr "hello12") |> should equal (Identifier(None, "hello12"))
-  (parseFragment expr "hello_12") |> should equal (Identifier(None, "hello_12")) // Allows underscores
+  parseFragment expr "hello" |> should equal (Identifier(None, "hello"))
+  parseFragment expr "hello12" |> should equal (Identifier(None, "hello12"))
+  parseFragment expr "hello_12" |> should equal (Identifier(None, "hello_12")) // Allows underscores
 
-  (parseFragment expr "hello.bar12")
+  parseFragment expr "hello.bar12"
   |> should equal (Identifier(Some "hello", "bar12")) // Allows qualified names
 
 [<Fact>]
