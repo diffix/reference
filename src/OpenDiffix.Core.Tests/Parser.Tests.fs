@@ -77,6 +77,9 @@ let ``Parses expressions`` () =
   parseFragment expr "value is not null"
   |> should equal (Not(IsNull(Identifier(None, "value"))))
 
+  parseFragment expr $"'ab' || 'bc'"
+  |> should equal (Expression.Function("||", [ String "ab"; String "bc" ]))
+
 [<Fact>]
 let ``Parses columns`` () =
   parseFragment commaSepExpressions "hello"

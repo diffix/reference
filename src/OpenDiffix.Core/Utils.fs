@@ -55,6 +55,10 @@ module Function =
     | "floor" -> ScalarFunction Floor
     | "abs" -> ScalarFunction Abs
     | "length" -> ScalarFunction Length
+    | "lower" -> ScalarFunction Lower
+    | "upper" -> ScalarFunction Upper
+    | "substring" -> ScalarFunction Substring
+    | "||" -> ScalarFunction Concat
     | other -> failwith $"Unknown function `{other}`"
 
 module Schema =

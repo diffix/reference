@@ -54,11 +54,15 @@ type ScalarFunction =
   | LtE
   | Gt
   | GtE
-  | Length
   | Round
   | Floor
   | Ceil
   | Abs
+  | Length
+  | Lower
+  | Upper
+  | Substring
+  | Concat
 
 type ScalarArgs = Value list
 

@@ -341,6 +341,46 @@ module DefaultFunctionsTests =
         [ String "a" ]
       ]
 
+  [<Fact>]
+  let Lower () =
+    runsUnary
+      Lower
+      [ //
+        String "_aBC_", String "_abc_"
+        Null, Null
+      ]
+
+    fails Lower [ [ Integer 3L ] ]
+
+  [<Fact>]
+  let Upper () =
+    runsUnary
+      Upper
+      [ //
+        String "_aBc_", String "_ABC_"
+        Null, Null
+      ]
+
+    fails Upper [ [ Integer 3L ] ]
+
+  [<Fact>]
+  let Substring () =
+    Expression.evaluateScalarFunction Substring [ String "abcd"; Integer 1L; Integer 2L ]
+    |> should equal (String "bc")
+
+    fails Substring [ [ String "abc"; Integer 3L; Real 3.0 ] ]
+
+  [<Fact>]
+  let Concat () =
+    runsBinary
+      Concat
+      [ //
+        String "ab", String "AB", String "abAB"
+        Null, String "ab", Null
+      ]
+
+    fails Concat [ [ Integer 3L; String "abc" ] ]
+
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 

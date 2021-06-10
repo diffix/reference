@@ -35,6 +35,10 @@ let typeOfScalarFunction fn args =
   | Floor
   | Ceil -> IntegerType
   | Abs -> args |> List.exactlyOne |> typeOf
+  | Lower
+  | Upper
+  | Substring
+  | Concat -> StringType
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -106,13 +110,18 @@ let rec evaluateScalarFunction fn args =
   | Gt, [ v1; v2 ] -> Boolean(v1 > v2)
   | GtE, [ v1; v2 ] -> Boolean(v1 >= v2)
 
-  | Length, [ String s ] -> Integer(int64 s.Length)
-
   | Round, [ Real r ] -> r |> round |> int64 |> Integer
   | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
   | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
   | Abs, [ Real r ] -> r |> abs |> Real
   | Abs, [ Integer i ] -> i |> abs |> Integer
+
+  | Length, [ String s ] -> Integer(int64 s.Length)
+
+  | Lower, [ String s ] -> String(s.ToLower())
+  | Upper, [ String s ] -> String(s.ToUpper())
+  | Substring, [ String s; Integer start; Integer length ] -> String(s.Substring(int start, int length))
+  | Concat, [ String s1; String s2 ] -> String(s1 + s2)
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 
