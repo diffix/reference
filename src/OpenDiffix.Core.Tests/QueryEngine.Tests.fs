@@ -128,6 +128,12 @@ type Tests(db: DBFixture) =
     testResult |> should equal expectedResult
 
   [<Fact>]
+  let ``query 11`` () =
+    let expected = { Columns = [ "n" ]; Rows = [ [| String "1Water" |] ] }
+    let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1"
+    assertOkEqual queryResult expected
+
+  [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
     equivalentQueries
       "SELECT p.name AS n FROM products AS p WHERE id = 1"
