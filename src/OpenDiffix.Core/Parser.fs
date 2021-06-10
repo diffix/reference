@@ -1,6 +1,7 @@
 ﻿module OpenDiffix.Core.Parser
 
 open ParserTypes
+open type System.Char
 
 module QueryParser =
   open FParsec
@@ -143,19 +144,17 @@ module QueryParser =
   let allCasingPermutations (s: string) =
     let rec createPermutations acc next =
       match acc, next with
-      | [], c :: cs -> createPermutations [ $"%c{System.Char.ToLower(c)}"; $"%c{System.Char.ToUpper(c)}" ] cs
       | acc, c :: cs ->
-          let newLower = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToLower(c)}")
-          let newUpper = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToUpper(c)}")
-          createPermutations (newLower @ newUpper) cs
+          let newAcc =
+            acc
+            |> List.collect (fun prefix -> //
+              List.distinct [ $"%s{prefix}%c{ToLower c}"; $"%s{prefix}%c{ToUpper c}" ]
+            )
+
+          createPermutations newAcc cs
       | acc, [] -> acc
 
-    s.ToCharArray()
-    |> Array.toList
-    |> createPermutations []
-    // To avoid duplicates of such things as upper and lowercase "+"
-    |> Set.ofList
-    |> Set.toList
+    s.ToCharArray() |> Array.toList |> createPermutations [ "" ]
 
   let addOperator opType opName parseNext precedence associativity f =
     allCasingPermutations opName
