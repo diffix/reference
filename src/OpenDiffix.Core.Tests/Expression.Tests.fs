@@ -381,6 +381,37 @@ module DefaultFunctionsTests =
 
     fails Concat [ [ Integer 3L; String "abc" ] ]
 
+  [<Fact>]
+  let WidthBucket () =
+    [ //
+      Integer 1L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
+      Integer 2L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
+      Integer 3L, Integer 1L, Integer 10L, Integer 5L, Integer 2L
+      Integer 9L, Integer 1L, Integer 10L, Integer 5L, Integer 5L
+      Integer 10L, Integer 1L, Integer 10L, Integer 5L, Integer 6L
+      Integer 1000L, Integer 1L, Integer 10L, Integer 5L, Integer 6L
+      Integer 0L, Integer 1L, Integer 10L, Integer 5L, Integer 0L
+      Integer -10L, Integer 1L, Integer 10L, Integer 5L, Integer 0L
+
+      Real 1., Real 1., Real 10., Integer 5L, Integer 1L
+      Real 1.5, Real 1., Real 10., Integer 5L, Integer 1L
+      Real 3., Real 1., Real 10., Integer 5L, Integer 2L
+      Real 9.5, Real 1., Real 10., Integer 5L, Integer 5L
+      Real 10., Real 1., Real 10., Integer 5L, Integer 6L
+      Real 1000., Real 1., Real 10., Integer 5L, Integer 6L
+      Real 0., Real 1., Real 10., Integer 5L, Integer 0L
+      Real -10., Real 1., Real 10., Integer 5L, Integer 0L
+
+      Null, Integer 1L, Integer 10L, Integer 5L, Null
+      Integer 0L, Integer 1L, Integer 10L, Null, Null
+    ]
+    |> List.iter (fun (v, b, t, c, result) ->
+      Expression.evaluateScalarFunction WidthBucket [ v; b; t; c ]
+      |> should equal result
+    )
+
+    fails WidthBucket [ [ Real 3.0; Real 1.0; Real 10.0; Real 10.0 ] ]
+
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 

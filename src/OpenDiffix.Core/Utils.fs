@@ -59,6 +59,7 @@ module Function =
     | "upper" -> ScalarFunction Upper
     | "substring" -> ScalarFunction Substring
     | "||" -> ScalarFunction Concat
+    | "width_bucket" -> ScalarFunction WidthBucket
     | other -> failwith $"Unknown function `{other}`"
 
 module Schema =

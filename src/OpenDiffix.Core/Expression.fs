@@ -39,6 +39,7 @@ let typeOfScalarFunction fn args =
   | Upper
   | Substring
   | Concat -> StringType
+  | WidthBucket -> args |> List.head |> typeOf
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -71,6 +72,11 @@ let rec typeOf expression =
 // Evaluation
 // ----------------------------------------------------------------
 
+let widthBucket v b t c =
+  let step = (t - b) / float c
+
+  ((v - b) / step) |> floor |> int64 |> max -1L |> min c |> (+) 1L
+
 /// Evaluates the result of a scalar function invocation.
 let rec evaluateScalarFunction fn args =
   match fn, args with
@@ -81,10 +87,17 @@ let rec evaluateScalarFunction fn args =
 
   | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
-  // From now on, if the unary or binary function gets a `Null` argument, we return `Null` directly.
+  // From now on, if the function gets a `Null` argument, we return `Null` directly.
   | _, [ Null ] -> Null
   | _, [ Null; _ ] -> Null
   | _, [ _; Null ] -> Null
+  | _, [ Null; _; _ ] -> Null
+  | _, [ _; Null; _ ] -> Null
+  | _, [ _; _; Null ] -> Null
+  | _, [ Null; _; _; _ ] -> Null
+  | _, [ _; Null; _; _ ] -> Null
+  | _, [ _; _; Null; _ ] -> Null
+  | _, [ _; _; _; Null ] -> Null
 
   | Not, [ Boolean b ] -> Boolean(not b)
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
@@ -115,6 +128,10 @@ let rec evaluateScalarFunction fn args =
   | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
   | Abs, [ Real r ] -> r |> abs |> Real
   | Abs, [ Integer i ] -> i |> abs |> Integer
+
+  | WidthBucket, [ Integer v; Integer b; Integer t; Integer c ] ->
+      widthBucket (float v) (float b) (float t) c |> Integer
+  | WidthBucket, [ Real v; Real b; Real t; Integer c ] -> widthBucket v b t c |> Integer
 
   | Length, [ String s ] -> Integer(int64 s.Length)
 

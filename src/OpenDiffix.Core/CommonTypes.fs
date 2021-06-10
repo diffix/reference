@@ -63,6 +63,7 @@ type ScalarFunction =
   | Upper
   | Substring
   | Concat
+  | WidthBucket
 
 type ScalarArgs = Value list
 
