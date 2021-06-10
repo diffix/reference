@@ -12,12 +12,15 @@ let typeOfList expressions =
 let typeOfScalarFunction fn args =
   match fn with
   | Add
-  | Subtract ->
+  | Subtract
+  | Multiply
+  | Divide ->
       args
       |> List.map typeOf
       |> function
       | [ IntegerType; IntegerType ] -> IntegerType
       | _ -> RealType
+  | Modulo -> IntegerType
   | Not
   | And
   | Equals
@@ -28,6 +31,10 @@ let typeOfScalarFunction fn args =
   | Gt
   | GtE -> BooleanType
   | Length -> IntegerType
+  | Round
+  | Floor
+  | Ceil -> IntegerType
+  | Abs -> args |> List.exactlyOne |> typeOf
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -86,6 +93,11 @@ let rec evaluateScalarFunction fn args =
   | Add, [ Real r1; Real r2 ] -> Real(r1 + r2)
   | Subtract, [ Integer i1; Integer i2 ] -> Integer(i1 - i2)
   | Subtract, [ Real r1; Real r2 ] -> Real(r1 - r2)
+  | Multiply, [ Integer i1; Integer i2 ] -> Integer(i1 * i2)
+  | Multiply, [ Real r1; Real r2 ] -> Real(r1 * r2)
+  | Divide, [ Integer i1; Integer i2 ] -> Integer(i1 / i2)
+  | Divide, [ Real r1; Real r2 ] -> Real(r1 / r2)
+  | Modulo, [ Integer i1; Integer i2 ] -> Integer(i1 % i2)
 
   | Equals, [ v1; v2 ] -> Boolean(v1 = v2)
 
@@ -95,6 +107,12 @@ let rec evaluateScalarFunction fn args =
   | GtE, [ v1; v2 ] -> Boolean(v1 >= v2)
 
   | Length, [ String s ] -> Integer(int64 s.Length)
+
+  | Round, [ Real r ] -> r |> round |> int64 |> Integer
+  | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
+  | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
+  | Abs, [ Real r ] -> r |> abs |> Real
+  | Abs, [ Integer i ] -> i |> abs |> Integer
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 

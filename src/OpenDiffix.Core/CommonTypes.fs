@@ -42,6 +42,9 @@ type Function =
 type ScalarFunction =
   | Add
   | Subtract
+  | Multiply
+  | Divide
+  | Modulo
   | Equals
   | IsNull
   | Not
@@ -52,6 +55,10 @@ type ScalarFunction =
   | Gt
   | GtE
   | Length
+  | Round
+  | Floor
+  | Ceil
+  | Abs
 
 type ScalarArgs = Value list
 

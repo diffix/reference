@@ -47,7 +47,13 @@ module Function =
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
-    | "=" -> ScalarFunction Equals
+    | "*" -> ScalarFunction Multiply
+    | "/" -> ScalarFunction Divide
+    | "%" -> ScalarFunction Modulo
+    | "round" -> ScalarFunction Round
+    | "ceil" -> ScalarFunction Ceil
+    | "floor" -> ScalarFunction Floor
+    | "abs" -> ScalarFunction Abs
     | "length" -> ScalarFunction Length
     | other -> failwith $"Unknown function `{other}`"
 

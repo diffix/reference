@@ -57,7 +57,7 @@ let ``Parses expressions`` () =
   ]
   |> List.iter (fun (value, expected) -> parseFragment expr value |> should equal expected)
 
-  [ "+"; "-"; "*"; "/"; "^"; "%" ]
+  [ "+"; "-"; "*"; "/"; "%" ]
   |> List.iter (fun op ->
     parseFragment expr $"1 %s{op} 1"
     |> should equal (Expression.Function(op, [ Integer 1L; Integer 1L ]))
@@ -112,12 +112,12 @@ let ``Parses functions`` () =
 
 [<Fact>]
 let ``Precedence is as expected`` () =
-  parseFragment expr "1 + 2 * 3^2 < 1 AND a or not b IS NULL"
+  parseFragment expr "1 + 2 * 3 % 2 < 1 AND a or not b IS NULL"
   |> should
        equal
        (And(
          Lt(
-           Function("+", [ Integer 1L; Function("*", [ Integer 2L; Function("^", [ Integer 3L; Integer 2L ]) ]) ]),
+           Function("+", [ Integer 1L; Function("*", [ Integer 2L; Function("%", [ Integer 3L; Integer 2L ]) ]) ]),
            Integer 1L
          ),
          Or(Identifier(None, "a"), Not(IsNull(Identifier(None, "b"))))
