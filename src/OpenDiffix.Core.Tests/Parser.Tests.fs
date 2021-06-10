@@ -60,7 +60,7 @@ let ``Parses expressions`` () =
   [ "+"; "-"; "*"; "/"; "%" ]
   |> List.iter (fun op ->
     parseFragment expr $"1 %s{op} 1"
-    |> should equal (Expression.Function(op, [ Integer 1L; Integer 1L ]))
+    |> should equal (Function(op, [ Integer 1L; Integer 1L ]))
   )
 
   [ "and", And; "or", Or; "<", Lt; "<=", LtE; ">", Gt; ">=", GtE; "=", Equals; "<>", Not << Equals ]
@@ -69,7 +69,7 @@ let ``Parses expressions`` () =
     |> should equal (expected (Integer 1L, Integer 1L))
   )
 
-  parseFragment expr "not 1" |> should equal (Expression.Not(Integer 1L))
+  parseFragment expr "not 1" |> should equal (Not(Integer 1L))
 
   parseFragment expr "value is null"
   |> should equal (IsNull(Identifier(None, "value")))
@@ -78,7 +78,7 @@ let ``Parses expressions`` () =
   |> should equal (Not(IsNull(Identifier(None, "value"))))
 
   parseFragment expr $"'ab' || 'bc'"
-  |> should equal (Expression.Function("||", [ String "ab"; String "bc" ]))
+  |> should equal (Function("||", [ String "ab"; String "bc" ]))
 
 [<Fact>]
 let ``Parses columns`` () =
