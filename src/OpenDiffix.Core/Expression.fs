@@ -96,16 +96,7 @@ let rec evaluateScalarFunction fn args =
   | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
   // From now on, if the function gets a `Null` argument, we return `Null` directly.
-  | _, [ Null ] -> Null
-  | _, [ Null; _ ] -> Null
-  | _, [ _; Null ] -> Null
-  | _, [ Null; _; _ ] -> Null
-  | _, [ _; Null; _ ] -> Null
-  | _, [ _; _; Null ] -> Null
-  | _, [ Null; _; _; _ ] -> Null
-  | _, [ _; Null; _; _ ] -> Null
-  | _, [ _; _; Null; _ ] -> Null
-  | _, [ _; _; _; Null ] -> Null
+  | _, args when List.contains Null args -> Null
 
   | Not, [ Boolean b ] -> Boolean(not b)
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
