@@ -61,6 +61,64 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let Multiply () =
+    runsBinary
+      Multiply
+      [
+        Integer 5L, Integer 3L, Integer 15L
+        Real 2.5, Integer 3L, Real 7.5
+        Integer 4L, Real 2.5, Real 10.0
+        Integer 3L, Null, Null
+        Null, Integer 3L, Null
+      ]
+
+    fails
+      Multiply
+      [ //
+        [ Integer 5L; String "a" ]
+        [ Boolean true; Integer 1L ]
+        [ String "a"; Real 2.5 ]
+      ]
+
+  [<Fact>]
+  let Divide () =
+    runsBinary
+      Divide
+      [
+        Integer 5L, Integer 3L, Integer 1L
+        Real 6.0, Integer 3L, Real 2.0
+        Integer 3L, Real 2.0, Real 1.5
+        Integer 3L, Null, Null
+        Null, Integer 3L, Null
+      ]
+
+    fails
+      Divide
+      [ //
+        [ Integer 5L; String "a" ]
+        [ Boolean true; Integer 1L ]
+        [ String "a"; Real 2.5 ]
+      ]
+
+  [<Fact>]
+  let Modulo () =
+    runsBinary
+      Modulo
+      [ //
+        Integer 5L, Integer 3L, Integer 2L
+        Integer 5L, Integer -3L, Integer 2L
+        Integer 3L, Null, Null
+      ]
+
+    fails
+      Modulo
+      [ //
+        [ Integer 2L; Real 1.0 ]
+        [ Boolean true; Integer 1L ]
+        [ String "a"; Real 2.5 ]
+      ]
+
+  [<Fact>]
   let Equals () =
     runsBinary
       Equals
@@ -202,6 +260,177 @@ module DefaultFunctionsTests =
         String "a", String "abc", Boolean false
         Null, String "abc", Null
         Boolean false, Boolean false, Boolean true
+      ]
+
+  [<Fact>]
+  let Round () =
+    runsUnary
+      Round
+      [
+        Real 1.5, Integer 2L
+        Real 2.2, Integer 2L
+        Real 0., Integer 0L
+        Real -0.2, Integer 0L
+        Null, Null
+      ]
+
+    fails
+      Round
+      [ //
+        [ Integer 5L ]
+        [ Boolean true ]
+        [ String "a" ]
+      ]
+
+  [<Fact>]
+  let Ceil () =
+    runsUnary
+      Ceil
+      [
+        Real 1.5, Integer 2L
+        Real 2.2, Integer 3L
+        Real 0., Integer 0L
+        Real -0.2, Integer 0L
+        Null, Null
+      ]
+
+    fails
+      Ceil
+      [ //
+        [ Integer 5L ]
+        [ Boolean true ]
+        [ String "a" ]
+      ]
+
+  [<Fact>]
+  let Floor () =
+    runsUnary
+      Floor
+      [
+        Real 1.5, Integer 1L
+        Real 2.2, Integer 2L
+        Real 0., Integer 0L
+        Real -0.2, Integer -1L
+        Null, Null
+      ]
+
+    fails
+      Floor
+      [ //
+        [ Integer 5L ]
+        [ Boolean true ]
+        [ String "a" ]
+      ]
+
+  [<Fact>]
+  let Abs () =
+    runsUnary
+      Abs
+      [ //
+        Real 1.5, Real 1.5
+        Real 0., Real 0.
+        Real -0.2, Real 0.2
+        Integer -3L, Integer 3L
+        Null, Null
+      ]
+
+    fails
+      Abs
+      [ //
+        [ Boolean true ]
+        [ String "a" ]
+      ]
+
+  [<Fact>]
+  let Lower () =
+    runsUnary
+      Lower
+      [ //
+        String "_aBC_", String "_abc_"
+        Null, Null
+      ]
+
+    fails Lower [ [ Integer 3L ] ]
+
+  [<Fact>]
+  let Upper () =
+    runsUnary
+      Upper
+      [ //
+        String "_aBc_", String "_ABC_"
+        Null, Null
+      ]
+
+    fails Upper [ [ Integer 3L ] ]
+
+  [<Fact>]
+  let Substring () =
+    Expression.evaluateScalarFunction Substring [ String "abcd"; Integer 1L; Integer 2L ]
+    |> should equal (String "bc")
+
+    fails Substring [ [ String "abc"; Integer 3L; Real 3.0 ] ]
+
+  [<Fact>]
+  let Concat () =
+    runsBinary
+      Concat
+      [ //
+        String "ab", String "AB", String "abAB"
+        Null, String "ab", Null
+      ]
+
+    fails Concat [ [ Integer 3L; String "abc" ] ]
+
+  [<Fact>]
+  let WidthBucket () =
+    [ // value, bottom, top, count, result
+      Integer 1L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
+      Integer 2L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
+      Integer 3L, Integer 1L, Integer 10L, Integer 5L, Integer 2L
+      Integer 9L, Integer 1L, Integer 10L, Integer 5L, Integer 5L
+      Integer 10L, Integer 1L, Integer 10L, Integer 5L, Integer 6L
+      Integer 1000L, Integer 1L, Integer 10L, Integer 5L, Integer 6L
+      Integer 0L, Integer 1L, Integer 10L, Integer 5L, Integer 0L
+      Integer -10L, Integer 1L, Integer 10L, Integer 5L, Integer 0L
+
+      Real 1., Real 1., Real 10., Integer 5L, Integer 1L
+      Real 1.5, Real 1., Real 10., Integer 5L, Integer 1L
+      Real 3., Real 1., Real 10., Integer 5L, Integer 2L
+      Real 9.5, Real 1., Real 10., Integer 5L, Integer 5L
+      Real 10., Real 1., Real 10., Integer 5L, Integer 6L
+      Real 1000., Real 1., Real 10., Integer 5L, Integer 6L
+      Real 0., Real 1., Real 10., Integer 5L, Integer 0L
+      Real -10., Real 1., Real 10., Integer 5L, Integer 0L
+
+      Null, Integer 1L, Integer 10L, Integer 5L, Null
+      Integer 0L, Integer 1L, Integer 10L, Null, Null
+    ]
+    |> List.iter (fun (v, b, t, c, result) ->
+      Expression.evaluateScalarFunction WidthBucket [ v; b; t; c ]
+      |> should equal result
+    )
+
+    fails WidthBucket [ [ Real 3.0; Real 1.0; Real 10.0; Real 10.0 ] ]
+
+  [<Fact>]
+  let Cast () =
+    runsBinary
+      Cast
+      [ //
+        String "  1 ", String "integer", Integer 1L
+        String "+0", String "integer", Integer 0L
+        String "-2", String "integer", Integer -2L
+        String "0.5", String "real", Real 0.5
+        String "-12.334", String "real", Real -12.334
+        String "true", String "boolean", Boolean true
+        Integer 100L, String "boolean", Boolean true
+        Integer 0L, String "boolean", Boolean false
+        Integer -1L, String "real", Real -1.
+        Real 0.7, String "integer", Integer 1L
+        Real 0.7, String "text", String "0.7"
+        Integer -2L, String "text", String "-2"
+        Boolean false, String "text", String "false"
+        Null, String "integer", Null
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =

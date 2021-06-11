@@ -1,6 +1,7 @@
 ﻿module OpenDiffix.Core.Parser
 
 open ParserTypes
+open type System.Char
 
 module QueryParser =
   open FParsec
@@ -23,7 +24,7 @@ module QueryParser =
     | name, None -> Expression.Identifier(None, name)
     | name1, Some name2 -> Expression.Identifier(Some name1, name2)
 
-  let word word = pstringCI word >>. spaces
+  let word word = pstringCI word .>> spaces
 
   let words words =
     words |> List.map word |> List.reduce (>>.)
@@ -62,6 +63,12 @@ module QueryParser =
   let functionExpression =
     simpleIdentifier .>>. inParenthesis expr .>> spaces
     |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
+
+  let typeName = word "text" <|> word "integer" <|> word "real" <|> word "boolean"
+
+  let castExpression =
+    word "cast" >>. inParenthesis (expr .>> word "as" .>>. typeName) .>> spaces
+    |>> fun (expr, typeName) -> Function("cast", [ expr; String typeName ])
 
   let selectedExpression = expr .>>. opt (word "AS" >>. simpleIdentifier) |>> As
 
@@ -143,19 +150,17 @@ module QueryParser =
   let allCasingPermutations (s: string) =
     let rec createPermutations acc next =
       match acc, next with
-      | [], c :: cs -> createPermutations [ $"%c{System.Char.ToLower(c)}"; $"%c{System.Char.ToUpper(c)}" ] cs
       | acc, c :: cs ->
-          let newLower = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToLower(c)}")
-          let newUpper = acc |> List.map (fun opVariant -> $"%s{opVariant}%c{System.Char.ToUpper(c)}")
-          createPermutations (newLower @ newUpper) cs
+          let newAcc =
+            acc
+            |> List.collect (fun prefix -> //
+              List.distinct [ $"%s{prefix}%c{ToLower c}"; $"%s{prefix}%c{ToUpper c}" ]
+            )
+
+          createPermutations newAcc cs
       | acc, [] -> acc
 
-    s.ToCharArray()
-    |> Array.toList
-    |> createPermutations []
-    // To avoid duplicates of such things as upper and lowercase "+"
-    |> Set.ofList
-    |> Set.toList
+    s.ToCharArray() |> Array.toList |> createPermutations [ "" ]
 
   let addOperator opType opName parseNext precedence associativity f =
     allCasingPermutations opName
@@ -184,13 +189,14 @@ module QueryParser =
   addInfixOperator "*" spaces 5 Associativity.Left (fun left right -> Expression.Function("*", [ left; right ]))
   addInfixOperator "/" spaces 5 Associativity.Left (fun left right -> Expression.Function("/", [ left; right ]))
   addInfixOperator "%" spaces 6 Associativity.Left (fun left right -> Expression.Function("%", [ left; right ]))
+  addInfixOperator "||" spaces 7 Associativity.Left (fun left right -> Expression.Function("||", [ left; right ]))
   addPostfixOperator "is null" spaces 8 false Expression.IsNull
   addPostfixOperator "is not null" spaces 8 false (fun expr -> Expression.Not(Expression.IsNull expr))
-  addInfixOperator "^" spaces 9 Associativity.Left (fun left right -> Expression.Function("^", [ left; right ]))
 
   opp.TermParser <-
     choice [
       (attempt selectQuery)
+      (attempt castExpression)
       (attempt functionExpression)
       inParenthesis expr
       star

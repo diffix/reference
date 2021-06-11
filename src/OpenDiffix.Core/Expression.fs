@@ -12,12 +12,15 @@ let typeOfList expressions =
 let typeOfScalarFunction fn args =
   match fn with
   | Add
-  | Subtract ->
+  | Subtract
+  | Multiply
+  | Divide ->
       args
       |> List.map typeOf
       |> function
       | [ IntegerType; IntegerType ] -> IntegerType
       | _ -> RealType
+  | Modulo -> IntegerType
   | Not
   | And
   | Equals
@@ -28,6 +31,23 @@ let typeOfScalarFunction fn args =
   | Gt
   | GtE -> BooleanType
   | Length -> IntegerType
+  | Round
+  | Floor
+  | Ceil -> IntegerType
+  | Abs -> args |> List.exactlyOne |> typeOf
+  | Lower
+  | Upper
+  | Substring
+  | Concat -> StringType
+  | WidthBucket -> args |> List.head |> typeOf
+  | Cast ->
+      args
+      |> List.item 1
+      |> function
+      | Constant (String "integer") -> IntegerType
+      | Constant (String "real") -> RealType
+      | Constant (String "boolean") -> BooleanType
+      | _ -> failwith "Unsupported cast destination type name."
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -60,6 +80,11 @@ let rec typeOf expression =
 // Evaluation
 // ----------------------------------------------------------------
 
+let widthBucket v b t c =
+  let step = (t - b) / float c
+
+  ((v - b) / step) |> floor |> int64 |> max -1L |> min c |> (+) 1L
+
 /// Evaluates the result of a scalar function invocation.
 let rec evaluateScalarFunction fn args =
   match fn, args with
@@ -70,10 +95,8 @@ let rec evaluateScalarFunction fn args =
 
   | IsNull, [ v1 ] -> Boolean(v1 = Null)
 
-  // From now on, if the unary or binary function gets a `Null` argument, we return `Null` directly.
-  | _, [ Null ] -> Null
-  | _, [ Null; _ ] -> Null
-  | _, [ _; Null ] -> Null
+  // From now on, if the function gets a `Null` argument, we return `Null` directly.
+  | _, args when List.contains Null args -> Null
 
   | Not, [ Boolean b ] -> Boolean(not b)
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
@@ -86,6 +109,11 @@ let rec evaluateScalarFunction fn args =
   | Add, [ Real r1; Real r2 ] -> Real(r1 + r2)
   | Subtract, [ Integer i1; Integer i2 ] -> Integer(i1 - i2)
   | Subtract, [ Real r1; Real r2 ] -> Real(r1 - r2)
+  | Multiply, [ Integer i1; Integer i2 ] -> Integer(i1 * i2)
+  | Multiply, [ Real r1; Real r2 ] -> Real(r1 * r2)
+  | Divide, [ Integer i1; Integer i2 ] -> Integer(i1 / i2)
+  | Divide, [ Real r1; Real r2 ] -> Real(r1 / r2)
+  | Modulo, [ Integer i1; Integer i2 ] -> Integer(i1 % i2)
 
   | Equals, [ v1; v2 ] -> Boolean(v1 = v2)
 
@@ -94,7 +122,33 @@ let rec evaluateScalarFunction fn args =
   | Gt, [ v1; v2 ] -> Boolean(v1 > v2)
   | GtE, [ v1; v2 ] -> Boolean(v1 >= v2)
 
+  | Round, [ Real r ] -> r |> round |> int64 |> Integer
+  | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
+  | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
+  | Abs, [ Real r ] -> r |> abs |> Real
+  | Abs, [ Integer i ] -> i |> abs |> Integer
+
+  | WidthBucket, [ Integer v; Integer b; Integer t; Integer c ] ->
+      widthBucket (float v) (float b) (float t) c |> Integer
+  | WidthBucket, [ Real v; Real b; Real t; Integer c ] -> widthBucket v b t c |> Integer
+
   | Length, [ String s ] -> Integer(int64 s.Length)
+
+  | Lower, [ String s ] -> String(s.ToLower())
+  | Upper, [ String s ] -> String(s.ToUpper())
+  | Substring, [ String s; Integer start; Integer length ] -> String(s.Substring(int start, int length))
+  | Concat, [ String s1; String s2 ] -> String(s1 + s2)
+
+  | Cast, [ String s; String "integer" ] -> s |> System.Int64.Parse |> Integer
+  | Cast, [ String s; String "real" ] -> s |> System.Double.Parse |> Real
+  | Cast, [ String s; String "boolean" ] -> s |> System.Boolean.Parse |> Boolean
+  | Cast, [ Integer i; String "real" ] -> i |> float |> Real
+  | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
+  | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
+  | Cast, [ Integer _; String "boolean" ] -> Boolean true
+  | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
+  | Cast, [ Real r; String "text" ] -> r.ToString() |> String
+  | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 

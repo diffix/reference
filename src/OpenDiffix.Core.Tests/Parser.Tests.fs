@@ -57,10 +57,10 @@ let ``Parses expressions`` () =
   ]
   |> List.iter (fun (value, expected) -> parseFragment expr value |> should equal expected)
 
-  [ "+"; "-"; "*"; "/"; "^"; "%" ]
+  [ "+"; "-"; "*"; "/"; "%" ]
   |> List.iter (fun op ->
     parseFragment expr $"1 %s{op} 1"
-    |> should equal (Expression.Function(op, [ Integer 1L; Integer 1L ]))
+    |> should equal (Function(op, [ Integer 1L; Integer 1L ]))
   )
 
   [ "and", And; "or", Or; "<", Lt; "<=", LtE; ">", Gt; ">=", GtE; "=", Equals; "<>", Not << Equals ]
@@ -69,13 +69,16 @@ let ``Parses expressions`` () =
     |> should equal (expected (Integer 1L, Integer 1L))
   )
 
-  parseFragment expr "not 1" |> should equal (Expression.Not(Integer 1L))
+  parseFragment expr "not 1" |> should equal (Not(Integer 1L))
 
   parseFragment expr "value is null"
   |> should equal (IsNull(Identifier(None, "value")))
 
   parseFragment expr "value is not null"
   |> should equal (Not(IsNull(Identifier(None, "value"))))
+
+  parseFragment expr $"'ab' || 'bc'"
+  |> should equal (Function("||", [ String "ab"; String "bc" ]))
 
 [<Fact>]
 let ``Parses columns`` () =
@@ -111,13 +114,21 @@ let ``Parses functions`` () =
        ]
 
 [<Fact>]
+let ``Parses casts`` () =
+  parseFragment expr "cast(1 as boolean)"
+  |> should equal (Function("cast", [ Integer 1L; String "boolean" ]))
+
+  parseFragment expr "cast('0' as real)"
+  |> should equal (Function("cast", [ String "0"; String "real" ]))
+
+[<Fact>]
 let ``Precedence is as expected`` () =
-  parseFragment expr "1 + 2 * 3^2 < 1 AND a or not b IS NULL"
+  parseFragment expr "1 + 2 * 3 % 2 < 1 AND a or not b IS NULL"
   |> should
        equal
        (And(
          Lt(
-           Function("+", [ Integer 1L; Function("*", [ Integer 2L; Function("^", [ Integer 3L; Integer 2L ]) ]) ]),
+           Function("+", [ Integer 1L; Function("*", [ Integer 2L; Function("%", [ Integer 3L; Integer 2L ]) ]) ]),
            Integer 1L
          ),
          Or(Identifier(None, "a"), Not(IsNull(Identifier(None, "b"))))

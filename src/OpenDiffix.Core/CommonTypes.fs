@@ -42,6 +42,9 @@ type Function =
 type ScalarFunction =
   | Add
   | Subtract
+  | Multiply
+  | Divide
+  | Modulo
   | Equals
   | IsNull
   | Not
@@ -51,7 +54,17 @@ type ScalarFunction =
   | LtE
   | Gt
   | GtE
+  | Round
+  | Floor
+  | Ceil
+  | Abs
   | Length
+  | Lower
+  | Upper
+  | Substring
+  | Concat
+  | WidthBucket
+  | Cast
 
 type ScalarArgs = Value list
 
