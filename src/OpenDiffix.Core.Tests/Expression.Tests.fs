@@ -383,7 +383,7 @@ module DefaultFunctionsTests =
 
   [<Fact>]
   let WidthBucket () =
-    [ //
+    [ // value, bottom, top, count, result
       Integer 1L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
       Integer 2L, Integer 1L, Integer 10L, Integer 5L, Integer 1L
       Integer 3L, Integer 1L, Integer 10L, Integer 5L, Integer 2L
