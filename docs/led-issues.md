@@ -42,7 +42,12 @@ This documents the need for LED, and motivates a number of design decisions. In 
       - [Multi-histogram first derivative difference attack](#multi-histogram-first-derivative-difference-attack-1)
       - [Multi-sample JOIN](#multi-sample-join)
   - [SELECT columns versus condition columns](#select-columns-versus-condition-columns)
-  - [Dealing with low-count buckets](#dealing-with-low-count-buckets)
+  - [Attacks on the LCF mechanism](#attacks-on-the-lcf-mechanism)
+    - [0/1 difference attack, 'A OR V'](#01-difference-attack-a-or-v)
+      - [Evaluating bigger LE combinations first](#evaluating-bigger-le-combinations-first)
+    - [0/1 difference attack, 'A AND NOT V'](#01-difference-attack-a-and-not-v)
+    - [1/2 difference attack, 'A OR PV'](#12-difference-attack-a-or-pv)
+    - [1/2 difference attack, 'A AND NOT PV'](#12-difference-attack-a-and-not-pv)
   - [When to evaluate and adjust](#when-to-evaluate-and-adjust)
 
 ## Noise layer notation
@@ -1178,57 +1183,323 @@ whereas the truth table for the second query is:
 
 In both cases, the LE condition is correctly identified as such, so I don't see an issue here. I guess just wanted to point out the difference.
 
-## Dealing with low-count buckets
+## Attacks on the LCF mechanism
 
-In all the LE examples until now, there are many AIDVs, and so combinations can be properly labeled as LE or NLE. If however a bucket has very few AIDVs, then every or nearly every combination may be labeled as LE. (The following examples assume that short-circuits are being over-ridden so as to learn all truth table values.)
+Here we try a number of difference attacks that try to exploit whether or not LCF occurred. The basic idea is that the bucket in any event has a pretty low count, and the attacker wants to detect presence or absence of the victim based on whether or not LCF takes place.
 
-For instance, assume the expression `A OR I`, where I is the isolating condition and A is being learned. If A is relatively low count in any event, then you might get this truth table (I has attribute A):
+I'm assuming the following:
 
-|     | A   | I   | out | AID    |
-| --- | --- | --- | --- | ------ |
-| C01 | 0   | 0   | 0   | NLE    |
-| C03 | 1   | 0   | 1   | LE (5) |
-| C04 | 1   | 1   | 1   | LE (1) |
+1. LED adjusts for one AIDV per combination when LE conditions are found.
+2. Both the LED and LCF noisy thresholds are seeded by the set of AIDVs in the combination or bucket respectively.
+3. When a combination is determined to be LE, we conceptually move all associated AIDVs into another combination as appropriate. (This is in contrast to flipping rows for the purpose of modifying the aggregate computation, where we flip at most the rows of one AIDV.) This is made more clear in examples below.
+4. When conceptually moving AIDVs to another LE combination, we re-evaluate whether that other combination is still LE or not.
+4. We move AIDVs in order of combinations with the least AIDVs to combinations with the most AIDVs. As a tie-breaker, in cases where two or more combinations have the same number of AIDVs, we can use the seed order (i.e. combination with the alphanumerically lower value goes first).
 
-where combination C03 is LE only because there are, in total, not too many instances that match condition A. At the same time, the bucket itself might not be LCF, because the noisy threshold falls at a different place.
+### 0/1 difference attack, 'A OR V'
 
-In this case, A is not labeled as an LE condition because forcing `A-->0` affects two combinations, so LE operates correctly.
+The left-hand query is `WHERE A OR V`, and the right-hand query is `WHERE A`.
 
-The following truth table is for when I does not have attribute A:
+V is the condition that selects a single victim.
 
-|     | A   | I   | out | AID    |
-| --- | --- | --- | --- | ------ |
-| C01 | 0   | 0   | 0   | NLE    |
-| C02 | 0   | 1   | 1   | LE (1) |
-| C03 | 1   | 0   | 1   | LE (5) |
+**Victim has attribute A:**
 
-Here there are four possibilities, forcing either of A or I to either 1 or 0. Forcing `A-->1` or `I-->1` changes the outcome of C01, so is not LE. Forcing `I-->0` changes only C02, so I is an LE condition. Forcing `A-->0` changes only C03, and so is also labeled as LE.
+The truth table for the left query `A OR V` is:
 
-This is an interesting situation, because both conditions are labeled as LE, and yet it is possible that the resulting bucket would otherwise not be suppressed.
+|     | A   | V   | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | 0   | 0   | NLE  |
+| C02 | 1   | 0   | 1   | ???3 |
+| C03 | 1   | 1   | 1   | LE1  |
 
-> TODO: go through potential difference attacks on the suppression mechanism itself
+In this example there are only four AIDVs with attribute A, one being the victim. Therefore combination C02 has only three distinct AIDVs. As such, it may be labeled as NLE or labeled as LE. (Here we explore both possibilities.)
 
+Note that in any event, C03 is LE by `V-->0`, and has fewer AIDVs than C02, so we flip its rows by forcing `V-->0`. This results in a kind of modified truth table where V is no longer present:
 
-Following for `A AND NOT I`, I has attribute A:
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C02 | 1   | 1   | ???4 |
 
-|     | A   | NOT I | out | AID    |
-| --- | --- | ----- | --- | ------ |
-| C02 | 0   | 1     | 0   | NLE    |
-| C03 | 1   | 0     | 0   | LE (1) |
-| C04 | 1   | 1     | 1   | LE (5) |
+Or alternatively it could be drawn this way, where we use '-' to show that we no longer care about V:
 
-Here A and I are determined to be LE. Oddly enough, we would add the victim in when we adjust, and remove one of the rows from C04, with zero net effect. Seems to me that a rule that says that if all combinations with outcome of true are LE, then LCF should kick in automatically.
+|     | A   | V   | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | -   | 0   | NLE  |
+| C02 | 1   | -   | 1   | ???4 |
 
-Following for `A AND NOT I`, I does not have attribute A:
+Either way, the former C03 rows are now in C02, which as a result now has four distinct AIDVs. As such, C02 could still be LE or NLE, depending on the noisy threshold seeded by the four AIDVs.
 
-|     | A   | NOT I | out | AID    |
-| --- | --- | ----- | --- | ------ |
-| C01 | 0   | 0     | 0   | LE (1) |
-| C02 | 0   | 1     | 0   | NLE    |
-| C04 | 1   | 1     | 1   | LE (5) |
+Assuming now that the truth table is for a bucket (LCF doesn't apply to i-rows), there are in principle four LCF/LE possibilities:
 
-In this case, forcing `A-->1` (by virtue of C01) changes all of the C02 rows, and so is NLE. Forcing `A-->0` is LE because doing so only changes the outcome of C04, but it is also effectively removes all rows from the output. Again this suggests that if all combinations with an outcome of true are LE, then LCF automatically kicks in.
+|     | Bucket       | C02  | Suppressed? |
+| --- | ------------ | ---- | ----------- |
+| P1  | Pass LCF (4) | LE4  | Yes         |
+| P2  | Pass LCF (4) | NLE4 | No          |
+| P3  | Fail LCF (4) | LE4  | Yes         |
+| P4  | Fail LCF (4) | NLE4 | Yes         |
 
+(In this particular example, the seeding for the bucket and combination C02 are identical, so in reality there are only two possibilities, but let's ignore that for now.)
+
+Supposing that the evaluation of LE comes before the evaluation of LCF, for possibilities P1 and P3 we would evaluate C02 as LE by virtue of forcing `A-->0`, thus flipping all C02 rows and removing all output. The effect is the same as that of having failed LCF. For possibilities P2 and P4, no rows would be flipped and we would subsequently evaluate LCF, which either fails or passes. This is indicated in the last column.
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???4 |
+
+On the assumption that in the left-hand query we evaluated C03 for LE before evaluating C02, then the left and right hand queries behave identically with respect to LCF, and so a difference attack exploiting LCF fails.
+
+#### Evaluating bigger LE combinations first
+
+Let's look at a quick example of what goes wrong if we evaluate bigger LE combinations first.
+
+Suppose for the above example left-hand query we had evaluated C02 before C03. The truth table is repeated here for convenience:
+
+|     | A   | V   | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | 0   | 0   | NLE  |
+| C02 | 1   | 0   | 1   | ???3 |
+| C03 | 1   | 1   | 1   | LE1  |
+
+In fact this situation is a little weird. Say we force `V-->1`. This changes the C00 outcome, so is not LE (which makes sense, because then the query condition would effectively be `WHERE A OR True`). Forcing `A-->0` changes the C02 rows only, so it could be evaluated as LE.
+
+Suppose that C02 is evaluated as LE. Then we effectively get this new truth table:
+
+|     | A   | V   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | -   | 0   | 0   | NLE |
+| C03 | -   | 1   | 1   | LE1 |
+
+Now of course we must evaluate C03 for LE by vitrue of forcing `V-->0`, and so we effectively remove all rows from the output.
+
+Recall, however, that the truth table from the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???4 |
+
+Here we evaluate C01 based on four AIDVs. It could very well happen that the right-hand C01 evaluates to NLE while and the bucket passes LCF, in which case the output is not suppressed. However, the left-hand query may well have been suppressed because of the C02 evaluation on three AIDVs. This allows the attack to succeed. The left-hand query `WHERE A OR V` was suppressed, while the right-hand query `WHERE A` was not suppressed. This verifies to the attacker that a different seed was used as the basis for the left-hand LE decision versus the right-hand LE decision, which in turn verifies that the victim V must have been involved in the right-hand LE decision, which in turn verifies that the victim has attribute A.
+
+**Victim does not have attribute A:**
+
+The truth table is:
+
+|     | A   | V   | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | 0   | 0   | NLE  |
+| C01 | 0   | 1   | 1   | LE1  |
+| C02 | 1   | 0   | 1   | ???3 |
+
+C01 is LE by virtue of forcing `V-->0` which only changes C01. The truth table after flipping C01 rows is:
+
+|     | A   | V   | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | -   | 0   | NLE  |
+| C02 | 1   | -   | 1   | ???3 |
+
+Here C02 may or may not be LE, depending on the seeding. Again we have these four possibilities:
+
+|     | Bucket       | C02  | Suppressed? |
+| --- | ------------ | ---- | ----------- |
+| P1  | Pass LCF (3) | LE3  | Yes         |
+| P2  | Pass LCF (3) | NLE3 | No          |
+| P3  | Fail LCF (3) | LE3  | Yes         |
+| P4  | Fail LCF (3) | NLE3 | Yes         |
+
+As before, the LCF and LE decisions are based on the same seed, but this time based on three AIDVs instead of four.
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???3 |
+
+The LE and LCF decisions are the same as for the left-hand query, so a difference attack fails.
+
+### 0/1 difference attack, 'A AND NOT V'
+
+The left-hand query is `WHERE A AND NOT V`, and the right-hand query is `WHERE A`.
+
+V is the condition that selects a single victim.
+
+**Victim has attribute A:**
+
+The truth table for the left query `A AND NOT V` is:
+
+|     | A   | NOT V | out | AID  |
+| --- | --- | ----- | --- | ---- |
+| C00 | 0   | 1     | 0   | NLE  |
+| C02 | 1   | 0     | 0   | LE1  |
+| C03 | 1   | 1     | 1   | ???3 |
+
+Regarding C02, if we force `NOT V-->1`, then the outcome of only one AIDV is affected (that of C02). If we force `A-->0` (essentially setting it to false rather than dropping the condition), then the outcome of three AIDVs are affected (those of C03). Since the former involves fewer AIDVs (and is therefore more likely to be part of an attack), then we flip the C02 rows by forcing `NOT V-->1`.
+
+This results in a subsequent truth table:
+
+|     | A   | NOT V | out | AID  |
+| --- | --- | ----- | --- | ---- |
+| C00 | 0   | -     | 0   | NLE  |
+| C02 | 1   | -     | 1   | ???4 |
+
+And the subsequent (identical) LCF and LE decisions.
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???4 |
+
+Which is the same, so the attack fails.
+
+**Victim does not have attribute A:**
+
+The truth table is:
+
+|     | A   | NOT V | out | AID  |
+| --- | --- | ----- | --- | ---- |
+| C00 | 0   | 1     | 0   | NLE  |
+| C01 | 0   | 0     | 0   | LE1  |
+| C02 | 1   | 1     | 1   | ???3 |
+
+C01 is LE by virtue of forcing `NOT V-->1` which doesn't change any outcome. The subsequent truth table is this:
+
+|     | A   | NOT V | out | AID  |
+| --- | --- | ----- | --- | ---- |
+| C00 | 0   | -     | 0   | NLE  |
+| C02 | 1   | -     | 1   | ???3 |
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???3 |
+
+The LE and LCF decisions are the same as for the left-hand query, so a difference attack fails.
+
+### 1/2 difference attack, 'A OR PV'
+
+Here, the left-hand attack query has the conditions `WHERE A OR PV`, where `PV` is a single condition that isolates two AIDVs, a plant (which is known to have attribute A) and the victim.
+
+**Victim has attribute A:**
+
+The truth table for the left query `A OR PV` is:
+
+|     | A   | PV  | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | 0   | 0   | NLE  |
+| C02 | 1   | 0   | 1   | ???3 |
+| C03 | 1   | 1   | 1   | LE2  |
+
+Note by the way that the conditions for this attack are very rare: the attacker has to find a case where not only can he form a plant/victim isolating condition (C03), but the remaining number of users with the corresponding attribute (C02) is in the range of AIDV counts that could be either LE or NLE.
+
+C03 is LE2 by virtue of `PV-->0`. According to the defined mechanism we would flip one of the two AIDVs. However, this rule exists with regard to how much we distort the answer, but doesn't need to hold with regard to a subsequent LE decision or LCF decision. Let's look at both cases:
+
+Let's say that conceptually we move only one of the two users into the C02 combination. Then we end up with a truth table like this:
+
+|     | A   | PV  | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | -   | 0   | NLE  |
+| C02 | 1   | -   | 1   | ???4 |
+| C03 | 1   | -   | 1   | (1)  |
+
+If we conceptually move both users, we get this:
+
+|     | A   | PV  | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | -   | 0   | NLE  |
+| C02 | 1   | -   | 1   | ???5 |
+
+The first one doesn't make much sense to me. We could make a decision based on an AIDV count of four, but regardless if we force `A-->0` five AIDVs are affected (those from both C02 and C03).
+
+In any event, the right-hand query truth table is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???5 |
+
+This matches the truth table for the second approach above, so it seems that we want to take the second approach in any event.
+
+**Victim does not have attribute A:**
+
+The truth table for the left query `A OR PV` is:
+
+|     | A   | PV  | out | AID                       |
+| --- | --- | --- | --- | ------------------------- |
+| C00 | 0   | 0   | 0   | NLE                       |
+| C02 | 1   | 0   | 1   | ???4 (victim plus others) |
+| C03 | 1   | 1   | 1   | LE1 (plant)               |
+
+C03 is LE by `PV-->0`. This leads to following subsequent truth table:
+
+|     | A   | PV  | out | AID  |
+| --- | --- | --- | --- | ---- |
+| C00 | 0   | -   | 0   | NLE  |
+| C02 | 1   | -   | 1   | ???5 |
+
+Which matches the right-side truth table, thus defeating the attack.
+
+### 1/2 difference attack, 'A AND NOT PV'
+
+Here, the left-hand attack query has the conditions `WHERE A AND NOT PV`, where `PV` is a single condition that isolates two AIDVs, a plant (which is known to have attribute A) and the victim.
+
+**Victim has attribute A:**
+
+The truth table for the left query `A AND NOT PV` is:
+
+|     | A   | NOT PV | out | AID  |
+| --- | --- | ------ | --- | ---- |
+| C00 | 0   | 1      | 0   | NLE  |
+| C02 | 1   | 0      | 0   | LE2  |
+| C03 | 1   | 1      | 1   | ???3 |
+
+C02 is LE by `NOT PV-->1`, leading to the subsequent truth table:
+
+|     | A   | NOT PV | out | AID  |
+| --- | --- | ------ | --- | ---- |
+| C00 | 0   | -      | 0   | NLE  |
+| C02 | 1   | -      | 1   | ???5 |
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???5 |
+
+Which is the same, so the attack fails.
+
+**Victim does not have attribute A:**
+
+The truth table is:
+
+|     | A   | NOT PV | out | AID                     |
+| --- | --- | ------ | --- | ----------------------- |
+| C00 | 0   | 1      | 0   | NLE                     |
+| C01 | 0   | 0      | 0   | LE1 (victim)            |
+| C02 | 1   | 1      | 1   | ???4 (plant and others) |
+
+C01 is LE by `NOT PV-->1` which doesn't change any outcome. The subsequent truth table is this:
+
+|     | A   | NOT V | out | AID  |
+| --- | --- | ----- | --- | ---- |
+| C00 | 0   | -     | 0   | NLE  |
+| C02 | 1   | -     | 1   | ???4 |
+
+The truth table for the right-hand query `WHERE A` is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE  |
+| C01 | 1   | 1   | ???4 |
+
+The LE and LCF decisions are the same as for the left-hand query, so a difference attack fails.
 
 ## When to evaluate and adjust
 
