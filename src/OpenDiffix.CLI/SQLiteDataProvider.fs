@@ -5,8 +5,6 @@ open System.Data.SQLite
 open OpenDiffix.Core
 open Dapper
 
-type DbConnection = SQLiteConnection
-
 let private openConnection path =
   let connection = new SQLiteConnection $"Data Source=%s{path}; Version=3; Read Only=true;"
   connection.Open()
@@ -74,15 +72,6 @@ let private columnTypeFromString =
   | "boolean" -> BooleanType
   | "real" -> RealType
   | other -> UnknownType other
-
-let rec columnTypeToString =
-  function
-  | IntegerType -> "integer"
-  | StringType -> "string"
-  | BooleanType -> "boolean"
-  | RealType -> "real"
-  | ListType elementType -> $"list of %s{columnTypeToString elementType}"
-  | UnknownType typeName -> $"unknown ({typeName})"
 
 type DataProvider(dbPath: string) =
   let connection = openConnection dbPath
