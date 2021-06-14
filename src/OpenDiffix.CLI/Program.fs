@@ -115,12 +115,13 @@ let runQuery query dbPath anonParams =
 let anonymize query dbPath anonParams =
   match runQuery query dbPath anonParams with
   | Ok result ->
-      let resultSet =
-        result.Rows
-        |> List.map (fun row -> row |> Array.map Value.toString |> String.join ";")
-        |> String.join "\n"
+      let header = result.Columns |> String.join ","
 
-      resultSet, 0
+      let rows =
+        result.Rows
+        |> List.map (fun row -> row |> Array.map Value.toString |> String.join ",")
+
+      header :: rows |> String.join "\n", 0
   | Error err -> $"ERROR: %s{err}", 1
 
 let batchExecuteQueries (queriesPath: string) =
