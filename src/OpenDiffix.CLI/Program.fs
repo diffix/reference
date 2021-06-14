@@ -67,8 +67,9 @@ let toNoise =
   | Some (stdDev, cutoffFactor) -> { StandardDev = stdDev; Cutoff = cutoffFactor }
   | _ -> NoiseParam.Default
 
-let private toTableSettings (aidColumns: string list) =
+let private toTableSettings (aidColumns: string list option) =
   aidColumns
+  |> Option.defaultValue List.empty<string>
   |> List.map (fun aidColumn ->
     match aidColumn.Split '.' with
     | [| tableName; columnName |] -> (tableName, columnName)
@@ -80,7 +81,7 @@ let private toTableSettings (aidColumns: string list) =
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
   {
-    TableSettings = parsedArgs.GetResult Aid_Columns |> toTableSettings
+    TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
     MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
