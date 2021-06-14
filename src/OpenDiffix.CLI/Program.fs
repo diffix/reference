@@ -7,7 +7,7 @@ open OpenDiffix.Core
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
   | Dry_Run
-  | [<Unique; AltCommandLine("-d")>] Database of db_path: string
+  | [<Unique; AltCommandLine("-f")>] File_Path of file_path: string
   | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
   | Queries_Path of path: string
@@ -27,7 +27,7 @@ type CliArguments =
       match this with
       | Version -> "Prints the version number of the program."
       | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
-      | Database _ -> "Specifies the path on disk to the SQLite database containing the data to be anonymized."
+      | File_Path _ -> "Specifies the path on disk to the SQLite or CSV file containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
@@ -95,26 +95,32 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
   | None, true -> Console.In.ReadLine()
   | _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
 
-let getDbPath (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult CliArguments.Database with
-  | Some dbPath ->
-      if File.Exists(dbPath) then
-        dbPath
+let getFilePath (parsedArgs: ParseResults<CliArguments>) =
+  match parsedArgs.TryGetResult CliArguments.File_Path with
+  | Some filePath ->
+      if File.Exists(filePath) then
+        filePath
       else
-        failWithUsageInfo $"Could not find a database at %s{dbPath}"
-  | None -> failWithUsageInfo $"Please specify the database path!"
+        failWithUsageInfo $"Could not find a file at %s{filePath}"
+  | None -> failWithUsageInfo "Please specify the file path."
 
-let dryRun query dbPath anonParams =
-  let encodedRequest = JsonEncodersDecoders.encodeRequestParams query dbPath anonParams
+let dryRun query filePath anonParams =
+  let encodedRequest = JsonEncodersDecoders.encodeRequestParams query filePath anonParams
   Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
 
-let runQuery query dbPath anonParams =
-  use dataProvider = new SQLite.DataProvider(dbPath)
+let getDataProvider (filePath: string) =
+  match filePath |> Path.GetExtension |> String.toLower with
+  | ".csv" -> new CSV.DataProvider(filePath) :> IDataProvider
+  | ".sqlite" -> new SQLite.DataProvider(filePath) :> IDataProvider
+  | _ -> failWithUsageInfo "Please specify a file path with a .csv or .sqlite extension."
+
+let runQuery query filePath anonParams =
+  use dataProvider = getDataProvider filePath
   let context = EvaluationContext.make anonParams dataProvider
   QueryEngine.run context query
 
-let anonymize query dbPath anonParams =
-  match runQuery query dbPath anonParams with
+let anonymize query filePath anonParams =
+  match runQuery query filePath anonParams with
   | Ok result ->
       let header = result.Columns |> String.join ","
 
@@ -168,12 +174,12 @@ let main argv =
 
     else
       let query = getQuery parsedArguments
-      let dbPath = getDbPath parsedArguments
+      let filePath = getFilePath parsedArguments
       let anonParams = constructAnonParameters parsedArguments
 
       let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize
 
-      (processor query dbPath anonParams)
+      (processor query filePath anonParams)
       |> fun (output, exitCode) ->
            printfn $"%s{output}"
            exitCode
