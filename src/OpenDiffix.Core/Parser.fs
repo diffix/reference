@@ -72,7 +72,7 @@ module QueryParser =
 
   let selectedExpression = expr .>>. opt (word "AS" >>. simpleIdentifier) |>> As
 
-  let commaSepExpressions = commaSeparated selectedExpression .>> spaces
+  let commaSepExpressions = commaSeparated (star <|> selectedExpression) .>> spaces
 
   let whereClause = word "WHERE" >>. expr
 

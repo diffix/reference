@@ -83,7 +83,17 @@ let private mapTargetEntry rangeColumns parsedExpr =
   | ParserTypes.As (parsedExpression, parsedAlias) ->
       let alias = parsedAlias |> Option.defaultValue (expressionName parsedExpression)
       let expression = parsedExpression |> mapExpression rangeColumns
-      { Expression = expression; Alias = alias; Tag = RegularTargetEntry }
+      [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
+  | ParserTypes.Star ->
+      rangeColumns
+      |> List.indexed
+      |> List.map (fun (index, rangeColumn) ->
+        {
+          Expression = ColumnReference(index, rangeColumn.Type)
+          Alias = rangeColumn.ColumnName
+          Tag = RegularTargetEntry
+        }
+      )
   | other -> failwith $"Unexpected expression selected '%A{other}'"
 
 // ----------------------------------------------------------------
@@ -173,7 +183,7 @@ let private validateRange range =
 let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.SelectQuery) =
   let range = mapQueryRange schema anonParams selectQuery.From |> validateRange
   let rangeColumns = collectRangeColumns anonParams range
-  let targetList = selectQuery.Expressions |> List.map (mapTargetEntry rangeColumns)
+  let targetList = selectQuery.Expressions |> List.collect (mapTargetEntry rangeColumns)
   let whereClause = mapFilterExpression rangeColumns selectQuery.Where
   let havingClause = mapFilterExpression rangeColumns selectQuery.Having
 
