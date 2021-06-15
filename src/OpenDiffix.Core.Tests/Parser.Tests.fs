@@ -383,3 +383,8 @@ let ``Parse sub-query`` () =
          SubQuery(query, "s"),
          Equals(Identifier(Some "t", "col"), Identifier(Some "s", "col"))
        ))
+
+[<Fact>]
+let ``Parses star select`` () =
+  parseFragment selectQuery "SELECT * FROM table"
+  |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ] })
