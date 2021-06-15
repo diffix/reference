@@ -86,8 +86,7 @@ let private mapTargetEntry rangeColumns parsedExpr =
       [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
   | ParserTypes.Star ->
       rangeColumns
-      |> List.indexed
-      |> List.map (fun (index, rangeColumn) ->
+      |> List.mapi (fun index rangeColumn ->
         {
           Expression = ColumnReference(index, rangeColumn.Type)
           Alias = rangeColumn.ColumnName
