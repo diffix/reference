@@ -2,6 +2,8 @@
 [<AutoOpen>]
 module rec OpenDiffix.Core.CommonTypes
 
+open System
+
 // ----------------------------------------------------------------
 // Values
 // ----------------------------------------------------------------
@@ -107,6 +109,7 @@ type Table = { Name: string; Columns: Column list }
 type Schema = Table list
 
 type IDataProvider =
+  inherit IDisposable
   abstract OpenTable : table: Table -> Row seq
   abstract GetSchema : unit -> Schema
 
@@ -165,5 +168,6 @@ type EvaluationContext =
         { new IDataProvider with
             member _.OpenTable _table = failwith "No tables in data provider"
             member _.GetSchema() = []
+            member _.Dispose() = ()
         }
     }
