@@ -1281,7 +1281,7 @@ Recall, however, that the truth table from the right-hand query `WHERE A` is:
 | C00 | 0   | 0   | NLE  |
 | C01 | 1   | 1   | ???4 |
 
-Here we evaluate C01 based on four AIDVs. It could very well happen that the right-hand C01 evaluates to NLE while and the bucket passes LCF, in which case the output is not suppressed. However, the left-hand query may well have been suppressed because of the C02 evaluation on three AIDVs. This allows the attack to succeed. The left-hand query `WHERE A OR V` was suppressed, while the right-hand query `WHERE A` was not suppressed. This verifies to the attacker that a different seed was used as the basis for the left-hand LE decision versus the right-hand LE decision, which in turn verifies that the victim V must have been involved in the right-hand LE decision, which in turn verifies that the victim has attribute A.
+Here we evaluate C01 based on four AIDVs. It could very well happen that the right-hand C01 evaluates to NLE while the bucket passes LCF, in which case the output is not suppressed. However, the left-hand query may well have been suppressed because of the C02 evaluation on three AIDVs. This allows the attack to succeed. The left-hand query `WHERE A OR V` was suppressed, while the right-hand query `WHERE A` was not suppressed. This verifies to the attacker that a different seed was used as the basis for the left-hand LE decision versus the right-hand LE decision, which in turn verifies that the victim V must have been involved in the right-hand LE decision, which in turn verifies that the victim has attribute A.
 
 **Victim does not have attribute A:**
 
@@ -1433,15 +1433,23 @@ The truth table for the left query `A OR PV` is:
 |     | A   | PV  | out | AID                       |
 | --- | --- | --- | --- | ------------------------- |
 | C00 | 0   | 0   | 0   | NLE                       |
-| C02 | 1   | 0   | 1   | ???4 (victim plus others) |
+| C01 | 0   | 1   | 1   | LE1 (victim)              |
+| C02 | 1   | 0   | 1   | ???3                      |
 | C03 | 1   | 1   | 1   | LE1 (plant)               |
 
-C03 is LE by `PV-->0`. This leads to following subsequent truth table:
+Both C03 and C01 are LE by `PV-->0`. This leads to following subsequent truth table:
 
 |     | A   | PV  | out | AID  |
 | --- | --- | --- | --- | ---- |
-| C00 | 0   | -   | 0   | NLE  |
-| C02 | 1   | -   | 1   | ???5 |
+| C00 | 0   | -   | 0   | NLE (includes victim)  |
+| C02 | 1   | -   | 1   | ???4 (plant) |
+
+The right-hand query truth table is:
+
+|     | A   | out | AID  |
+| --- | --- | --- | ---- |
+| C00 | 0   | 0   | NLE (includes victim) |
+| C01 | 1   | 1   | ???4 (plant) |
 
 Which matches the right-side truth table, thus defeating the attack.
 
@@ -1483,14 +1491,18 @@ The truth table is:
 | --- | --- | ------ | --- | ----------------------- |
 | C00 | 0   | 1      | 0   | NLE                     |
 | C01 | 0   | 0      | 0   | LE1 (victim)            |
-| C02 | 1   | 1      | 1   | ???4 (plant and others) |
+| C02 | 1   | 0      | 1   | LE1 (plant) |
+| C03 | 1   | 1      | 1   | ???3  |
 
-C01 is LE by `NOT PV-->1` which doesn't change any outcome. The subsequent truth table is this:
+
+Both C01 and C02 are LE by `NOT PV-->1`. This results in the subsequent truth table:
+
+which doesn't change any outcome. The subsequent truth table is this:
 
 |     | A   | NOT V | out | AID  |
 | --- | --- | ----- | --- | ---- |
-| C00 | 0   | -     | 0   | NLE  |
-| C02 | 1   | -     | 1   | ???4 |
+| C00 | 0   | -     | 0   | NLE  (includes victim) |
+| C02 | 1   | -     | 1   | ???4 (includes plant) |
 
 The truth table for the right-hand query `WHERE A` is:
 
