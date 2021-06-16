@@ -33,12 +33,23 @@ type DataProvider(dbPath: string) =
         |> Array.toList
         |> List.map (fun name -> { Name = name; Type = StringType })
 
-      [ { Name = "table"; Columns = columns } ]
+      [
+        {
+          Name = "table"
+          Columns = { Name = "RowIndex"; Type = IntegerType } :: columns
+        }
+      ]
 
     member this.OpenTable(table) =
       assert (table.Name = "table")
 
       seq<Row> {
+        let mutable index = 0L
+
         while csv.Read() do
-          yield [| 0 .. csv.HeaderRecord.Length - 1 |] |> Array.map (csv.GetField >> String)
+          index <- index + 1L
+
+          yield
+            Array.init csv.HeaderRecord.Length (csv.GetField >> String)
+            |> Array.append [| Integer index |]
       }
