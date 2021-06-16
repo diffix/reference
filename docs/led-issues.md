@@ -1430,26 +1430,26 @@ This matches the truth table for the second approach above, so it seems that we 
 
 The truth table for the left query `A OR PV` is:
 
-|     | A   | PV  | out | AID                       |
-| --- | --- | --- | --- | ------------------------- |
-| C00 | 0   | 0   | 0   | NLE                       |
-| C01 | 0   | 1   | 1   | LE1 (victim)              |
-| C02 | 1   | 0   | 1   | ???3                      |
-| C03 | 1   | 1   | 1   | LE1 (plant)               |
+|     | A   | PV  | out | AID          |
+| --- | --- | --- | --- | ------------ |
+| C00 | 0   | 0   | 0   | NLE          |
+| C01 | 0   | 1   | 1   | LE1 (victim) |
+| C02 | 1   | 0   | 1   | ???3         |
+| C03 | 1   | 1   | 1   | LE1 (plant)  |
 
 Both C03 and C01 are LE by `PV-->0`. This leads to following subsequent truth table:
 
-|     | A   | PV  | out | AID  |
-| --- | --- | --- | --- | ---- |
-| C00 | 0   | -   | 0   | NLE (includes victim)  |
-| C02 | 1   | -   | 1   | ???4 (plant) |
+|     | A   | PV  | out | AID                   |
+| --- | --- | --- | --- | --------------------- |
+| C00 | 0   | -   | 0   | NLE (includes victim) |
+| C02 | 1   | -   | 1   | ???4 (plant)          |
 
 The right-hand query truth table is:
 
-|     | A   | out | AID  |
-| --- | --- | --- | ---- |
+|     | A   | out | AID                   |
+| --- | --- | --- | --------------------- |
 | C00 | 0   | 0   | NLE (includes victim) |
-| C01 | 1   | 1   | ???4 (plant) |
+| C01 | 1   | 1   | ???4 (plant)          |
 
 Which matches the right-side truth table, thus defeating the attack.
 
@@ -1487,22 +1487,22 @@ Which is the same, so the attack fails.
 
 The truth table is:
 
-|     | A   | NOT PV | out | AID                     |
-| --- | --- | ------ | --- | ----------------------- |
-| C00 | 0   | 1      | 0   | NLE                     |
-| C01 | 0   | 0      | 0   | LE1 (victim)            |
-| C02 | 1   | 0      | 1   | LE1 (plant) |
-| C03 | 1   | 1      | 1   | ???3  |
+|     | A   | NOT PV | out | AID          |
+| --- | --- | ------ | --- | ------------ |
+| C00 | 0   | 1      | 0   | NLE          |
+| C01 | 0   | 0      | 0   | LE1 (victim) |
+| C02 | 1   | 0      | 1   | LE1 (plant)  |
+| C03 | 1   | 1      | 1   | ???3         |
 
 
 Both C01 and C02 are LE by `NOT PV-->1`. This results in the subsequent truth table:
 
 which doesn't change any outcome. The subsequent truth table is this:
 
-|     | A   | NOT V | out | AID  |
-| --- | --- | ----- | --- | ---- |
+|     | A   | NOT V | out | AID                    |
+| --- | --- | ----- | --- | ---------------------- |
 | C00 | 0   | -     | 0   | NLE  (includes victim) |
-| C02 | 1   | -     | 1   | ???4 (includes plant) |
+| C02 | 1   | -     | 1   | ???4 (includes plant)  |
 
 The truth table for the right-hand query `WHERE A` is:
 
