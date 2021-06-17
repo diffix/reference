@@ -56,7 +56,7 @@ let executableName = "OpenDiffix.CLI"
 let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
 
 let failWithUsageInfo errorMsg =
-  failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
+  failwith $"%s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
 let toThreshold =
   function
@@ -131,11 +131,6 @@ let csvFormatter result =
 
 let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
 
-let anonymize formatter query filePath anonParams =
-  match runQuery query filePath anonParams with
-  | Ok result -> formatter result, 0
-  | Error err -> $"ERROR: %s{err}", 1
-
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
     failWithUsageInfo $"Could not find a queries file at %s{queriesPath}"
@@ -182,12 +177,10 @@ let main argv =
       let filePath = getFilePath parsedArguments
       let anonParams = constructAnonParameters parsedArguments
       let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
-
-      (anonymize outputFormatter query filePath anonParams)
-      |> fun (output, exitCode) ->
-           printfn $"%s{output}"
-           exitCode
+      let output = runQuery query filePath anonParams |> outputFormatter
+      printfn $"%s{output}"
+      0
 
   with e ->
-    printfn $"%s{e.Message}"
+    eprintfn $"ERROR: %s{e.Message}"
     1

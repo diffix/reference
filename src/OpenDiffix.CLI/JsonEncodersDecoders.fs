@@ -70,15 +70,12 @@ let encodeRequestParams query dbPath anonParams =
 let encodeErrorMsg errorMsg =
   Encode.object [ "success", Encode.bool false; "error", Encode.string errorMsg ]
 
-let encodeIndividualQueryResponse (queryRequest: QueryRequest) =
-  function
-  | Ok queryResult ->
-      Encode.object [
-        "success", Encode.bool true
-        "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
-        "result", encodeQueryResult queryResult
-      ]
-  | Error parseError -> encodeErrorMsg (parseError.ToString())
+let encodeIndividualQueryResponse queryRequest queryResult =
+  Encode.object [
+    "success", Encode.bool true
+    "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
+    "result", encodeQueryResult queryResult
+  ]
 
 let encodeBatchRunResult (time: System.DateTime) version queryResults =
   Encode.object [

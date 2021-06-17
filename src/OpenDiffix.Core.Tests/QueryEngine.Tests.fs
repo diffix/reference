@@ -36,7 +36,7 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT name AS n FROM products WHERE id = 1"
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``query 2`` () =
@@ -47,7 +47,7 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM products"
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``query 3`` () =
@@ -58,7 +58,7 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT name, SUM(price) FROM products GROUP BY 1 HAVING length(name) = 7"
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``query 4`` () =
@@ -69,7 +69,7 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``query 5 - bucket expansion`` () =
@@ -79,12 +79,11 @@ type Tests(db: DBFixture) =
 
     let expected = { Columns = [ { Name = "city"; Type = StringType } ]; Rows = expectedRows }
 
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   /// Returns the aggregate result of a query such as `SELECT count(*) FROM ...`
   let runQueryToInteger query =
     runQuery query
-    |> Result.value
     |> fun result ->
          result.Rows
          |> List.head
@@ -138,13 +137,12 @@ type Tests(db: DBFixture) =
         Rows = [ [| String "Water" |] ]
       }
 
-    let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
-    assertOkEqual queryResult expected
+    runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
 
   let equivalentQueries expectedQuery testQuery =
-    let testResult = runQuery testQuery |> Result.value
-    let expectedResult = runQuery expectedQuery |> Result.value
-    testResult |> should equal expectedResult
+    let testResult = runQuery testQuery
+    let expected = runQuery expectedQuery
+    testResult |> should equal expected
 
   [<Fact>]
   let ``query 11`` () =
@@ -155,7 +153,7 @@ type Tests(db: DBFixture) =
       }
 
     let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1"
-    assertOkEqual queryResult expected
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
