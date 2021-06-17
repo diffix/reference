@@ -123,7 +123,7 @@ let runQuery query filePath anonParams =
   QueryEngine.run context query
 
 let csvFormatter result =
-  let header = result.Columns |> String.join ","
+  let header = result.Columns |> List.map (fun column -> column.Name) |> String.join ","
 
   let rows =
     result.Rows
