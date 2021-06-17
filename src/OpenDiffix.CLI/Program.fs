@@ -7,7 +7,6 @@ open OpenDiffix.Core.QueryEngine
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
-  | Dry_Run
   | [<Unique; AltCommandLine("-f")>] File_Path of file_path: string
   | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
@@ -28,7 +27,6 @@ type CliArguments =
     member this.Usage =
       match this with
       | Version -> "Prints the version number of the program."
-      | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | File_Path _ -> "Specifies the path on disk to the SQLite or CSV file containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
@@ -185,9 +183,7 @@ let main argv =
       let anonParams = constructAnonParameters parsedArguments
       let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
 
-      let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize outputFormatter
-
-      (processor query filePath anonParams)
+      (anonymize outputFormatter query filePath anonParams)
       |> fun (output, exitCode) ->
            printfn $"%s{output}"
            exitCode
