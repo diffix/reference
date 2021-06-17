@@ -3,6 +3,7 @@ open System.IO
 open Argu
 open OpenDiffix.CLI
 open OpenDiffix.Core
+open OpenDiffix.Core.QueryEngine
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
@@ -13,6 +14,7 @@ type CliArguments =
   | Queries_Path of path: string
   | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
+  | Json
 
   // Threshold values
   | [<Unique>] Threshold_Outlier_Count of lower: int * upper: int
@@ -36,6 +38,7 @@ type CliArguments =
           + "file specification."
       | Query_Stdin -> "Reads the query from standard in."
       | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
+      | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
           + "should be excluded. A number is picked from a uniform distribution between the upper and lower limit."
@@ -119,16 +122,20 @@ let runQuery query filePath anonParams =
   let context = EvaluationContext.make anonParams dataProvider
   QueryEngine.run context query
 
-let anonymize query filePath anonParams =
+let csvFormatter result =
+  let header = result.Columns |> String.join ","
+
+  let rows =
+    result.Rows
+    |> List.map (fun row -> row |> Array.map Value.toString |> String.join ",")
+
+  header :: rows |> String.join "\n"
+
+let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
+
+let anonymize formatter query filePath anonParams =
   match runQuery query filePath anonParams with
-  | Ok result ->
-      let header = result.Columns |> String.join ","
-
-      let rows =
-        result.Rows
-        |> List.map (fun row -> row |> Array.map Value.toString |> String.join ",")
-
-      header :: rows |> String.join "\n", 0
+  | Ok result -> formatter result, 0
   | Error err -> $"ERROR: %s{err}", 1
 
 let batchExecuteQueries (queriesPath: string) =
@@ -176,8 +183,9 @@ let main argv =
       let query = getQuery parsedArguments
       let filePath = getFilePath parsedArguments
       let anonParams = constructAnonParameters parsedArguments
+      let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
 
-      let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize
+      let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize outputFormatter
 
       (processor query filePath anonParams)
       |> fun (output, exitCode) ->
