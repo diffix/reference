@@ -29,19 +29,34 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 1`` () =
-    let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
+    let expected =
+      {
+        Columns = [ { Name = "n"; Type = StringType } ]
+        Rows = [ [| String "Water" |] ]
+      }
+
     let queryResult = runQuery "SELECT name AS n FROM products WHERE id = 1"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 2`` () =
-    let expected = { Columns = [ "c1"; "c2" ]; Rows = [ [| Integer 11L; Integer 4L |] ] }
+    let expected =
+      {
+        Columns = [ { Name = "c1"; Type = IntegerType }; { Name = "c2"; Type = IntegerType } ]
+        Rows = [ [| Integer 11L; Integer 4L |] ]
+      }
+
     let queryResult = runQuery "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM products"
     assertOkEqual queryResult expected
 
   [<Fact>]
   let ``query 3`` () =
-    let expected = { Columns = [ "name"; "sum" ]; Rows = [ [| String "Chicken"; Real 12.81 |] ] }
+    let expected =
+      {
+        Columns = [ { Name = "name"; Type = StringType }; { Name = "sum"; Type = RealType } ]
+        Rows = [ [| String "Chicken"; Real 12.81 |] ]
+      }
+
     let queryResult = runQuery "SELECT name, SUM(price) FROM products GROUP BY 1 HAVING length(name) = 7"
     assertOkEqual queryResult expected
 
@@ -49,7 +64,7 @@ type Tests(db: DBFixture) =
   let ``query 4`` () =
     let expected =
       {
-        Columns = [ "city"; "count" ]
+        Columns = [ { Name = "city"; Type = StringType }; { Name = "count"; Type = IntegerType } ]
         Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
       }
 
@@ -62,7 +77,7 @@ type Tests(db: DBFixture) =
 
     let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
 
-    let expected = { Columns = [ "city" ]; Rows = expectedRows }
+    let expected = { Columns = [ { Name = "city"; Type = StringType } ]; Rows = expectedRows }
 
     assertOkEqual queryResult expected
 
@@ -117,7 +132,11 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 10`` () =
-    let expected = { Columns = [ "n" ]; Rows = [ [| String "Water" |] ] }
+    let expected =
+      {
+        Columns = [ { Name = "n"; Type = StringType } ]
+        Rows = [ [| String "Water" |] ]
+      }
 
     let queryResult = runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
     assertOkEqual queryResult expected
@@ -129,7 +148,12 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 11`` () =
-    let expected = { Columns = [ "n" ]; Rows = [ [| String "1Water" |] ] }
+    let expected =
+      {
+        Columns = [ { Name = "n"; Type = StringType } ]
+        Rows = [ [| String "1Water" |] ]
+      }
+
     let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1"
     assertOkEqual queryResult expected
 

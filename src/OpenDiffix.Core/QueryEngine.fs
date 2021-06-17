@@ -2,23 +2,21 @@
 
 open AnalyzerTypes
 
-type ColumnName = string
-
-type Columns = ColumnName list
-
-let rec private extractColumnNames query =
+let rec private extractColumns query =
   match query with
-  | UnionQuery (_, query1, _query2) -> extractColumnNames query1
+  | UnionQuery (_, query1, _query2) -> extractColumns query1
   | SelectQuery query ->
       query.TargetList
       |> List.filter TargetEntry.isRegular
-      |> List.map (fun column -> column.Alias)
+      |> List.map (fun column -> //
+        { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
+      )
 
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
-type QueryResult = { Columns: Columns; Rows: Row list }
+type QueryResult = { Columns: Column list; Rows: Row list }
 
 type QueryError = string
 
@@ -32,6 +30,6 @@ let run context statement : Result<QueryResult, QueryError> =
       |> Analyzer.rewrite context
 
     let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
-    let columns = extractColumnNames query
+    let columns = extractColumns query
     Ok { Columns = columns; Rows = rows }
   with ex -> Error ex.Message
