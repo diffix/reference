@@ -7,7 +7,6 @@ open OpenDiffix.Core.QueryEngine
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
-  | Dry_Run
   | [<Unique; AltCommandLine("-f")>] File_Path of file_path: string
   | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
@@ -28,7 +27,6 @@ type CliArguments =
     member this.Usage =
       match this with
       | Version -> "Prints the version number of the program."
-      | Dry_Run -> "Outputs the anonymization parameters used, but without running a query or anonymizing data."
       | File_Path _ -> "Specifies the path on disk to the SQLite or CSV file containing the data to be anonymized."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
@@ -58,7 +56,7 @@ let executableName = "OpenDiffix.CLI"
 let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
 
 let failWithUsageInfo errorMsg =
-  failwith $"ERROR: %s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
+  failwith $"%s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
 let toThreshold =
   function
@@ -123,7 +121,7 @@ let runQuery query filePath anonParams =
   QueryEngine.run context query
 
 let csvFormatter result =
-  let header = result.Columns |> String.join ","
+  let header = result.Columns |> List.map (fun column -> column.Name) |> String.join ","
 
   let rows =
     result.Rows
@@ -132,11 +130,6 @@ let csvFormatter result =
   header :: rows |> String.join "\n"
 
 let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
-
-let anonymize formatter query filePath anonParams =
-  match runQuery query filePath anonParams with
-  | Ok result -> formatter result, 0
-  | Error err -> $"ERROR: %s{err}", 1
 
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
@@ -184,14 +177,10 @@ let main argv =
       let filePath = getFilePath parsedArguments
       let anonParams = constructAnonParameters parsedArguments
       let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
-
-      let processor = if parsedArguments.Contains Dry_Run then dryRun else anonymize outputFormatter
-
-      (processor query filePath anonParams)
-      |> fun (output, exitCode) ->
-           printfn $"%s{output}"
-           exitCode
+      let output = runQuery query filePath anonParams |> outputFormatter
+      printfn $"%s{output}"
+      0
 
   with e ->
-    printfn $"%s{e.Message}"
+    eprintfn $"ERROR: %s{e.Message}"
     1

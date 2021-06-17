@@ -18,18 +18,14 @@ let rec private extractColumns query =
 
 type QueryResult = { Columns: Column list; Rows: Row list }
 
-type QueryError = string
+let run context statement : QueryResult =
+  let query =
+    statement
+    |> Parser.parse
+    |> Analyzer.analyze context
+    |> Normalizer.normalize
+    |> Analyzer.rewrite context
 
-let run context statement : Result<QueryResult, QueryError> =
-  try
-    let query =
-      statement
-      |> Parser.parse
-      |> Analyzer.analyze context
-      |> Normalizer.normalize
-      |> Analyzer.rewrite context
-
-    let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
-    let columns = extractColumns query
-    Ok { Columns = columns; Rows = rows }
-  with ex -> Error ex.Message
+  let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
+  let columns = extractColumns query
+  { Columns = columns; Rows = rows }
