@@ -49,6 +49,10 @@ This documents the need for LED, and motivates a number of design decisions. In 
     - [1/2 difference attack, 'A OR PV'](#12-difference-attack-a-or-pv)
     - [1/2 difference attack, 'A AND NOT PV'](#12-difference-attack-a-and-not-pv)
   - [When to evaluate and adjust](#when-to-evaluate-and-adjust)
+    - [Evaluate LED before GROUP BY aggregation, not after](#evaluate-led-before-group-by-aggregation-not-after)
+  - [A procedure for when to evaluate LED](#a-procedure-for-when-to-evaluate-led)
+    - [Lone woman examples](#lone-woman-examples)
+    - [Split isolator via sub-queries](#split-isolator-via-sub-queries)
 
 ## Noise layer notation
 
@@ -1702,12 +1706,12 @@ where acct_district_id = 1
 
 All three are (supposedly) designed to force inclusion of the victim in the buckets where the victim is not, so that the attacker can see the difference with the right-side query (which is missing the `or uid=400` term). However, the bucket for `acct=2` in the histogram query has a different underlying count than the left-side query targeted for `acct=2`. The following table shows the true counts for the above left-side queries and the corresponding right-side queries:
 
-| attack        | acct = 1 | acct = 2 |
-| ------------- | -------- | -------- |
-| left hist     | 671      | 46       |
-| right hist    | 671      | 46       |
-| left target   | 671      | 47       |
-| right target  | 671      | 46       |
+| attack       | acct = 1 | acct = 2 |
+| ------------ | -------- | -------- |
+| left hist    | 671      | 46       |
+| right hist   | 671      | 46       |
+| left target  | 671      | 47       |
+| right target | 671      | 46       |
 
 Specifically, the victim is not included in the `acct=2` bucket for the left-side histogram query (count 46), but is included in the left-side targeted query for `acct=2` (count 47). This in turn means that for `acct=2` we want to adjust downwards for the targeted query, but not for the histogram query. By contrast, we don't want to adjust for the `acct=1` bucket in both cases.
 
@@ -1715,20 +1719,20 @@ This can be accomplished by evaluating LED before aggregation.
 
 For the left-side histogram, the truth table is:
 
-|     |  True | uid=400 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C02 | 1 | 0 | 1 | NLE |
-| C03 | 1 | 1 | 1 | LE1 |
+|     | True | uid=400 | out | AID |
+| --- | ---- | ------- | --- | --- |
+| C02 | 1    | 0       | 1   | NLE |
+| C03 | 1    | 1       | 1   | LE1 |
 
 Forcing `uid=400-->0` results in no change. Note that the implicit `AND acct_district_id=X` term doesn't play a role in the LED evaluation.
 
 For the left-side targeted query, the truth table is:
 
-|     |  acct=2 | uid=400 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 1 | LE1 |
-| C02 | 1 | 0 | 1 | NLE |
+|     | acct=2 | uid=400 | out | AID |
+| --- | ------ | ------- | --- | --- |
+| C00 | 0      | 0       | 0   | NLE |
+| C01 | 0      | 1       | 1   | LE1 |
+| C02 | 1      | 0       | 1   | NLE |
 
 Forcing `uid=400-->0` only changes C01, and so the aggregate is adjusted down by 1.
 
@@ -1766,12 +1770,12 @@ where acct_district_id = 1
 
 The following table shows the true counts for the above left-side queries and the corresponding right-side queries:
 
-| attack        | acct = 1 | acct = 2 |
-| ------------- | -------- | -------- |
-| left hist     | 670      | 46       |
-| right hist    | 671      | 46       |
-| left target   | 670      | 46       |
-| right target  | 671      | 46       |
+| attack       | acct = 1 | acct = 2 |
+| ------------ | -------- | -------- |
+| left hist    | 670      | 46       |
+| right hist   | 671      | 46       |
+| left target  | 670      | 46       |
+| right target | 671      | 46       |
 
 In this case, we want to adjust upwards for both left-side queries for `acct=1` (histogram and targeted), and not adjust for both left-side queries for `acct=2`.
 
@@ -1779,30 +1783,30 @@ Again, this can be accomplished by evaluating LED before aggregation.
 
 For the left-side histogram, the truth table is:
 
-|     |  uid<>400 | out | AID |
-| --- |  --- | --- | --- |
-| C02 | 1 | 1 | NLE |
-| C03 | 0 | 0 | LE1 |
+|     | uid<>400 | out | AID |
+| --- | -------- | --- | --- |
+| C02 | 1        | 1   | NLE |
+| C03 | 0        | 0   | LE1 |
 
 Forcing `uid<>400-->1` results in a change only for C03, so we add the victim back in. This only affects the `acct=1` bucket.  Note again that the implicit `AND acct_district_id=X` term doesn't play a role in the LED evaluation.
 
 For the left-side targeted query for `acct=2`, the truth table is:
 
-|     |  acct=2 | uid<>400 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 1 | 0 | NLE |
-| C01 | 0 | 0 | 0 | LE1 |
-| C02 | 1 | 1 | 1 | NLE |
+|     | acct=2 | uid<>400 | out | AID |
+| --- | ------ | -------- | --- | --- |
+| C00 | 0      | 1        | 0   | NLE |
+| C01 | 0      | 0        | 0   | LE1 |
+| C02 | 1      | 1        | 1   | NLE |
 
 Forcing `uid<>400-->1` doesn't change any outcome, so no adjustment is made.
 
 For the left-side targeted query for `acct=1`, the truth table is:
 
-|     |  acct=1 | uid<>400 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 1 | 0 | NLE |
-| C01 | 1 | 0 | 0 | LE1 |
-| C02 | 1 | 1 | 1 | NLE |
+|     | acct=1 | uid<>400 | out | AID |
+| --- | ------ | -------- | --- | --- |
+| C00 | 0      | 1        | 0   | NLE |
+| C01 | 1      | 0        | 0   | LE1 |
+| C02 | 1      | 1        | 1   | NLE |
 
 Forcing `uid<>400-->1` changes only C01, so we adjust up.
 
@@ -1842,16 +1846,16 @@ WHERE D and Z
 
 The TT (truth table) for the left query is when the victim is in the zip is:
 
-|     |  G | D | Z | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C03 | 0 | 1 | 1 | 0 | LE1 |
-| C04 | 1 | 0 | 0 | 0 | NLE |
-| C05 | 1 | 0 | 1 | 0 | NLE |
-| C06 | 1 | 1 | 0 | 0 | NLE |
-| C07 | 1 | 1 | 1 | 1 | NLE |
+|     | G   | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | 0   | NLE |
+| C01 | 0   | 0   | 1   | 0   | NLE |
+| C02 | 0   | 1   | 0   | 0   | NLE |
+| C03 | 0   | 1   | 1   | 0   | LE1 |
+| C04 | 1   | 0   | 0   | 0   | NLE |
+| C05 | 1   | 0   | 1   | 0   | NLE |
+| C06 | 1   | 1   | 0   | 0   | NLE |
+| C07 | 1   | 1   | 1   | 1   | NLE |
 
 Forcing `G->1` adds the woman to the count.
 
@@ -1866,22 +1870,22 @@ GROUP BY 1
 
 Here we build a TT just prior to the `count(*)` aggregation. It looks like this:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | G   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C02 | 1   | 0   | 0   | NLE |
+| C03 | 1   | 1   | 1   | NLE |
 
 C03 is the combination for men in zip 12345, and C01 is for women in zip 12345. Here, everything is NLE, so there is no flipping.
 
 Then we build TTs for each bucket produced by the GROUP BY. The TT for the CS dept is this:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C01 | 0 | 1 | 0 | LE1 |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | G   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C01 | 0   | 1   | 0   | LE1 |
+| C02 | 1   | 0   | 0   | NLE |
+| C03 | 1   | 1   | 1   | NLE |
 
 and so we force `G-->1` and add the woman to the output.
 
@@ -1896,37 +1900,37 @@ GROUP BY 1
 
 Here we build a TT just prior to the `count(*)` aggregation. It looks like this (no LE combinations or conditions):
 
-|     |  D | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C02 | 1   | 0   | 0   | NLE |
+| C03 | 1   | 1   | 1   | NLE |
 
 After the GROUP BY, the bucket for Female looks like this:
 
-|     |  D | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C03 | 1 | 1 | 1 | LE1 |
+|     | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C03 | 1   | 1   | 1   | LE1 |
 
 And the bucket for Male looks like this:
 
-|     |  D | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C02 | 1   | 0   | 0   | NLE |
+| C03 | 1   | 1   | 1   | NLE |
 
 Note that if the victim was not in `zip=12345`, then the bucket for Female looks like this:
 
-|     |  D | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C02 | 1 | 0 | 0 | LE1 |
+|     | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C02 | 1   | 0   | 0   | LE1 |
 
 Either way, this is a special case. There are only two buckets, and one of them has an LE combination and fails LCF. As such, by simply not including the GROUP BY at all, the analyst could cause the victim to appear (or not appear) in the aggregate result. Therefore, we can have a special rule for this case where we effectively combine the output into a single TT and evaluate LED accordingly.
 
@@ -1980,31 +1984,31 @@ WHERE D
 
 The TT prior to the GROUP BY is this:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | G   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | NLE |
+| C01 | 0   | 1   | 0   | NLE |
+| C02 | 1   | 0   | 0   | NLE |
+| C03 | 1   | 1   | 1   | NLE |
 
 After the GROUP BY, there is a "trivial" TT associated with each i-row that contains only a single combination. For instance, the TT for the victim would be:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C01 | 0 | 1 | 0 | LE1 |
+|     | G   | Z   | out | AID |
+| --- | --- | --- | --- | --- |
+| C01 | 0   | 1   | 0   | LE1 |
 
 Note that at this point we must continue to process any i-row that has any LE combinations, even if the only outcome is False, because they are still potentially flippable. As such, we build a TT from the i-rows derived from the inner select like this:
 
-|     |  G | D | Z | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C03 | 0 | 1 | 1 | 0 | LE1 |
-| C04 | 1 | 0 | 0 | 0 | NLE |
-| C05 | 1 | 0 | 1 | 0 | NLE |
-| C06 | 1 | 1 | 0 | 0 | NLE |
-| C07 | 1 | 1 | 1 | 1 | NLE |
+|     | G   | D   | Z   | out | AID |
+| --- | --- | --- | --- | --- | --- |
+| C00 | 0   | 0   | 0   | 0   | NLE |
+| C01 | 0   | 0   | 1   | 0   | NLE |
+| C02 | 0   | 1   | 0   | 0   | NLE |
+| C03 | 0   | 1   | 1   | 0   | LE1 |
+| C04 | 1   | 0   | 0   | 0   | NLE |
+| C05 | 1   | 0   | 1   | 0   | NLE |
+| C06 | 1   | 1   | 0   | 0   | NLE |
+| C07 | 1   | 1   | 1   | 1   | NLE |
 
 And we flip the row in C03 as a result.
 
@@ -2036,34 +2040,34 @@ WHERE D
 
 Regarding the left-hand query, TT prior to the GROUP BY is this:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 0 | NLE (victim is here) |
-| C02 | 1 | 0 | 0 | NLE |
-| C03 | 1 | 1 | 1 | NLE (plant is here) |
+|     | G   | Z   | out | AID                  |
+| --- | --- | --- | --- | -------------------- |
+| C00 | 0   | 0   | 0   | NLE                  |
+| C01 | 0   | 1   | 0   | NLE (victim is here) |
+| C02 | 1   | 0   | 0   | NLE                  |
+| C03 | 1   | 1   | 1   | NLE (plant is here)  |
 
 After the GROUP BY, there is a single i-row for the victim and the plant which has a TT like this:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C01 | 0 | 1 | 0 | LE1 (victim) |
-| C02 | 1 | 1 | 1 | LE1 (plant) |
+|     | G   | Z   | out | AID          |
+| --- | --- | --- | --- | ------------ |
+| C01 | 0   | 1   | 0   | LE1 (victim) |
+| C02 | 1   | 1   | 1   | LE1 (plant)  |
 
 Most other i-rows derive from a single d-row.
 
 Since the victim/plant i-row has LE combinations, and are therefore still flippable, we need to build the TT that appears prior to the next aggregate (`sum(cnt)`). That TT looks like this:
 
-|     |  G | D | Z | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C03 | 0 | 1 | 1 | 0 | LE1 (victim) |
-| C04 | 1 | 0 | 0 | 0 | NLE |
-| C05 | 1 | 0 | 1 | 0 | NLE |
-| C06 | 1 | 1 | 0 | 0 | NLE |
-| C07 | 1 | 1 | 1 | 1 | NLE (plant is here) |
+|     | G   | D   | Z   | out | AID                 |
+| --- | --- | --- | --- | --- | ------------------- |
+| C00 | 0   | 0   | 0   | 0   | NLE                 |
+| C01 | 0   | 0   | 1   | 0   | NLE                 |
+| C02 | 0   | 1   | 0   | 0   | NLE                 |
+| C03 | 0   | 1   | 1   | 0   | LE1 (victim)        |
+| C04 | 1   | 0   | 0   | 0   | NLE                 |
+| C05 | 1   | 0   | 1   | 0   | NLE                 |
+| C06 | 1   | 1   | 0   | 0   | NLE                 |
+| C07 | 1   | 1   | 1   | 1   | NLE (plant is here) |
 
 If we wanted to flip the victim, we'd have to recognize that doing so would change the `cnt` value of the victim/plant i-row from 1 to 2, and then compute the `sum(cnt)` aggregate accordingly. This is possible, but complex and frankly I'm not sure it is necessary. It would require that we maintain per-row information about how LE i-rows were generated, and recompute them when we flip. (We wouldn't need such information for NLE i-rows though.)
 
@@ -2071,22 +2075,22 @@ The reason I don't think it is necessary is because it is unlikely that an attac
 
 An alternative approach would be that we never flip once more than one AIDV is merged together in an i-row. In that case, we might want to know that a condition is LE, but not adjust as a result. Given that, the TT for the victim/plant i-row could instead be written as:
 
-|     |  G | Z | out | AID |
-| --- |  --- | --- | --- | --- |
-| C01 | - | 1 | 0 | LE2 (victim and plant) |
+|     | G   | Z   | out | AID                    |
+| --- | --- | --- | --- | ---------------------- |
+| C01 | -   | 1   | 0   | LE2 (victim and plant) |
 
 Then the TT prior to the `sum(cnt)` aggregate might be this:
 
-|     |  G | D | Z | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C03 | - | 1 | 1 | - | LE2 (victim and plant) |
-| C04 | 1 | 0 | 0 | 0 | NLE |
-| C05 | 1 | 0 | 1 | 0 | NLE |
-| C06 | 1 | 1 | 0 | 0 | NLE |
-| C07 | 1 | 1 | 1 | 1 | NLE |
+|     | G   | D   | Z   | out | AID                    |
+| --- | --- | --- | --- | --- | ---------------------- |
+| C00 | 0   | 0   | 0   | 0   | NLE                    |
+| C01 | 0   | 0   | 1   | 0   | NLE                    |
+| C02 | 0   | 1   | 0   | 0   | NLE                    |
+| C03 | -   | 1   | 1   | -   | LE2 (victim and plant) |
+| C04 | 1   | 0   | 0   | 0   | NLE                    |
+| C05 | 1   | 0   | 1   | 0   | NLE                    |
+| C06 | 1   | 1   | 0   | 0   | NLE                    |
+| C07 | 1   | 1   | 1   | 1   | NLE                    |
 
 With the above TT, we could in principle still see that gender (G) is LE by virtue of forcing `G-->1`. The difference attack would be protected by the noise itself.
 
@@ -2125,57 +2129,57 @@ WHERE age=20
 
 The composite TT prior to the inner GROUP BY for the left query is:
 
-|     |  age=20 | zip=12345 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 1 | 1 | NLE |
-| C02 | 1 | 0 | 1 | NLE |
-| C03 | 1 | 1 | 1 | NLE |
+|     | age=20 | zip=12345 | out | AID |
+| --- | ------ | --------- | --- | --- |
+| C00 | 0      | 0         | 0   | NLE |
+| C01 | 0      | 1         | 1   | NLE |
+| C02 | 1      | 0         | 1   | NLE |
+| C03 | 1      | 1         | 1   | NLE |
 
 **Victim has age=20:**
 
 Assuming that the victim has `age=20`, the per-row TT for the victim's i-row after the inner GROUP BY is:
 
-|     |  age=20 | zip=12345 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C03 | 1 | 1 | 1 | LE1 |
+|     | age=20 | zip=12345 | out | AID |
+| --- | ------ | --------- | --- | --- |
+| C03 | 1      | 1         | 1   | LE1 |
 
 The per-row TT for some other AIDV's i-row might well be for instance (a given bday but all other ages and zips):
 
-|     |  age=20 | zip=12345 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | NLE |
+|     | age=20 | zip=12345 | out | AID |
+| --- | ------ | --------- | --- | --- |
+| C00 | 0      | 0         | 0   | NLE |
 
 or (a given bday in this zip but all other ages):
 
-|     |  age=20 | zip=12345 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C01 | 0 | 1 | 1 | NLE |
+|     | age=20 | zip=12345 | out | AID |
+| --- | ------ | --------- | --- | --- |
+| C01 | 0      | 1         | 1   | NLE |
 
 Though of course many of the other i-row TT's might be LE.
 
 In any event, we produce a composite TT from the per-row TT's like this:
 
-|     |  age=20 | zip=12345 | bday='14.12.57' | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C04 | 1 | 0 | 0 | 1 | NLE |
-| C05 | 1 | 0 | 1 | 1 | NLE |
-| C06 | 1 | 1 | 0 | 1 | NLE |
-| C07 | 1 | 1 | 1 | 1 | LE1 (victim) |
+|     | age=20 | zip=12345 | bday='14.12.57' | out | AID          |
+| --- | ------ | --------- | --------------- | --- | ------------ |
+| C00 | 0      | 0         | 0               | 0   | NLE          |
+| C01 | 0      | 0         | 1               | 0   | NLE          |
+| C02 | 0      | 1         | 0               | 0   | NLE          |
+| C04 | 1      | 0         | 0               | 1   | NLE          |
+| C05 | 1      | 0         | 1               | 1   | NLE          |
+| C06 | 1      | 1         | 0               | 1   | NLE          |
+| C07 | 1      | 1         | 1               | 1   | LE1 (victim) |
 
 
-|     |  age=20 | age=20 | zip=12345 | bday='14.12.57' | out | AID |
-| --- |  --- | --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 0 | 1 | 0 | 0 | NLE |
-| C12 | 1 | 1 | 0 | 0 | 1 | NLE |
-| C13 | 1 | 1 | 0 | 1 | 1 | NLE |
-| C14 | 1 | 1 | 1 | 0 | 1 | NLE |
-| C15 | 1 | 1 | 1 | 1 | 1 | LE1 |
+|     | age=20 | age=20 | zip=12345 | bday='14.12.57' | out | AID |
+| --- | ------ | ------ | --------- | --------------- | --- | --- |
+| C00 | 0      | 0      | 0         | 0               | 0   | NLE |
+| C01 | 0      | 0      | 0         | 1               | 0   | NLE |
+| C02 | 0      | 0      | 1         | 0               | 0   | NLE |
+| C12 | 1      | 1      | 0         | 0               | 1   | NLE |
+| C13 | 1      | 1      | 0         | 1               | 1   | NLE |
+| C14 | 1      | 1      | 1         | 0               | 1   | NLE |
+| C15 | 1      | 1      | 1         | 1               | 1   | LE1 |
 
 And from this we conclude that forcing both `zip-->0,bday-->0` is LE, so we flip the C07 rows and remove the victim from the answer. Note as well that the two `age=20` conditions would have the same seed and could in principle be recognized as being identical, thus letting us drop one of the noise layers.
 
@@ -2183,21 +2187,21 @@ And from this we conclude that forcing both `zip-->0,bday-->0` is LE, so we flip
 
 Assuming that the victim does not have `age=20`, the per-row TT for the victim's i-row after the inner GROUP BY is:
 
-|     |  age=20 | zip=12345 | out | AID |
-| --- |  --- | --- | --- | --- |
-| C03 | 0 | 1 | 1 | LE1 |
+|     | age=20 | zip=12345 | out | AID |
+| --- | ------ | --------- | --- | --- |
+| C03 | 0      | 1         | 1   | LE1 |
 
 We produce a composite TT from the per-row TT's like this:
 
-|     |  age=20 | zip=12345 | bday='14.12.57' | out | AID |
-| --- |  --- | --- | --- | --- | --- |
-| C00 | 0 | 0 | 0 | 0 | NLE |
-| C01 | 0 | 0 | 1 | 0 | NLE |
-| C02 | 0 | 1 | 0 | 0 | NLE |
-| C03 | 0 | 1 | 1 | 0 | LE1 (victim) |
-| C04 | 1 | 0 | 0 | 1 | NLE |
-| C05 | 1 | 0 | 1 | 1 | NLE |
-| C06 | 1 | 1 | 0 | 1 | NLE |
+|     | age=20 | zip=12345 | bday='14.12.57' | out | AID          |
+| --- | ------ | --------- | --------------- | --- | ------------ |
+| C00 | 0      | 0         | 0               | 0   | NLE          |
+| C01 | 0      | 0         | 1               | 0   | NLE          |
+| C02 | 0      | 1         | 0               | 0   | NLE          |
+| C03 | 0      | 1         | 1               | 0   | LE1 (victim) |
+| C04 | 1      | 0         | 0               | 1   | NLE          |
+| C05 | 1      | 0         | 1               | 1   | NLE          |
+| C06 | 1      | 1         | 0               | 1   | NLE          |
 
 And from this we conclude that forcing both `zip-->0,bday-->0` is LE. This does not change the outcome of C03, so no change in rows is needed.
 
