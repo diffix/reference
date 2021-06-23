@@ -1968,7 +1968,7 @@ FROM table
 WHERE G and D and Z
 ```
 
-then the G `gender='M'` term will lead to a dynamic noise layer instead of the static `gender-'M'` noise layer of the left side, and again the difference in noise hides the presence or absence of the victim.
+then the G `gender='M'` term will lead to a dynamic LE noise layer instead of the static `gender-'M'` noise layer of the left side, and again the difference in noise hides the presence or absence of the victim.
 
 
 **Sub-query without GROUP BY:**
