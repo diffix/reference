@@ -1683,7 +1683,7 @@ Consider the following three left-side queries:
 ```
 select acct_district_id, count(*)
 from accounts
-where True or uid = 400
+where gender = 'Male' or uid = 400
 group by 1
 order by 1
 ```
@@ -1693,6 +1693,7 @@ order by 1
 select count(*)
 from accounts
 where acct_district_id = 2
+      and gender = 'Male'
       or uid = 400
 ```
 
@@ -1701,6 +1702,7 @@ where acct_district_id = 2
 select count(*)
 from accounts
 where acct_district_id = 1
+      and gender = 'Male'
       or uid = 400
 ```
 
@@ -1708,12 +1710,12 @@ All three are (supposedly) designed to force inclusion of the victim in the buck
 
 | attack       | acct = 1 | acct = 2 |
 | ------------ | -------- | -------- |
-| left hist    | 671      | 46       |
-| right hist   | 671      | 46       |
-| left target  | 671      | 47       |
-| right target | 671      | 46       |
+| left hist    | 337      | 22       |
+| right hist   | 337      | 22       |
+| left target  | 337      | 23       |
+| right target | 337      | 22       |
 
-Specifically, the victim is not included in the `acct=2` bucket for the left-side histogram query (count 46), but is included in the left-side targeted query for `acct=2` (count 47). This in turn means that for `acct=2` we want to adjust downwards for the targeted query, but not for the histogram query. By contrast, we don't want to adjust for the `acct=1` bucket in both cases.
+Specifically, the victim is not included in the `acct=2` bucket for the left-side histogram query (count 22), but is included in the left-side targeted query for `acct=2` (count 23). This in turn means that for `acct=2` we want to adjust downwards for the targeted query, but not for the histogram query. By contrast, we don't want to adjust for the `acct=1` bucket in both cases.
 
 This can be accomplished by evaluating LED before aggregation.
 
@@ -1879,7 +1881,7 @@ Here we build a TT just prior to the `count(*)` aggregation. It looks like this:
 
 C03 is the combination for men in zip 12345, and C01 is for women in zip 12345. Here, everything is NLE, so there is no flipping.
 
-Then we build TTs for each bucket produced by the GROUP BY. The TT for the CS dept is this:
+Then we build individual TTs for each bucket produced by the GROUP BY. The TT for the CS dept is this:
 
 |     | G   | Z   | out | AID |
 | --- | --- | --- | --- | --- |
@@ -1888,6 +1890,18 @@ Then we build TTs for each bucket produced by the GROUP BY. The TT for the CS de
 | C03 | 1   | 1   | 1   | NLE |
 
 and so we force `G-->1` and add the woman to the output.
+
+Note in particular that we don't need to include dept in the TT. Doing so would produce the following TT, which doesn't change the outcome of the LED evaluation for the `dept=CS` bucket:
+
+|     |  D | G | Z | out | AID |
+| --- |  --- | --- | --- | --- | --- |
+| C00 | 0 | 0 | 0 | 0 | NLE |
+| C01 | 0 | 0 | 1 | 0 | NLE |
+| C02 | 0 | 1 | 0 | 0 | NLE |
+| C03 | 0 | 1 | 1 | 0 | NLE |
+| C05 | 1 | 0 | 1 | 0 | LE1 |
+| C06 | 1 | 1 | 0 | 0 | NLE |
+| C07 | 1 | 1 | 1 | 1 | NLE |
 
 **Outer GROUP BY, bucket by gender:**
 
@@ -2094,7 +2108,7 @@ Then the TT prior to the `sum(cnt)` aggregate might be this:
 
 With the above TT, we could in principle still see that gender (G) is LE by virtue of forcing `G-->1`. The difference attack would be protected by the noise itself.
 
-Yet another alternative would be to ignore the victim/plant i-row altogether when making the TT (or any i-row that aggregates multiple i-rows).
+Yet another alternative would be to ignore the victim/plant i-row altogether when making the TT (or any i-row that aggregates multiple AIDVs).
 
 I'm on the fence about which approach is best. It depends on how complex the approach with full information and flipping is.
 
@@ -2205,5 +2219,3 @@ We produce a composite TT from the per-row TT's like this:
 
 And from this we conclude that forcing both `zip-->0,bday-->0` is LE. This does not change the outcome of C03, so no change in rows is needed.
 
-
-A and not (I and J)
