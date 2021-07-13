@@ -52,7 +52,8 @@ let comparer direction nulls =
 let hash value =
   match value with
   | Null -> 0
-  | Boolean b -> b |> BitConverter.GetBytes |> Hash.bytes
+  | Boolean false -> 0
+  | Boolean true -> 1
   | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
   | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
   | String s -> s |> Text.Encoding.UTF8.GetBytes |> Hash.bytes
