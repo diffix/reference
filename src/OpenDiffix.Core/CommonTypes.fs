@@ -117,7 +117,7 @@ type IDataProvider =
 // Anonymizer types
 // ----------------------------------------------------------------
 
-type AidHash = int32
+type AidHash = uint64
 
 type Threshold =
   {

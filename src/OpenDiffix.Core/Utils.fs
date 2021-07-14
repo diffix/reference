@@ -103,13 +103,13 @@ module AnonymizationParams =
 module Hash =
   let bytes (data: byte []) =
     // Implementation of FNV-1a hash algorithm: http://www.isthe.com/chongo/tech/comp/fnv/index.html
-    let fnvPrime = 16777619u
-    let offsetBasis = 2166136261u
+    let fnvPrime = 1099511628211UL
+    let offsetBasis = 14695981039346656037UL
 
     let mutable hash = offsetBasis
 
     for octet in data do
-      hash <- hash ^^^ uint32 octet
+      hash <- hash ^^^ uint64 octet
       hash <- hash * fnvPrime
 
-    int32 hash
+    hash

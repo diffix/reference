@@ -48,13 +48,13 @@ let comparer direction nulls =
     | _, Null -> -nullsValue
     | x, y -> directionValue * Operators.compare x y
 
-/// Computes a 32 bit hash of the given value.
-let hash value =
+/// Computes a 64 bit hash of the given value.
+let rec hash value =
   match value with
-  | Null -> 0
-  | Boolean false -> 0
-  | Boolean true -> 1
+  | Null -> 0UL
+  | Boolean false -> 0UL
+  | Boolean true -> 1UL
   | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
   | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
   | String s -> s |> Text.Encoding.UTF8.GetBytes |> Hash.bytes
-  | List l -> l |> List.map hash |> List.fold (^^^) 0
+  | List l -> l |> List.map hash |> List.fold (^^^) 0UL
