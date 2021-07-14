@@ -19,7 +19,7 @@ let private randomNormal (rnd: Random) stdDev =
 
 let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
   let combinedAids = Seq.fold (^^^) 0 aidSet
-  let seed = combinedAids ^^^ anonymizationParams.Seed
+  let seed = combinedAids ^^^ int anonymizationParams.Seed
   Random(seed)
 
 let private noiseValue rnd (noiseParam: NoiseParam) =
@@ -58,7 +58,7 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
   )
   |> List.reduce (||)
 
-type private AidCount = { FlattenedSum: float; Flattening: float; noise: NoiseParam; Rnd: Random }
+type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
 
 let inline private aidFlattening
   (anonymizationParams: AnonymizationParams)
@@ -99,8 +99,8 @@ let inline private aidFlattening
       {
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
-        noise = { anonymizationParams.Noise with StandardDev = noiseSD }
-        Rnd = rnd
+        NoiseSD = noiseSD
+        Noise = noiseValue rnd { anonymizationParams.Noise with StandardDev = noiseSD }
       }
 
 let mapValueSet value =
@@ -153,9 +153,9 @@ let private anonymizedSum (byAidSum: AidCount list) =
 
   let noise =
     byAidSum
-    |> List.sortByDescending (fun aggregate -> aggregate.noise.StandardDev)
+    |> List.sortByDescending (fun aggregate -> aggregate.NoiseSD)
     |> List.tryHead
-    |> Option.map (fun aggregate -> noiseValue aggregate.Rnd aggregate.noise)
+    |> Option.map (fun aggregate -> aggregate.Noise)
 
   match aidForFlattening, noise with
   | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise

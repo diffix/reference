@@ -12,7 +12,7 @@ type CliArguments =
   | [<AltCommandLine("-q")>] Query of sql: string
   | Queries_Path of path: string
   | Query_Stdin
-  | [<Unique; AltCommandLine("-s")>] Seed of seed_value: int
+  | [<Unique; AltCommandLine("-s")>] Seed of seed_value: uint64
   | Json
 
   // Threshold values
@@ -83,7 +83,7 @@ let private toTableSettings (aidColumns: string list option) =
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
-    Seed = parsedArgs.GetResult(Seed, defaultValue = 1)
+    Seed = parsedArgs.GetResult(Seed, defaultValue = 1UL)
     MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
