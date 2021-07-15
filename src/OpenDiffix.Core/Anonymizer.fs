@@ -18,9 +18,9 @@ let private randomNormal (rnd: Random) stdDev =
   stdDev * randStdNormal
 
 let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
-  let combinedAids = Seq.fold (^^^) 0 aidSet
-  let seed = combinedAids ^^^ int anonymizationParams.Seed
-  Random(seed)
+  let combinedAids = Seq.fold (^^^) 0UL aidSet
+  let seed = combinedAids ^^^ anonymizationParams.Seed
+  Random(int seed)
 
 let private noiseValue rnd (noiseParam: NoiseParam) =
   let absoluteCutoff = noiseParam.Cutoff * noiseParam.StandardDev
