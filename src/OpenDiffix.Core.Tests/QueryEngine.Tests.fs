@@ -14,7 +14,7 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ "cid" ] } //
           "customers_small", { AidColumns = [ "id" ] } //
         ]
-      Seed = 1UL
+      Salt = 1UL
       MinimumAllowedAids = 2
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
