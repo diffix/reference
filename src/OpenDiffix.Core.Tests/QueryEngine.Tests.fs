@@ -14,7 +14,7 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ "cid" ] } //
           "customers_small", { AidColumns = [ "id" ] } //
         ]
-      Seed = 1UL
+      Salt = 1UL
       MinimumAllowedAids = 2
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
@@ -168,5 +168,16 @@ type Tests(db: DBFixture) =
     equivalentQueries
       "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
       "SELECT count(*) FROM (SELECT id, cid FROM customers_small LEFT JOIN purchases ON id = cid) x"
+
+  [<Fact>]
+  let ``standard query can use diffix functions`` () =
+    let expected =
+      {
+        Columns = [ { Name = "dc"; Type = IntegerType }; { Name = "lc"; Type = BooleanType } ]
+        Rows = [ [| Integer 11L; Boolean false |] ]
+      }
+
+    let queryResult = runQuery "SELECT diffix_count(id) AS dc, diffix_low_count(id) AS lc FROM products"
+    queryResult |> should equal expected
 
   interface IClassFixture<DBFixture>

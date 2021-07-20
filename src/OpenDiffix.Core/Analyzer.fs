@@ -47,6 +47,9 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
       let arg = mapExpression rangeColumns expr
       AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
+  | AggregateFunction (fn, aggregateArgs), parsedArgs when List.contains fn [ DiffixCount; DiffixLowCount ] -> //
+      let args = parsedArgs |> List.map (mapExpression rangeColumns)
+      AggregateFunction(fn, aggregateArgs), [ ListExpr args ]
   | _ ->
       let args = parsedArgs |> List.map (mapExpression rangeColumns)
       fn, args

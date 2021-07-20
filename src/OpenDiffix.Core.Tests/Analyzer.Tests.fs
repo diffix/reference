@@ -242,7 +242,7 @@ type Tests(db: DBFixture) =
           "customers_small", { AidColumns = [ "id"; "company_name" ] }
           "purchases", { AidColumns = [ "cid" ] }
         ]
-      Seed = 1UL
+      Salt = 1UL
       MinimumAllowedAids = 2
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }

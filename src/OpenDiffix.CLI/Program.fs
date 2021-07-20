@@ -12,7 +12,7 @@ type CliArguments =
   | [<AltCommandLine("-q")>] Query of sql: string
   | Queries_Path of path: string
   | Query_Stdin
-  | [<Unique; AltCommandLine("-s")>] Seed of seed_value: uint64
+  | [<Unique; AltCommandLine("-s")>] Salt of salt_value: uint64
   | Json
 
   // Threshold values
@@ -35,7 +35,7 @@ type CliArguments =
           + "batch mode, and the results will be written to standard out. Please consult the README for the query "
           + "file specification."
       | Query_Stdin -> "Reads the query from standard in."
-      | Seed _ -> "The seed value to use when anonymizing the data. Changing the seed will change the result."
+      | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Threshold_Outlier_Count _ ->
           "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -83,7 +83,7 @@ let private toTableSettings (aidColumns: string list option) =
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
-    Seed = parsedArgs.GetResult(Seed, defaultValue = 1UL)
+    Salt = parsedArgs.GetResult(Salt, defaultValue = 1UL)
     MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold

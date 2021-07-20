@@ -107,7 +107,7 @@ type private DiffixCount(perAidCounts: (Map<AidHash, float> * int64) list option
     match aidInstances with
     | Value.List aidInstances when List.forall missingAid aidInstances -> perAidCounts
     | Value.List aidInstances -> increaseContributions valueIncrease aidInstances
-    | _ -> failwith "Expecting an AID list as input"
+    | _ -> failwith "Expecting a list as input"
 
   new() = DiffixCount(None)
 

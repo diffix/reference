@@ -45,6 +45,7 @@ module Function =
     | "count" -> AggregateFunction(Count, AggregateOptions.Default)
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
+    | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply
