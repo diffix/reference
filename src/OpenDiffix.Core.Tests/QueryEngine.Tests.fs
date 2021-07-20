@@ -169,4 +169,15 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
       "SELECT count(*) FROM (SELECT id, cid FROM customers_small LEFT JOIN purchases ON id = cid) x"
 
+  [<Fact>]
+  let ``standard query can use diffix functions`` () =
+    let expected =
+      {
+        Columns = [ { Name = "dc"; Type = IntegerType }; { Name = "lc"; Type = BooleanType } ]
+        Rows = [ [| Integer 11L; Boolean false |] ]
+      }
+
+    let queryResult = runQuery "SELECT diffix_count(id) AS dc, diffix_low_count(id) AS lc FROM products"
+    queryResult |> should equal expected
+
   interface IClassFixture<DBFixture>
