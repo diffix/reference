@@ -16,6 +16,7 @@ let defaultSelect =
     Where = None
     GroupBy = []
     Having = None
+    Limit = None
   }
 
 let expectFail query =
@@ -388,3 +389,8 @@ let ``Parse sub-query`` () =
 let ``Parses star select`` () =
   parseFragment selectQuery "SELECT * FROM table"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ] })
+
+[<Fact>]
+let ``Parses limit`` () =
+  parseFragment selectQuery "SELECT * FROM table LIMIT 10"
+  |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ]; Limit = Some(10u) })

@@ -78,6 +78,8 @@ module QueryParser =
 
   let havingClause = word "HAVING" >>. expr
 
+  let limitClause = word "LIMIT" >>. puint32
+
   let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 
   let distinct = opt (word "distinct") |>> Option.isSome
@@ -131,18 +133,21 @@ module QueryParser =
                                  opt groupBy
                                  >>= fun groupBy ->
                                        opt havingClause
-                                       >>= fun havingClause ->
-                                             let query =
-                                               {
-                                                 SelectDistinct = distinct
-                                                 Expressions = columns
-                                                 From = from
-                                                 Where = whereClause
-                                                 GroupBy = groupBy |> Option.defaultValue []
-                                                 Having = havingClause
-                                               }
+                                       >>= fun having ->
+                                             opt limitClause
+                                             >>= fun limit ->
+                                                   let query =
+                                                     {
+                                                       SelectDistinct = distinct
+                                                       Expressions = columns
+                                                       From = from
+                                                       Where = whereClause
+                                                       GroupBy = groupBy |> Option.defaultValue []
+                                                       Having = having
+                                                       Limit = limit
+                                                     }
 
-                                             preturn (Expression.SelectQuery query)
+                                                   preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore
