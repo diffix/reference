@@ -42,6 +42,10 @@ let validateSelectTarget selectQuery =
 
   selectQuery |> visit rangeVisitor
 
+let private validateLimitUsage selectQuery =
+  if selectQuery.Limit <> None then
+    failwith "Limit is not allowed in anonymizing subqueries"
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -51,3 +55,4 @@ let validateQuery (selectQuery: SelectQuery) =
   validateOnlyCount selectQuery
   allowedCountUsage selectQuery
   validateSelectTarget selectQuery
+  validateLimitUsage selectQuery

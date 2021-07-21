@@ -227,6 +227,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
       GroupingSets = [ GroupingSet groupBy ]
       Having = havingClause
       OrderBy = []
+      Limit = selectQuery.Limit
     }
 
 // ----------------------------------------------------------------
@@ -287,7 +288,7 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
   let isAnonymizing = aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
   if isAnonymizing then
-    QueryValidator.validateQuery selectQuery
+    QueryValidator.validateQuery { selectQuery with Limit = None }
 
     selectQuery
     |> rewriteToDiffixAggregate aidColumnsExpression

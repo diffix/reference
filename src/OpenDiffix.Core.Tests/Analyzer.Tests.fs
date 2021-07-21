@@ -28,6 +28,7 @@ let defaultQuery =
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
+    Limit = None
   }
 
 let testParsedQuery queryString expected =
@@ -158,6 +159,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           ]
         )
       OrderBy = []
+      Limit = None
     }
 
 [<Fact>]
@@ -293,6 +295,11 @@ type Tests(db: DBFixture) =
     |> Analyzer.rewrite context
     |> Query.assertSelectQuery
 
+  let ensureQueryFails query error =
+    try
+      query |> Parser.parse |> Analyzer.analyze context |> ignore
+    with ex -> ex.Message |> should equal error
+
   [<Fact>]
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
@@ -401,5 +408,15 @@ type Tests(db: DBFixture) =
                  "x"
                )
          }
+
+  [<Fact>]
+  let ``Reject limiting anonymizing subquery`` () =
+    ensureQueryFails
+      "SELECT count(*) FROM (SELECT city FROM customers_small LIMIT 1) t"
+      "Limit is not allowed in anonymizing subqueries"
+
+  [<Fact>]
+  let ``Allow limiting top query`` () =
+    analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
 
   interface IClassFixture<DBFixture>

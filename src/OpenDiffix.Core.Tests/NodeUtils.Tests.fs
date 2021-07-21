@@ -28,6 +28,7 @@ let selectQuery =
     GroupingSets = [ GroupingSet [ expression ] ]
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
+    Limit = None
   }
 
 let selectQueryNegative =
@@ -38,6 +39,7 @@ let selectQueryNegative =
     GroupingSets = [ GroupingSet [ negativeExpression ] ]
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
+    Limit = None
   }
 
 [<Fact>]

@@ -33,6 +33,7 @@ type NodeFunctions =
       GroupingSets = NodeFunctions.Map(query.GroupingSets, f)
       OrderBy = NodeFunctions.Map(query.OrderBy, f)
       Having = f query.Having
+      Limit = query.Limit
     }
 
   // TargetEntry

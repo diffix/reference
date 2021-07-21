@@ -26,6 +26,7 @@ let emptySelect =
     GroupingSets = []
     Having = constTrue
     OrderBy = []
+    Limit = None
   }
 
 let column index =
