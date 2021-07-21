@@ -229,6 +229,37 @@ let ``Selecting columns from invalid table`` () =
 let ``Selecting ambiguous table names`` () =
   testQueryError "SELECT count(*) FROM table, table AS Table"
 
+[<Fact>]
+let ``Star selecting columns from a table`` () =
+  testParsedQuery
+    "SELECT * FROM table"
+    { defaultQuery with
+        TargetList =
+          [
+            {
+              Expression = ColumnReference(0, StringType)
+              Alias = "str_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(1, IntegerType)
+              Alias = "int_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(2, RealType)
+              Alias = "float_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(3, BooleanType)
+              Alias = "bool_col"
+              Tag = RegularTargetEntry
+            }
+          ]
+    }
+
+
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema()
 
@@ -370,35 +401,5 @@ type Tests(db: DBFixture) =
                  "x"
                )
          }
-
-  [<Fact>]
-  let ``Star selecting columns from a table`` () =
-    testParsedQuery
-      "SELECT * FROM table"
-      { defaultQuery with
-          TargetList =
-            [
-              {
-                Expression = ColumnReference(0, StringType)
-                Alias = "str_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(1, IntegerType)
-                Alias = "int_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(2, RealType)
-                Alias = "float_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(3, BooleanType)
-                Alias = "bool_col"
-                Tag = RegularTargetEntry
-              }
-            ]
-      }
 
   interface IClassFixture<DBFixture>
