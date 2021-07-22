@@ -288,7 +288,7 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
   let isAnonymizing = aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
   if isAnonymizing then
-    QueryValidator.validateQuery { selectQuery with Limit = None }
+    QueryValidator.validateQuery selectQuery
 
     selectQuery
     |> rewriteToDiffixAggregate aidColumnsExpression

@@ -297,7 +297,8 @@ type Tests(db: DBFixture) =
 
   let ensureQueryFails query error =
     try
-      query |> Parser.parse |> Analyzer.analyze context |> ignore
+      query |> analyzeQuery |> ignore
+      failwith "Expected query to fail"
     with ex -> ex.Message |> should equal error
 
   [<Fact>]

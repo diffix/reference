@@ -32,6 +32,7 @@ let private validateSubQuery query =
     failwith "Grouping in subqueries is not currently supported"
 
   validateSelectTarget selectQuery
+  validateLimitUsage selectQuery
 
 let validateSelectTarget selectQuery =
   let rec rangeVisitor range =
@@ -55,4 +56,3 @@ let validateQuery (selectQuery: SelectQuery) =
   validateOnlyCount selectQuery
   allowedCountUsage selectQuery
   validateSelectTarget selectQuery
-  validateLimitUsage selectQuery
