@@ -28,6 +28,7 @@ let defaultQuery =
     GroupingSets = [ GroupingSet [] ]
     Having = Boolean true |> Constant
     OrderBy = []
+    Limit = None
   }
 
 let testParsedQuery queryString expected =
@@ -158,6 +159,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           ]
         )
       OrderBy = []
+      Limit = None
     }
 
 [<Fact>]
@@ -229,6 +231,37 @@ let ``Selecting columns from invalid table`` () =
 let ``Selecting ambiguous table names`` () =
   testQueryError "SELECT count(*) FROM table, table AS Table"
 
+[<Fact>]
+let ``Star selecting columns from a table`` () =
+  testParsedQuery
+    "SELECT * FROM table"
+    { defaultQuery with
+        TargetList =
+          [
+            {
+              Expression = ColumnReference(0, StringType)
+              Alias = "str_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(1, IntegerType)
+              Alias = "int_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(2, RealType)
+              Alias = "float_col"
+              Tag = RegularTargetEntry
+            }
+            {
+              Expression = ColumnReference(3, BooleanType)
+              Alias = "bool_col"
+              Tag = RegularTargetEntry
+            }
+          ]
+    }
+
+
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema()
 
@@ -261,6 +294,12 @@ type Tests(db: DBFixture) =
     |> Analyzer.analyze context
     |> Analyzer.rewrite context
     |> Query.assertSelectQuery
+
+  let ensureQueryFails query error =
+    try
+      query |> analyzeQuery |> ignore
+      failwith "Expected query to fail"
+    with ex -> ex.Message |> should equal error
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -372,33 +411,13 @@ type Tests(db: DBFixture) =
          }
 
   [<Fact>]
-  let ``Star selecting columns from a table`` () =
-    testParsedQuery
-      "SELECT * FROM table"
-      { defaultQuery with
-          TargetList =
-            [
-              {
-                Expression = ColumnReference(0, StringType)
-                Alias = "str_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(1, IntegerType)
-                Alias = "int_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(2, RealType)
-                Alias = "float_col"
-                Tag = RegularTargetEntry
-              }
-              {
-                Expression = ColumnReference(3, BooleanType)
-                Alias = "bool_col"
-                Tag = RegularTargetEntry
-              }
-            ]
-      }
+  let ``Reject limiting anonymizing subquery`` () =
+    ensureQueryFails
+      "SELECT count(*) FROM (SELECT city FROM customers_small LIMIT 1) t"
+      "Limit is not allowed in anonymizing subqueries"
+
+  [<Fact>]
+  let ``Allow limiting top query`` () =
+    analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
 
   interface IClassFixture<DBFixture>

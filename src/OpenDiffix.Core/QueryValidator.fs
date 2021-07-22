@@ -32,6 +32,7 @@ let private validateSubQuery query =
     failwith "Grouping in subqueries is not currently supported"
 
   validateSelectTarget selectQuery
+  validateLimitUsage selectQuery
 
 let validateSelectTarget selectQuery =
   let rec rangeVisitor range =
@@ -41,6 +42,10 @@ let validateSelectTarget selectQuery =
     | RangeTable _ -> ()
 
   selectQuery |> visit rangeVisitor
+
+let private validateLimitUsage selectQuery =
+  if selectQuery.Limit <> None then
+    failwith "Limit is not allowed in anonymizing subqueries"
 
 // ----------------------------------------------------------------
 // Public API

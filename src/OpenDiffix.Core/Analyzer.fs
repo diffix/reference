@@ -227,6 +227,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
       GroupingSets = [ GroupingSet groupBy ]
       Having = havingClause
       OrderBy = []
+      Limit = selectQuery.Limit
     }
 
 // ----------------------------------------------------------------

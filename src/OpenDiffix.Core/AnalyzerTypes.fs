@@ -16,6 +16,7 @@ type SelectQuery =
     GroupingSets: GroupingSet list
     OrderBy: OrderBy list
     Having: Expression
+    Limit: uint option
   }
 
 type TargetEntry = { Expression: Expression; Alias: string; Tag: TargetEntryTag }

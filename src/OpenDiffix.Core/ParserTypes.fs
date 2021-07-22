@@ -19,6 +19,7 @@ type SelectQuery =
     Where: Expression option
     GroupBy: Expression list
     Having: Expression option
+    Limit: uint option
   }
 
 and Expression =

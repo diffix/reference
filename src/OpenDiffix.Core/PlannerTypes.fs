@@ -13,6 +13,7 @@ type Plan =
   | Unique of Plan
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
+  | Limit of Plan * amount: uint
 
 module Plan =
   let rec columnsCount (plan: Plan) =
@@ -26,3 +27,4 @@ module Plan =
     | Plan.Unique plan -> columnsCount plan
     | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
     | Plan.Append (first, _) -> columnsCount first
+    | Plan.Limit (plan, _) -> columnsCount plan

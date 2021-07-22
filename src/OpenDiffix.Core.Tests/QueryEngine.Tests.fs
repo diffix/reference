@@ -156,6 +156,17 @@ type Tests(db: DBFixture) =
     queryResult |> should equal expected
 
   [<Fact>]
+  let ``query 12 - limit`` () =
+    let expected =
+      {
+        Columns = [ { Name = "id"; Type = IntegerType } ]
+        Rows = [ [| Integer 1L |]; [| Integer 2L |]; [| Integer 3L |] ]
+      }
+
+    let queryResult = runQuery "SELECT id FROM products LIMIT 3"
+    queryResult |> should equal expected
+
+  [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
     equivalentQueries
       "SELECT p.name AS n FROM products AS p WHERE id = 1"
