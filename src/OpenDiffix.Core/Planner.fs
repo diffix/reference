@@ -79,6 +79,11 @@ let private planFrom queryRange =
   | Join join -> planJoin join
   | SubQuery (query, _alias) -> query |> Query.assertSelectQuery |> planQuery
 
+let private planLimit amount plan =
+  match amount with
+  | None -> plan
+  | Some amount -> Plan.Limit(plan, amount)
+
 let private planQuery query =
   let selectedExpressions = query.TargetList |> List.map (fun column -> column.Expression)
   let orderByExpressions = query.OrderBy |> List.map (fun (OrderBy (expression, _, _)) -> expression)
@@ -96,6 +101,7 @@ let private planQuery query =
   |> planFilter havingExpression
   |> planSort orderByExpressions
   |> planProject selectedExpressions
+  |> planLimit query.Limit
 
 let private filterJunk targetList plan =
   let columns =

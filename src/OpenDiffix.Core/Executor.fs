@@ -43,6 +43,12 @@ let private executeFilter context (childPlan, condition) : seq<Row> =
 let private executeSort context (childPlan, orderings) : seq<Row> =
   childPlan |> execute context |> Expression.sortRows context orderings
 
+let private executeLimit context (childPlan, amount) : seq<Row> =
+  if amount > uint System.Int32.MaxValue then
+    failwith "`LIMIT` amount is greater than supported range"
+
+  childPlan |> execute context |> Seq.truncate (int amount)
+
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
@@ -110,4 +116,5 @@ let rec execute context plan : seq<Row> =
   | Plan.Sort (plan, orderings) -> executeSort context (plan, orderings)
   | Plan.Aggregate (plan, labels, aggregators) -> executeAggregate context (plan, labels, aggregators)
   | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin context (leftPlan, rightPlan, joinType, on)
+  | Plan.Limit (plan, amount) -> executeLimit context (plan, amount)
   | _ -> failwith "Plan execution not implemented"
