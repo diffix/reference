@@ -16,16 +16,17 @@ module QueryParser =
     let isIdentifierChar token =
       isLetter token || isDigit token || token = '_'
 
-    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> spaces
+    many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier"
 
   let quotedIdentifier =
     let isIdentifierChar token = token <> '"' && token <> '\n'
+
     pchar '"' >>. many1SatisfyL isIdentifierChar "quoted identifier" .>> pchar '"'
 
-  let anyIdentifier = simpleIdentifier <|> quotedIdentifier
+  let identifier = (simpleIdentifier <|> quotedIdentifier) .>> spaces
 
-  let identifier =
-    anyIdentifier .>>. opt (pchar '.' >>. anyIdentifier)
+  let qualifiedIdentifier =
+    identifier .>>. opt (pchar '.' >>. identifier)
     |>> function
     | name, None -> Expression.Identifier(None, name)
     | name1, Some name2 -> Expression.Identifier(Some name1, name2)
@@ -43,6 +44,9 @@ module QueryParser =
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   let star = word "*" |>> fun _ -> Expression.Star
+
+  let alias = word "AS" >>. identifier
+
   // This custom numbers parser is needed as both pint64 and pfloat are eager
   // to the point of not being possible to combine. pint64 would parse 1.2 as 1,
   // and pfloat would parse 1 as 1.0.
@@ -67,7 +71,7 @@ module QueryParser =
   let spaceSepUnaliasedExpressions = many1 expr
 
   let functionExpression =
-    simpleIdentifier .>>. inParenthesis expr .>> spaces
+    simpleIdentifier .>> spaces .>>. inParenthesis expr .>> spaces
     |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
 
   let typeName = word "text" <|> word "integer" <|> word "real" <|> word "boolean"
@@ -76,7 +80,7 @@ module QueryParser =
     word "cast" >>. inParenthesis (expr .>> word "as" .>>. typeName) .>> spaces
     |>> fun (expr, typeName) -> Function("cast", [ expr; String typeName ])
 
-  let selectedExpression = expr .>>. opt (word "AS" >>. simpleIdentifier) |>> As
+  let selectedExpression = expr .>>. opt alias |>> As
 
   let commaSepExpressions = commaSeparated (star <|> selectedExpression) .>> spaces
 
@@ -90,7 +94,7 @@ module QueryParser =
 
   let distinct = opt (word "distinct") |>> Option.isSome
 
-  let table = simpleIdentifier .>>. opt (word "AS" >>. simpleIdentifier) |>> Expression.Table
+  let table = identifier .>>. opt alias |>> Expression.Table
 
   let joinType =
     choice [
@@ -104,7 +108,7 @@ module QueryParser =
   let selectQuery, selectQueryRef = createParserForwardedToRef<Expression, unit> ()
 
   let subQuery =
-    inParenthesis selectQuery .>>. simpleIdentifier
+    inParenthesis selectQuery .>>. identifier
     >>= function
     | SelectQuery subQuery, alias -> preturn <| SubQuery(subQuery, alias)
     | _ -> fail "Expected sub-query"
@@ -214,7 +218,7 @@ module QueryParser =
       number
       boolean
       stringLiteral
-      identifier
+      qualifiedIdentifier
     ]
 
   let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof

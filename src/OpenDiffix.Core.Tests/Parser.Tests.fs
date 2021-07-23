@@ -396,11 +396,39 @@ let ``Parses limit`` () =
   |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ]; Limit = Some(10u) })
 
 [<Fact>]
-let ``Parses quoted indentifier 1`` () =
+let ``Parses quoted identifier 1`` () =
   parseFragment selectQuery "SELECT \"*-\\(\" FROM table"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "*-\\("), None) ] })
 
 [<Fact>]
-let ``Parses quoted indentifier 2`` () =
+let ``Parses quoted identifier 2`` () =
   parseFragment selectQuery "SELECT \"(a)\".\"(b)\" FROM table"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(Some "(a)", "(b)"), None) ] })
+
+[<Fact>]
+let ``Parses quoted identifier 3`` () =
+  parseFragment selectQuery "SELECT * FROM \"table\""
+  |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ] })
+
+[<Fact>]
+let ``Parses quoted identifier 4`` () =
+  parseFragment selectQuery "SELECT a FROM table GROUP BY \"a\" LIMIT 1"
+  |> should
+       equal
+       (SelectQuery
+         { defaultSelect with
+             Expressions = [ As(Identifier(None, "a"), None) ]
+             GroupBy = [ Identifier(None, "a") ]
+             Limit = Some 1u
+         })
+
+[<Fact>]
+let ``Parses quoted alias`` () =
+  parseFragment selectQuery "SELECT a AS \"a b\" FROM table AS \"a b\""
+  |> should
+       equal
+       (SelectQuery
+         { defaultSelect with
+             Expressions = [ As(Identifier(None, "a"), Some "a b") ]
+             From = Table("table", Some "a b")
+         })
