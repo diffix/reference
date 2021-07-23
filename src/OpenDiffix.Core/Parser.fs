@@ -18,8 +18,14 @@ module QueryParser =
 
     many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> spaces
 
+  let quotedIdentifier =
+    let isIdentifierChar token = token <> '"' && token <> '\n'
+    pchar '"' >>. many1SatisfyL isIdentifierChar "quoted identifier" .>> pchar '"'
+
+  let anyIdentifier = simpleIdentifier <|> quotedIdentifier
+
   let identifier =
-    simpleIdentifier .>>. opt (pchar '.' >>. simpleIdentifier)
+    anyIdentifier .>>. opt (pchar '.' >>. anyIdentifier)
     |>> function
     | name, None -> Expression.Identifier(None, name)
     | name1, Some name2 -> Expression.Identifier(Some name1, name2)

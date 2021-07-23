@@ -394,3 +394,13 @@ let ``Parses star select`` () =
 let ``Parses limit`` () =
   parseFragment selectQuery "SELECT * FROM table LIMIT 10"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ Star ]; Limit = Some(10u) })
+
+[<Fact>]
+let ``Parses quoted indentifier 1`` () =
+  parseFragment selectQuery "SELECT \"*-\\(\" FROM table"
+  |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "*-\\("), None) ] })
+
+[<Fact>]
+let ``Parses quoted indentifier 2`` () =
+  parseFragment selectQuery "SELECT \"(a)\".\"(b)\" FROM table"
+  |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(Some "(a)", "(b)"), None) ] })
