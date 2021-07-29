@@ -65,7 +65,7 @@ type private Sum(sum: Value) =
 
     member this.Final _ctx = sum
 
-type private DiffixCount(perAidCounts: (Map<AidHash, float> * int64) list option) =
+type private DiffixCount(minCount, perAidCounts: (Map<AidHash, float> * int64) list option) =
   /// Initializes (if not already initialized) per aid counts with empty maps.
   let initializeCounts aidInstances counts =
     match counts with
@@ -109,22 +109,24 @@ type private DiffixCount(perAidCounts: (Map<AidHash, float> * int64) list option
     | Value.List aidInstances -> increaseContributions valueIncrease aidInstances
     | _ -> failwith "Expecting a list as input"
 
-  new() = DiffixCount(None)
+  new(minCount) = DiffixCount(minCount, None)
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ aidInstances; Null ] -> updateAidMaps aidInstances 0L |> DiffixCount
+      | [ aidInstances; Null ] -> DiffixCount(minCount, updateAidMaps aidInstances 0L)
       | [ aidInstances ]
-      | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L |> DiffixCount
+      | [ aidInstances; _ ] -> DiffixCount(minCount, updateAidMaps aidInstances 1L)
       | _ -> invalidArgs args
       :> IAggregator
 
     member this.Final ctx =
-      Anonymizer.count ctx.AnonymizationParams perAidCounts
+      match Anonymizer.count ctx.AnonymizationParams perAidCounts with
+      | Null -> Integer minCount
+      | value -> value
 
-type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash> list>) =
-  new() = DiffixCountDistinct(0, Map.empty)
+type private DiffixCountDistinct(minCount, aidsCount, aidsPerValue: Map<Value, Set<AidHash> list>) =
+  new(minCount) = DiffixCountDistinct(minCount, 0, Map.empty)
 
   interface IAggregator with
     member this.Transition args =
@@ -153,6 +155,7 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
             )
 
           DiffixCountDistinct(
+            minCount,
             aidInstances.Length,
             Map.change value (Option.map transitionEntry >> Option.orElseWith initialEntry) aidsPerValue
           )
@@ -160,7 +163,9 @@ type private DiffixCountDistinct(aidsCount, aidsPerValue: Map<Value, Set<AidHash
       :> IAggregator
 
     member this.Final ctx =
-      Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams
+      match Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams with
+      | Null -> Integer minCount
+      | value -> value
 
 type private DiffixLowCount(aidValueSets: Set<AidHash> list option) =
   new() = DiffixLowCount(None)
@@ -210,13 +215,15 @@ type private MergeAids(aidValueSet: Set<Value>) =
 
 type T = IAggregator
 
-let create _ctx fn : T =
+let create ctx globalBucket fn : T =
+  let minDiffixCount = if globalBucket then 0L else int64 ctx.AnonymizationParams.MinimumAllowedAids
+
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T
   | AggregateFunction (Count, { Distinct = true }) -> CountDistinct() :> T
   | AggregateFunction (Sum, { Distinct = false }) -> Sum() :> T
-  | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount() :> T
-  | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct() :> T
+  | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount(minDiffixCount) :> T
+  | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct(minDiffixCount) :> T
   | AggregateFunction (DiffixLowCount, _) -> DiffixLowCount() :> T
   | AggregateFunction (MergeAids, _) -> MergeAids() :> T
   | _ -> failwith "Invalid aggregator"
