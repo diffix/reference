@@ -38,9 +38,6 @@ let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
 let encodeThreshold (t: Threshold) =
   Encode.object [ "lower", Encode.int t.Lower; "upper", Encode.int t.Upper ]
 
-let encodeNoiseParam (np: NoiseParam) =
-  Encode.object [ "standard_dev", Encode.float np.StandardDev; "cutoff", Encode.float np.Cutoff ]
-
 let encodeTableSettings (ts: TableSettings) =
   Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
 
@@ -57,7 +54,7 @@ let encodeAnonParams (ap: AnonymizationParams) =
     "minimum_allowed_aid_values", Encode.int ap.MinimumAllowedAids
     "outlier_count", encodeThreshold ap.OutlierCount
     "top_count", encodeThreshold ap.TopCount
-    "noise", encodeNoiseParam ap.Noise
+    "noise_sd", Encode.float ap.NoiseSD
   ]
 
 let encodeRequestParams query dbPath anonParams =

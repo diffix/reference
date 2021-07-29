@@ -126,13 +126,6 @@ type Threshold =
   }
   static member Default = { Lower = 2; Upper = 5 }
 
-type NoiseParam =
-  {
-    StandardDev: float
-    Cutoff: float
-  }
-  static member Default = { StandardDev = 2.; Cutoff = 3. }
-
 type TableSettings = { AidColumns: string list }
 
 type AnonymizationParams =
@@ -144,7 +137,7 @@ type AnonymizationParams =
     // Count params
     OutlierCount: Threshold
     TopCount: Threshold
-    Noise: NoiseParam
+    NoiseSD: float
   }
   static member Default =
     {
@@ -153,7 +146,7 @@ type AnonymizationParams =
       MinimumAllowedAids = 2
       OutlierCount = Threshold.Default
       TopCount = Threshold.Default
-      Noise = NoiseParam.Default
+      NoiseSD = 2.
     }
 
 type EvaluationContext =

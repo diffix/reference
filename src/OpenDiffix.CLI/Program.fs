@@ -21,7 +21,7 @@ type CliArguments =
   | [<Unique>] Minimum_Allowed_Aid_Values of threshold: int
 
   // General anonymization parameters
-  | [<Unique>] Noise of std_dev: float * factor: float
+  | [<Unique>] Noise_SD of std_dev: float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -46,10 +46,7 @@ type CliArguments =
           + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
       | Minimum_Allowed_Aid_Values _ ->
           "Sets the bound for the minimum number of AID values must be present in a bucket for it to pass the low count filter."
-      | Noise _ ->
-          "Specifies the standard deviation used when calculating the noise throughout the system. "
-          + "Additionally, a factor for the SD must be specified which is used to truncate the normal "
-          + "distributed value generated."
+      | Noise_SD _ -> "Specifies the standard deviation used when calculating the noise throughout the system."
 
 let executableName = "OpenDiffix.CLI"
 
@@ -65,8 +62,8 @@ let toThreshold =
 
 let toNoise =
   function
-  | Some (stdDev, cutoffFactor) -> { StandardDev = stdDev; Cutoff = cutoffFactor }
-  | _ -> NoiseParam.Default
+  | Some stdDev -> stdDev
+  | _ -> AnonymizationParams.Default.NoiseSD
 
 let private toTableSettings (aidColumns: string list option) =
   aidColumns
@@ -87,7 +84,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
     OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
     TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
-    Noise = parsedArgs.TryGetResult Noise |> toNoise
+    NoiseSD = parsedArgs.TryGetResult Noise_SD |> toNoise
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
