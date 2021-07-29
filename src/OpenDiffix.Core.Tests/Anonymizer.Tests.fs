@@ -34,7 +34,7 @@ let context =
           MinimumAllowedAids = 2
           OutlierCount = { Lower = 1; Upper = 1 }
           TopCount = { Lower = 1; Upper = 1 }
-          Noise = { StandardDev = 1.; Cutoff = 0. }
+          NoiseSD = 0.
         }
   }
 

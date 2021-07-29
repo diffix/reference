@@ -22,16 +22,10 @@ let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHas
   let seed = combinedAids ^^^ anonymizationParams.Salt
   Random(int seed)
 
-let private noiseValue rnd (noiseParam: NoiseParam) =
-  let absoluteCutoff = noiseParam.Cutoff * noiseParam.StandardDev
+let private noiseValue rnd noiseSD = randomNormal rnd noiseSD
 
-  noiseParam.StandardDev
-  |> randomNormal rnd
-  |> max -absoluteCutoff
-  |> min absoluteCutoff
-
-let private noiseValueInt rnd (noiseParam: NoiseParam) =
-  noiseValue rnd noiseParam |> round |> int32
+let private noiseValueInt rnd noiseSD =
+  noiseValue rnd noiseSD |> round |> int32
 
 // ----------------------------------------------------------------
 // AID processing
@@ -93,14 +87,14 @@ let inline private aidFlattening
     let flattenedAvg = flattenedSum / float sortedUserContributions.Length
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
-    let noiseSD = anonymizationParams.Noise.StandardDev * noiseScale
+    let noiseSD = anonymizationParams.NoiseSD * noiseScale
 
     Some
       {
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         NoiseSD = noiseSD
-        Noise = noiseValue rnd { anonymizationParams.Noise with StandardDev = noiseSD }
+        Noise = noiseValue rnd noiseSD
       }
 
 let mapValueSet value =
