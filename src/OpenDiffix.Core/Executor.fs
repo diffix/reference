@@ -52,7 +52,7 @@ let private executeLimit context (childPlan, amount) : seq<Row> =
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
-  let defaultAggregators = aggFns |> Array.map (Aggregator.create context)
+  let defaultAggregators = aggFns |> Array.map (Aggregator.create context (Array.isEmpty groupingLabels))
 
   let initialState : Map<Row, Aggregator.T array> =
     if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []

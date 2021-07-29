@@ -106,16 +106,16 @@ let ``anon count(col)`` () =
   |> should equal (Integer 30L)
 
 [<Fact>]
-let ``anon count returns Null if insufficient users`` () =
+let ``anon count returns 0 if insufficient users`` () =
   let firstRow = rows |> List.take 1
 
   firstRow
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
-  |> should equal Null
+  |> should equal (Integer 0L)
 
   firstRow
   |> evaluateAggregator diffixCount [ allAidColumns; aidColumn ]
-  |> should equal Null
+  |> should equal (Integer 0L)
 
 [<Fact>]
 let ``anon count returns 0 for Null inputs`` () =
@@ -126,12 +126,12 @@ let ``anon count returns 0 for Null inputs`` () =
   |> should equal (Integer 0L)
 
 [<Fact>]
-let ``anon count returns Null when all AIDs null`` () =
+let ``anon count returns 0 when all AIDs null`` () =
   let rows = [ 1L .. 10L ] |> List.map (fun _ -> [| Null; String "value"; Null |])
 
   rows
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
-  |> should equal Null
+  |> should equal (Integer 0L)
 
 [<Fact>]
 let ``multi-AID count`` () =
@@ -223,7 +223,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   |> should equal (Integer 2L)
 
 [<Fact>]
-let ``counts with insufficient values for one AID return Null`` () =
+let ``counts with insufficient values for one AID return 0`` () =
   let rows =
     [
       // AID1; AID2; Fruit
@@ -241,11 +241,11 @@ let ``counts with insufficient values for one AID return Null`` () =
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext diffixCount [ allAidColumns; value ]
-  |> should equal Null
+  |> should equal (Integer 0L)
 
   rows
   |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; value ]
-  |> should equal Null
+  |> should equal (Integer 0L)
 
 [<Fact>]
 let ``allows null-values for some of the AID rows`` () =
