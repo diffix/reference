@@ -117,12 +117,23 @@ let runQuery query filePath anonParams =
   let context = EvaluationContext.make anonParams dataProvider
   QueryEngine.run context query
 
+let quoteString (string: string) =
+  "\"" + string.Replace("\"", "\"\"") + "\""
+
+let csvFormat value =
+  match value with
+  | String string -> quoteString string
+  | _ -> Value.toString value
+
 let csvFormatter result =
-  let header = result.Columns |> List.map (fun column -> column.Name) |> String.join ","
+  let header =
+    result.Columns
+    |> List.map (fun column -> quoteString column.Name)
+    |> String.join ","
 
   let rows =
     result.Rows
-    |> List.map (fun row -> row |> Array.map Value.toString |> String.join ",")
+    |> List.map (fun row -> row |> Array.map csvFormat |> String.join ",")
 
   header :: rows |> String.join "\n"
 
