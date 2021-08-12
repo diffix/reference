@@ -4,7 +4,6 @@
     <TargetFramework>net5.0</TargetFramework>
     <Authors>Open Diffix</Authors>
     <Description>CLI interface to the Open Diffix Reference anonymizer</Description>
-    <PublishTrimmed>true</PublishTrimmed>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
