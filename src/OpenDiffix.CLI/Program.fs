@@ -7,7 +7,8 @@ open OpenDiffix.Core.QueryEngine
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
-  | [<Unique; AltCommandLine("-f")>] File_Path of file_path: string
+  | [<Unique; AltCommandLine("-f")>] In_File_Path of file_path: string
+  | [<Unique; AltCommandLine("-o")>] Out_File_Path of file_path: string
   | Aid_Columns of column_name: string list
   | [<AltCommandLine("-q")>] Query of sql: string
   | Queries_Path of path: string
@@ -27,13 +28,13 @@ type CliArguments =
     member this.Usage =
       match this with
       | Version -> "Prints the version number of the program."
-      | File_Path _ -> "Specifies the path on disk to the SQLite or CSV file containing the data to be anonymized."
+      | In_File_Path _ -> "Specifies the path on disk to the SQLite or CSV file containing the data to be anonymized."
+      | Out_File_Path _ ->
+          "Specifies the path on disk where the output is to be written. By default, standard out is used."
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
-          "Path to a file containing a list of query specifications. All queries will be executed in "
-          + "batch mode, and the results will be written to standard out. Please consult the README for the query "
-          + "file specification."
+          "Path to a file containing a list of query specifications. All queries will be executed in batch mode."
       | Query_Stdin -> "Reads the query from standard in."
       | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
@@ -93,14 +94,19 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
   | None, true -> Console.In.ReadLine()
   | _, _ -> failWithUsageInfo "Please specify one (and only one) of the query input methods."
 
-let getFilePath (parsedArgs: ParseResults<CliArguments>) =
-  match parsedArgs.TryGetResult CliArguments.File_Path with
+let getInFilePath (parsedArgs: ParseResults<CliArguments>) =
+  match parsedArgs.TryGetResult CliArguments.In_File_Path with
   | Some filePath ->
       if File.Exists(filePath) then
         filePath
       else
         failWithUsageInfo $"Could not find a file at %s{filePath}"
   | None -> failWithUsageInfo "Please specify the file path."
+
+let getOutputStream (parsedArgs: ParseResults<CliArguments>) =
+  match parsedArgs.TryGetResult CliArguments.Out_File_Path with
+  | Some filePath -> new StreamWriter(filePath)
+  | None -> new StreamWriter(Console.OpenStandardOutput())
 
 let dryRun query filePath anonParams =
   let encodedRequest = JsonEncodersDecoders.encodeRequestParams query filePath anonParams
@@ -182,11 +188,13 @@ let main argv =
 
     else
       let query = getQuery parsedArguments
-      let filePath = getFilePath parsedArguments
+      let inFilePath = getInFilePath parsedArguments
       let anonParams = constructAnonParameters parsedArguments
       let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
-      let output = runQuery query filePath anonParams |> outputFormatter
-      printfn $"%s{output}"
+      let output = runQuery query inFilePath anonParams |> outputFormatter
+
+      use writer = getOutputStream parsedArguments
+      fprintfn writer $"%s{output}"
       0
 
   with e ->
