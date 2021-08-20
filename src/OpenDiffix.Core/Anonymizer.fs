@@ -1,6 +1,7 @@
 module OpenDiffix.Core.Anonymizer
 
 open System
+open System.Security.Cryptography
 
 // ----------------------------------------------------------------
 // Random & noise
@@ -25,10 +26,15 @@ type private Random64(seed: uint64) =
 
     stdDev * randStdNormal
 
-let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
-  let combinedAids = Seq.fold (^^^) 0UL aidSet
-  let seed = combinedAids ^^^ anonymizationParams.Salt
-  Random64(seed)
+let private cryptoHashSaltedAid salt (aid: AidHash) =
+  let aidBytes = BitConverter.GetBytes(aid)
+  use sha256 = SHA256Managed.Create()
+  sha256.ComputeHash(Array.append salt aidBytes)
+
+let private newRandom anonymizationParams (aidSet: AidHash seq) =
+  let setAid = Seq.fold (^^^) 0UL aidSet
+  let hash = cryptoHashSaltedAid anonymizationParams.Salt setAid
+  Random64(BitConverter.ToUInt64(hash, 0))
 
 // ----------------------------------------------------------------
 // AID processing
