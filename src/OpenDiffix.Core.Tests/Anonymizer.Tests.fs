@@ -30,7 +30,7 @@ let context =
       AnonymizationParams =
         {
           TableSettings = Map.empty
-          Salt = 0UL
+          Salt = [||]
           MinimumAllowedAids = 2
           OutlierCount = { Lower = 1; Upper = 1 }
           TopCount = { Lower = 1; Upper = 1 }

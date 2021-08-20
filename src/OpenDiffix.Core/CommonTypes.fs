@@ -131,7 +131,7 @@ type TableSettings = { AidColumns: string list }
 type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
-    Salt: uint64
+    Salt: byte []
     MinimumAllowedAids: int
 
     // Count params
@@ -142,7 +142,7 @@ type AnonymizationParams =
   static member Default =
     {
       TableSettings = Map.empty
-      Salt = 0UL
+      Salt = [||]
       MinimumAllowedAids = 2
       OutlierCount = Threshold.Default
       TopCount = Threshold.Default

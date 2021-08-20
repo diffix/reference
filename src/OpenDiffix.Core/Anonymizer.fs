@@ -1,12 +1,15 @@
 module OpenDiffix.Core.Anonymizer
 
+open System
+open System.Security.Cryptography
+
 // ----------------------------------------------------------------
 // Random & noise
 // ----------------------------------------------------------------
 
 // A 64-bit RNG built from 2 32-bit RNGs.
-type private Random(seed: uint64) =
-  let mutable state = (System.Random(int seed), System.Random(int (seed >>> 32)))
+type private Random64(seed: uint64) =
+  let mutable state = (Random(int seed), Random(int (seed >>> 32)))
 
   member this.Uniform(threshold: Threshold) =
     let (state1, state2) = state
@@ -19,14 +22,20 @@ type private Random(seed: uint64) =
     let u1 = 1.0 - state1.NextDouble()
     let u2 = 1.0 - state2.NextDouble()
 
-    let randStdNormal = System.Math.Sqrt(-2.0 * log u1) * System.Math.Sin(2.0 * System.Math.PI * u2)
+    let randStdNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
 
     stdDev * randStdNormal
 
-let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
-  let combinedAids = Seq.fold (^^^) 0UL aidSet
-  let seed = combinedAids ^^^ anonymizationParams.Salt
-  Random(seed)
+let private sha256 = SHA256.Create()
+
+let private cryptoHashSaltedAid salt (aid: AidHash) =
+  let aidBytes = BitConverter.GetBytes(aid)
+  sha256.ComputeHash(Array.append salt aidBytes)
+
+let private newRandom anonymizationParams (aidSet: AidHash seq) =
+  let setAid = Seq.fold (^^^) 0UL aidSet
+  let hash = cryptoHashSaltedAid anonymizationParams.Salt setAid
+  Random64(BitConverter.ToUInt64(hash, 0))
 
 // ----------------------------------------------------------------
 // AID processing
