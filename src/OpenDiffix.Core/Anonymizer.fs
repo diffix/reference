@@ -26,9 +26,10 @@ type private Random64(seed: uint64) =
 
     stdDev * randStdNormal
 
+let private sha256 = SHA256.Create()
+
 let private cryptoHashSaltedAid salt (aid: AidHash) =
   let aidBytes = BitConverter.GetBytes(aid)
-  use sha256 = SHA256Managed.Create()
   sha256.ComputeHash(Array.append salt aidBytes)
 
 let private newRandom anonymizationParams (aidSet: AidHash seq) =
