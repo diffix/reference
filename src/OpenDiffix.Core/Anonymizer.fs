@@ -1,31 +1,32 @@
 module OpenDiffix.Core.Anonymizer
 
-open System
-
 // ----------------------------------------------------------------
 // Random & noise
 // ----------------------------------------------------------------
 
-let private randomUniform (rnd: Random) (threshold: Threshold) =
-  rnd.Next(threshold.Lower, threshold.Upper + 1)
+// A 64-bit RNG built from 2 32-bit RNGs.
+type private Random(seed: uint64) =
+  let mutable state = (System.Random(int seed), System.Random(int (seed >>> 32)))
 
-let private randomNormal (rnd: Random) stdDev =
-  let u1 = 1.0 - rnd.NextDouble()
-  let u2 = 1.0 - rnd.NextDouble()
+  member this.Uniform(threshold: Threshold) =
+    let (state1, state2) = state
+    state <- (state2, state1) // Rotate the 32-bit RNGs.
+    state1.Next(threshold.Lower, threshold.Upper + 1)
 
-  let randStdNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
+  member this.Normal(stdDev) =
+    let (state1, state2) = state
 
-  stdDev * randStdNormal
+    let u1 = 1.0 - state1.NextDouble()
+    let u2 = 1.0 - state2.NextDouble()
+
+    let randStdNormal = System.Math.Sqrt(-2.0 * log u1) * System.Math.Sin(2.0 * System.Math.PI * u2)
+
+    stdDev * randStdNormal
 
 let private newRandom (anonymizationParams: AnonymizationParams) (aidSet: AidHash seq) =
   let combinedAids = Seq.fold (^^^) 0UL aidSet
   let seed = combinedAids ^^^ anonymizationParams.Salt
-  Random(int seed)
-
-let private noiseValue rnd noiseSD = randomNormal rnd noiseSD
-
-let private noiseValueInt rnd noiseSD =
-  noiseValue rnd noiseSD |> round |> int32
+  Random(seed)
 
 // ----------------------------------------------------------------
 // AID processing
@@ -41,12 +42,12 @@ let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationP
       let rnd = newRandom anonymizationParams aidSet
 
       let threshold =
-        randomUniform
-          rnd
+        rnd.Uniform(
           {
             Lower = anonymizationParams.MinimumAllowedAids
             Upper = anonymizationParams.MinimumAllowedAids + 2
           }
+        )
 
       aidSet.Count < threshold
   )
@@ -61,8 +62,8 @@ let inline private aidFlattening
   : AidCount option =
   let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
 
-  let outlierCount = randomUniform rnd anonymizationParams.OutlierCount
-  let topCount = randomUniform rnd anonymizationParams.TopCount
+  let outlierCount = rnd.Uniform(anonymizationParams.OutlierCount)
+  let topCount = rnd.Uniform(anonymizationParams.TopCount)
 
   let sortedUserContributions = aidContributions |> List.map snd |> List.sortDescending
 
@@ -94,7 +95,7 @@ let inline private aidFlattening
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         NoiseSD = noiseSD
-        Noise = noiseValue rnd noiseSD
+        Noise = rnd.Normal(noiseSD)
       }
 
 let mapValueSet value =
