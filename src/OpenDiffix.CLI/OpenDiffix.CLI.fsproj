@@ -8,13 +8,11 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="JsonEncodersDecoders.fs" />
-    <Compile Include="CSVDataProvider.fs" />
     <Compile Include="SQLiteDataProvider.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.1.1" />
-    <PackageReference Include="CsvHelper" Version="27.1.0" />
     <PackageReference Include="GitInfo" Version="2.1.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
