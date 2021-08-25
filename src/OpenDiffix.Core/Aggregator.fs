@@ -216,7 +216,11 @@ type private MergeAids(aidValueSet: Set<Value>) =
 type T = IAggregator
 
 let create ctx globalBucket fn : T =
-  let minDiffixCount = if globalBucket then 0L else int64 ctx.AnonymizationParams.MinimumAllowedAids
+  let minDiffixCount =
+    if globalBucket then
+      0L
+    else
+      int64 ctx.AnonymizationParams.Supression.LowThreshold
 
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T
