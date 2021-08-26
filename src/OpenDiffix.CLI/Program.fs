@@ -7,21 +7,23 @@ open OpenDiffix.Core.QueryEngine
 
 type CliArguments =
   | [<AltCommandLine("-v")>] Version
-  | [<Unique; AltCommandLine("-f")>] File_Path of file_path: string
-  | Aid_Columns of column_name: string list
-  | [<AltCommandLine("-q")>] Query of sql: string
-  | Queries_Path of path: string
+  | [<Unique; AltCommandLine("-f")>] File_Path of string
+  | Aid_Columns of string list
+  | [<AltCommandLine("-q")>] Query of string
+  | Queries_Path of string
   | Query_Stdin
-  | [<Unique; AltCommandLine("-s")>] Salt of salt_value: string
+  | [<Unique; AltCommandLine("-s")>] Salt of string
   | Json
 
   // Threshold values
-  | [<Unique>] Threshold_Outlier_Count of lower: int * upper: int
-  | [<Unique>] Threshold_Top_Count of lower: int * upper: int
-  | [<Unique>] Minimum_Allowed_Aid_Values of threshold: int
+  | [<Unique>] Outlier_Count of int * int
+  | [<Unique>] Top_Count of int * int
+  | [<Unique>] Low_Threshold of int
+  | [<Unique>] Low_SD of float
+  | [<Unique>] Low_Mean_Gap of float
 
   // General anonymization parameters
-  | [<Unique>] Noise_SD of std_dev: float
+  | [<Unique>] Noise_SD of float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -35,15 +37,18 @@ type CliArguments =
       | Query_Stdin -> "Reads the query from standard in."
       | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
-      | Threshold_Outlier_Count _ ->
-          "Threshold used in the count aggregate to determine how many of the entities with the most extreme values "
+      | Outlier_Count _ ->
+          "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
           + "should be excluded. A number is picked from a uniform distribution between the upper and lower limit."
-      | Threshold_Top_Count _ ->
-          "Threshold used in the count aggregate together with the outlier count threshold. It determines how many "
+      | Top_Count _ ->
+          "Interval used in the count aggregate together with the outlier count interval. It determines how many "
           + "of the next most contributing users' values should be used to calculate the replacement value for the "
           + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
-      | Minimum_Allowed_Aid_Values _ ->
-          "Sets the bound for the minimum number of AID values must be present in a bucket for it to pass the low count filter."
+      | Low_Threshold _ ->
+          "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the low count filter."
+      | Low_SD _ -> "Sets the standard deviation for the low count filter threshold."
+      | Low_Mean_Gap _ ->
+          "Sets the number of standard deviations between the lower bound and the mean of the low count filter threshold."
       | Noise_SD _ -> "Specifies the standard deviation used when calculating the noise throughout the system."
 
 let executableName = "OpenDiffix.CLI"
@@ -53,10 +58,10 @@ let parser = ArgumentParser.Create<CliArguments>(programName = executableName)
 let failWithUsageInfo errorMsg =
   failwith $"%s{errorMsg}\n\nPlease run '%s{executableName} -h' for help."
 
-let toThreshold =
+let toInterval =
   function
   | Some (lower, upper) -> { Lower = lower; Upper = upper }
-  | _ -> Threshold.Default
+  | _ -> Interval.Default
 
 let toNoise =
   function
@@ -81,12 +86,25 @@ let toSalt =
   | _ -> [||]
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
+  let supression =
+    {
+      LowThreshold =
+        parsedArgs.TryGetResult Low_Threshold
+        |> Option.defaultValue SuppressionParams.Default.LowThreshold
+      SD =
+        parsedArgs.TryGetResult Low_SD
+        |> Option.defaultValue SuppressionParams.Default.SD
+      LowMeanGap =
+        parsedArgs.TryGetResult Low_Mean_Gap
+        |> Option.defaultValue SuppressionParams.Default.LowMeanGap
+    }
+
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
-    MinimumAllowedAids = parsedArgs.TryGetResult Minimum_Allowed_Aid_Values |> Option.defaultValue 2
-    OutlierCount = parsedArgs.TryGetResult Threshold_Outlier_Count |> toThreshold
-    TopCount = parsedArgs.TryGetResult Threshold_Top_Count |> toThreshold
+    Supression = supression
+    OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
+    TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
     NoiseSD = parsedArgs.TryGetResult Noise_SD |> toNoise
   }
 

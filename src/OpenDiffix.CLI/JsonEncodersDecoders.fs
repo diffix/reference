@@ -35,8 +35,8 @@ let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
     "rows", Encode.list (queryResult.Rows |> List.map encodeRow)
   ]
 
-let encodeThreshold (t: Threshold) =
-  Encode.object [ "lower", Encode.int t.Lower; "upper", Encode.int t.Upper ]
+let encodeInterval (i: Interval) =
+  Encode.object [ "lower", Encode.int i.Lower; "upper", Encode.int i.Upper ]
 
 let encodeTableSettings (ts: TableSettings) =
   Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
@@ -51,9 +51,11 @@ let encodeAnonParams (ap: AnonymizationParams) =
         Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
       )
     )
-    "minimum_allowed_aid_values", Encode.int ap.MinimumAllowedAids
-    "outlier_count", encodeThreshold ap.OutlierCount
-    "top_count", encodeThreshold ap.TopCount
+    "low_threshold", Encode.int ap.Supression.LowThreshold
+    "low_mean_gap", Encode.float ap.Supression.LowMeanGap
+    "low_sd", Encode.float ap.Supression.SD
+    "outlier_count", encodeInterval ap.OutlierCount
+    "top_count", encodeInterval ap.TopCount
     "noise_sd", Encode.float ap.NoiseSD
   ]
 

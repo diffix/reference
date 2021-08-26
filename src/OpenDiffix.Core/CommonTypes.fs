@@ -119,7 +119,7 @@ type IDataProvider =
 
 type AidHash = uint64
 
-type Threshold =
+type Interval =
   {
     Lower: int
     Upper: int
@@ -128,25 +128,33 @@ type Threshold =
 
 type TableSettings = { AidColumns: string list }
 
+type SuppressionParams =
+  {
+    LowThreshold: int
+    SD: float
+    LowMeanGap: float
+  }
+  static member Default = { LowThreshold = 2; SD = 1.; LowMeanGap = 2. }
+
 type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Salt: byte []
-    MinimumAllowedAids: int
+    Supression: SuppressionParams
 
     // Count params
-    OutlierCount: Threshold
-    TopCount: Threshold
+    OutlierCount: Interval
+    TopCount: Interval
     NoiseSD: float
   }
   static member Default =
     {
       TableSettings = Map.empty
       Salt = [||]
-      MinimumAllowedAids = 2
-      OutlierCount = Threshold.Default
-      TopCount = Threshold.Default
-      NoiseSD = 2.
+      Supression = SuppressionParams.Default
+      OutlierCount = Interval.Default
+      TopCount = Interval.Default
+      NoiseSD = 0.5
     }
 
 type EvaluationContext =

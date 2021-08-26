@@ -276,7 +276,7 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ "cid" ] }
         ]
       Salt = [||]
-      MinimumAllowedAids = 2
+      Supression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       NoiseSD = 0.

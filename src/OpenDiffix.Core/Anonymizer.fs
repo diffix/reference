@@ -11,10 +11,10 @@ open System.Security.Cryptography
 type private Random64(seed: uint64) =
   let mutable state = (Random(int seed), Random(int (seed >>> 32)))
 
-  member this.Uniform(threshold: Threshold) =
+  member this.Uniform(interval: Interval) =
     let (state1, state2) = state
     state <- (state2, state1) // Rotate the 32-bit RNGs.
-    state1.Next(threshold.Lower, threshold.Upper + 1)
+    state1.Next(interval.Lower, interval.Upper + 1)
 
   member this.Normal(stdDev) =
     let (state1, state2) = state
@@ -45,20 +45,16 @@ let private newRandom anonymizationParams (aidSet: AidHash seq) =
 let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
   aidSets
   |> List.map (fun aidSet ->
-    if aidSet.Count < anonymizationParams.MinimumAllowedAids then
+    let supression = anonymizationParams.Supression
+
+    if aidSet.Count < supression.LowThreshold then
       true
     else
       let rnd = newRandom anonymizationParams aidSet
+      let thresholdMean = supression.LowMeanGap + float supression.LowThreshold
+      let threshold = rnd.Normal(supression.SD) + thresholdMean
 
-      let threshold =
-        rnd.Uniform(
-          {
-            Lower = anonymizationParams.MinimumAllowedAids
-            Upper = anonymizationParams.MinimumAllowedAids + 2
-          }
-        )
-
-      aidSet.Count < threshold
+      float aidSet.Count < threshold
   )
   |> List.reduce (||)
 
