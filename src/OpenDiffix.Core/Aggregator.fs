@@ -123,6 +123,7 @@ type private DiffixCount(minCount, perAidCounts: (Map<AidHash, float> * int64) l
     member this.Final ctx =
       match Anonymizer.count ctx.AnonymizationParams perAidCounts with
       | Null -> Integer minCount
+      | Integer value -> Integer(max value minCount)
       | value -> value
 
 type private DiffixCountDistinct(minCount, aidsCount, aidsPerValue: Map<Value, Set<AidHash> list>) =
@@ -165,6 +166,7 @@ type private DiffixCountDistinct(minCount, aidsCount, aidsPerValue: Map<Value, S
     member this.Final ctx =
       match Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams with
       | Null -> Integer minCount
+      | Integer value -> Integer(max value minCount)
       | value -> value
 
 type private DiffixLowCount(aidValueSets: Set<AidHash> list option) =
