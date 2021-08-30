@@ -71,8 +71,8 @@ module QueryParser =
   let spaceSepUnaliasedExpressions = many1 expr
 
   let functionExpression =
-    simpleIdentifier .>> spaces .>>. inParenthesis expr .>> spaces
-    |>> fun (funName, expr) -> Function(funName.ToLower(), [ expr ])
+    simpleIdentifier .>> spaces .>>. inParenthesis (commaSeparated expr) .>> spaces
+    |>> fun (funName, exprs) -> Function(funName.ToLower(), exprs)
 
   let typeName = word "text" <|> word "integer" <|> word "real" <|> word "boolean"
 

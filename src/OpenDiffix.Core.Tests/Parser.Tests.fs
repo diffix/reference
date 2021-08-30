@@ -114,6 +114,9 @@ let ``Parses functions`` () =
          As(Function("hello", [ Identifier(None, "moon") ]), None)
        ]
 
+  parseFragment expr "hello('world', 1, 2.5)"
+  |> should equal (Function("hello", [ String("world"); Integer(1L); Float(2.5) ]))
+
 [<Fact>]
 let ``Parses casts`` () =
   parseFragment expr "cast(1 as boolean)"
