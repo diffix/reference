@@ -52,6 +52,7 @@ let ``Parses expressions`` () =
     "1.1", Float 1.1
     "1.01", Float 1.01
     "1.001", Float 1.001
+    "1.0", Float 1.0
     "'hello'", String "hello"
     "true", Boolean true
     "false", Boolean false

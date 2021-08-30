@@ -51,14 +51,15 @@ module QueryParser =
   // to the point of not being possible to combine. pint64 would parse 1.2 as 1,
   // and pfloat would parse 1 as 1.0.
   let number =
-    pint64 .>>. opt (pchar '.' >>. many (pchar '0') .>>. pint32) .>> spaces
+    pint64 .>>. opt (pchar '.' >>. many (pchar '0') .>>. opt pint32) .>> spaces
     |>> fun (wholeValue, decimalPartOption) ->
           match decimalPartOption with
           | None -> Expression.Integer wholeValue
-          | Some (leadingZeros, decimalValue) ->
+          | Some (leadingZeros, Some decimalValue) ->
               let divisor = List.length leadingZeros + 1
               let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
               Expression.Float(float wholeValue + decimalPart)
+          | Some (_leadingZeros, None) -> Expression.Float(float wholeValue)
 
   let boolean =
     (word "true" |>> fun _ -> Expression.Boolean true)
