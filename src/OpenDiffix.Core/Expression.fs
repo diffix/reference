@@ -138,7 +138,13 @@ let rec evaluateScalarFunction fn args =
 
   | Lower, [ String s ] -> String(s.ToLower())
   | Upper, [ String s ] -> String(s.ToUpper())
-  | Substring, [ String s; Integer start; Integer length ] -> String(s.Substring(int start, int length))
+  | Substring, [ String s; Integer start; Integer length ] ->
+      let start = int start
+      let length = int length
+
+      if start <= 0 || length < 0 then Null
+      else if start > s.Length then String ""
+      else s.Substring(start - 1, min (s.Length - start + 1) length) |> String
   | Concat, [ String s1; String s2 ] -> String(s1 + s2)
 
   | Cast, [ String s; String "integer" ] -> s |> System.Int64.Parse |> Integer

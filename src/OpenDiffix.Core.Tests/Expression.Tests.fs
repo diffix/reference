@@ -365,8 +365,20 @@ module DefaultFunctionsTests =
 
   [<Fact>]
   let Substring () =
-    Expression.evaluateScalarFunction Substring [ String "abcd"; Integer 1L; Integer 2L ]
-    |> should equal (String "bc")
+    [
+      "abcd", 1, 2, String "ab"
+      "abcd", -1, 2, Null
+      "abcd", 1, -2, Null
+      "abcd", 2, 3, String "bcd"
+      "abcd", 4, 0, String ""
+      "abcd", 4, 1, String "d"
+      "abcd", 4, 3, String "d"
+      "abcd", 1, 7, String "abcd"
+    ]
+    |> List.iter (fun (v, s, l, result) ->
+      Expression.evaluateScalarFunction Substring [ String v; Integer(int64 s); Integer(int64 l) ]
+      |> should equal result
+    )
 
     fails Substring [ [ String "abc"; Integer 3L; Real 3.0 ] ]
 
