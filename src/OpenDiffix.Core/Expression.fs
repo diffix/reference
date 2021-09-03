@@ -85,6 +85,8 @@ let widthBucket v b t c =
 
   ((v - b) / step) |> floor |> int64 |> max -1L |> min c |> (+) 1L
 
+let private doubleStyle = System.Globalization.NumberFormatInfo.InvariantInfo
+
 /// Evaluates the result of a scalar function invocation.
 let rec evaluateScalarFunction fn args =
   match fn, args with
@@ -140,14 +142,14 @@ let rec evaluateScalarFunction fn args =
   | Concat, [ String s1; String s2 ] -> String(s1 + s2)
 
   | Cast, [ String s; String "integer" ] -> s |> System.Int64.Parse |> Integer
-  | Cast, [ String s; String "real" ] -> s |> System.Double.Parse |> Real
+  | Cast, [ String s; String "real" ] -> System.Double.Parse(s, doubleStyle) |> Real
   | Cast, [ String s; String "boolean" ] -> s |> System.Boolean.Parse |> Boolean
   | Cast, [ Integer i; String "real" ] -> i |> float |> Real
   | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
   | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
   | Cast, [ Integer _; String "boolean" ] -> Boolean true
   | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
-  | Cast, [ Real r; String "text" ] -> r.ToString() |> String
+  | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
