@@ -154,7 +154,7 @@ type AnonymizationParams =
       Supression = SuppressionParams.Default
       OutlierCount = Interval.Default
       TopCount = Interval.Default
-      NoiseSD = 0.5
+      NoiseSD = 1.0
     }
 
 type EvaluationContext =
