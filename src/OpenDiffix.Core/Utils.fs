@@ -114,3 +114,6 @@ module Hash =
       hash <- hash * fnvPrime
 
     hash
+
+module Row =
+  let equalityComparer = LanguagePrimitives.FastGenericEqualityComparer<Row>

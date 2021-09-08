@@ -1,5 +1,6 @@
 module rec OpenDiffix.Core.Executor
 
+open System
 open PlannerTypes
 
 let private filter context condition rows =
@@ -30,12 +31,12 @@ let private executeProject context (childPlan, expressions) : seq<Row> =
 let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
   childPlan
   |> execute context
-  |> Seq.collect (fun row ->
-    let args = args |> List.map (Expression.evaluate context row)
+  |> Seq.collect
+       (fun row ->
+         let args = args |> List.map (Expression.evaluate context row)
 
-    Expression.evaluateSetFunction fn args
-    |> Seq.map (fun value -> Array.append row [| value |])
-  )
+         Expression.evaluateSetFunction fn args
+         |> Seq.map (fun value -> Array.append row [| value |]))
 
 let private executeFilter context (childPlan, condition) : seq<Row> =
   childPlan |> execute context |> filter context condition
@@ -54,31 +55,28 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
   let defaultAggregators = aggFns |> Array.map (Aggregator.create context (Array.isEmpty groupingLabels))
 
-  let initialState : Map<Row, Aggregator.T array> =
-    if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []
+  let state = Collections.Generic.Dictionary<Row, Aggregator.T array>(Row.equalityComparer)
 
-  childPlan
-  |> execute context
-  |> Seq.fold
-    (fun state row ->
-      let group = groupingLabels |> Array.map (Expression.evaluate context row)
-      let argEvaluator = Expression.evaluate context row
+  if groupingLabels.Length = 0 then state.Add([||], defaultAggregators)
 
-      let aggregators =
-        match Map.tryFind group state with
-        | Some aggregators -> aggregators
-        | None -> defaultAggregators
-        |> Array.zip aggArgs
-        |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Transition)
+  for row in execute context childPlan do
+    let group = groupingLabels |> Array.map (Expression.evaluate context row)
+    let argEvaluator = Expression.evaluate context row
 
-      Map.add group aggregators state
-    )
-    initialState
-  |> Map.toSeq
-  |> Seq.map (fun (group, aggregators) ->
-    let values = aggregators |> Array.map (fun acc -> acc.Final context)
-    Array.append group values
-  )
+    let aggregators =
+      match state.TryGetValue(group) with
+      | true, aggregators -> aggregators
+      | false, _ -> defaultAggregators
+      |> Array.zip aggArgs
+      |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Transition)
+
+    state.[group] <- aggregators
+
+  state
+  |> Seq.map
+       (fun pair ->
+         let values = pair.Value |> Array.map (fun acc -> acc.Final context)
+         Array.append pair.Key values)
 
 let private executeJoin context (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =
@@ -93,15 +91,15 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
 
   outerPlan
   |> execute context
-  |> Seq.collect (fun outerRow ->
-    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
+  |> Seq.collect
+       (fun outerRow ->
+         let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
 
-    if isOuterJoin && Seq.isEmpty joinedRows then
-      let nullInnerRow = Array.create innerColumnsCount Null
-      seq { rowJoiner outerRow nullInnerRow }
-    else
-      joinedRows
-  )
+         if isOuterJoin && Seq.isEmpty joinedRows then
+           let nullInnerRow = Array.create innerColumnsCount Null
+           seq { rowJoiner outerRow nullInnerRow }
+         else
+           joinedRows)
 
 // ----------------------------------------------------------------
 // Public API
