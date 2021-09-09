@@ -9,7 +9,7 @@ let rec encodeValue =
   function
   | Null -> Encode.nil
   | Boolean bool -> Encode.bool bool
-  | Integer int64 -> Encode.int64 int64
+  | Integer int64 -> Encode.float (float int64)
   | Real float -> Encode.float float
   | String string -> Encode.string string
   | List values -> Encode.list (values |> List.map encodeValue)
