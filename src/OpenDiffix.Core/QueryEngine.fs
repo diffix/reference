@@ -16,7 +16,7 @@ let rec private extractColumns query =
 // Public API
 // ----------------------------------------------------------------
 
-type QueryResult = { Columns: Column list; Rows: Row list }
+type QueryResult = { Columns: Column list; Rows: Value array list }
 
 let run context statement : QueryResult =
   let query =
@@ -26,6 +26,13 @@ let run context statement : QueryResult =
     |> Normalizer.normalize
     |> Analyzer.rewrite context
 
-  let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
   let columns = extractColumns query
+
+  let rows =
+    query
+    |> Planner.plan
+    |> Executor.execute context
+    |> Seq.map rowToArray
+    |> Seq.toList
+
   { Columns = columns; Rows = rows }

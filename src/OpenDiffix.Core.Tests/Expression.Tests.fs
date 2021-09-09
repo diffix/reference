@@ -445,11 +445,11 @@ module DefaultFunctionsTests =
         Null, String "integer", Null
       ]
 
-let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
+let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
 let makeRow strValue intValue floatValue =
-  [| String strValue; Integer intValue; Real floatValue |]
+  arrayToRow [| String strValue; Integer intValue; Real floatValue |]
 
 let testRow = makeRow "Some text" 7L 0.25
 
@@ -515,6 +515,7 @@ let sortRows () =
     [| Null; Integer 2L |]
     [| Null; Null |]
   ]
+  |> List.map arrayToRow
   |> Expression.sortRows
        ctx
        [ //
@@ -522,6 +523,7 @@ let sortRows () =
          OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
        ]
   |> List.ofSeq
+  |> List.map rowToArray
   |> should
        equal
        [

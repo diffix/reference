@@ -56,13 +56,21 @@ let private readValue (reader: SQLiteDataReader) index =
     | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
     | _unknownType -> Null
 
+type Row(reader) =
+  interface IRow with
+    member this.Item
+      with get (index) = readValue reader index
+
+    member this.Length = reader.FieldCount
+
 let private executeQuery (connection: SQLiteConnection) (query: string) =
   use command = new SQLiteCommand(query, connection)
   let reader = command.ExecuteReader()
+  let row = Row(reader)
 
-  seq<Row> {
+  seq<IRow> {
     while reader.Read() do
-      yield [| 0 .. reader.FieldCount - 1 |] |> Array.map (readValue reader)
+      yield row
   }
 
 let private columnTypeFromString =

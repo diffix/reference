@@ -20,41 +20,45 @@ let private unpackAggregators aggregators =
 
 let private executeScan context table = context.DataProvider.OpenTable(table)
 
-let private executeProject context (childPlan, expressions) : seq<Row> =
+let private executeProject context (childPlan, expressions) : Rows =
   let expressions = Array.ofList expressions
 
   childPlan
   |> execute context
-  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row))
+  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row) |> arrayToRow)
 
-let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
+let private executeProjectSet context (childPlan, fn, args) : Rows =
   childPlan
   |> execute context
   |> Seq.collect (fun row ->
     let args = args |> List.map (Expression.evaluate context row)
 
     Expression.evaluateSetFunction fn args
-    |> Seq.map (fun value -> Array.append row [| value |])
+    |> Seq.map (fun value -> Array.append (rowToArray row) [| value |] |> arrayToRow)
   )
 
-let private executeFilter context (childPlan, condition) : seq<Row> =
+let private executeFilter context (childPlan, condition) : Rows =
   childPlan |> execute context |> filter context condition
 
-let private executeSort context (childPlan, orderings) : seq<Row> =
-  childPlan |> execute context |> Expression.sortRows context orderings
+let private executeSort context (childPlan, orderings) : Rows =
+  childPlan
+  |> execute context
+  // Sorting does multiple passes through the sequence, so we need to make sure the rows are collapsed.
+  |> Seq.map (rowToArray >> arrayToRow)
+  |> Expression.sortRows context orderings
 
-let private executeLimit context (childPlan, amount) : seq<Row> =
+let private executeLimit context (childPlan, amount) : Rows =
   if amount > uint System.Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
   childPlan |> execute context |> Seq.truncate (int amount)
 
-let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
+let private executeAggregate context (childPlan, groupingLabels, aggregators) : Rows =
   let groupingLabels = Array.ofList groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
   let defaultAggregators = aggFns |> Array.map (Aggregator.create context (Array.isEmpty groupingLabels))
 
-  let initialState : Map<Row, Aggregator.T array> =
+  let initialState : Map<Value array, Aggregator.T array> =
     if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []
 
   childPlan
@@ -77,28 +81,33 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
   |> Map.toSeq
   |> Seq.map (fun (group, aggregators) ->
     let values = aggregators |> Array.map (fun acc -> acc.Final context)
-    Array.append group values
+    Array.append group values |> arrayToRow
   )
 
-let private executeJoin context (leftPlan, rightPlan, joinType, on) =
-  let isOuterJoin, outerPlan, innerPlan, rowJoiner =
+let private executeJoin context (leftPlan, rightPlan, joinType, on) : Rows =
+  let isOuterJoin, outerPlan, innerPlan, arrayJoiner =
     match joinType with
     | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
     | ParserTypes.LeftJoin -> true, leftPlan, rightPlan, Array.append
     | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
     | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
-  let innerRows = innerPlan |> execute context |> Seq.toList
+  let innerRows = innerPlan |> execute context |> Seq.map rowToArray |> Seq.toList
   let innerColumnsCount = Plan.columnsCount innerPlan
 
   outerPlan
   |> execute context
   |> Seq.collect (fun outerRow ->
-    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
+    let outerRow = rowToArray outerRow
+
+    let joinedRows =
+      innerRows
+      |> List.map (fun innerRow -> arrayJoiner outerRow innerRow |> arrayToRow)
+      |> filter context on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullInnerRow = Array.create innerColumnsCount Null
-      seq { rowJoiner outerRow nullInnerRow }
+      seq { arrayJoiner outerRow nullInnerRow |> arrayToRow }
     else
       joinedRows
   )
@@ -107,7 +116,7 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-let rec execute context plan : seq<Row> =
+let rec execute context plan : Rows =
   match plan with
   | Plan.Scan table -> executeScan context table
   | Plan.Project (plan, expressions) -> executeProject context (plan, expressions)

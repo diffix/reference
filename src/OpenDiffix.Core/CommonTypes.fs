@@ -16,7 +16,27 @@ type Value =
   | String of string
   | List of Value list
 
-type Row = Value array
+type IRow =
+  abstract Item : int -> Value with get
+  abstract Length : int
+
+type Rows = IRow seq
+
+type ArrayRow(values: Value array) =
+  member this.Values = values
+
+  interface IRow with
+    member this.Item
+      with get (index) = values.[index]
+
+    member this.Length = values.Length
+
+let arrayToRow values = ArrayRow(values) :> IRow
+
+let rowToArray (row: IRow) =
+  match row with
+  | :? ArrayRow as arrayRow -> arrayRow.Values
+  | _ -> Array.init row.Length (fun i -> row.[i])
 
 // ----------------------------------------------------------------
 // Expressions
@@ -110,7 +130,7 @@ type Schema = Table list
 
 type IDataProvider =
   inherit IDisposable
-  abstract OpenTable : table: Table -> Row seq
+  abstract OpenTable : table: Table -> Rows
   abstract GetSchema : unit -> Schema
 
 // ----------------------------------------------------------------

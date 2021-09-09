@@ -167,7 +167,7 @@ let evaluateSetFunction fn args =
   | _ -> failwith $"Invalid usage of set function '%A{fn}'."
 
 /// Evaluates the expression for a given row.
-let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
+let rec evaluate (ctx: EvaluationContext) (row: IRow) (expr: Expression) =
   match expr with
   | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
   | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
@@ -177,7 +177,7 @@ let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
   | Constant value -> value
 
 /// Sorts a row sequence based on the given orderings.
-let sortRows ctx orderings (rows: Row seq) =
+let sortRows ctx orderings (rows: Rows) =
   let rec performSort orderings rows =
     match orderings with
     | [] -> rows

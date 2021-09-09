@@ -10,7 +10,11 @@ type DBFixture() =
 let evaluateAggregator ctx fn args rows =
   let processor = fun (agg: Aggregator.T) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Transition
 
-  let aggregator = List.fold processor (Aggregator.create ctx true fn) rows
+  let aggregator =
+    rows
+    |> List.map arrayToRow
+    |> List.fold processor (Aggregator.create ctx true fn)
+
   aggregator.Final ctx
 
 let dummyDataProvider schema =

@@ -29,7 +29,7 @@ type Tests(db: DBFixture) =
   let context = { EvaluationContext.Default with DataProvider = db.DataProvider }
 
   let execute plan =
-    plan |> Executor.execute context |> Seq.toList
+    plan |> Executor.execute context |> Seq.map rowToArray |> Seq.toList
 
   [<Fact>]
   let ``execute scan`` () =
@@ -85,7 +85,7 @@ type Tests(db: DBFixture) =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
     let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [ nameLength ], [ countStar ])
 
-    let expected : Row list = []
+    let expected : Value array list = []
     plan |> execute |> should equal expected
 
   [<Fact>]
