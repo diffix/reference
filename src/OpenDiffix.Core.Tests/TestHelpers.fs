@@ -8,9 +8,9 @@ type DBFixture() =
     new OpenDiffix.CLI.SQLite.DataProvider(__SOURCE_DIRECTORY__ + "/../../data/data.sqlite") :> IDataProvider
 
 let evaluateAggregator ctx fn args rows =
-  let processor = fun (agg: Aggregator.T) row -> args |> List.map (Expression.evaluate ctx row) |> agg.Transition
-
-  let aggregator = List.fold processor (Aggregator.create ctx true fn) rows
+  let aggregator = Aggregator.create ctx true fn
+  let processor = fun row -> args |> List.map (Expression.evaluate ctx row) |> aggregator.Transition
+  List.iter processor rows
   aggregator.Final ctx
 
 let dummyDataProvider schema =

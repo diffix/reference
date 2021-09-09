@@ -1,7 +1,9 @@
 module OpenDiffix.Core.Aggregator
 
+open System.Collections.Generic
+
 type IAggregator =
-  abstract Transition : Value list -> IAggregator
+  abstract Transition : Value list -> unit
   abstract Final : EvaluationContext -> Value
 
 // ----------------------------------------------------------------
@@ -21,147 +23,143 @@ let private missingAid (aidValue: Value) =
   | Value.List [] -> true
   | _ -> false
 
+let private emptySets length =
+  Array.init length (fun _ -> HashSet<AidHash>())
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
 
-type private Count(counter) =
-  new() = Count(0L)
+type private Count() =
+  let mutable state = 0L
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ Null ] -> this
-      | _ -> Count(counter + 1L)
-      :> IAggregator
+      | [ Null ] -> ()
+      | _ -> state <- state + 1L
 
-    member this.Final _ctx = Integer counter
+    member this.Final _ctx = Integer state
 
-type private CountDistinct(set: Set<Value>) =
-  new() = CountDistinct(Set.empty)
+type private CountDistinct() =
+  let state = HashSet<Value>()
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ Null ] -> this
-      | [ value ] -> set |> Set.add value |> CountDistinct
+      | [ Null ] -> ()
+      | [ value ] -> state.Add(value) |> ignore
       | _ -> invalidArgs args
-      :> IAggregator
 
-    member this.Final _ctx = set.Count |> int64 |> Integer
+    member this.Final _ctx = state.Count |> int64 |> Integer
 
-type private Sum(sum: Value) =
-  new() = Sum(Null)
+type private Sum() =
+  let mutable state = Null
 
   interface IAggregator with
     member this.Transition args =
-      match sum, args with
-      | _, [ Null ] -> this
-      | Null, [ value ] -> Sum(value)
-      | Integer oldValue, [ Integer value ] -> (oldValue + value) |> Integer |> Sum
-      | Real oldValue, [ Real value ] -> (oldValue + value) |> Real |> Sum
-      | _ -> invalidArgs args
-      :> IAggregator
+      state <-
+        match state, args with
+        | _, [ Null ] -> state
+        | Null, [ value ] -> value
+        | Integer oldValue, [ Integer value ] -> Integer(oldValue + value)
+        | Real oldValue, [ Real value ] -> Real(oldValue + value)
+        | _ -> invalidArgs args
 
-    member this.Final _ctx = sum
+    member this.Final _ctx = state
 
-type private DiffixCount(minCount, perAidCounts: (Map<AidHash, float> * int64) list option) =
-  /// Initializes (if not already initialized) per aid counts with empty maps.
-  let initializeCounts aidInstances counts =
-    match counts with
-    | Some counts -> counts
-    | None -> List.replicate (List.length aidInstances) (Map.empty, 0L)
+type private DiffixCount(minCount) =
+  let mutable state : Anonymizer.AidCountState array = null
 
   /// Increases contribution of a single AID value.
-  let increaseContribution valueIncrease aidValue aidMap =
-    Map.change
-      (hashAid aidValue)
-      (function
-      | Some count -> Some(count + valueIncrease)
-      | None -> Some(valueIncrease))
-      aidMap
+  let increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidHash, float>) =
+    let aidHash = hashAid aidValue
+
+    let updatedContribution =
+      match aidMap.TryGetValue(aidHash) with
+      | true, aidContribution -> aidContribution + valueIncrease
+      | false, _ -> valueIncrease
+
+    aidMap.[aidHash] <- updatedContribution
 
   /// Increases contribution of all AID instances.
   let increaseContributions valueIncrease (aidInstances: Value list) =
-    perAidCounts
-    |> initializeCounts aidInstances
-    |> List.zip aidInstances
-    |> List.map (fun (aidValue: Value, (aidMap, unaccountedFor)) ->
+    if state = null then
+      state <-
+        Array.init
+          aidInstances.Length
+          (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0L }
+          )
+
+    aidInstances
+    |> List.iteri (fun i aidValue ->
+      let aidState = state.[i]
+      let aidContributions = aidState.AidContributions
+
       match aidValue with
       // No AIDs, add to unaccounted value
       | Null
-      | Value.List [] -> aidMap, unaccountedFor + valueIncrease
+      | Value.List [] -> aidState.UnaccountedFor <- aidState.UnaccountedFor + valueIncrease
       // List of AIDs, distribute contribution evenly
       | Value.List aidValues ->
           let partialIncrease = (float valueIncrease) / (aidValues |> List.length |> float)
 
           aidValues
-          |> List.fold (fun acc aidValue -> increaseContribution partialIncrease aidValue acc) aidMap,
-          unaccountedFor
+          |> List.iter (fun aidValue -> increaseContribution partialIncrease aidValue aidContributions)
       // Single AID, add to its contribution
-      | aidValue -> increaseContribution (float valueIncrease) aidValue aidMap, unaccountedFor
+      | aidValue -> increaseContribution (float valueIncrease) aidValue aidContributions
     )
-    |> Some
 
   let updateAidMaps aidInstances valueIncrease =
     match aidInstances with
-    | Value.List aidInstances when List.forall missingAid aidInstances -> perAidCounts
+    | Value.List aidInstances when List.forall missingAid aidInstances -> ()
     | Value.List aidInstances -> increaseContributions valueIncrease aidInstances
     | _ -> failwith "Expecting a list as input"
 
-  new(minCount) = DiffixCount(minCount, None)
-
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ aidInstances; Null ] -> DiffixCount(minCount, updateAidMaps aidInstances 0L)
+      | [ aidInstances; Null ] -> updateAidMaps aidInstances 0L
       | [ aidInstances ]
-      | [ aidInstances; _ ] -> DiffixCount(minCount, updateAidMaps aidInstances 1L)
+      | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
       | _ -> invalidArgs args
-      :> IAggregator
 
     member this.Final ctx =
-      match Anonymizer.count ctx.AnonymizationParams perAidCounts with
-      | Null -> Integer minCount
-      | Integer value -> Integer(max value minCount)
-      | value -> value
+      if state = null then
+        Integer minCount
+      else
+        match Anonymizer.count ctx.AnonymizationParams state with
+        | Null -> Integer minCount
+        | Integer value -> Integer(max value minCount)
+        | value -> value
 
-type private DiffixCountDistinct(minCount, aidsCount, aidsPerValue: Map<Value, Set<AidHash> list>) =
-  new(minCount) = DiffixCountDistinct(minCount, 0, Map.empty)
+type private DiffixCountDistinct(minCount) =
+  let mutable aidsCount = 0
+  let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ _aidInstances; Null ] -> this
+      | [ _aidInstances; Null ] -> ()
       | [ Value.List aidInstances; value ] ->
-          let initialEntry =
-            fun () ->
-              aidInstances
-              |> List.map
-                   (function
-                   | Null
-                   | Value.List [] -> Set.empty
-                   | Value.List aidValues -> aidValues |> hashAidList |> Set.ofList
-                   | aidValue -> aidValue |> hashAid |> Set.singleton)
-              |> Some
+          let aidSets =
+            match aidsPerValue.TryGetValue(value) with
+            | true, aidSets -> aidSets
+            | false, _ ->
+                if aidsCount = 0 then aidsCount <- aidInstances.Length
+                let aidSets = emptySets aidsCount
+                aidsPerValue.[value] <- aidSets
+                aidSets
 
-          let transitionEntry =
-            aidInstances
-            |> List.map2 (fun aidValue hashSet ->
-              match aidValue with
-              | Null
-              | Value.List [] -> hashSet
-              | Value.List aidValues -> Set.addSeq (hashAidList aidValues) hashSet
-              | aidValue -> Set.add (hashAid aidValue) hashSet
-            )
-
-          DiffixCountDistinct(
-            minCount,
-            aidInstances.Length,
-            Map.change value (Option.map transitionEntry >> Option.orElseWith initialEntry) aidsPerValue
+          aidInstances
+          |> List.iteri (fun i aidValue ->
+            match aidValue with
+            | Null
+            | Value.List [] -> ()
+            | Value.List aidValues -> aidSets.[i].UnionWith(hashAidList aidValues)
+            | aidValue -> aidSets.[i].Add(hashAid aidValue) |> ignore
           )
       | _ -> invalidArgs args
-      :> IAggregator
 
     member this.Final ctx =
       match Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams with
@@ -169,47 +167,45 @@ type private DiffixCountDistinct(minCount, aidsCount, aidsPerValue: Map<Value, S
       | Integer value -> Integer(max value minCount)
       | value -> value
 
-type private DiffixLowCount(aidValueSets: Set<AidHash> list option) =
-  new() = DiffixLowCount(None)
+type private DiffixLowCount() =
+  let mutable state : HashSet<AidHash> [] = null
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ Null ] -> this
+      | [ Null ] -> ()
       | [ Value.List aidInstances ] ->
-          aidValueSets
-          |> Option.defaultWith (fun () -> List.replicate aidInstances.Length Set.empty)
-          |> List.zip aidInstances
-          |> List.map (fun (aidValue: Value, aidValueSet) ->
+          if state = null then state <- emptySets aidInstances.Length
+
+          aidInstances
+          |> List.iteri (fun i aidValue ->
             match aidValue with
             | Null
-            | Value.List [] -> aidValueSet
-            | Value.List aidValues -> Set.addSeq (hashAidList aidValues) aidValueSet
-            | aidValue -> Set.add (hashAid aidValue) aidValueSet
+            | Value.List [] -> ()
+            | Value.List aidValues -> state.[i].UnionWith(hashAidList aidValues)
+            | aidValue -> state.[i].Add(hashAid aidValue) |> ignore
           )
-          |> Some
-          |> DiffixLowCount
+
       | _ -> invalidArgs args
-      :> IAggregator
 
     member this.Final ctx =
-      match aidValueSets with
-      | None -> true |> Boolean
-      | Some aidValueSets -> Anonymizer.isLowCount aidValueSets ctx.AnonymizationParams |> Boolean
+      if state = null then
+        Boolean true
+      else
+        Anonymizer.isLowCount state ctx.AnonymizationParams |> Boolean
 
-type private MergeAids(aidValueSet: Set<Value>) =
-  new() = MergeAids(Set.empty)
+type private MergeAids() =
+  let state = HashSet<Value>()
 
   interface IAggregator with
     member this.Transition args =
       match args with
-      | [ Null ] -> this
-      | [ Value.List aidValues ] -> aidValueSet |> Set.addSeq aidValues |> MergeAids
-      | [ aidValue ] -> aidValueSet |> Set.add aidValue |> MergeAids
+      | [ Null ] -> ()
+      | [ Value.List aidValues ] -> state.UnionWith(aidValues)
+      | [ aidValue ] -> state.Add(aidValue) |> ignore
       | _ -> invalidArgs args
-      :> IAggregator
 
-    member this.Final _ctx = aidValueSet |> Set.toList |> Value.List
+    member this.Final _ctx = state |> Seq.toList |> Value.List
 
 // ----------------------------------------------------------------
 // Public API
@@ -222,7 +218,7 @@ let create ctx globalBucket fn : T =
     if globalBucket then
       0L
     else
-      int64 ctx.AnonymizationParams.Supression.LowThreshold
+      int64 ctx.AnonymizationParams.Suppression.LowThreshold
 
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T

@@ -140,7 +140,7 @@ type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Salt: byte []
-    Supression: SuppressionParams
+    Suppression: SuppressionParams
 
     // Count params
     OutlierCount: Interval
@@ -151,7 +151,7 @@ type AnonymizationParams =
     {
       TableSettings = Map.empty
       Salt = [||]
-      Supression = SuppressionParams.Default
+      Suppression = SuppressionParams.Default
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       NoiseSD = 1.0

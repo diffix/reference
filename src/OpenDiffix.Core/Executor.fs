@@ -31,12 +31,12 @@ let private executeProject context (childPlan, expressions) : seq<Row> =
 let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
   childPlan
   |> execute context
-  |> Seq.collect
-       (fun row ->
-         let args = args |> List.map (Expression.evaluate context row)
+  |> Seq.collect (fun row ->
+    let args = args |> List.map (Expression.evaluate context row)
 
-         Expression.evaluateSetFunction fn args
-         |> Seq.map (fun value -> Array.append row [| value |]))
+    Expression.evaluateSetFunction fn args
+    |> Seq.map (fun value -> Array.append row [| value |])
+  )
 
 let private executeFilter context (childPlan, condition) : seq<Row> =
   childPlan |> execute context |> filter context condition
@@ -45,19 +45,21 @@ let private executeSort context (childPlan, orderings) : seq<Row> =
   childPlan |> execute context |> Expression.sortRows context orderings
 
 let private executeLimit context (childPlan, amount) : seq<Row> =
-  if amount > uint System.Int32.MaxValue then
+  if amount > uint Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
   childPlan |> execute context |> Seq.truncate (int amount)
 
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
+  let isGlobal = Array.isEmpty groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
-  let defaultAggregators = aggFns |> Array.map (Aggregator.create context (Array.isEmpty groupingLabels))
+
+  let makeAggregators () =
+    aggFns |> Array.map (Aggregator.create context isGlobal)
 
   let state = Collections.Generic.Dictionary<Row, Aggregator.T array>(Row.equalityComparer)
-
-  if groupingLabels.Length = 0 then state.Add([||], defaultAggregators)
+  if isGlobal then state.Add([||], makeAggregators ())
 
   for row in execute context childPlan do
     let group = groupingLabels |> Array.map (Expression.evaluate context row)
@@ -66,17 +68,19 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
     let aggregators =
       match state.TryGetValue(group) with
       | true, aggregators -> aggregators
-      | false, _ -> defaultAggregators
-      |> Array.zip aggArgs
-      |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Transition)
+      | false, _ ->
+          let aggregators = makeAggregators ()
+          state.[group] <- aggregators
+          aggregators
 
-    state.[group] <- aggregators
+    aggregators
+    |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
   state
-  |> Seq.map
-       (fun pair ->
-         let values = pair.Value |> Array.map (fun acc -> acc.Final context)
-         Array.append pair.Key values)
+  |> Seq.map (fun pair ->
+    let values = pair.Value |> Array.map (fun acc -> acc.Final context)
+    Array.append pair.Key values
+  )
 
 let private executeJoin context (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =
@@ -91,15 +95,15 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
 
   outerPlan
   |> execute context
-  |> Seq.collect
-       (fun outerRow ->
-         let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
+  |> Seq.collect (fun outerRow ->
+    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
 
-         if isOuterJoin && Seq.isEmpty joinedRows then
-           let nullInnerRow = Array.create innerColumnsCount Null
-           seq { rowJoiner outerRow nullInnerRow }
-         else
-           joinedRows)
+    if isOuterJoin && Seq.isEmpty joinedRows then
+      let nullInnerRow = Array.create innerColumnsCount Null
+      seq { rowJoiner outerRow nullInnerRow }
+    else
+      joinedRows
+  )
 
 // ----------------------------------------------------------------
 // Public API

@@ -86,7 +86,7 @@ let toSalt =
   | _ -> [||]
 
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
-  let supression =
+  let suppression =
     {
       LowThreshold =
         parsedArgs.TryGetResult Low_Threshold
@@ -102,7 +102,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
-    Supression = supression
+    Suppression = suppression
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
     NoiseSD = parsedArgs.TryGetResult Noise_SD |> toNoise
