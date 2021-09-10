@@ -51,9 +51,9 @@ let encodeAnonParams (ap: AnonymizationParams) =
         Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
       )
     )
-    "low_threshold", Encode.int ap.Supression.LowThreshold
-    "low_mean_gap", Encode.float ap.Supression.LowMeanGap
-    "low_sd", Encode.float ap.Supression.SD
+    "low_threshold", Encode.int ap.Suppression.LowThreshold
+    "low_mean_gap", Encode.float ap.Suppression.LowMeanGap
+    "low_sd", Encode.float ap.Suppression.SD
     "outlier_count", encodeInterval ap.OutlierCount
     "top_count", encodeInterval ap.TopCount
     "noise_sd", Encode.float ap.NoiseSD

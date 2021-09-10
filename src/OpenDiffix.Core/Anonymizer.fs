@@ -1,6 +1,7 @@
 module OpenDiffix.Core.Anonymizer
 
 open System
+open System.Collections.Generic
 open System.Security.Cryptography
 
 // ----------------------------------------------------------------
@@ -12,12 +13,12 @@ type private Random64(seed: uint64) =
   let mutable state = (Random(int seed), Random(int (seed >>> 32)))
 
   member this.Uniform(interval: Interval) =
-    let (state1, state2) = state
+    let state1, state2 = state
     state <- (state2, state1) // Rotate the 32-bit RNGs.
     state1.Next(interval.Lower, interval.Upper + 1)
 
   member this.Normal(stdDev) =
-    let (state1, state2) = state
+    let state1, state2 = state
 
     let u1 = 1.0 - state1.NextDouble()
     let u2 = 1.0 - state2.NextDouble()
@@ -42,21 +43,21 @@ let private newRandom anonymizationParams (aidSet: AidHash seq) =
 // ----------------------------------------------------------------
 
 /// Returns whether any of the AID value sets has a low count.
-let isLowCount (aidSets: Set<AidHash> list) (anonymizationParams: AnonymizationParams) =
+let isLowCount (aidSets: HashSet<AidHash> seq) (anonymizationParams: AnonymizationParams) =
   aidSets
-  |> List.map (fun aidSet ->
-    let supression = anonymizationParams.Supression
+  |> Seq.map (fun aidSet ->
+    let suppression = anonymizationParams.Suppression
 
-    if aidSet.Count < supression.LowThreshold then
+    if aidSet.Count < suppression.LowThreshold then
       true
     else
       let rnd = newRandom anonymizationParams aidSet
-      let thresholdMean = supression.LowMeanGap + float supression.LowThreshold
-      let threshold = rnd.Normal(supression.SD) + thresholdMean
+      let thresholdMean = suppression.LowMeanGap + float suppression.LowThreshold
+      let threshold = rnd.Normal(suppression.SD) + thresholdMean
 
       float aidSet.Count < threshold
   )
-  |> List.reduce (||)
+  |> Seq.reduce (||)
 
 type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
 
@@ -65,12 +66,12 @@ let inline private aidFlattening
   (unaccountedFor: int64)
   (aidContributions: (AidHash * ^Contribution) list)
   : AidCount option =
-  let rnd = aidContributions |> List.map fst |> newRandom anonymizationParams
+  let rnd = aidContributions |> Seq.map fst |> newRandom anonymizationParams
 
   let outlierCount = rnd.Uniform(anonymizationParams.OutlierCount)
   let topCount = rnd.Uniform(anonymizationParams.TopCount)
 
-  let sortedUserContributions = aidContributions |> List.map snd |> List.sortDescending
+  let sortedUserContributions = aidContributions |> Seq.map snd |> Seq.sortDescending |> Seq.toList
 
   if sortedUserContributions.Length < outlierCount + topCount then
     None
@@ -103,20 +104,25 @@ let inline private aidFlattening
         Noise = rnd.Normal(noiseSD)
       }
 
-let mapValueSet value =
-  Option.map (Set.add value) >> Option.orElse (Some(Set.singleton value))
+let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) aidIndex =
+  let result = Dictionary<AidHash, HashSet<Value>>()
 
-let transposeToPerAid (aidsPerValue: Map<Value, Set<AidHash> list>) aidIndex =
-  aidsPerValue
-  |> Map.fold
-    (fun acc value aids ->
-      aids
-      |> List.item aidIndex
-      |> Set.fold (fun acc aidHash -> acc |> Map.change aidHash (mapValueSet value)) acc
-    )
-    Map.empty
+  let addToResult value aid =
+    match result.TryGetValue(aid) with
+    | true, valueSet -> valueSet.Add(value) |> ignore
+    | false, _ ->
+        let valueSet = HashSet<Value>()
+        result.[aid] <- valueSet
+        valueSet.Add(value) |> ignore
 
-let rec distributeValues valuesByAID =
+  for pair in aidsPerValue do
+    let value = pair.Key
+    let aids = pair.Value.[aidIndex]
+    aids |> Seq.iter (addToResult value)
+
+  result
+
+let rec private distributeValues valuesByAID =
   match valuesByAID with
   | [] -> [] // Done :D
   | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
@@ -126,35 +132,33 @@ let rec distributeValues valuesByAID =
 
       (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
-let private countDistinctFlatteningByAid anonParams (perAidContributions: Map<AidHash, Set<Value>>) =
+let private countDistinctFlatteningByAid anonParams (perAidContributions: Dictionary<AidHash, HashSet<Value>>) =
   perAidContributions
-  |> Map.map (fun _aidHash valuesSet ->
-    // keep low count values in sorted order to ensure the algorithm is deterministic
-    Set.toList valuesSet
-  )
-  |> Map.toList
-  |> List.sortBy (fun (aid, values) -> values.Length, aid)
+  // keep low count values in sorted order to ensure the algorithm is deterministic
+  |> Seq.map (fun pair -> pair.Key, pair.Value |> Seq.toList)
+  |> Seq.sortBy (fun (aid, values) -> values.Length, aid)
+  |> Seq.toList
   |> distributeValues
   |> List.countBy fst
   |> List.map (fun (aid, count) -> aid, int64 count)
   |> aidFlattening anonParams 0L
 
-let private anonymizedSum (byAidSum: AidCount list) =
+let private anonymizedSum (byAidSum: AidCount seq) =
   let aidForFlattening =
     byAidSum
-    |> List.sortByDescending (fun aggregate -> aggregate.Flattening)
-    |> List.groupBy (fun aggregate -> aggregate.Flattening)
-    |> List.tryHead
+    |> Seq.sortByDescending (fun aggregate -> aggregate.Flattening)
+    |> Seq.groupBy (fun aggregate -> aggregate.Flattening)
+    |> Seq.tryHead
     // We might end up with multiple different flattened sums that have the same amount of flattening.
     // This could be the result of some AID values being null for one of the AIDs, while there were still
     // overall enough AIDs to produce a flattened sum.
     // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
-    |> Option.map (fun (_, values) -> values |> List.maxBy (fun aggregate -> aggregate.FlattenedSum))
+    |> Option.map (fun (_, values) -> values |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum))
 
   let noise =
     byAidSum
-    |> List.sortByDescending (fun aggregate -> aggregate.NoiseSD)
-    |> List.tryHead
+    |> Seq.sortByDescending (fun aggregate -> aggregate.NoiseSD)
+    |> Seq.tryHead
     |> Option.map (fun aggregate -> aggregate.Noise)
 
   match aidForFlattening, noise with
@@ -165,12 +169,17 @@ let private anonymizedSum (byAidSum: AidCount list) =
 // Public API
 // ----------------------------------------------------------------
 
-let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anonymizationParams: AnonymizationParams) =
+let countDistinct
+  aidsCount
+  (aidsPerValue: Dictionary<Value, HashSet<AidHash> array>)
+  (anonymizationParams: AnonymizationParams)
+  =
   // These values are safe, and can be counted as they are
   // without any additional noise.
   let lowCountValues, highCountValues =
     aidsPerValue
-    |> Map.partition (fun _value aidSets -> isLowCount aidSets anonymizationParams)
+    |> Seq.toList
+    |> List.partition (fun pair -> isLowCount pair.Value anonymizationParams)
 
   let byAid =
     [ 0 .. aidsCount - 1 ]
@@ -179,7 +188,7 @@ let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anony
       >> countDistinctFlatteningByAid anonymizationParams
     )
 
-  let safeCount = int64 highCountValues.Count
+  let safeCount = int64 highCountValues.Length
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we can only report the count of values we already know to be safe as they
@@ -193,23 +202,25 @@ let countDistinct aidsCount (aidsPerValue: Map<Value, Set<AidHash> list>) (anony
     |> Option.defaultValue 0.
     |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: (Map<AidHash, float> * int64) list option) =
-  match perAidContributions with
-  | None -> Null
-  | Some perAidContributions ->
-      let byAid =
-        perAidContributions
-        |> List.map (fun (aidMap, unaccountedFor) ->
-          aidMap |> Map.toList |> aidFlattening anonymizationParams unaccountedFor
-        )
+type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
-      // If any of the AIDs had insufficient data to produce a sensible flattening
-      // we have to abort anonymization.
-      if byAid |> List.exists ((=) None) then
-        Null
-      else
-        byAid
-        |> List.choose id
-        |> anonymizedSum
-        |> Option.map (round >> int64 >> Integer)
-        |> Option.defaultValue Null
+let count (anonymizationParams: AnonymizationParams) (perAidContributions: AidCountState array) =
+  let byAid =
+    perAidContributions
+    |> Array.map (fun aidState ->
+      aidState.AidContributions
+      |> Seq.map (fun pair -> pair.Key, pair.Value)
+      |> Seq.toList
+      |> aidFlattening anonymizationParams aidState.UnaccountedFor
+    )
+
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // we have to abort anonymization.
+  if byAid |> Array.exists ((=) None) then
+    Null
+  else
+    byAid
+    |> Array.choose id
+    |> anonymizedSum
+    |> Option.map (round >> int64 >> Integer)
+    |> Option.defaultValue Null

@@ -15,7 +15,7 @@ type Tests(db: DBFixture) =
           "customers_small", { AidColumns = [ "id" ] } //
         ]
       Salt = [||]
-      Supression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
+      Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       NoiseSD = 0.

@@ -71,7 +71,7 @@ type Tests(db: DBFixture) =
         [| Integer 7L; Integer 1L |]
       ]
 
-    plan |> execute |> should equal expected
+    plan |> execute |> List.sort |> should equal expected
 
   [<Fact>]
   let ``execute global aggregate`` () =

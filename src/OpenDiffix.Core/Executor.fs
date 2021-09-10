@@ -1,5 +1,6 @@
 module rec OpenDiffix.Core.Executor
 
+open System
 open PlannerTypes
 
 let private filter context condition rows =
@@ -44,40 +45,41 @@ let private executeSort context (childPlan, orderings) : seq<Row> =
   childPlan |> execute context |> Expression.sortRows context orderings
 
 let private executeLimit context (childPlan, amount) : seq<Row> =
-  if amount > uint System.Int32.MaxValue then
+  if amount > uint Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
   childPlan |> execute context |> Seq.truncate (int amount)
 
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
+  let isGlobal = Array.isEmpty groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
-  let defaultAggregators = aggFns |> Array.map (Aggregator.create context (Array.isEmpty groupingLabels))
 
-  let initialState : Map<Row, Aggregator.T array> =
-    if groupingLabels.Length = 0 then Map [ [||], defaultAggregators ] else Map []
+  let makeAggregators () =
+    aggFns |> Array.map (Aggregator.create context isGlobal)
 
-  childPlan
-  |> execute context
-  |> Seq.fold
-    (fun state row ->
-      let group = groupingLabels |> Array.map (Expression.evaluate context row)
-      let argEvaluator = Expression.evaluate context row
+  let state = Collections.Generic.Dictionary<Row, Aggregator.T array>(Row.equalityComparer)
+  if isGlobal then state.Add([||], makeAggregators ())
 
-      let aggregators =
-        match Map.tryFind group state with
-        | Some aggregators -> aggregators
-        | None -> defaultAggregators
-        |> Array.zip aggArgs
-        |> Array.map (fun (args, aggregator) -> args |> List.map argEvaluator |> aggregator.Transition)
+  for row in execute context childPlan do
+    let group = groupingLabels |> Array.map (Expression.evaluate context row)
+    let argEvaluator = Expression.evaluate context row
 
-      Map.add group aggregators state
-    )
-    initialState
-  |> Map.toSeq
-  |> Seq.map (fun (group, aggregators) ->
-    let values = aggregators |> Array.map (fun acc -> acc.Final context)
-    Array.append group values
+    let aggregators =
+      match state.TryGetValue(group) with
+      | true, aggregators -> aggregators
+      | false, _ ->
+          let aggregators = makeAggregators ()
+          state.[group] <- aggregators
+          aggregators
+
+    aggregators
+    |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
+
+  state
+  |> Seq.map (fun pair ->
+    let values = pair.Value |> Array.map (fun acc -> acc.Final context)
+    Array.append pair.Key values
   )
 
 let private executeJoin context (leftPlan, rightPlan, joinType, on) =

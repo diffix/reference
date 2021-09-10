@@ -31,7 +31,7 @@ let context =
         {
           TableSettings = Map.empty
           Salt = [||]
-          Supression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
+          Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
           OutlierCount = { Lower = 1; Upper = 1 }
           TopCount = { Lower = 1; Upper = 1 }
           NoiseSD = 0.
@@ -49,7 +49,7 @@ let anonymizedAggregationContext =
 
   { context with AnonymizationParams = anonParams }
 
-let evaluateAggregator = evaluateAggregator context
+let evaluateAggregator fn args = evaluateAggregator context fn args
 
 let mergeAids = AggregateFunction(MergeAids, AggregateOptions.Default)
 let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
@@ -60,6 +60,9 @@ let diffixLowCount = AggregateFunction(DiffixLowCount, AggregateOptions.Default)
 let ``merge bucket aids`` () =
   rows
   |> evaluateAggregator mergeAids [ aidColumn ]
+  |> (function
+  | Value.List values -> Value.List(List.sort values)
+  | x -> x)
   |> should
        equal
        (Value.List [
