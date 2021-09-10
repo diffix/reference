@@ -53,3 +53,10 @@ module Query =
 
 module TargetEntry =
   let isRegular targetEntry = targetEntry.Tag = RegularTargetEntry
+
+module QueryRange =
+  let rec columnsCount (queryRange: QueryRange) =
+    match queryRange with
+    | SubQuery (query, _) -> (Query.assertSelectQuery query).TargetList.Length
+    | Join join -> (columnsCount join.Left) + (columnsCount join.Right)
+    | RangeTable (table, _) -> table.Columns.Length

@@ -18,7 +18,8 @@ let private unpackAggregators aggregators =
 // Node execution
 // ----------------------------------------------------------------
 
-let private executeScan context table = context.DataProvider.OpenTable(table)
+let private executeScan context table columnIndices =
+  context.DataProvider.OpenTable(table, columnIndices)
 
 let private executeProject context (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions
@@ -109,7 +110,7 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
 
 let rec execute context plan : seq<Row> =
   match plan with
-  | Plan.Scan table -> executeScan context table
+  | Plan.Scan (table, columnIndices) -> executeScan context table columnIndices
   | Plan.Project (plan, expressions) -> executeProject context (plan, expressions)
   | Plan.ProjectSet (plan, fn, args) -> executeProjectSet context (plan, fn, args)
   | Plan.Filter (plan, condition) -> executeFilter context (plan, condition)

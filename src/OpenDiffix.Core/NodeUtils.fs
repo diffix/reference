@@ -11,6 +11,7 @@ type NodeFunctions =
   static member Map(expression: Expression, f: Expression -> Expression) =
     match expression with
     | FunctionExpr (fn, args) -> FunctionExpr(fn, List.map f args)
+    | ListExpr exprs -> ListExpr(List.map f exprs)
     | expr -> expr
 
   static member Map(expressions: Expression list, f: Expression -> Expression) = //

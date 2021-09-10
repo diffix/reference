@@ -110,7 +110,7 @@ type Schema = Table list
 
 type IDataProvider =
   inherit IDisposable
-  abstract OpenTable : table: Table -> Row seq
+  abstract OpenTable : table: Table * columnIndices: int list -> Row seq
   abstract GetSchema : unit -> Schema
 
 // ----------------------------------------------------------------
@@ -167,7 +167,7 @@ type EvaluationContext =
       AnonymizationParams = AnonymizationParams.Default
       DataProvider =
         { new IDataProvider with
-            member _.OpenTable _table = failwith "No tables in data provider"
+            member _.OpenTable(_table, _columnIndices) = failwith "No tables in data provider"
             member _.GetSchema() = []
             member _.Dispose() = ()
         }
