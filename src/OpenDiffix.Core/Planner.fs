@@ -87,7 +87,7 @@ let private planLimit amount plan =
   | None -> plan
   | Some amount -> Plan.Limit(plan, amount)
 
-let collectColumnIndices node =
+let private collectColumnIndices node =
   let rec exprIndices expr =
     match expr with
     | ColumnReference (index, _) -> [ index ]
