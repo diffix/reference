@@ -93,11 +93,13 @@ type DataProvider(dbPath: string) =
       use command = new SQLiteCommand(loadQuery, connection)
       let reader = command.ExecuteReader()
 
+      let indexedColumnIndices = List.indexed columnIndices
+
       seq<Row> {
         while reader.Read() do
           let row = Array.create table.Columns.Length Null
 
-          for dbFieldIndex, columnIndex in List.indexed columnIndices do
+          for dbFieldIndex, columnIndex in indexedColumnIndices do
             row.[columnIndex] <- readValue reader dbFieldIndex
 
           yield row
