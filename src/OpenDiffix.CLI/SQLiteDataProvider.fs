@@ -56,15 +56,6 @@ let private readValue (reader: SQLiteDataReader) index =
     | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
     | _unknownType -> Null
 
-let private executeQuery (connection: SQLiteConnection) (query: string) =
-  use command = new SQLiteCommand(query, connection)
-  let reader = command.ExecuteReader()
-
-  seq<Row> {
-    while reader.Read() do
-      yield [| 0 .. reader.FieldCount - 1 |] |> Array.map (readValue reader)
-  }
-
 let private columnTypeFromString =
   function
   | "integer" -> IntegerType
@@ -91,12 +82,25 @@ type DataProvider(dbPath: string) =
         { Name = table.Name; Columns = columns }
       )
 
-    member this.OpenTable(table) =
+    member this.OpenTable(table, columnIndices) =
       let columns =
-        table.Columns
-        |> List.map (fun column -> $"\"%s{column.Name}\"")
+        columnIndices
+        |> List.map (fun index -> $"\"%s{table.Columns.[index].Name}\"")
         |> String.join ", "
 
       let loadQuery = $"SELECT {columns} FROM {table.Name}"
 
-      executeQuery connection loadQuery
+      use command = new SQLiteCommand(loadQuery, connection)
+      let reader = command.ExecuteReader()
+
+      let indexedColumnIndices = List.indexed columnIndices
+
+      seq<Row> {
+        while reader.Read() do
+          let row = Array.create table.Columns.Length Null
+
+          for dbFieldIndex, columnIndex in indexedColumnIndices do
+            row.[columnIndex] <- readValue reader dbFieldIndex
+
+          yield row
+      }

@@ -51,7 +51,7 @@ let plus1 expression =
 let ``plan select`` () =
   let select = { emptySelect with TargetList = [ selectColumn 0; selectColumn 1 ] }
 
-  let expected = Plan.Project(Plan.Scan(table), [ column 0; column 1 ])
+  let expected = Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ])
 
   SelectQuery select |> Planner.plan |> should equal expected
 
@@ -61,7 +61,7 @@ let ``plan where`` () =
 
   let select = { emptySelect with Where = condition }
 
-  let expected = Plan.Project(Plan.Filter(Plan.Scan(table), condition), [])
+  let expected = Plan.Project(Plan.Filter(Plan.Scan(table, [ 1 ]), condition), [])
 
   SelectQuery select |> Planner.plan |> should equal expected
 
@@ -70,7 +70,7 @@ let ``plan order by`` () =
   let orderBy = [ OrderBy(column 1, Ascending, NullsFirst) ]
   let select = { emptySelect with OrderBy = orderBy }
 
-  let expected = Plan.Project(Plan.Sort(Plan.Scan(table), orderBy), [])
+  let expected = Plan.Project(Plan.Sort(Plan.Scan(table, [ 1 ]), orderBy), [])
 
   SelectQuery select |> Planner.plan |> should equal expected
 
@@ -87,7 +87,7 @@ let ``plan aggregation`` () =
 
   let expected =
     Plan.Project(
-      Plan.Aggregate(Plan.Scan(table), groupingSet, [ countStar ]),
+      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupingSet, [ countStar ]),
       [ ColumnReference(0, StringType); ColumnReference(1, IntegerType) ]
     )
 
@@ -122,7 +122,7 @@ let ``plan all`` () =
         Plan.Filter(
           Plan.Aggregate(
             Plan.Filter(
-              Plan.Scan(table), //
+              Plan.Scan(table, [ 0; 1 ]), //
               whereCondition
             ),
             groupingSet,
@@ -148,7 +148,7 @@ let ``sub-query plan`` () =
         From = SubQuery(SelectQuery subQuery, "subQuery")
     }
 
-  let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 1 ]), [ column 0 ])
+  let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 1 ]), [ column 1 ]), [ column 0 ])
 
   SelectQuery query |> Planner.plan |> should equal expected
 
@@ -164,7 +164,8 @@ let ``plan join`` () =
 
   let select = { emptySelect with From = Join join }
 
-  let expected = Plan.Project(Plan.Join(Plan.Scan(table), Plan.Scan(table), JoinType.InnerJoin, on = constTrue), [])
+  let expected =
+    Plan.Project(Plan.Join(Plan.Scan(table, []), Plan.Scan(table, []), JoinType.InnerJoin, on = constTrue), [])
 
   SelectQuery select |> Planner.plan |> should equal expected
 
@@ -177,7 +178,7 @@ let ``plan set select`` () =
 
   let expected =
     Plan.Project(
-      Plan.ProjectSet(Plan.Scan(table), GenerateSeries, [ column 0 ]),
+      Plan.ProjectSet(Plan.Scan(table, [ 0; 1 ]), GenerateSeries, [ column 0 ]),
       [ column 1; ColumnReference(2, IntegerType) ]
     )
 
@@ -189,6 +190,6 @@ let ``junk filter`` () =
 
   let select = { emptySelect with TargetList = [ junkCol; selectColumn 1 ] }
 
-  let expected = Plan.Project(Plan.Project(Plan.Scan(table), [ column 0; column 1 ]), [ column 1 ])
+  let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
 
   SelectQuery select |> Planner.plan |> should equal expected

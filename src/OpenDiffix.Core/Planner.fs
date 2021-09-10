@@ -45,8 +45,11 @@ let rec private collectSetFunctions expression =
 // Node planners
 // ----------------------------------------------------------------
 
-let private planJoin join =
-  Plan.Join(planFrom join.Left, planFrom join.Right, join.Type, join.On)
+let private planJoin join columnIndices =
+  let leftColumnCount = QueryRange.columnsCount join.Left
+  let leftIndices, rightIndices = List.partition ((>=) leftColumnCount) columnIndices
+  let rightIndices = List.map (fun i -> i - leftColumnCount) rightIndices
+  Plan.Join(planFrom join.Left leftIndices, planFrom join.Right rightIndices, join.Type, join.On)
 
 let private planProject expressions plan =
   match expressions |> List.collect collectSetFunctions |> List.distinct with
@@ -73,16 +76,24 @@ let private planAggregate (groupingLabels: Expression list) (aggregators: Expres
   else
     Plan.Aggregate(plan, groupingLabels, aggregators)
 
-let private planFrom queryRange =
+let private planFrom queryRange columnIndices =
   match queryRange with
-  | RangeTable (table, _alias) -> Plan.Scan table
-  | Join join -> planJoin join
+  | RangeTable (table, _alias) -> Plan.Scan(table, columnIndices)
+  | Join join -> planJoin join columnIndices
   | SubQuery (query, _alias) -> query |> Query.assertSelectQuery |> planQuery
 
 let private planLimit amount plan =
   match amount with
   | None -> plan
   | Some amount -> Plan.Limit(plan, amount)
+
+let private collectColumnIndices node =
+  let rec exprIndices expr =
+    match expr with
+    | ColumnReference (index, _) -> [ index ]
+    | expr -> expr |> collect exprIndices
+
+  node |> collect exprIndices
 
 let private planQuery query =
   let selectedExpressions = query.TargetList |> List.map (fun column -> column.Expression)
@@ -95,7 +106,9 @@ let private planQuery query =
   let orderByExpressions = query.OrderBy |> map (projectExpression aggregatedColumns)
   let havingExpression = projectExpression aggregatedColumns query.Having
 
-  planFrom query.From
+  let columnIndices = query.Where :: expressions |> collectColumnIndices |> List.distinct |> List.sort
+
+  planFrom query.From columnIndices
   |> planFilter query.Where
   |> planAggregate groupingLabels aggregators
   |> planFilter havingExpression

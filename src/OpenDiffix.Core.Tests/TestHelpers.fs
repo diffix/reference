@@ -15,7 +15,7 @@ let evaluateAggregator ctx fn args rows =
 
 let dummyDataProvider schema =
   { new IDataProvider with
-      member _.OpenTable _table = failwith "Opening tables not supported"
+      member _.OpenTable(_table, _columnIndices) = failwith "Opening tables not supported"
       member _.GetSchema() = schema
       member _.Dispose() = ()
   }

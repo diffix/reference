@@ -4,7 +4,7 @@ open AnalyzerTypes
 
 [<RequireQualifiedAccess>]
 type Plan =
-  | Scan of Table
+  | Scan of Table * int list
   | Project of Plan * expressions: Expression list
   | ProjectSet of Plan * setGenerator: SetFunction * args: Expression list
   | Filter of Plan * condition: Expression
@@ -18,7 +18,7 @@ type Plan =
 module Plan =
   let rec columnsCount (plan: Plan) =
     match plan with
-    | Plan.Scan table -> table.Columns.Length
+    | Plan.Scan (table, _) -> table.Columns.Length
     | Plan.Project (_, expressions) -> expressions.Length
     | Plan.ProjectSet (plan, _, _) -> (columnsCount plan) + 1
     | Plan.Filter (plan, _) -> columnsCount plan

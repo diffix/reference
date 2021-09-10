@@ -33,34 +33,34 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute scan`` () =
-    let plan = Plan.Scan(products)
+    let plan = Plan.Scan(products, [ 0; 1; 2 ])
     let expected = [ [| Integer 1L; String "Water"; Real 1.3 |]; [| Integer 2L; String "Pasta"; Real 7.5 |] ]
     plan |> execute |> List.take 2 |> should equal expected
 
   [<Fact>]
   let ``execute project`` () =
-    let plan = Plan.Project(Plan.Scan(products), [ plus1 (column products 0) ])
+    let plan = Plan.Project(Plan.Scan(products, [ 0 ]), [ plus1 (column products 0) ])
     let expected = [ [| Integer 2L |]; [| Integer 3L |]; [| Integer 4L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
   let ``execute filter`` () =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "Milk") ])
-    let plan = Plan.Filter(Plan.Scan(products), condition)
-    let expected = [ [| Integer 6L; String "Milk"; Real 3.74 |] ]
+    let plan = Plan.Filter(Plan.Scan(products, [ 1 ]), condition)
+    let expected = [ [| Null; String "Milk"; Null |] ]
     plan |> execute |> should equal expected
 
   [<Fact>]
   let ``execute sort`` () =
     let idColumn = column products 0
     let orderById = OrderBy(idColumn, Descending, NullsFirst)
-    let plan = Plan.Project(Plan.Sort(Plan.Scan(products), [ orderById ]), [ idColumn ])
+    let plan = Plan.Project(Plan.Sort(Plan.Scan(products, [ 0 ]), [ orderById ]), [ idColumn ])
     let expected = [ [| Integer 1001L |]; [| Integer 1000L |]; [| Integer 10L |] ]
     plan |> execute |> List.take 3 |> should equal expected
 
   [<Fact>]
   let ``execute grouping aggregate`` () =
-    let plan = Plan.Aggregate(Plan.Scan(products), [ nameLength ], [ countStar ])
+    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [ nameLength ], [ countStar ])
 
     let expected =
       [
@@ -75,7 +75,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute global aggregate`` () =
-    let plan = Plan.Aggregate(Plan.Scan(products), [], [ countStar; countDistinct nameLength ])
+    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [], [ countStar; countDistinct nameLength ])
 
     let expected = [ [| Integer 11L; Integer 4L |] ]
     plan |> execute |> should equal expected
@@ -83,7 +83,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute grouping aggregate over nothing`` () =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
-    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [ nameLength ], [ countStar ])
+    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [ nameLength ], [ countStar ])
 
     let expected : Row list = []
     plan |> execute |> should equal expected
@@ -91,7 +91,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute global aggregate over nothing`` () =
     let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
-    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products), condition), [], [ countStar ])
+    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [], [ countStar ])
 
     let expected = [ [| Integer 0L |] ]
     plan |> execute |> should equal expected
@@ -101,7 +101,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), ParserTypes.InnerJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), ParserTypes.InnerJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
@@ -112,7 +112,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products), Plan.Scan(products), ParserTypes.LeftJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), ParserTypes.LeftJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
@@ -120,7 +120,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute project set`` () =
-    let fromPlan = Plan.Project(Plan.Scan(products), [ column products 0 ])
+    let fromPlan = Plan.Project(Plan.Scan(products, [ 0 ]), [ column products 0 ])
     let plan = Plan.ProjectSet(fromPlan, GenerateSeries, [ Constant(Integer 2L) ])
 
     let expected =
