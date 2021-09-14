@@ -435,6 +435,10 @@ module DefaultFunctionsTests =
         String "0.5", String "real", Real 0.5
         String "-12.334", String "real", Real -12.334
         String "true", String "boolean", Boolean true
+        String "TRUE", String "boolean", Boolean true
+        String "1", String "boolean", Boolean true
+        String "", String "boolean", Null
+        String "False", String "boolean", Boolean false
         Integer 100L, String "boolean", Boolean true
         Integer 0L, String "boolean", Boolean false
         Integer -1L, String "real", Real -1.

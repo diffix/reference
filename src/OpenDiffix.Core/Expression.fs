@@ -149,7 +149,14 @@ let rec evaluateScalarFunction fn args =
 
   | Cast, [ String s; String "integer" ] -> if s = "" then Null else s |> System.Int64.Parse |> Integer
   | Cast, [ String s; String "real" ] -> if s = "" then Null else System.Double.Parse(s, doubleStyle) |> Real
-  | Cast, [ String s; String "boolean" ] -> s |> System.Boolean.Parse |> Boolean
+  | Cast, [ String s; String "boolean" ] ->
+      match s.ToLower() with
+      | "true"
+      | "1" -> Boolean true
+      | "false"
+      | "0" -> Boolean false
+      | "" -> Null
+      | _ -> failwith "Input value is not a valid boolean string."
   | Cast, [ Integer i; String "real" ] -> i |> float |> Real
   | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
   | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
