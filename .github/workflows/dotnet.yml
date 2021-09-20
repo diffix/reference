@@ -19,6 +19,10 @@ jobs:
           dotnet-version: 5.0.100
       - name: Install dependencies
         run: dotnet restore
+      - name: Install tools
+        run: dotnet tool restore
+      - name: Check format
+        run: dotnet fantomas --check -r .
       - name: Build
         run: dotnet build --configuration Release --no-restore
       - name: Generate test data
