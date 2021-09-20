@@ -70,9 +70,9 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
       match state.TryGetValue(group) with
       | true, aggregators -> aggregators
       | false, _ ->
-          let aggregators = makeAggregators ()
-          state.[group] <- aggregators
-          aggregators
+        let aggregators = makeAggregators ()
+        state.[group] <- aggregators
+        aggregators
 
     aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)

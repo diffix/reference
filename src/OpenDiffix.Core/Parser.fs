@@ -28,8 +28,8 @@ module QueryParser =
   let qualifiedIdentifier =
     identifier .>>. opt (pchar '.' >>. identifier)
     |>> function
-    | name, None -> Expression.Identifier(None, name)
-    | name1, Some name2 -> Expression.Identifier(Some name1, name2)
+      | name, None -> Expression.Identifier(None, name)
+      | name1, Some name2 -> Expression.Identifier(Some name1, name2)
 
   let word word = pstringCI word .>> spaces
 
@@ -56,9 +56,9 @@ module QueryParser =
           match decimalPartOption with
           | None -> Expression.Integer wholeValue
           | Some (leadingZeros, Some decimalValue) ->
-              let divisor = List.length leadingZeros + 1
-              let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
-              Expression.Float(float wholeValue + decimalPart)
+            let divisor = List.length leadingZeros + 1
+            let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
+            Expression.Float(float wholeValue + decimalPart)
           | Some (_leadingZeros, None) -> Expression.Float(float wholeValue)
 
   let boolean =
@@ -111,8 +111,8 @@ module QueryParser =
   let subQuery =
     inParenthesis selectQuery .>>. identifier
     >>= function
-    | SelectQuery subQuery, alias -> preturn <| SubQuery(subQuery, alias)
-    | _ -> fail "Expected sub-query"
+      | SelectQuery subQuery, alias -> preturn <| SubQuery(subQuery, alias)
+      | _ -> fail "Expected sub-query"
 
   let tableOrSubQuery = attempt subQuery <|> table
 
@@ -133,32 +133,32 @@ module QueryParser =
     selectQueryRef
     := word "SELECT"
        >>= fun _ ->
-         distinct
-         >>= fun distinct ->
-               commaSepExpressions
-               >>= fun columns ->
-                     from
-                     >>= fun from ->
-                           opt whereClause
-                           >>= fun whereClause ->
-                                 opt groupBy
-                                 >>= fun groupBy ->
-                                       opt havingClause
-                                       >>= fun having ->
-                                             opt limitClause
-                                             >>= fun limit ->
-                                                   let query =
-                                                     {
-                                                       SelectDistinct = distinct
-                                                       Expressions = columns
-                                                       From = from
-                                                       Where = whereClause
-                                                       GroupBy = groupBy |> Option.defaultValue []
-                                                       Having = having
-                                                       Limit = limit
-                                                     }
+             distinct
+             >>= fun distinct ->
+                   commaSepExpressions
+                   >>= fun columns ->
+                         from
+                         >>= fun from ->
+                               opt whereClause
+                               >>= fun whereClause ->
+                                     opt groupBy
+                                     >>= fun groupBy ->
+                                           opt havingClause
+                                           >>= fun having ->
+                                                 opt limitClause
+                                                 >>= fun limit ->
+                                                       let query =
+                                                         {
+                                                           SelectDistinct = distinct
+                                                           Expressions = columns
+                                                           From = from
+                                                           Where = whereClause
+                                                           GroupBy = groupBy |> Option.defaultValue []
+                                                           Having = having
+                                                           Limit = limit
+                                                         }
 
-                                                   preturn (Expression.SelectQuery query)
+                                                       preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore
@@ -167,13 +167,13 @@ module QueryParser =
     let rec createPermutations acc next =
       match acc, next with
       | acc, c :: cs ->
-          let newAcc =
-            acc
-            |> List.collect (fun prefix -> //
-              List.distinct [ $"%s{prefix}%c{ToLower c}"; $"%s{prefix}%c{ToUpper c}" ]
-            )
+        let newAcc =
+          acc
+          |> List.collect (fun prefix -> //
+            List.distinct [ $"%s{prefix}%c{ToLower c}"; $"%s{prefix}%c{ToUpper c}" ]
+          )
 
-          createPermutations newAcc cs
+        createPermutations newAcc cs
       | acc, [] -> acc
 
     s.ToCharArray() |> Array.toList |> createPermutations [ "" ]
@@ -231,7 +231,7 @@ module QueryParser =
 let parse sql : SelectQuery =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
   | FParsec.CharParsers.Success (result, _, _) ->
-      match result with
-      | SelectQuery selectQuery -> selectQuery
-      | _ -> failwith "Parse error: Expecting SELECT query"
+    match result with
+    | SelectQuery selectQuery -> selectQuery
+    | _ -> failwith "Parse error: Expecting SELECT query"
   | FParsec.CharParsers.Failure (errorMessage, _, _) -> failwith ("Parse error: " + errorMessage)

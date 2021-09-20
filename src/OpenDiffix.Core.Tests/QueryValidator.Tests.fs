@@ -2,7 +2,7 @@ module OpenDiffix.Core.QueryValidatorTests
 
 open Xunit
 
-let testTable : Table =
+let testTable: Table =
   {
     Name = "table"
     Columns =
@@ -31,7 +31,8 @@ let ensureFailParsedQuery queryString (errorFragment: string) =
   try
     analyzeQuery queryString
     failwith "Was expecting query analysis to fail"
-  with ex ->
+  with
+  | ex ->
     let str = ex.Message.ToLower()
 
     if str.Contains(errorFragment.ToLower()) then

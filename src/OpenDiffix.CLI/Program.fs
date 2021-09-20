@@ -33,22 +33,22 @@ type CliArguments =
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
-          "Path to a file containing a list of query specifications. All queries will be executed in batch mode."
+        "Path to a file containing a list of query specifications. All queries will be executed in batch mode."
       | Query_Stdin -> "Reads the query from standard in."
       | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Outlier_Count _ ->
-          "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
-          + "should be excluded. A number is picked from a uniform distribution between the upper and lower limit."
+        "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
+        + "should be excluded. A number is picked from a uniform distribution between the upper and lower limit."
       | Top_Count _ ->
-          "Interval used in the count aggregate together with the outlier count interval. It determines how many "
-          + "of the next most contributing users' values should be used to calculate the replacement value for the "
-          + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
+        "Interval used in the count aggregate together with the outlier count interval. It determines how many "
+        + "of the next most contributing users' values should be used to calculate the replacement value for the "
+        + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
       | Low_Threshold _ ->
-          "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the low count filter."
+        "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the low count filter."
       | Low_SD _ -> "Sets the standard deviation for the low count filter threshold."
       | Low_Mean_Gap _ ->
-          "Sets the number of standard deviations between the lower bound and the mean of the low count filter threshold."
+        "Sets the number of standard deviations between the lower bound and the mean of the low count filter threshold."
       | Noise_SD _ -> "Specifies the standard deviation used when calculating the noise throughout the system."
 
 let executableName = "OpenDiffix.CLI"
@@ -117,10 +117,10 @@ let getQuery (parsedArgs: ParseResults<CliArguments>) =
 let getFilePath (parsedArgs: ParseResults<CliArguments>) =
   match parsedArgs.TryGetResult CliArguments.File_Path with
   | Some filePath ->
-      if File.Exists(filePath) then
-        filePath
-      else
-        failWithUsageInfo $"Could not find a file at %s{filePath}"
+    if File.Exists(filePath) then
+      filePath
+    else
+      failWithUsageInfo $"Could not find a file at %s{filePath}"
   | None -> failWithUsageInfo "Please specify the file path."
 
 let dryRun query filePath anonParams =
@@ -173,7 +173,8 @@ let batchExecuteQueries (queriesPath: string) =
       try
         runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
         |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
-      with (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message
+      with
+      | (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message
     )
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
@@ -205,6 +206,7 @@ let main argv =
       printfn $"%s{output}"
       0
 
-  with e ->
+  with
+  | e ->
     eprintfn $"ERROR: %s{e.Message}"
     1

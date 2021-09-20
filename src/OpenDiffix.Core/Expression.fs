@@ -15,9 +15,9 @@ let typeOfScalarFunction fn args =
   | Subtract
   | Multiply
   | Divide ->
-      args
-      |> List.map typeOf
-      |> function
+    args
+    |> List.map typeOf
+    |> function
       | [ IntegerType; IntegerType ] -> IntegerType
       | _ -> RealType
   | Modulo -> IntegerType
@@ -41,9 +41,9 @@ let typeOfScalarFunction fn args =
   | Concat -> StringType
   | WidthBucket -> args |> List.head |> typeOf
   | Cast ->
-      args
-      |> List.item 1
-      |> function
+    args
+    |> List.item 1
+    |> function
       | Constant (String "integer") -> IntegerType
       | Constant (String "real") -> RealType
       | Constant (String "boolean") -> BooleanType
@@ -61,9 +61,9 @@ let typeOfAggregate fn args =
   | DiffixCount -> IntegerType
   | DiffixLowCount -> BooleanType
   | Sum ->
-      match typeOfList args with
-      | ListType IntegerType -> IntegerType
-      | _ -> RealType
+    match typeOfList args with
+    | ListType IntegerType -> IntegerType
+    | _ -> RealType
   | MergeAids -> ListType MIXED_TYPE
 
 /// Resolves the type of an expression.
@@ -131,7 +131,7 @@ let rec evaluateScalarFunction fn args =
   | Abs, [ Integer i ] -> i |> abs |> Integer
 
   | WidthBucket, [ Integer v; Integer b; Integer t; Integer c ] ->
-      widthBucket (float v) (float b) (float t) c |> Integer
+    widthBucket (float v) (float b) (float t) c |> Integer
   | WidthBucket, [ Real v; Real b; Real t; Integer c ] -> widthBucket v b t c |> Integer
 
   | Length, [ String s ] -> Integer(int64 s.Length)
@@ -139,24 +139,24 @@ let rec evaluateScalarFunction fn args =
   | Lower, [ String s ] -> String(s.ToLower())
   | Upper, [ String s ] -> String(s.ToUpper())
   | Substring, [ String s; Integer start; Integer length ] ->
-      let start = int start
-      let length = int length
+    let start = int start
+    let length = int length
 
-      if start <= 0 || length < 0 then Null
-      else if start > s.Length then String ""
-      else s.Substring(start - 1, min (s.Length - start + 1) length) |> String
+    if start <= 0 || length < 0 then Null
+    else if start > s.Length then String ""
+    else s.Substring(start - 1, min (s.Length - start + 1) length) |> String
   | Concat, [ String s1; String s2 ] -> String(s1 + s2)
 
   | Cast, [ String s; String "integer" ] -> if s = "" then Null else s |> System.Int64.Parse |> Integer
   | Cast, [ String s; String "real" ] -> if s = "" then Null else System.Double.Parse(s, doubleStyle) |> Real
   | Cast, [ String s; String "boolean" ] ->
-      match s.ToLower() with
-      | "true"
-      | "1" -> Boolean true
-      | "false"
-      | "0" -> Boolean false
-      | "" -> Null
-      | _ -> failwith "Input value is not a valid boolean string."
+    match s.ToLower() with
+    | "true"
+    | "1" -> Boolean true
+    | "false"
+    | "0" -> Boolean false
+    | "" -> Null
+    | _ -> failwith "Input value is not a valid boolean string."
   | Cast, [ Integer i; String "real" ] -> i |> float |> Real
   | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
   | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
@@ -189,15 +189,15 @@ let sortRows ctx orderings (rows: Row seq) =
     match orderings with
     | [] -> rows
     | OrderBy (expr, direction, nulls) :: tail ->
-        let compare = Value.comparer direction nulls
+      let compare = Value.comparer direction nulls
 
-        rows
-        |> Seq.sortWith (fun rowA rowB ->
-          let valueA = evaluate ctx rowA expr
-          let valueB = evaluate ctx rowB expr
-          compare valueA valueB
-        )
-        |> performSort tail
+      rows
+      |> Seq.sortWith (fun rowA rowB ->
+        let valueA = evaluate ctx rowA expr
+        let valueB = evaluate ctx rowB expr
+        compare valueA valueB
+      )
+      |> performSort tail
 
   performSort (List.rev orderings) rows
 

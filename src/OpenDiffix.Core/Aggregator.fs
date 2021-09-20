@@ -69,7 +69,7 @@ type private Sum() =
     member this.Final _ctx = state
 
 type private DiffixCount(minCount) =
-  let mutable state : Anonymizer.AidCountState array = null
+  let mutable state: Anonymizer.AidCountState array = null
 
   /// Increases contribution of a single AID value.
   let increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidHash, float>) =
@@ -88,8 +88,7 @@ type private DiffixCount(minCount) =
       state <-
         Array.init
           aidInstances.Length
-          (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0L }
-          )
+          (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0L })
 
     aidInstances
     |> List.iteri (fun i aidValue ->
@@ -102,10 +101,10 @@ type private DiffixCount(minCount) =
       | Value.List [] -> aidState.UnaccountedFor <- aidState.UnaccountedFor + valueIncrease
       // List of AIDs, distribute contribution evenly
       | Value.List aidValues ->
-          let partialIncrease = (float valueIncrease) / (aidValues |> List.length |> float)
+        let partialIncrease = (float valueIncrease) / (aidValues |> List.length |> float)
 
-          aidValues
-          |> List.iter (fun aidValue -> increaseContribution partialIncrease aidValue aidContributions)
+        aidValues
+        |> List.iter (fun aidValue -> increaseContribution partialIncrease aidValue aidContributions)
       // Single AID, add to its contribution
       | aidValue -> increaseContribution (float valueIncrease) aidValue aidContributions
     )
@@ -142,23 +141,23 @@ type private DiffixCountDistinct(minCount) =
       match args with
       | [ _aidInstances; Null ] -> ()
       | [ Value.List aidInstances; value ] ->
-          let aidSets =
-            match aidsPerValue.TryGetValue(value) with
-            | true, aidSets -> aidSets
-            | false, _ ->
-                if aidsCount = 0 then aidsCount <- aidInstances.Length
-                let aidSets = emptySets aidsCount
-                aidsPerValue.[value] <- aidSets
-                aidSets
+        let aidSets =
+          match aidsPerValue.TryGetValue(value) with
+          | true, aidSets -> aidSets
+          | false, _ ->
+            if aidsCount = 0 then aidsCount <- aidInstances.Length
+            let aidSets = emptySets aidsCount
+            aidsPerValue.[value] <- aidSets
+            aidSets
 
-          aidInstances
-          |> List.iteri (fun i aidValue ->
-            match aidValue with
-            | Null
-            | Value.List [] -> ()
-            | Value.List aidValues -> aidSets.[i].UnionWith(hashAidList aidValues)
-            | aidValue -> aidSets.[i].Add(hashAid aidValue) |> ignore
-          )
+        aidInstances
+        |> List.iteri (fun i aidValue ->
+          match aidValue with
+          | Null
+          | Value.List [] -> ()
+          | Value.List aidValues -> aidSets.[i].UnionWith(hashAidList aidValues)
+          | aidValue -> aidSets.[i].Add(hashAid aidValue) |> ignore
+        )
       | _ -> invalidArgs args
 
     member this.Final ctx =
@@ -168,23 +167,23 @@ type private DiffixCountDistinct(minCount) =
       | value -> value
 
 type private DiffixLowCount() =
-  let mutable state : HashSet<AidHash> [] = null
+  let mutable state: HashSet<AidHash> [] = null
 
   interface IAggregator with
     member this.Transition args =
       match args with
       | [ Null ] -> ()
       | [ Value.List aidInstances ] ->
-          if state = null then state <- emptySets aidInstances.Length
+        if state = null then state <- emptySets aidInstances.Length
 
-          aidInstances
-          |> List.iteri (fun i aidValue ->
-            match aidValue with
-            | Null
-            | Value.List [] -> ()
-            | Value.List aidValues -> state.[i].UnionWith(hashAidList aidValues)
-            | aidValue -> state.[i].Add(hashAid aidValue) |> ignore
-          )
+        aidInstances
+        |> List.iteri (fun i aidValue ->
+          match aidValue with
+          | Null
+          | Value.List [] -> ()
+          | Value.List aidValues -> state.[i].UnionWith(hashAidList aidValues)
+          | aidValue -> state.[i].Add(hashAid aidValue) |> ignore
+        )
 
       | _ -> invalidArgs args
 

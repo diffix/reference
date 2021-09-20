@@ -111,9 +111,9 @@ let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash
     match result.TryGetValue(aid) with
     | true, valueSet -> valueSet.Add(value) |> ignore
     | false, _ ->
-        let valueSet = HashSet<Value>()
-        result.[aid] <- valueSet
-        valueSet.Add(value) |> ignore
+      let valueSet = HashSet<Value>()
+      result.[aid] <- valueSet
+      valueSet.Add(value) |> ignore
 
   for pair in aidsPerValue do
     let value = pair.Key
@@ -127,10 +127,10 @@ let rec private distributeValues valuesByAID =
   | [] -> [] // Done :D
   | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
   | (aid, value :: restValues) :: restValuesByAID ->
-      let restValuesByAID = // Drop current value from the remaining items.
-        List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
+    let restValuesByAID = // Drop current value from the remaining items.
+      List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
 
-      (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
+    (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
 let private countDistinctFlatteningByAid anonParams (perAidContributions: Dictionary<AidHash, HashSet<Value>>) =
   perAidContributions

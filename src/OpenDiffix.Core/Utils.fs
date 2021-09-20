@@ -11,9 +11,9 @@ module ExpressionType =
     types
     |> List.distinct
     |> function
-    | [] -> MISSING_TYPE
-    | [ t ] -> t
-    | _ -> MIXED_TYPE
+      | [] -> MISSING_TYPE
+      | [ t ] -> t
+      | _ -> MIXED_TYPE
 
 module EvaluationContext =
   let make anonParams dataProvider =
@@ -74,8 +74,8 @@ module Schema =
     tableName
     |> tryFindTable schema
     |> function
-    | Some table -> table
-    | None -> failwith $"Could not find table `{tableName}`."
+      | Some table -> table
+      | None -> failwith $"Could not find table `{tableName}`."
 
 module Table =
   /// Finds a column along with its index. The index is zero-based.
@@ -89,8 +89,8 @@ module Table =
     columnName
     |> tryFindColumn table
     |> function
-    | Some column -> column
-    | None -> failwith $"Could not find column `{columnName}` in table `{table.Name}`"
+      | Some column -> column
+      | None -> failwith $"Could not find column `{columnName}` in table `{table.Name}`"
 
 module AnonymizationParams =
   /// Returns whether the given column in the table is an AID column.
@@ -98,8 +98,8 @@ module AnonymizationParams =
     anonParams.TableSettings
     |> Map.tryFind tableName
     |> function
-    | Some tableSettings -> tableSettings.AidColumns |> List.exists (String.equalsI columnName)
-    | None -> false
+      | Some tableSettings -> tableSettings.AidColumns |> List.exists (String.equalsI columnName)
+      | None -> false
 
 module Hash =
   let bytes (data: byte []) =
