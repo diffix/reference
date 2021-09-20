@@ -22,7 +22,7 @@ jobs:
       - name: Install tools
         run: dotnet tool restore
       - name: Check format
-        run: dotnet fantomas --check .
+        run: dotnet fantomas --check -r .
       - name: Build
         run: dotnet build --configuration Release --no-restore
       - name: Generate test data
