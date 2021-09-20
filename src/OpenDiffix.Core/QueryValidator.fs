@@ -5,22 +5,24 @@ open NodeUtils
 
 let private validateOnlyCount query =
   query
-  |> visitAggregates
-       (function
-       | FunctionExpr (AggregateFunction (Count, _), _) -> ()
-       | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
-       | _ -> ())
+  |> visitAggregates (
+    function
+    | FunctionExpr (AggregateFunction (Count, _), _) -> ()
+    | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
+    | _ -> ()
+  )
 
 let private allowedCountUsage query =
   query
-  |> visitAggregates
-       (function
-       | FunctionExpr (AggregateFunction (Count, _), args) ->
-           match args with
-           | []
-           | [ ColumnReference _ ] -> ()
-           | _ -> failwith "Only count(*) and count(distinct column) are supported"
-       | _ -> ())
+  |> visitAggregates (
+    function
+    | FunctionExpr (AggregateFunction (Count, _), args) ->
+      match args with
+      | []
+      | [ ColumnReference _ ] -> ()
+      | _ -> failwith "Only count(*) and count(distinct column) are supported"
+    | _ -> ()
+  )
 
 let private validateSubQuery query =
   let selectQuery = Query.assertSelectQuery query

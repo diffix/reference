@@ -23,13 +23,15 @@ let expectFail query =
   try
     let result = parse query
     failwith $"Expected query to fail parsing. Got successfully parsed: %A{result}"
-  with _e -> ()
+  with
+  | _e -> ()
 
 let expectFailWithParser parser fragment =
   try
     let result = FParsec.CharParsers.run parser fragment
     failwith $"Expected query fragment parser to fail. Got successfully parsed: %A{result}"
-  with _e -> ()
+  with
+  | _e -> ()
 
 let parseFragment parser fragment =
   match FParsec.CharParsers.run parser fragment with

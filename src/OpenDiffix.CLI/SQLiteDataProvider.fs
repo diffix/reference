@@ -18,7 +18,8 @@ let private loadSchema (connection: SQLiteConnection) =
   // The reason is that we are using an anonymous record to deserialize the rows from the database.
   // Anonymous records have a constructor where the parameters are sorted alphabetically by name.
   // The order in which the columns are returned from the DB need to match that.
-  let sql = """
+  let sql =
+    """
   SELECT p.name as ColumnName,
          p.type as ColumnType,
          m.name as TableName
@@ -50,9 +51,9 @@ let private readValue (reader: SQLiteDataReader) index =
     match reader.GetFieldType(index) with
     | fieldType when fieldType = typeof<bool> -> Boolean(reader.GetBoolean index)
     | fieldType when fieldType = typeof<int32> || fieldType = typeof<int64> ->
-        Integer(reader.GetFieldValue<int64> index)
+      Integer(reader.GetFieldValue<int64> index)
     | fieldType when fieldType = typeof<single> || fieldType = typeof<double> ->
-        Real(reader.GetFieldValue<double> index)
+      Real(reader.GetFieldValue<double> index)
     | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
     | _unknownType -> Null
 

@@ -11,10 +11,10 @@ let rec private resolveColumn rangeColumns tableName columnName =
   let label, condition =
     match tableName with
     | Some tableName ->
-        $"%s{tableName}.%s{columnName}",
-        fun (_, col) ->
-          String.equalsI col.RangeName tableName
-          && String.equalsI col.ColumnName columnName
+      $"%s{tableName}.%s{columnName}",
+      fun (_, col) ->
+        String.equalsI col.RangeName tableName
+        && String.equalsI col.ColumnName columnName
     | None -> columnName, (fun (_, col) -> String.equalsI col.ColumnName columnName)
 
   let candidates = rangeColumns |> List.indexed |> List.filter condition
@@ -43,16 +43,16 @@ let private mapColumnReference rangeColumns tableName columnName =
 let private mapFunctionExpression rangeColumns fn parsedArgs =
   (match fn, parsedArgs with
    | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
-       AggregateFunction(Count, aggregateArgs), []
+     AggregateFunction(Count, aggregateArgs), []
    | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
-       let arg = mapExpression rangeColumns expr
-       AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
+     let arg = mapExpression rangeColumns expr
+     AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
    | AggregateFunction (fn, aggregateArgs), parsedArgs when List.contains fn [ DiffixCount; DiffixLowCount ] -> //
-       let args = parsedArgs |> List.map (mapExpression rangeColumns)
-       AggregateFunction(fn, aggregateArgs), [ ListExpr args ]
+     let args = parsedArgs |> List.map (mapExpression rangeColumns)
+     AggregateFunction(fn, aggregateArgs), [ ListExpr args ]
    | _ ->
-       let args = parsedArgs |> List.map (mapExpression rangeColumns)
-       fn, args)
+     let args = parsedArgs |> List.map (mapExpression rangeColumns)
+     fn, args)
   |> FunctionExpr
 
 let private mapExpression rangeColumns parsedExpr =
@@ -72,8 +72,8 @@ let private mapExpression rangeColumns parsedExpr =
   | ParserTypes.Equals (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Equals) [ left; right ]
   | ParserTypes.IsNull expr -> mapFunctionExpression rangeColumns (ScalarFunction IsNull) [ expr ]
   | ParserTypes.Function (name, args) ->
-      let fn = Function.fromString name
-      mapFunctionExpression rangeColumns fn args
+    let fn = Function.fromString name
+    mapFunctionExpression rangeColumns fn args
   | other -> failwith $"The expression is not permitted in this context: %A{other}"
 
 let private mapFilterExpression rangeColumns optionalExpr =
@@ -84,18 +84,18 @@ let private mapFilterExpression rangeColumns optionalExpr =
 let private mapTargetEntry rangeColumns parsedExpr =
   match parsedExpr with
   | ParserTypes.As (parsedExpression, parsedAlias) ->
-      let alias = parsedAlias |> Option.defaultValue (expressionName parsedExpression)
-      let expression = parsedExpression |> mapExpression rangeColumns
-      [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
+    let alias = parsedAlias |> Option.defaultValue (expressionName parsedExpression)
+    let expression = parsedExpression |> mapExpression rangeColumns
+    [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
   | ParserTypes.Star ->
-      rangeColumns
-      |> List.mapi (fun index rangeColumn ->
-        {
-          Expression = ColumnReference(index, rangeColumn.Type)
-          Alias = rangeColumn.ColumnName
-          Tag = RegularTargetEntry
-        }
-      )
+    rangeColumns
+    |> List.mapi (fun index rangeColumn ->
+      {
+        Expression = ColumnReference(index, rangeColumn.Type)
+        Alias = rangeColumn.ColumnName
+        Tag = RegularTargetEntry
+      }
+    )
   | other -> failwith $"Unexpected expression selected '%A{other}'"
 
 // ----------------------------------------------------------------
@@ -105,10 +105,10 @@ let private mapTargetEntry rangeColumns parsedExpr =
 let private mapGroupByIndex (expressions: Expression list) groupByExpression =
   match groupByExpression with
   | Constant (Integer index) ->
-      if index < 1L || index > int64 expressions.Length then
-        failwith $"Invalid `GROUP BY` index: {index}"
-      else
-        expressions |> List.item (int index - 1)
+    if index < 1L || index > int64 expressions.Length then
+      failwith $"Invalid `GROUP BY` index: {index}"
+    else
+      expressions |> List.item (int index - 1)
   | _ -> groupByExpression
 
 let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions =
@@ -123,42 +123,42 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
 let rec private collectRangeColumns anonParams range =
   match range with
   | SubQuery (query, queryAlias) ->
-      (Query.assertSelectQuery query).TargetList
-      |> List.map (fun targetEntry ->
-        {
-          RangeName = queryAlias
-          ColumnName = targetEntry.Alias
-          Type = Expression.typeOf targetEntry.Expression
-          IsAid = (targetEntry.Tag = AidTargetEntry)
-        }
-      )
+    (Query.assertSelectQuery query).TargetList
+    |> List.map (fun targetEntry ->
+      {
+        RangeName = queryAlias
+        ColumnName = targetEntry.Alias
+        Type = Expression.typeOf targetEntry.Expression
+        IsAid = (targetEntry.Tag = AidTargetEntry)
+      }
+    )
   | Join { Left = left; Right = right } -> //
-      collectRangeColumns anonParams left @ collectRangeColumns anonParams right
+    collectRangeColumns anonParams left @ collectRangeColumns anonParams right
   | RangeTable (table, alias) ->
-      table.Columns
-      |> List.map (fun col ->
-        {
-          RangeName = alias
-          ColumnName = col.Name
-          Type = col.Type
-          IsAid = AnonymizationParams.isAidColumn anonParams table.Name col.Name
-        }
-      )
+    table.Columns
+    |> List.map (fun col ->
+      {
+        RangeName = alias
+        ColumnName = col.Name
+        Type = col.Type
+        IsAid = AnonymizationParams.isAidColumn anonParams table.Name col.Name
+      }
+    )
 
 let rec private mapQueryRange schema anonParams parsedRange =
   match parsedRange with
   | ParserTypes.Table (name, alias) ->
-      let alias = alias |> Option.defaultValue name
-      let table = name |> Schema.findTable schema
-      RangeTable(table, alias)
+    let alias = alias |> Option.defaultValue name
+    let table = name |> Schema.findTable schema
+    RangeTable(table, alias)
   | ParserTypes.Join (joinType, left, right, on) ->
-      let left = mapQueryRange schema anonParams left
-      let right = mapQueryRange schema anonParams right
+    let left = mapQueryRange schema anonParams left
+    let right = mapQueryRange schema anonParams right
 
-      let rangeColumns = collectRangeColumns anonParams left @ collectRangeColumns anonParams right
-      let condition = mapFilterExpression rangeColumns (Some on)
+    let rangeColumns = collectRangeColumns anonParams left @ collectRangeColumns anonParams right
+    let condition = mapFilterExpression rangeColumns (Some on)
 
-      Join { Type = joinType; Left = left; Right = right; On = condition }
+    Join { Type = joinType; Left = left; Right = right; On = condition }
   | ParserTypes.SubQuery (subQuery, alias) -> SubQuery(mapQuery schema anonParams true subQuery, alias)
   | _ -> failwith "Invalid `FROM` clause"
 
@@ -246,7 +246,7 @@ let private rewriteToDiffixAggregate aidColumnsExpression query =
   let rec exprMapper expr =
     match expr with
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
-        FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
+      FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
     | other -> other |> map exprMapper
 
   query |> map exprMapper

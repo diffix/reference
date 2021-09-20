@@ -5,7 +5,7 @@ open FsUnit.Xunit
 
 open AnalyzerTypes
 
-let testTable : Table =
+let testTable: Table =
   {
     Name = "table"
     Columns =
@@ -98,7 +98,8 @@ let ``Selecting columns from a table`` () =
 
 [<Fact>]
 let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
-  let query = @"
+  let query =
+    @"
   SELECT
     int_col as colAlias,
     float_col + int_col,
@@ -299,7 +300,8 @@ type Tests(db: DBFixture) =
     try
       query |> analyzeQuery |> ignore
       failwith "Expected query to fail"
-    with ex -> ex.Message |> should equal error
+    with
+    | ex -> ex.Message |> should equal error
 
   [<Fact>]
   let ``Analyze count transforms`` () =

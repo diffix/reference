@@ -89,8 +89,8 @@ type Tests(db: DBFixture) =
          |> List.head
          |> Array.head
          |> function
-         | Integer i -> Integer i
-         | other -> failwith $"Unexpected return '%A{other}'"
+           | Integer i -> Integer i
+           | other -> failwith $"Unexpected return '%A{other}'"
 
   [<Fact>]
   let ``query 6 - cross join`` () =

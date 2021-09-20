@@ -5,7 +5,7 @@ open FsUnit.Xunit
 
 open AnalyzerTypes
 
-let testTable : Table =
+let testTable: Table =
   {
     Name = "table"
     Columns =
@@ -46,9 +46,10 @@ let selectQueryNegative =
 let ``Map expressions`` () =
   let data =
     selectQuery
-    |> NodeUtils.map
-         (function
-         | Constant (Boolean true) -> Constant(Boolean false)
-         | other -> other)
+    |> NodeUtils.map (
+      function
+      | Constant (Boolean true) -> Constant(Boolean false)
+      | other -> other
+    )
 
   should equal selectQueryNegative data

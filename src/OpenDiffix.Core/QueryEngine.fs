@@ -6,11 +6,11 @@ let rec private extractColumns query =
   match query with
   | UnionQuery (_, query1, _query2) -> extractColumns query1
   | SelectQuery query ->
-      query.TargetList
-      |> List.filter TargetEntry.isRegular
-      |> List.map (fun column -> //
-        { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
-      )
+    query.TargetList
+    |> List.filter TargetEntry.isRegular
+    |> List.map (fun column -> //
+      { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
+    )
 
 // ----------------------------------------------------------------
 // Public API

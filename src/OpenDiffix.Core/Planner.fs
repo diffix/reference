@@ -17,13 +17,13 @@ let rec private projectExpression innerExpressions outerExpression =
   else
     match innerExpressions |> List.tryFindIndex ((=) outerExpression) with
     | None ->
-        match outerExpression with
-        | FunctionExpr (fn, args) ->
-            let args = args |> List.map (projectExpression innerExpressions)
-            FunctionExpr(fn, args)
-        | Constant _ -> outerExpression
-        | ColumnReference _ -> failwith "Expression projection failed"
-        | ListExpr values -> values |> List.map (projectExpression innerExpressions) |> ListExpr
+      match outerExpression with
+      | FunctionExpr (fn, args) ->
+        let args = args |> List.map (projectExpression innerExpressions)
+        FunctionExpr(fn, args)
+      | Constant _ -> outerExpression
+      | ColumnReference _ -> failwith "Expression projection failed"
+      | ListExpr values -> values |> List.map (projectExpression innerExpressions) |> ListExpr
     | Some i -> ColumnReference(i, Expression.typeOf outerExpression)
 
 /// Swaps set function expressions with a reference to their evaluated value in the child plan.
@@ -55,9 +55,9 @@ let private planProject expressions plan =
   match expressions |> List.collect collectSetFunctions |> List.distinct with
   | [] -> Plan.Project(plan, expressions)
   | [ setFn, args ] ->
-      let setColumn = ColumnReference(Plan.columnsCount plan, Expression.typeOfSetFunction setFn args)
-      let expressions = expressions |> List.map (projectSetFunctions setColumn)
-      Plan.Project(Plan.ProjectSet(plan, setFn, args), expressions)
+    let setColumn = ColumnReference(Plan.columnsCount plan, Expression.typeOfSetFunction setFn args)
+    let expressions = expressions |> List.map (projectSetFunctions setColumn)
+    Plan.Project(Plan.ProjectSet(plan, setFn, args), expressions)
   | _ -> failwith "Using multiple set functions in the same query is not supported"
 
 let private planFilter condition plan =
