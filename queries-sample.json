@@ -5,13 +5,15 @@
     "anonymization_parameters": {
       "table_settings": {
         "customers": {
-          "aid_columns": [
-            "id"
-          ]
+          "aid_columns": ["id"]
         }
       },
-      "seed": 1,
-      "minimum_allowed_aid_values": 2,
+      "salt": [],
+      "suppression": {
+        "low_threshold": 2,
+        "s_d": 1,
+        "low_mean_gap": 2
+      },
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -20,7 +22,7 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_sd": 3
+      "noise_s_d": 3
     }
   },
   {
@@ -29,13 +31,15 @@
     "anonymization_parameters": {
       "table_settings": {
         "customers": {
-          "aid_columns": [
-            "id"
-          ]
+          "aid_columns": ["id"]
         }
       },
-      "seed": 1,
-      "minimum_allowed_aid_values": 2,
+      "salt": [],
+      "suppression": {
+        "low_threshold": 2,
+        "s_d": 1,
+        "low_mean_gap": 2
+      },
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -44,22 +48,24 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_sd": 3
+      "noise_s_d": 3
     }
   },
   {
-    "query": "SELECT city, count(*), count(distinct id) FROM customers",
+    "query": "SELECT city, count(*), count(distinct id) FROM customers GROUP BY 1",
     "db_path": "data/data.sqlite",
     "anonymization_parameters": {
       "table_settings": {
         "customers": {
-          "aid_columns": [
-            "id"
-          ]
+          "aid_columns": ["id"]
         }
       },
-      "seed": 1,
-      "minimum_allowed_aid_values": 2,
+      "salt": [],
+      "suppression": {
+        "low_threshold": 2,
+        "s_d": 1,
+        "low_mean_gap": 2
+      },
       "outlier_count": {
         "lower": 1,
         "upper": 2
@@ -68,7 +74,7 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_sd": 3
+      "noise_s_d": 3
     }
   }
 ]

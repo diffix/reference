@@ -179,7 +179,7 @@ let batchExecuteQueries (queriesPath: string) =
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
   let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
-  printf $"%s{resultJsonEncoded}"
+  printfn $"%s{resultJsonEncoded}"
 
   0
 
