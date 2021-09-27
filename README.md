@@ -87,14 +87,16 @@ git diff --cached --name-only --diff-filter=ACM -z | xargs -0 git add -p
 
 ## Creating a release
 
-To generate an executable of the command line interface, run one of:
+To generate an executable of the command line interface, run:
 
-- `make release-linux` for Linux
-- `make release-macos` for macOS
-- execute the `release.bat` file
+```
+dotnet publish -r <win|linux|osx>-x64 -o build -c Release \
+  /p:PublishSingleFile=true /p:PublishTrimmed=true /p:IncludeNativeLibrariesForSelfExtract=true \
+  --self-contained true src/OpenDiffix.CLI/
+```
 
-If the build succeeds, the binary will be placed in the `build` folder. It is self-contained and can be moved anywhere
-you desire.
+If the build succeeds, the binary will be placed in the `build` folder.
+It is self-contained and can be moved anywhere you desire.
 
 ## Using CLI
 
@@ -104,10 +106,10 @@ See "Creating a release" for more information on how to build the command line i
 The `-h` command gives you an overview of the available paramters. Typical usage should achievable with one of the
 two following sample commands:
 
-- Run a single query: `OpenDiffix.CLI -d data/data.sqlite --aid-columns customers.id -q "SELECT city, count(*) FROM
+- Run a single query: `OpenDiffix.CLI -f data/data.sqlite --aid-columns customers.id -q "SELECT city, count(*) FROM
   customers GROUP BY city"`.
 - Run a batch of queries (significantly faster if you want to run many queries at one time): `OpenDiffix.CLI
-  --queries-file queries-sample.json`. For an example of what the input file format should look like,
+  --queries-path queries-sample.json`. For an example of what the input file format should look like,
   please consult [queries-sample.json].
 
 In both cases the query result will be written back to the terminal (standard out).

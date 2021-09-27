@@ -84,7 +84,7 @@ type private DiffixCount(minCount) =
 
   /// Increases contribution of all AID instances.
   let increaseContributions valueIncrease (aidInstances: Value list) =
-    if state = null then
+    if isNull state then
       state <-
         Array.init
           aidInstances.Length
@@ -124,7 +124,7 @@ type private DiffixCount(minCount) =
       | _ -> invalidArgs args
 
     member this.Final ctx =
-      if state = null then
+      if isNull state then
         Integer minCount
       else
         match Anonymizer.count ctx.AnonymizationParams state with
@@ -174,7 +174,7 @@ type private DiffixLowCount() =
       match args with
       | [ Null ] -> ()
       | [ Value.List aidInstances ] ->
-        if state = null then state <- emptySets aidInstances.Length
+        if isNull state then state <- emptySets aidInstances.Length
 
         aidInstances
         |> List.iteri (fun i aidValue ->
@@ -188,7 +188,7 @@ type private DiffixLowCount() =
       | _ -> invalidArgs args
 
     member this.Final ctx =
-      if state = null then
+      if isNull state then
         Boolean true
       else
         Anonymizer.isLowCount state ctx.AnonymizationParams |> Boolean
