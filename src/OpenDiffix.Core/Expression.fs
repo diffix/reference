@@ -174,17 +174,17 @@ let evaluateSetFunction fn args =
   | _ -> failwith $"Invalid usage of set function '%A{fn}'."
 
 /// Evaluates the expression for a given row.
-let rec evaluate (ctx: EvaluationContext) (row: Row) (expr: Expression) =
+let rec evaluate (row: Row) (expr: Expression) =
   match expr with
-  | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate ctx row))
+  | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate row))
   | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
   | FunctionExpr (SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
-  | ListExpr expressions -> expressions |> List.map (evaluate ctx row) |> Value.List
+  | ListExpr expressions -> expressions |> List.map (evaluate row) |> Value.List
   | ColumnReference (index, _) -> row.[index]
   | Constant value -> value
 
 /// Sorts a row sequence based on the given orderings.
-let sortRows ctx orderings (rows: Row seq) =
+let sortRows orderings (rows: Row seq) =
   let rec performSort orderings rows =
     match orderings with
     | [] -> rows
@@ -193,8 +193,8 @@ let sortRows ctx orderings (rows: Row seq) =
 
       rows
       |> Seq.sortWith (fun rowA rowB ->
-        let valueA = evaluate ctx rowA expr
-        let valueB = evaluate ctx rowB expr
+        let valueA = evaluate rowA expr
+        let valueB = evaluate rowB expr
         compare valueA valueB
       )
       |> performSort tail

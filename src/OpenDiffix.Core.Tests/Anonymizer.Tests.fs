@@ -47,7 +47,7 @@ let anonymizedAggregationContext =
         TopCount = threshold
     }
 
-  { context with AnonymizationParams = anonParams }
+  { EvaluationContext.Default with AnonymizationParams = anonParams }
 
 let evaluateAggregator fn args = evaluateAggregator context fn args
 
