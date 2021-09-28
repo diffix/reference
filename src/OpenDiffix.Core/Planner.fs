@@ -80,7 +80,7 @@ let private planFrom queryRange columnIndices =
   match queryRange with
   | RangeTable (table, _alias) -> Plan.Scan(table, columnIndices)
   | Join join -> planJoin join columnIndices
-  | SubQuery (query, _alias) -> query |> Query.assertSelectQuery |> planQuery
+  | SubQuery (query, _alias) -> planQuery query
 
 let private planLimit amount plan =
   match amount with
@@ -143,5 +143,4 @@ let private filterJunk targetList plan =
 // ----------------------------------------------------------------
 
 let plan query =
-  let query = Query.assertSelectQuery query
   query |> planQuery |> filterJunk query.TargetList

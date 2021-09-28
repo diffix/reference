@@ -24,7 +24,6 @@ let analyzeQuery queryString =
   queryString
   |> Parser.parse
   |> Analyzer.analyze context
-  |> AnalyzerTypes.Query.assertSelectQuery
   |> QueryValidator.validateQuery
 
 let ensureFailParsedQuery queryString (errorFragment: string) =

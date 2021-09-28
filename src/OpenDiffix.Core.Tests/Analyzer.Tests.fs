@@ -32,10 +32,7 @@ let defaultQuery =
   }
 
 let testParsedQuery queryString expected =
-  queryString
-  |> Parser.parse
-  |> Analyzer.analyze context
-  |> should equal (SelectQuery expected)
+  queryString |> Parser.parse |> Analyzer.analyze context |> should equal expected
 
 let testQueryError queryString =
   (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
@@ -204,22 +201,21 @@ let ``Selecting columns from subquery`` () =
           ]
         From =
           SubQuery(
-            SelectQuery
-              { defaultQuery with
-                  TargetList =
-                    [
-                      {
-                        Expression = ColumnReference(0, StringType)
-                        Alias = "aliased"
-                        Tag = RegularTargetEntry
-                      }
-                      {
-                        Expression = ColumnReference(1, IntegerType)
-                        Alias = "int_col"
-                        Tag = RegularTargetEntry
-                      }
-                    ]
-              },
+            { defaultQuery with
+                TargetList =
+                  [
+                    {
+                      Expression = ColumnReference(0, StringType)
+                      Alias = "aliased"
+                      Tag = RegularTargetEntry
+                    }
+                    {
+                      Expression = ColumnReference(1, IntegerType)
+                      Alias = "int_col"
+                      Tag = RegularTargetEntry
+                    }
+                  ]
+            },
             "x"
           )
     }
@@ -290,11 +286,7 @@ type Tests(db: DBFixture) =
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
-    query
-    |> Parser.parse
-    |> Analyzer.analyze context
-    |> Analyzer.rewrite context
-    |> Query.assertSelectQuery
+    query |> Parser.parse |> Analyzer.analyze context |> Analyzer.rewrite context
 
   let ensureQueryFails query error =
     try
@@ -374,40 +366,39 @@ type Tests(db: DBFixture) =
                ]
              From =
                SubQuery(
-                 SelectQuery
-                   { defaultQuery with
-                       TargetList =
-                         [
-                           { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
-                           {
-                             Expression = ColumnReference(2, StringType)
-                             Alias = "__aid_0"
-                             Tag = AidTargetEntry
-                           }
-                           {
-                             Expression = ColumnReference(4, IntegerType)
-                             Alias = "__aid_1"
-                             Tag = AidTargetEntry
-                           }
-                           {
-                             Expression = ColumnReference(7, IntegerType)
-                             Alias = "__aid_2"
-                             Tag = AidTargetEntry
-                           }
-                         ]
-                       From =
-                         Join
-                           {
-                             Type = JoinType.InnerJoin
-                             Left = RangeTable(getTable "customers_small", "customers_small")
-                             Right = RangeTable(getTable "purchases", "purchases")
-                             On =
-                               FunctionExpr(
-                                 ScalarFunction Equals,
-                                 [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
-                               )
-                           }
-                   },
+                 { defaultQuery with
+                     TargetList =
+                       [
+                         { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
+                         {
+                           Expression = ColumnReference(2, StringType)
+                           Alias = "__aid_0"
+                           Tag = AidTargetEntry
+                         }
+                         {
+                           Expression = ColumnReference(4, IntegerType)
+                           Alias = "__aid_1"
+                           Tag = AidTargetEntry
+                         }
+                         {
+                           Expression = ColumnReference(7, IntegerType)
+                           Alias = "__aid_2"
+                           Tag = AidTargetEntry
+                         }
+                       ]
+                     From =
+                       Join
+                         {
+                           Type = JoinType.InnerJoin
+                           Left = RangeTable(getTable "customers_small", "customers_small")
+                           Right = RangeTable(getTable "purchases", "purchases")
+                           On =
+                             FunctionExpr(
+                               ScalarFunction Equals,
+                               [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
+                             )
+                         }
+                 },
                  "x"
                )
          }

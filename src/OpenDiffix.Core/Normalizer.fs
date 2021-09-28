@@ -61,8 +61,7 @@ let private normalizeBooleanExpression expr =
 
 let rec normalize (query: Query) : Query =
   match query with
-  | SelectQuery ({ From = SubQuery (subquery, alias) } as query) ->
-    SelectQuery { query with From = SubQuery(normalize subquery, alias) }
+  | { From = SubQuery (subquery, alias) } -> { query with From = SubQuery(normalize subquery, alias) }
   | _ -> query
   |> map (mapBottomUp normalizeConstant)
   |> map (mapBottomUp normalizeComparison)

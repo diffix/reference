@@ -53,7 +53,7 @@ let ``plan select`` () =
 
   let expected = Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ])
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan where`` () =
@@ -63,7 +63,7 @@ let ``plan where`` () =
 
   let expected = Plan.Project(Plan.Filter(Plan.Scan(table, [ 1 ]), condition), [])
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan order by`` () =
@@ -72,7 +72,7 @@ let ``plan order by`` () =
 
   let expected = Plan.Project(Plan.Sort(Plan.Scan(table, [ 1 ]), orderBy), [])
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan aggregation`` () =
@@ -91,7 +91,7 @@ let ``plan aggregation`` () =
       [ ColumnReference(0, StringType); ColumnReference(1, IntegerType) ]
     )
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan all`` () =
@@ -135,7 +135,7 @@ let ``plan all`` () =
       [ plus1 (ColumnReference(0, IntegerType)); ColumnReference(1, IntegerType) ]
     )
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``sub-query plan`` () =
@@ -145,12 +145,12 @@ let ``sub-query plan`` () =
   let query =
     { subQuery with
         TargetList = [ selectColumn 0 ]
-        From = SubQuery(SelectQuery subQuery, "subQuery")
+        From = SubQuery(subQuery, "subQuery")
     }
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 1 ]), [ column 1 ]), [ column 0 ])
 
-  SelectQuery query |> Planner.plan |> should equal expected
+  query |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan join`` () =
@@ -167,7 +167,7 @@ let ``plan join`` () =
   let expected =
     Plan.Project(Plan.Join(Plan.Scan(table, []), Plan.Scan(table, []), JoinType.InnerJoin, on = constTrue), [])
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``plan set select`` () =
@@ -182,7 +182,7 @@ let ``plan set select`` () =
       [ column 1; ColumnReference(2, IntegerType) ]
     )
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected
 
 [<Fact>]
 let ``junk filter`` () =
@@ -192,4 +192,4 @@ let ``junk filter`` () =
 
   let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
 
-  SelectQuery select |> Planner.plan |> should equal expected
+  select |> Planner.plan |> should equal expected

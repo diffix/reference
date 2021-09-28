@@ -123,7 +123,7 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
 let rec private collectRangeColumns anonParams range =
   match range with
   | SubQuery (query, queryAlias) ->
-    (Query.assertSelectQuery query).TargetList
+    query.TargetList
     |> List.map (fun targetEntry ->
       {
         RangeName = queryAlias
@@ -219,16 +219,15 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     else
       []
 
-  SelectQuery
-    {
-      TargetList = targetList @ aidTargets
-      Where = whereClause
-      From = range
-      GroupingSets = [ GroupingSet groupBy ]
-      Having = havingClause
-      OrderBy = []
-      Limit = selectQuery.Limit
-    }
+  {
+    TargetList = targetList @ aidTargets
+    Where = whereClause
+    From = range
+    GroupingSets = [ GroupingSet groupBy ]
+    Having = havingClause
+    OrderBy = []
+    Limit = selectQuery.Limit
+  }
 
 // ----------------------------------------------------------------
 // Rewriting
