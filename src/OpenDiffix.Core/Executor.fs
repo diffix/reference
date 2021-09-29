@@ -20,7 +20,7 @@ let private unpackAggregators aggregators =
 // ----------------------------------------------------------------
 
 let private executeScan context table columnIndices =
-  context.DataProvider.OpenTable(table, columnIndices)
+  context.EvaluationContext.DataProvider.OpenTable(table, columnIndices)
 
 let private executeProject context (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions

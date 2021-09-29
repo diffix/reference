@@ -172,3 +172,16 @@ type EvaluationContext =
             member _.Dispose() = ()
         }
     }
+
+type NoiseLayers = { Static: AidHash }
+
+type ExecutionContext =
+  {
+    EvaluationContext: EvaluationContext
+    NoiseLayers: NoiseLayers
+  }
+  static member Default =
+    {
+      EvaluationContext = EvaluationContext.Default
+      NoiseLayers = { Static = 0UL }
+    }

@@ -472,7 +472,7 @@ let colRef2 = ColumnReference(2, RealType)
 let evaluate expr = Expression.evaluate testRow expr
 
 let evaluateAggregator fn args =
-  evaluateAggregator EvaluationContext.Default fn args testRows
+  evaluateAggregator ExecutionContext.Default fn args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =

@@ -26,15 +26,18 @@ let companyColumn = ColumnReference(2, StringType)
 let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
 let context =
-  { EvaluationContext.Default with
-      AnonymizationParams =
-        {
-          TableSettings = Map.empty
-          Salt = [||]
-          Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
-          OutlierCount = { Lower = 1; Upper = 1 }
-          TopCount = { Lower = 1; Upper = 1 }
-          NoiseSD = 0.
+  { ExecutionContext.Default with
+      EvaluationContext =
+        { EvaluationContext.Default with
+            AnonymizationParams =
+              {
+                TableSettings = Map.empty
+                Salt = [||]
+                Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
+                OutlierCount = { Lower = 1; Upper = 1 }
+                TopCount = { Lower = 1; Upper = 1 }
+                NoiseSD = 0.
+              }
         }
   }
 
@@ -42,12 +45,14 @@ let anonymizedAggregationContext =
   let threshold = { Lower = 2; Upper = 2 }
 
   let anonParams =
-    { context.AnonymizationParams with
+    { context.EvaluationContext.AnonymizationParams with
         OutlierCount = threshold
         TopCount = threshold
     }
 
-  { EvaluationContext.Default with AnonymizationParams = anonParams }
+  { ExecutionContext.Default with
+      EvaluationContext = { EvaluationContext.Default with AnonymizationParams = anonParams }
+  }
 
 let evaluateAggregator fn args = evaluateAggregator context fn args
 

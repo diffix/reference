@@ -305,5 +305,8 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   let query = mapQuery schema anonParams false parseTree
   query
 
-let rewrite context (query: Query) =
-  query |> map (rewriteQuery context.AnonymizationParams)
+let anonymize evaluationContext (query: Query) =
+  let executionContext = { EvaluationContext = evaluationContext; NoiseLayers = { Static = 0UL } }
+
+  let query = map (rewriteQuery evaluationContext.AnonymizationParams) query
+  query, executionContext

@@ -286,7 +286,8 @@ type Tests(db: DBFixture) =
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
-    query |> Parser.parse |> Analyzer.analyze context |> Analyzer.rewrite context
+    let query, _ = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
+    query
 
   let ensureQueryFails query error =
     try

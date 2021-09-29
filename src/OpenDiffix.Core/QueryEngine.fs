@@ -15,14 +15,14 @@ let rec private extractColumns query =
 
 type QueryResult = { Columns: Column list; Rows: Row list }
 
-let run context statement : QueryResult =
-  let query =
+let run evaluationContext statement : QueryResult =
+  let query, executionContext =
     statement
     |> Parser.parse
-    |> Analyzer.analyze context
+    |> Analyzer.analyze evaluationContext
     |> Normalizer.normalize
-    |> Analyzer.rewrite context
+    |> Analyzer.anonymize evaluationContext
 
-  let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
+  let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
   let columns = extractColumns query
   { Columns = columns; Rows = rows }
