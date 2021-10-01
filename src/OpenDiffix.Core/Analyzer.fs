@@ -223,7 +223,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     TargetList = targetList @ aidTargets
     Where = whereClause
     From = range
-    GroupingSets = [ GroupingSet groupBy ]
+    GroupBy = groupBy
     Having = havingClause
     OrderBy = []
     Limit = selectQuery.Limit
@@ -255,7 +255,7 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
     Expression.makeAggregate DiffixLowCount [ aidColumnsExpression ]
     |> Expression.makeNot
 
-  if selectQuery.GroupingSets = [ GroupingSet [] ] then
+  if List.isEmpty selectQuery.GroupBy then
     let selectedExpressions =
       selectQuery.TargetList
       |> List.map (fun selectedColumn -> selectedColumn.Expression)
@@ -269,7 +269,7 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
           TargetList =
             { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
             :: selectQuery.TargetList
-          GroupingSets = [ GroupingSet selectedExpressions ]
+          GroupBy = selectedExpressions
           Having = Expression.makeAnd lowCountFilter selectQuery.Having
       }
     else

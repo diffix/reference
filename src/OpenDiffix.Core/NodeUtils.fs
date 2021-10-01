@@ -25,7 +25,7 @@ type NodeFunctions =
       TargetList = NodeFunctions.Map(query.TargetList, f)
       From = query.From
       Where = f query.Where
-      GroupingSets = NodeFunctions.Map(query.GroupingSets, f)
+      GroupBy = NodeFunctions.Map(query.GroupBy, f)
       OrderBy = NodeFunctions.Map(query.OrderBy, f)
       Having = f query.Having
       Limit = query.Limit
@@ -37,13 +37,6 @@ type NodeFunctions =
 
   static member Map(targetEntry: TargetEntry, f: Expression -> Expression) =
     { targetEntry with Expression = f targetEntry.Expression }
-
-  // GroupingSet
-  static member Map(groupingSets: GroupingSet list, f: Expression -> Expression) =
-    groupingSets |> List.map (fun groupingSet -> NodeFunctions.Map(groupingSet, f))
-
-  static member Map(groupingSet: GroupingSet, f: Expression -> Expression) =
-    groupingSet |> NodeFunctions.Unwrap |> List.map f |> GroupingSet
 
   // OrderBy
   static member Map(orderByList: OrderBy list, f: Expression -> Expression) =
@@ -67,10 +60,6 @@ type NodeFunctions =
   static member Unwrap(orderByExpression: OrderBy) =
     match orderByExpression with
     | OrderBy (expr, direction, nulls) -> (expr, direction, nulls)
-
-  static member Unwrap(groupingSet: GroupingSet) : Expression list =
-    match groupingSet with
-    | GroupingSet expressions -> expressions
 
 let inline private callMap (_: ^M, node: ^T, func: ^F) =
   ((^M or ^T): (static member Map : ^T * ^F -> ^T) (node, func))

@@ -23,7 +23,7 @@ let emptySelect =
     TargetList = []
     Where = constTrue
     From = RangeTable(table, table.Name)
-    GroupingSets = []
+    GroupBy = []
     Having = constTrue
     OrderBy = []
     Limit = None
@@ -76,18 +76,14 @@ let ``plan order by`` () =
 
 [<Fact>]
 let ``plan aggregation`` () =
-  let groupingSet = [ column 1 ]
+  let groupBy = [ column 1 ]
   let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
 
-  let select =
-    { emptySelect with
-        TargetList = selectedColumns
-        GroupingSets = [ GroupingSet groupingSet ]
-    }
+  let select = { emptySelect with TargetList = selectedColumns; GroupBy = groupBy }
 
   let expected =
     Plan.Project(
-      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupingSet, [ countStar ]),
+      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ]),
       [ ColumnReference(0, StringType); ColumnReference(1, IntegerType) ]
     )
 
@@ -95,7 +91,7 @@ let ``plan aggregation`` () =
 
 [<Fact>]
 let ``plan all`` () =
-  let groupingSet = [ column 0 ]
+  let groupBy = [ column 0 ]
 
   let selectedColumns =
     [
@@ -110,7 +106,7 @@ let ``plan all`` () =
   let select =
     { emptySelect with
         TargetList = selectedColumns
-        GroupingSets = [ GroupingSet groupingSet ]
+        GroupBy = groupBy
         Where = whereCondition
         OrderBy = orderBy
         Having = havingCondition
@@ -125,7 +121,7 @@ let ``plan all`` () =
               Plan.Scan(table, [ 0; 1 ]), //
               whereCondition
             ),
-            groupingSet,
+            groupBy,
             [ countStar ]
           ),
           FunctionExpr(ScalarFunction Equals, [ ColumnReference(1, IntegerType); Constant(Integer 0L) ])

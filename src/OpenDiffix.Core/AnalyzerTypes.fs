@@ -11,7 +11,7 @@ type SelectQuery =
     TargetList: TargetEntry list
     From: QueryRange
     Where: Expression
-    GroupingSets: GroupingSet list
+    GroupBy: Expression list
     OrderBy: OrderBy list
     Having: Expression
     Limit: uint option
@@ -23,8 +23,6 @@ type TargetEntryTag =
   | RegularTargetEntry
   | JunkTargetEntry
   | AidTargetEntry
-
-type GroupingSet = GroupingSet of Expression list
 
 type QueryRange =
   | SubQuery of query: Query * alias: string

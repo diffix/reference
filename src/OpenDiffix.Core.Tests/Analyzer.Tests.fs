@@ -25,7 +25,7 @@ let defaultQuery =
     TargetList = []
     Where = Boolean true |> Constant
     From = RangeTable(testTable, testTable.Name)
-    GroupingSets = [ GroupingSet [] ]
+    GroupBy = []
     Having = Boolean true |> Constant
     OrderBy = []
     Limit = None
@@ -140,13 +140,11 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           ]
         )
       From = RangeTable(testTable, testTable.Name)
-      GroupingSets =
+      GroupBy =
         [
-          GroupingSet [
-            ColumnReference(1, IntegerType)
-            FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
-            FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-          ]
+          ColumnReference(1, IntegerType)
+          FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+          FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
         ]
       Having =
         FunctionExpr(
