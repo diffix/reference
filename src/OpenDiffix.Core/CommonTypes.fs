@@ -173,7 +173,7 @@ type EvaluationContext =
         }
     }
 
-type NoiseLayers = { Static: AidHash }
+type NoiseLayers = { BucketSeed: AidHash }
 
 type ExecutionContext =
   {
@@ -183,5 +183,5 @@ type ExecutionContext =
   static member Default =
     {
       EvaluationContext = EvaluationContext.Default
-      NoiseLayers = { Static = 0UL }
+      NoiseLayers = { BucketSeed = 0UL }
     }

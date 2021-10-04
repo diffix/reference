@@ -294,6 +294,11 @@ type Tests(db: DBFixture) =
     with
     | ex -> ex.Message |> should equal error
 
+  let assertSqlSeed query (seedMaterial: string) =
+    let expectedSeed = seedMaterial |> System.Text.Encoding.ASCII.GetBytes |> Hash.bytes
+    let _query, executionContext = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
+    executionContext.NoiseLayers.BucketSeed |> should equal expectedSeed
+
   [<Fact>]
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
@@ -411,5 +416,19 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``Allow limiting top query`` () =
     analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
+
+  [<Fact>]
+  let ``SQL seed from column selection`` () =
+    assertSqlSeed "SELECT city FROM customers_small" "customers_small.city"
+
+  [<Fact>]
+  let ``SQL seed from column generalization`` () =
+    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "substring,customers_small.city,1,2"
+
+  [<Fact>]
+  let ``SQL seed from multiple groupings from multiple tables`` () =
+    assertSqlSeed
+      "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
+      "customers_small.city,round,purchases.amount"
 
   interface IClassFixture<DBFixture>

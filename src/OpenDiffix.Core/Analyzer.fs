@@ -296,6 +296,60 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
     selectQuery
 
 // ----------------------------------------------------------------
+// Noise layers
+// ----------------------------------------------------------------
+
+let private collectGroupingExpressions selectQuery : Expression list =
+  if List.isEmpty selectQuery.GroupBy then
+    selectQuery.TargetList
+    |> List.map (fun selectedColumn -> selectedColumn.Expression)
+    |> List.filter Expression.isScalar
+  else
+    selectQuery.GroupBy
+
+let rec private basicSeedMaterial rangeColumns expression =
+  match expression with
+  | FunctionExpr (ScalarFunction Cast, [ expression; _ ]) -> basicSeedMaterial rangeColumns expression
+  | ColumnReference (index, _type) ->
+    let rangeColumn = List.item index rangeColumns
+    $"%s{rangeColumn.RangeName}.%s{rangeColumn.ColumnName}"
+  | Constant (String value) -> value
+  | Constant (Integer value) -> value.ToString()
+  | Constant (Real value) -> value.ToString()
+  | Constant (Boolean value) -> value.ToString()
+  | _ -> failwith "Unsupported expression used for defining buckets."
+
+let private functionSeedMaterial =
+  function
+  | Substring -> "substring"
+  | Ceil -> "ceil"
+  | Floor -> "floor"
+  | Round -> "round"
+  | WidthBucket -> "width_bucket"
+  | Concat -> "concat"
+  | _ -> failwith "Unsupported function used for defining buckets."
+
+let rec private collectSeedMaterials rangeColumns expression =
+  match expression with
+  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> collectSeedMaterials rangeColumns expression
+  | FunctionExpr (ScalarFunction fn, args) ->
+    (functionSeedMaterial fn) :: (List.map (basicSeedMaterial rangeColumns) args)
+  | _ -> [ basicSeedMaterial rangeColumns expression ]
+
+let private computeNoiseLayers anonParams query =
+  let rangeColumns = collectRangeColumns anonParams query.From
+
+  let sqlSeed =
+    query
+    |> collectGroupingExpressions
+    |> Seq.collect (collectSeedMaterials rangeColumns)
+    |> String.join ","
+    |> System.Text.Encoding.ASCII.GetBytes
+    |> Hash.bytes
+
+  { BucketSeed = sqlSeed }
+
+// ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
@@ -306,7 +360,11 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   query
 
 let anonymize evaluationContext (query: Query) =
-  let executionContext = { EvaluationContext = evaluationContext; NoiseLayers = { Static = 0UL } }
+  let executionContext =
+    {
+      EvaluationContext = evaluationContext
+      NoiseLayers = computeNoiseLayers evaluationContext.AnonymizationParams query
+    }
 
   let query = map (rewriteQuery evaluationContext.AnonymizationParams) query
   query, executionContext
