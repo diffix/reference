@@ -51,6 +51,9 @@ let private executeLimit context (childPlan, amount) : seq<Row> =
 
   childPlan |> execute context |> Seq.truncate (int amount)
 
+let private addValuesToSeed seed values =
+  values |> Seq.map Value.hash |> Seq.fold (^^^) seed
+
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let isGlobal = Array.isEmpty groupingLabels
@@ -79,6 +82,13 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
 
   state
   |> Seq.map (fun pair ->
+    let bucketSeed = addValuesToSeed context.NoiseLayers.BucketSeed pair.Key
+
+    let context =
+      { context with
+          NoiseLayers = { context.NoiseLayers with BucketSeed = bucketSeed }
+      }
+
     let values = pair.Value |> Array.map (fun acc -> acc.Final context)
     Array.append pair.Key values
   )
