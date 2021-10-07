@@ -27,8 +27,8 @@ let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
 let context =
   { ExecutionContext.Default with
-      EvaluationContext =
-        { EvaluationContext.Default with
+      QueryContext =
+        { QueryContext.Default with
             AnonymizationParams =
               {
                 TableSettings = Map.empty
@@ -45,13 +45,13 @@ let anonymizedAggregationContext =
   let threshold = { Lower = 2; Upper = 2 }
 
   let anonParams =
-    { context.EvaluationContext.AnonymizationParams with
+    { context.QueryContext.AnonymizationParams with
         OutlierCount = threshold
         TopCount = threshold
     }
 
   { ExecutionContext.Default with
-      EvaluationContext = { EvaluationContext.Default with AnonymizationParams = anonParams }
+      QueryContext = { QueryContext.Default with AnonymizationParams = anonParams }
   }
 
 let evaluateAggregator fn args = evaluateAggregator context fn args

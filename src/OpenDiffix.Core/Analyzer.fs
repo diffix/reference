@@ -359,12 +359,12 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   let query = mapQuery schema anonParams false parseTree
   query
 
-let anonymize evaluationContext (query: Query) =
+let anonymize queryContext (query: Query) =
   let executionContext =
     {
-      EvaluationContext = evaluationContext
-      NoiseLayers = computeNoiseLayers evaluationContext.AnonymizationParams query
+      QueryContext = queryContext
+      NoiseLayers = computeNoiseLayers queryContext.AnonymizationParams query
     }
 
-  let query = map (rewriteQuery evaluationContext.AnonymizationParams) query
+  let query = map (rewriteQuery queryContext.AnonymizationParams) query
   query, executionContext

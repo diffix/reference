@@ -212,12 +212,12 @@ type private MergeAids() =
 
 type T = IAggregator
 
-let create context globalBucket fn : T =
+let create executionContext globalBucket fn : T =
   let minDiffixCount =
     if globalBucket then
       0L
     else
-      int64 context.EvaluationContext.AnonymizationParams.Suppression.LowThreshold
+      int64 executionContext.QueryContext.AnonymizationParams.Suppression.LowThreshold
 
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T

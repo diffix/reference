@@ -158,7 +158,7 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
-type EvaluationContext =
+type QueryContext =
   {
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
@@ -178,11 +178,7 @@ type NoiseLayers = { BucketSeed: Hash }
 
 type ExecutionContext =
   {
-    EvaluationContext: EvaluationContext
+    QueryContext: QueryContext
     NoiseLayers: NoiseLayers
   }
-  static member Default =
-    {
-      EvaluationContext = EvaluationContext.Default
-      NoiseLayers = { BucketSeed = 0UL }
-    }
+  static member Default = { QueryContext = QueryContext.Default; NoiseLayers = { BucketSeed = 0UL } }

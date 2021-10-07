@@ -28,7 +28,7 @@ type Tests(db: DBFixture) =
 
   let context =
     { ExecutionContext.Default with
-        EvaluationContext = { EvaluationContext.Default with DataProvider = db.DataProvider }
+        QueryContext = { QueryContext.Default with DataProvider = db.DataProvider }
     }
 
   let execute plan =
