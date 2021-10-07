@@ -344,7 +344,7 @@ let private computeNoiseLayers anonParams query =
     |> collectGroupingExpressions
     |> Seq.collect (collectSeedMaterials rangeColumns)
     |> String.join ","
-    |> System.Text.Encoding.ASCII.GetBytes
+    |> System.Text.Encoding.UTF8.GetBytes
     |> Hash.bytes
 
   { BucketSeed = sqlSeed }

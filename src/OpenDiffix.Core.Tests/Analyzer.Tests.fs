@@ -295,7 +295,7 @@ type Tests(db: DBFixture) =
     | ex -> ex.Message |> should equal error
 
   let assertSqlSeed query (seedMaterial: string) =
-    let expectedSeed = seedMaterial |> System.Text.Encoding.ASCII.GetBytes |> Hash.bytes
+    let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
     let _query, executionContext = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
     executionContext.NoiseLayers.BucketSeed |> should equal expectedSeed
 
