@@ -117,7 +117,8 @@ type IDataProvider =
 // Anonymizer types
 // ----------------------------------------------------------------
 
-type AidHash = uint64
+type Hash = uint64
+type AidHash = Hash
 
 type Interval =
   {
@@ -173,7 +174,7 @@ type EvaluationContext =
         }
     }
 
-type NoiseLayers = { BucketSeed: AidHash }
+type NoiseLayers = { BucketSeed: Hash }
 
 type ExecutionContext =
   {

@@ -127,7 +127,7 @@ type private DiffixCount(minCount) =
       if isNull state then
         Integer minCount
       else
-        match Anonymizer.count context.EvaluationContext.AnonymizationParams state with
+        match Anonymizer.count context state with
         | Null -> Integer minCount
         | Integer value -> Integer(max value minCount)
         | value -> value
@@ -161,7 +161,7 @@ type private DiffixCountDistinct(minCount) =
       | _ -> invalidArgs args
 
     member this.Final context =
-      match Anonymizer.countDistinct aidsCount aidsPerValue context.EvaluationContext.AnonymizationParams with
+      match Anonymizer.countDistinct context aidsCount aidsPerValue with
       | Null -> Integer minCount
       | Integer value -> Integer(max value minCount)
       | value -> value
@@ -191,8 +191,7 @@ type private DiffixLowCount() =
       if isNull state then
         Boolean true
       else
-        Anonymizer.isLowCount state context.EvaluationContext.AnonymizationParams
-        |> Boolean
+        Anonymizer.isLowCount context state |> Boolean
 
 type private MergeAids() =
   let state = HashSet<Value>()

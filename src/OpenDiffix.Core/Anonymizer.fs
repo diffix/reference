@@ -8,100 +8,149 @@ open System.Security.Cryptography
 // Random & noise
 // ----------------------------------------------------------------
 
-// A 64-bit RNG built from 2 32-bit RNGs.
-type private Random64(seed: uint64) =
-  let mutable state = (Random(int seed), Random(int (seed >>> 32)))
+// The noise seeds are hash values.
+// From each seed we generate a single random value, with either a uniform or a normal distribution.
+// Any decent hash function should produce values that are uniformly distributed over the output space.
+// Hence, we only need to limit the seed to the requested interval to get a uniform random integer.
+// To get a normal random float, we use the Box-Muller method on two uniformly distributed integers.
 
-  member this.Uniform(interval: Interval) =
-    let state1, state2 = state
-    state <- (state2, state1) // Rotate the 32-bit RNGs.
-    state1.Next(interval.Lower, interval.Upper + 1)
+// While using modulo to bound values produces biased output, we are using very small ranges
+// (typically less than 10), for which the bias is insignificant.
+let private boundRandomUniform random range = random % range
 
-  member this.Normal(stdDev) =
-    let state1, state2 = state
+let private randomUniform (interval: Interval) (seed: Hash) =
+  let randomUniform = abs (int ((seed >>> 32) ^^^ seed))
+  let boundedRandomUniform = boundRandomUniform randomUniform (interval.Upper - interval.Lower + 1)
+  interval.Lower + boundedRandomUniform
 
-    let u1 = 1.0 - state1.NextDouble()
-    let u2 = 1.0 - state2.NextDouble()
-
-    let randStdNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
-
-    stdDev * randStdNormal
+let private randomNormal stdDev (seed: Hash) =
+  let u1 = float (uint32 seed) / float UInt32.MaxValue
+  let u2 = float (uint32 (seed >>> 32)) / float UInt32.MaxValue
+  let randomNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
+  stdDev * randomNormal
 
 let private sha256 = SHA256.Create()
 
-let private cryptoHashSaltedAid salt (aid: AidHash) =
-  let aidBytes = BitConverter.GetBytes(aid)
-  sha256.ComputeHash(Array.append salt aidBytes)
+let private cryptoHashSaltedSeed salt (seed: Hash) : Hash =
+  let seedBytes = BitConverter.GetBytes(seed)
+  let hash = sha256.ComputeHash(Array.append salt seedBytes)
+  BitConverter.ToUInt64(hash, 0)
 
-let private newRandom anonymizationParams (aidSet: AidHash seq) =
-  let setAid = Seq.fold (^^^) 0UL aidSet
-  let hash = cryptoHashSaltedAid anonymizationParams.Salt setAid
-  Random64(BitConverter.ToUInt64(hash, 0))
+let private seedFromAidSet (aidSet: AidHash seq) = Seq.fold (^^^) 0UL aidSet
+
+let private mixSeed (text: string) (seed: Hash) =
+  let seedBytes = BitConverter.GetBytes(seed)
+  let textBytes = System.Text.Encoding.ASCII.GetBytes text
+  Array.append seedBytes textBytes |> Hash.bytes
+
+let private generateNoise salt stepName stdDev noiseLayers =
+  noiseLayers
+  |> Seq.map (cryptoHashSaltedSeed salt >> mixSeed stepName >> randomNormal stdDev)
+  |> Seq.reduce (+)
 
 // ----------------------------------------------------------------
 // AID processing
 // ----------------------------------------------------------------
 
 /// Returns whether any of the AID value sets has a low count.
-let isLowCount (aidSets: HashSet<AidHash> seq) (anonymizationParams: AnonymizationParams) =
+let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
   aidSets
   |> Seq.map (fun aidSet ->
-    let suppression = anonymizationParams.Suppression
+    let anonParams = executionContext.EvaluationContext.AnonymizationParams
 
-    if aidSet.Count < suppression.LowThreshold then
+    if aidSet.Count < anonParams.Suppression.LowThreshold then
       true
     else
-      let rnd = newRandom anonymizationParams aidSet
-      let thresholdMean = suppression.LowMeanGap + float suppression.LowThreshold
-      let threshold = rnd.Normal(suppression.SD) + thresholdMean
+      let thresholdNoise =
+        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
+        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.SD
+
+      let thresholdMean = anonParams.Suppression.LowMeanGap + float anonParams.Suppression.LowThreshold
+      let threshold = thresholdNoise + thresholdMean
 
       float aidSet.Count < threshold
   )
   |> Seq.reduce (||)
 
+// Compacts flattening intervals to fit into the total count of contributors.
+// Both intervals are reduced proportionally, with `topCount` taking priority.
+let private compactFlatteningIntervals outlierCount topCount totalCount =
+  let totalAdjustment = outlierCount.Upper + topCount.Upper - totalCount
+
+  if totalAdjustment <= 0 then
+    outlierCount, topCount // no adjustment needed
+  else
+    let outlierRange = outlierCount.Upper - outlierCount.Lower
+
+    if outlierRange > topCount.Upper - topCount.Lower then
+      failwith "Invalid config: OutlierCount interval is larger than TopCount interval."
+
+    let outlierAdjustment, topAdjustment =
+      if outlierRange < totalAdjustment / 2 then
+        outlierRange, totalAdjustment - outlierRange
+      else
+        totalAdjustment / 2, totalAdjustment - totalAdjustment / 2
+
+    { outlierCount with Upper = outlierCount.Upper - outlierAdjustment },
+    { topCount with Upper = topCount.Upper - topAdjustment }
+
 type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
 
 let inline private aidFlattening
-  (anonymizationParams: AnonymizationParams)
+  (executionContext: ExecutionContext)
   (unaccountedFor: int64)
   (aidContributions: (AidHash * ^Contribution) list)
   : AidCount option =
-  let rnd = aidContributions |> Seq.map fst |> newRandom anonymizationParams
+  let anonParams = executionContext.EvaluationContext.AnonymizationParams
 
-  let outlierCount = rnd.Uniform(anonymizationParams.OutlierCount)
-  let topCount = rnd.Uniform(anonymizationParams.TopCount)
-
-  let sortedUserContributions = aidContributions |> Seq.map snd |> Seq.sortDescending |> Seq.toList
-
-  if sortedUserContributions.Length < outlierCount + topCount then
+  if aidContributions.Length < anonParams.OutlierCount.Lower + anonParams.TopCount.Lower then
     None
   else
-    let outliersSummed = sortedUserContributions |> List.take outlierCount |> List.sum
+    let outlierInterval, topInterval =
+      compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount aidContributions.Length
+
+    let sortedAidContributions = aidContributions |> List.sortByDescending snd
+
+    let flatSeed =
+      sortedAidContributions
+      |> List.take (outlierInterval.Upper + topInterval.Upper)
+      |> Seq.map fst
+      |> seedFromAidSet
+      |> cryptoHashSaltedSeed anonParams.Salt
+
+    let outlierCount = flatSeed |> mixSeed "outlier" |> randomUniform outlierInterval
+    let topCount = flatSeed |> mixSeed "top" |> randomUniform topInterval
+
+    let outliersSummed = sortedAidContributions |> List.take outlierCount |> List.sumBy snd
 
     let topGroupValuesSummed =
-      sortedUserContributions
+      sortedAidContributions
       |> List.skip outlierCount
       |> List.take topCount
-      |> List.sum
+      |> List.sumBy snd
 
     let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
     let outlierReplacement = topGroupAverage * (float outlierCount)
 
-    let summedContributions = sortedUserContributions |> List.sum
+    let summedContributions = aidContributions |> List.sumBy snd
     let flattening = float outliersSummed - outlierReplacement
     let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
-    let flattenedAvg = flattenedSum / float sortedUserContributions.Length
+    let flattenedAvg = flattenedSum / float aidContributions.Length
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
-    let noiseSD = anonymizationParams.NoiseSD * noiseScale
+    let noiseSD = executionContext.EvaluationContext.AnonymizationParams.NoiseSD * noiseScale
+
+    let noise =
+      [ executionContext.NoiseLayers.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
+      |> generateNoise anonParams.Salt "noise" anonParams.NoiseSD
 
     Some
       {
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         NoiseSD = noiseSD
-        Noise = rnd.Normal(noiseSD)
+        Noise = noise
       }
 
 let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) aidIndex =
@@ -132,7 +181,10 @@ let rec private distributeValues valuesByAID =
 
     (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
 
-let private countDistinctFlatteningByAid anonParams (perAidContributions: Dictionary<AidHash, HashSet<Value>>) =
+let private countDistinctFlatteningByAid
+  (executionContext: ExecutionContext)
+  (perAidContributions: Dictionary<AidHash, HashSet<Value>>)
+  =
   perAidContributions
   // keep low count values in sorted order to ensure the algorithm is deterministic
   |> Seq.map (fun pair -> pair.Key, pair.Value |> Seq.toList)
@@ -141,7 +193,7 @@ let private countDistinctFlatteningByAid anonParams (perAidContributions: Dictio
   |> distributeValues
   |> List.countBy fst
   |> List.map (fun (aid, count) -> aid, int64 count)
-  |> aidFlattening anonParams 0L
+  |> aidFlattening executionContext 0L
 
 let private anonymizedSum (byAidSum: AidCount seq) =
   let aidForFlattening =
@@ -170,22 +222,22 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 // ----------------------------------------------------------------
 
 let countDistinct
+  (executionContext: ExecutionContext)
   aidsCount
   (aidsPerValue: Dictionary<Value, HashSet<AidHash> array>)
-  (anonymizationParams: AnonymizationParams)
   =
   // These values are safe, and can be counted as they are
   // without any additional noise.
   let lowCountValues, highCountValues =
     aidsPerValue
     |> Seq.toList
-    |> List.partition (fun pair -> isLowCount pair.Value anonymizationParams)
+    |> List.partition (fun pair -> isLowCount executionContext pair.Value)
 
   let byAid =
     [ 0 .. aidsCount - 1 ]
     |> List.map (
       transposeToPerAid lowCountValues
-      >> countDistinctFlatteningByAid anonymizationParams
+      >> countDistinctFlatteningByAid executionContext
     )
 
   let safeCount = int64 highCountValues.Length
@@ -204,14 +256,14 @@ let countDistinct
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
-let count (anonymizationParams: AnonymizationParams) (perAidContributions: AidCountState array) =
+let count (executionContext: ExecutionContext) (perAidContributions: AidCountState array) =
   let byAid =
     perAidContributions
     |> Array.map (fun aidState ->
       aidState.AidContributions
       |> Seq.map (fun pair -> pair.Key, pair.Value)
       |> Seq.toList
-      |> aidFlattening anonymizationParams aidState.UnaccountedFor
+      |> aidFlattening executionContext aidState.UnaccountedFor
     )
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
