@@ -80,7 +80,7 @@ let private planFrom queryRange columnIndices =
   match queryRange with
   | RangeTable (table, _alias) -> Plan.Scan(table, columnIndices)
   | Join join -> planJoin join columnIndices
-  | SubQuery (query, _alias) -> query |> Query.assertSelectQuery |> planQuery
+  | SubQuery (query, _alias) -> planQuery query
 
 let private planLimit amount plan =
   match amount with
@@ -100,7 +100,7 @@ let private planQuery query =
   let orderByExpressions = query.OrderBy |> List.map (fun (OrderBy (expression, _, _)) -> expression)
   let expressions = query.Having :: selectedExpressions @ orderByExpressions
   let aggregators = expressions |> collectAggregates |> List.distinct
-  let groupingLabels = query.GroupingSets |> List.collect unwrap |> List.distinct
+  let groupingLabels = query.GroupBy |> List.distinct
   let aggregatedColumns = groupingLabels @ aggregators
   let selectedExpressions = selectedExpressions |> List.map (projectExpression aggregatedColumns)
   let orderByExpressions = query.OrderBy |> map (projectExpression aggregatedColumns)
@@ -143,5 +143,4 @@ let private filterJunk targetList plan =
 // ----------------------------------------------------------------
 
 let plan query =
-  let query = Query.assertSelectQuery query
   query |> planQuery |> filterJunk query.TargetList

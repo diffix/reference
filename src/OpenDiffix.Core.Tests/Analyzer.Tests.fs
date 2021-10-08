@@ -25,17 +25,14 @@ let defaultQuery =
     TargetList = []
     Where = Boolean true |> Constant
     From = RangeTable(testTable, testTable.Name)
-    GroupingSets = [ GroupingSet [] ]
+    GroupBy = []
     Having = Boolean true |> Constant
     OrderBy = []
     Limit = None
   }
 
 let testParsedQuery queryString expected =
-  queryString
-  |> Parser.parse
-  |> Analyzer.analyze context
-  |> should equal (SelectQuery expected)
+  queryString |> Parser.parse |> Analyzer.analyze context |> should equal expected
 
 let testQueryError queryString =
   (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
@@ -143,13 +140,11 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
           ]
         )
       From = RangeTable(testTable, testTable.Name)
-      GroupingSets =
+      GroupBy =
         [
-          GroupingSet [
-            ColumnReference(1, IntegerType)
-            FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
-            FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
-          ]
+          ColumnReference(1, IntegerType)
+          FunctionExpr(ScalarFunction Add, [ ColumnReference(2, RealType); ColumnReference(1, IntegerType) ])
+          FunctionExpr(AggregateFunction(Count, AggregateOptions.Default), [ ColumnReference(1, IntegerType) ])
         ]
       Having =
         FunctionExpr(
@@ -204,22 +199,21 @@ let ``Selecting columns from subquery`` () =
           ]
         From =
           SubQuery(
-            SelectQuery
-              { defaultQuery with
-                  TargetList =
-                    [
-                      {
-                        Expression = ColumnReference(0, StringType)
-                        Alias = "aliased"
-                        Tag = RegularTargetEntry
-                      }
-                      {
-                        Expression = ColumnReference(1, IntegerType)
-                        Alias = "int_col"
-                        Tag = RegularTargetEntry
-                      }
-                    ]
-              },
+            { defaultQuery with
+                TargetList =
+                  [
+                    {
+                      Expression = ColumnReference(0, StringType)
+                      Alias = "aliased"
+                      Tag = RegularTargetEntry
+                    }
+                    {
+                      Expression = ColumnReference(1, IntegerType)
+                      Alias = "int_col"
+                      Tag = RegularTargetEntry
+                    }
+                  ]
+            },
             "x"
           )
     }
@@ -290,11 +284,8 @@ type Tests(db: DBFixture) =
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
+    let query, _ = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
     query
-    |> Parser.parse
-    |> Analyzer.analyze context
-    |> Analyzer.rewrite context
-    |> Query.assertSelectQuery
 
   let ensureQueryFails query error =
     try
@@ -302,6 +293,11 @@ type Tests(db: DBFixture) =
       failwith "Expected query to fail"
     with
     | ex -> ex.Message |> should equal error
+
+  let assertSqlSeed query (seedMaterial: string) =
+    let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
+    let _query, executionContext = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
+    executionContext.NoiseLayers.BucketSeed |> should equal expectedSeed
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -374,40 +370,39 @@ type Tests(db: DBFixture) =
                ]
              From =
                SubQuery(
-                 SelectQuery
-                   { defaultQuery with
-                       TargetList =
-                         [
-                           { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
-                           {
-                             Expression = ColumnReference(2, StringType)
-                             Alias = "__aid_0"
-                             Tag = AidTargetEntry
-                           }
-                           {
-                             Expression = ColumnReference(4, IntegerType)
-                             Alias = "__aid_1"
-                             Tag = AidTargetEntry
-                           }
-                           {
-                             Expression = ColumnReference(7, IntegerType)
-                             Alias = "__aid_2"
-                             Tag = AidTargetEntry
-                           }
-                         ]
-                       From =
-                         Join
-                           {
-                             Type = JoinType.InnerJoin
-                             Left = RangeTable(getTable "customers_small", "customers_small")
-                             Right = RangeTable(getTable "purchases", "purchases")
-                             On =
-                               FunctionExpr(
-                                 ScalarFunction Equals,
-                                 [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
-                               )
-                           }
-                   },
+                 { defaultQuery with
+                     TargetList =
+                       [
+                         { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
+                         {
+                           Expression = ColumnReference(2, StringType)
+                           Alias = "__aid_0"
+                           Tag = AidTargetEntry
+                         }
+                         {
+                           Expression = ColumnReference(4, IntegerType)
+                           Alias = "__aid_1"
+                           Tag = AidTargetEntry
+                         }
+                         {
+                           Expression = ColumnReference(7, IntegerType)
+                           Alias = "__aid_2"
+                           Tag = AidTargetEntry
+                         }
+                       ]
+                     From =
+                       Join
+                         {
+                           Type = JoinType.InnerJoin
+                           Left = RangeTable(getTable "customers_small", "customers_small")
+                           Right = RangeTable(getTable "purchases", "purchases")
+                           On =
+                             FunctionExpr(
+                               ScalarFunction Equals,
+                               [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
+                             )
+                         }
+                 },
                  "x"
                )
          }
@@ -421,5 +416,19 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``Allow limiting top query`` () =
     analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
+
+  [<Fact>]
+  let ``SQL seed from column selection`` () =
+    assertSqlSeed "SELECT city FROM customers_small" "customers_small.city"
+
+  [<Fact>]
+  let ``SQL seed from column generalization`` () =
+    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "substring,customers_small.city,1,2"
+
+  [<Fact>]
+  let ``SQL seed from multiple groupings from multiple tables`` () =
+    assertSqlSeed
+      "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
+      "customers_small.city,round,purchases.amount"
 
   interface IClassFixture<DBFixture>

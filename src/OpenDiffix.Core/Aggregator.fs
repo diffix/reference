@@ -4,7 +4,7 @@ open System.Collections.Generic
 
 type IAggregator =
   abstract Transition : Value list -> unit
-  abstract Final : EvaluationContext -> Value
+  abstract Final : ExecutionContext -> Value
 
 // ----------------------------------------------------------------
 // Helpers
@@ -123,11 +123,11 @@ type private DiffixCount(minCount) =
       | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
       | _ -> invalidArgs args
 
-    member this.Final ctx =
+    member this.Final context =
       if isNull state then
         Integer minCount
       else
-        match Anonymizer.count ctx.AnonymizationParams state with
+        match Anonymizer.count context state with
         | Null -> Integer minCount
         | Integer value -> Integer(max value minCount)
         | value -> value
@@ -160,8 +160,8 @@ type private DiffixCountDistinct(minCount) =
         )
       | _ -> invalidArgs args
 
-    member this.Final ctx =
-      match Anonymizer.countDistinct aidsCount aidsPerValue ctx.AnonymizationParams with
+    member this.Final context =
+      match Anonymizer.countDistinct context aidsCount aidsPerValue with
       | Null -> Integer minCount
       | Integer value -> Integer(max value minCount)
       | value -> value
@@ -187,11 +187,11 @@ type private DiffixLowCount() =
 
       | _ -> invalidArgs args
 
-    member this.Final ctx =
+    member this.Final context =
       if isNull state then
         Boolean true
       else
-        Anonymizer.isLowCount state ctx.AnonymizationParams |> Boolean
+        Anonymizer.isLowCount context state |> Boolean
 
 type private MergeAids() =
   let state = HashSet<Value>()
@@ -212,12 +212,12 @@ type private MergeAids() =
 
 type T = IAggregator
 
-let create ctx globalBucket fn : T =
+let create executionContext globalBucket fn : T =
   let minDiffixCount =
     if globalBucket then
       0L
     else
-      int64 ctx.AnonymizationParams.Suppression.LowThreshold
+      int64 executionContext.QueryContext.AnonymizationParams.Suppression.LowThreshold
 
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T

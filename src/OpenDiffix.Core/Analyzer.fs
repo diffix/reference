@@ -123,7 +123,7 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
 let rec private collectRangeColumns anonParams range =
   match range with
   | SubQuery (query, queryAlias) ->
-    (Query.assertSelectQuery query).TargetList
+    query.TargetList
     |> List.map (fun targetEntry ->
       {
         RangeName = queryAlias
@@ -219,16 +219,15 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     else
       []
 
-  SelectQuery
-    {
-      TargetList = targetList @ aidTargets
-      Where = whereClause
-      From = range
-      GroupingSets = [ GroupingSet groupBy ]
-      Having = havingClause
-      OrderBy = []
-      Limit = selectQuery.Limit
-    }
+  {
+    TargetList = targetList @ aidTargets
+    Where = whereClause
+    From = range
+    GroupBy = groupBy
+    Having = havingClause
+    OrderBy = []
+    Limit = selectQuery.Limit
+  }
 
 // ----------------------------------------------------------------
 // Rewriting
@@ -256,7 +255,7 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
     Expression.makeAggregate DiffixLowCount [ aidColumnsExpression ]
     |> Expression.makeNot
 
-  if selectQuery.GroupingSets = [ GroupingSet [] ] then
+  if List.isEmpty selectQuery.GroupBy then
     let selectedExpressions =
       selectQuery.TargetList
       |> List.map (fun selectedColumn -> selectedColumn.Expression)
@@ -270,7 +269,7 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
           TargetList =
             { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
             :: selectQuery.TargetList
-          GroupingSets = [ GroupingSet selectedExpressions ]
+          GroupBy = selectedExpressions
           Having = Expression.makeAnd lowCountFilter selectQuery.Having
       }
     else
@@ -297,6 +296,60 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
     selectQuery
 
 // ----------------------------------------------------------------
+// Noise layers
+// ----------------------------------------------------------------
+
+let private collectGroupingExpressions selectQuery : Expression list =
+  if List.isEmpty selectQuery.GroupBy then
+    selectQuery.TargetList
+    |> List.map (fun selectedColumn -> selectedColumn.Expression)
+    |> List.filter Expression.isScalar
+  else
+    selectQuery.GroupBy
+
+let rec private basicSeedMaterial rangeColumns expression =
+  match expression with
+  | FunctionExpr (ScalarFunction Cast, [ expression; _ ]) -> basicSeedMaterial rangeColumns expression
+  | ColumnReference (index, _type) ->
+    let rangeColumn = List.item index rangeColumns
+    $"%s{rangeColumn.RangeName}.%s{rangeColumn.ColumnName}"
+  | Constant (String value) -> value
+  | Constant (Integer value) -> value.ToString()
+  | Constant (Real value) -> value.ToString()
+  | Constant (Boolean value) -> value.ToString()
+  | _ -> failwith "Unsupported expression used for defining buckets."
+
+let private functionSeedMaterial =
+  function
+  | Substring -> "substring"
+  | Ceil -> "ceil"
+  | Floor -> "floor"
+  | Round -> "round"
+  | WidthBucket -> "width_bucket"
+  | Concat -> "concat"
+  | _ -> failwith "Unsupported function used for defining buckets."
+
+let rec private collectSeedMaterials rangeColumns expression =
+  match expression with
+  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> collectSeedMaterials rangeColumns expression
+  | FunctionExpr (ScalarFunction fn, args) ->
+    (functionSeedMaterial fn) :: (List.map (basicSeedMaterial rangeColumns) args)
+  | _ -> [ basicSeedMaterial rangeColumns expression ]
+
+let private computeNoiseLayers anonParams query =
+  let rangeColumns = collectRangeColumns anonParams query.From
+
+  let sqlSeed =
+    query
+    |> collectGroupingExpressions
+    |> Seq.collect (collectSeedMaterials rangeColumns)
+    |> String.join ","
+    |> System.Text.Encoding.UTF8.GetBytes
+    |> Hash.bytes
+
+  { BucketSeed = sqlSeed }
+
+// ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
@@ -306,5 +359,12 @@ let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
   let query = mapQuery schema anonParams false parseTree
   query
 
-let rewrite context (query: Query) =
-  query |> map (rewriteQuery context.AnonymizationParams)
+let anonymize queryContext (query: Query) =
+  let executionContext =
+    {
+      QueryContext = queryContext
+      NoiseLayers = computeNoiseLayers queryContext.AnonymizationParams query
+    }
+
+  let query = map (rewriteQuery queryContext.AnonymizationParams) query
+  query, executionContext

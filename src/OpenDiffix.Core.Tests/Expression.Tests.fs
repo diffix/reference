@@ -5,8 +5,6 @@ open FsUnit.Xunit
 
 open CommonTypes
 
-let ctx = EvaluationContext.Default
-
 module DefaultFunctionsTests =
   let runsBinary fn expectations =
     expectations
@@ -471,9 +469,10 @@ let colRef0 = ColumnReference(0, StringType)
 let colRef1 = ColumnReference(1, IntegerType)
 let colRef2 = ColumnReference(2, RealType)
 
-let evaluate expr = Expression.evaluate ctx testRow expr
+let evaluate expr = Expression.evaluate testRow expr
 
-let evaluateAggregator fn args = evaluateAggregator ctx fn args testRows
+let evaluateAggregator fn args =
+  evaluateAggregator ExecutionContext.Default fn args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =
@@ -519,12 +518,10 @@ let sortRows () =
     [| Null; Integer 2L |]
     [| Null; Null |]
   ]
-  |> Expression.sortRows
-       ctx
-       [ //
-         OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
-         OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
-       ]
+  |> Expression.sortRows [ //
+       OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
+       OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
+     ]
   |> List.ofSeq
   |> should
        equal

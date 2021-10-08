@@ -24,13 +24,11 @@ let private allowedCountUsage query =
     | _ -> ()
   )
 
-let private validateSubQuery query =
-  let selectQuery = Query.assertSelectQuery query
-
+let private validateSubQuery selectQuery =
   selectQuery
   |> visitAggregates (fun _ -> failwith "Aggregates in subqueries are not currently supported")
 
-  if selectQuery.GroupingSets <> [ GroupingSet [] ] then
+  if not (List.isEmpty selectQuery.GroupBy) then
     failwith "Grouping in subqueries is not currently supported"
 
   validateSelectTarget selectQuery

@@ -9,7 +9,7 @@ type DBFixture() =
 
 let evaluateAggregator ctx fn args rows =
   let aggregator = Aggregator.create ctx true fn
-  let processor = fun row -> args |> List.map (Expression.evaluate ctx row) |> aggregator.Transition
+  let processor = fun row -> args |> List.map (Expression.evaluate row) |> aggregator.Transition
   List.iter processor rows
   aggregator.Final ctx
 

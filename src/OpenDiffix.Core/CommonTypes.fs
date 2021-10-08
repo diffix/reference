@@ -117,7 +117,8 @@ type IDataProvider =
 // Anonymizer types
 // ----------------------------------------------------------------
 
-type AidHash = uint64
+type Hash = uint64
+type AidHash = Hash
 
 type Interval =
   {
@@ -157,7 +158,7 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
-type EvaluationContext =
+type QueryContext =
   {
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
@@ -172,3 +173,12 @@ type EvaluationContext =
             member _.Dispose() = ()
         }
     }
+
+type NoiseLayers = { BucketSeed: Hash }
+
+type ExecutionContext =
+  {
+    QueryContext: QueryContext
+    NoiseLayers: NoiseLayers
+  }
+  static member Default = { QueryContext = QueryContext.Default; NoiseLayers = { BucketSeed = 0UL } }

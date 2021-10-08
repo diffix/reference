@@ -3,9 +3,9 @@ module rec OpenDiffix.Core.Executor
 open System
 open PlannerTypes
 
-let private filter context condition rows =
+let private filter condition rows =
   rows
-  |> Seq.filter (fun row -> condition |> Expression.evaluate context row |> Value.unwrapBoolean)
+  |> Seq.filter (fun row -> condition |> Expression.evaluate row |> Value.unwrapBoolean)
 
 let private unpackAggregator =
   function
@@ -20,36 +20,39 @@ let private unpackAggregators aggregators =
 // ----------------------------------------------------------------
 
 let private executeScan context table columnIndices =
-  context.DataProvider.OpenTable(table, columnIndices)
+  context.QueryContext.DataProvider.OpenTable(table, columnIndices)
 
 let private executeProject context (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions
 
   childPlan
   |> execute context
-  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate context row))
+  |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate row))
 
 let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
   childPlan
   |> execute context
   |> Seq.collect (fun row ->
-    let args = args |> List.map (Expression.evaluate context row)
+    let args = args |> List.map (Expression.evaluate row)
 
     Expression.evaluateSetFunction fn args
     |> Seq.map (fun value -> Array.append row [| value |])
   )
 
 let private executeFilter context (childPlan, condition) : seq<Row> =
-  childPlan |> execute context |> filter context condition
+  childPlan |> execute context |> filter condition
 
 let private executeSort context (childPlan, orderings) : seq<Row> =
-  childPlan |> execute context |> Expression.sortRows context orderings
+  childPlan |> execute context |> Expression.sortRows orderings
 
 let private executeLimit context (childPlan, amount) : seq<Row> =
   if amount > uint Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
   childPlan |> execute context |> Seq.truncate (int amount)
+
+let private addValuesToSeed seed values =
+  values |> Seq.map Value.hash |> Seq.fold (^^^) seed
 
 let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
@@ -63,8 +66,8 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
   if isGlobal then state.Add([||], makeAggregators ())
 
   for row in execute context childPlan do
-    let group = groupingLabels |> Array.map (Expression.evaluate context row)
-    let argEvaluator = Expression.evaluate context row
+    let group = groupingLabels |> Array.map (Expression.evaluate row)
+    let argEvaluator = Expression.evaluate row
 
     let aggregators =
       match state.TryGetValue(group) with
@@ -79,6 +82,13 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
 
   state
   |> Seq.map (fun pair ->
+    let bucketSeed = addValuesToSeed context.NoiseLayers.BucketSeed pair.Key
+
+    let context =
+      { context with
+          NoiseLayers = { context.NoiseLayers with BucketSeed = bucketSeed }
+      }
+
     let values = pair.Value |> Array.map (fun acc -> acc.Final context)
     Array.append pair.Key values
   )
@@ -97,7 +107,7 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
   outerPlan
   |> execute context
   |> Seq.collect (fun outerRow ->
-    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter context on
+    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullInnerRow = Array.create innerColumnsCount Null

@@ -3,14 +3,11 @@
 open AnalyzerTypes
 
 let rec private extractColumns query =
-  match query with
-  | UnionQuery (_, query1, _query2) -> extractColumns query1
-  | SelectQuery query ->
-    query.TargetList
-    |> List.filter TargetEntry.isRegular
-    |> List.map (fun column -> //
-      { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
-    )
+  query.TargetList
+  |> List.filter TargetEntry.isRegular
+  |> List.map (fun column -> //
+    { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
+  )
 
 // ----------------------------------------------------------------
 // Public API
@@ -18,14 +15,14 @@ let rec private extractColumns query =
 
 type QueryResult = { Columns: Column list; Rows: Row list }
 
-let run context statement : QueryResult =
-  let query =
+let run queryContext statement : QueryResult =
+  let query, executionContext =
     statement
     |> Parser.parse
-    |> Analyzer.analyze context
+    |> Analyzer.analyze queryContext
     |> Normalizer.normalize
-    |> Analyzer.rewrite context
+    |> Analyzer.anonymize queryContext
 
-  let rows = query |> Planner.plan |> Executor.execute context |> Seq.toList
+  let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
   let columns = extractColumns query
   { Columns = columns; Rows = rows }

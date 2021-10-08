@@ -18,20 +18,14 @@ type NodeFunctions =
     List.map f expressions
 
   // Query
-  static member Map(query: Query, f: SelectQuery -> SelectQuery) =
-    match query with
-    | UnionQuery (distinct, q1, q2) -> UnionQuery(distinct, NodeFunctions.Map(q1, f), NodeFunctions.Map(q2, f))
-    | SelectQuery selectQuery -> SelectQuery(f selectQuery)
-
-  static member Map(query: Query, f: Expression -> Expression) =
-    NodeFunctions.Map(query, (fun (selectQuery: SelectQuery) -> NodeFunctions.Map(selectQuery, f)))
+  static member Map(query: Query, f: SelectQuery -> SelectQuery) = f query
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     {
       TargetList = NodeFunctions.Map(query.TargetList, f)
       From = query.From
       Where = f query.Where
-      GroupingSets = NodeFunctions.Map(query.GroupingSets, f)
+      GroupBy = NodeFunctions.Map(query.GroupBy, f)
       OrderBy = NodeFunctions.Map(query.OrderBy, f)
       Having = f query.Having
       Limit = query.Limit
@@ -44,13 +38,6 @@ type NodeFunctions =
   static member Map(targetEntry: TargetEntry, f: Expression -> Expression) =
     { targetEntry with Expression = f targetEntry.Expression }
 
-  // GroupingSet
-  static member Map(groupingSets: GroupingSet list, f: Expression -> Expression) =
-    groupingSets |> List.map (fun groupingSet -> NodeFunctions.Map(groupingSet, f))
-
-  static member Map(groupingSet: GroupingSet, f: Expression -> Expression) =
-    groupingSet |> NodeFunctions.Unwrap |> List.map f |> GroupingSet
-
   // OrderBy
   static member Map(orderByList: OrderBy list, f: Expression -> Expression) =
     orderByList |> List.map (fun orderBy -> NodeFunctions.Map(orderBy, f))
@@ -60,9 +47,6 @@ type NodeFunctions =
     OrderBy(f exp, direction, nullBehavior)
 
   // QueryRange
-  static member Map(query: Query, f: QueryRange -> QueryRange) =
-    NodeFunctions.Map(query, (fun (selectQuery: SelectQuery) -> { selectQuery with From = f selectQuery.From }))
-
   static member Map(selectQuery: SelectQuery, f: QueryRange -> QueryRange) =
     { selectQuery with From = f selectQuery.From }
 
@@ -76,10 +60,6 @@ type NodeFunctions =
   static member Unwrap(orderByExpression: OrderBy) =
     match orderByExpression with
     | OrderBy (expr, direction, nulls) -> (expr, direction, nulls)
-
-  static member Unwrap(groupingSet: GroupingSet) : Expression list =
-    match groupingSet with
-    | GroupingSet expressions -> expressions
 
 let inline private callMap (_: ^M, node: ^T, func: ^F) =
   ((^M or ^T): (static member Map : ^T * ^F -> ^T) (node, func))

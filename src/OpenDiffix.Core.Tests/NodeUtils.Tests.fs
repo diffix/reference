@@ -25,7 +25,7 @@ let selectQuery =
     TargetList = [ { Expression = expression; Alias = "col"; Tag = RegularTargetEntry } ]
     Where = expression
     From = RangeTable(testTable, testTable.Name)
-    GroupingSets = [ GroupingSet [ expression ] ]
+    GroupBy = [ expression ]
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
     Limit = None
@@ -36,7 +36,7 @@ let selectQueryNegative =
     TargetList = [ { Expression = negativeExpression; Alias = "col"; Tag = RegularTargetEntry } ]
     Where = negativeExpression
     From = RangeTable(testTable, testTable.Name)
-    GroupingSets = [ GroupingSet [ negativeExpression ] ]
+    GroupBy = [ negativeExpression ]
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
     Limit = None
