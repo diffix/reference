@@ -54,6 +54,9 @@ module Function =
     | "round" -> ScalarFunction Round
     | "ceil" -> ScalarFunction Ceil
     | "floor" -> ScalarFunction Floor
+    | "round_by" -> ScalarFunction RoundBy
+    | "ceil_by" -> ScalarFunction CeilBy
+    | "floor_by" -> ScalarFunction FloorBy
     | "abs" -> ScalarFunction Abs
     | "length" -> ScalarFunction Length
     | "lower" -> ScalarFunction Lower

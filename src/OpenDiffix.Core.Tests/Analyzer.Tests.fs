@@ -423,12 +423,12 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``SQL seed from column generalization`` () =
-    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "substring,customers_small.city,1,2"
+    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "range,customers_small.city,1,2"
 
   [<Fact>]
   let ``SQL seed from multiple groupings from multiple tables`` () =
     assertSqlSeed
       "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      "customers_small.city,round,purchases.amount"
+      "customers_small.city,range,purchases.amount"
 
   interface IClassFixture<DBFixture>

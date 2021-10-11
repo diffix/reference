@@ -281,6 +281,27 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let RoundBy () =
+    runsBinary
+      RoundBy
+      [
+        Integer 3L, Integer 2L, Integer 4L
+        Integer 3L, Real 2.5, Real 2.5
+        Integer 3L, Integer -1L, Null
+        Real 2.5, Integer 2L, Integer 2L
+        Real 3.5, Real 2.0, Real 4.0
+        Integer 1L, Real 0.5, Real 1.0
+        Real 1.3245, Real 0.5, Real 1.5
+      ]
+
+    fails
+      RoundBy
+      [ //
+        [ Integer 5L; String "a" ]
+        [ String "a"; Real 1.0 ]
+      ]
+
+  [<Fact>]
   let Ceil () =
     runsUnary
       Ceil
@@ -301,6 +322,27 @@ module DefaultFunctionsTests =
       ]
 
   [<Fact>]
+  let CeilBy () =
+    runsBinary
+      CeilBy
+      [
+        Integer 3L, Integer 2L, Integer 4L
+        Integer 3L, Real 2.5, Real 5.0
+        Integer 3L, Integer -1L, Null
+        Real 2.5, Integer 2L, Integer 4L
+        Real 3.5, Real 2.0, Real 4.0
+        Integer 1L, Real 0.5, Real 1.0
+        Real 1.233, Real 0.5, Real 1.5
+      ]
+
+    fails
+      CeilBy
+      [ //
+        [ Integer 5L; String "a" ]
+        [ String "a"; Real 1.0 ]
+      ]
+
+  [<Fact>]
   let Floor () =
     runsUnary
       Floor
@@ -318,6 +360,27 @@ module DefaultFunctionsTests =
         [ Integer 5L ]
         [ Boolean true ]
         [ String "a" ]
+      ]
+
+  [<Fact>]
+  let FloorbY () =
+    runsBinary
+      FloorBy
+      [
+        Integer 3L, Integer 2L, Integer 2L
+        Integer 3L, Real 2.5, Real 2.5
+        Integer 3L, Integer -1L, Null
+        Real 2.5, Integer 2L, Integer 2L
+        Real 3.5, Real 2.0, Real 2.0
+        Integer 1L, Real 0.5, Real 1.0
+        Real 1.3245, Real 0.5, Real 1.0
+      ]
+
+    fails
+      FloorBy
+      [ //
+        [ Integer 5L; String "a" ]
+        [ String "a"; Real 1.0 ]
       ]
 
   [<Fact>]

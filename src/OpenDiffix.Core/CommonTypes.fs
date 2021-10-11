@@ -59,6 +59,9 @@ type ScalarFunction =
   | Round
   | Floor
   | Ceil
+  | RoundBy
+  | FloorBy
+  | CeilBy
   | Abs
   | Length
   | Lower

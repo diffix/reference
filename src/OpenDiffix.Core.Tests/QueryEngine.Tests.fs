@@ -167,6 +167,18 @@ type Tests(db: DBFixture) =
     queryResult |> should equal expected
 
   [<Fact>]
+  let ``query 12 - group with rounding`` () =
+    let queryResult = runQuery "SELECT round_by(age, 5), count(*) FROM customers_small GROUP BY 1"
+
+    let expected =
+      {
+        Columns = [ { Name = "round_by"; Type = IntegerType }; { Name = "count"; Type = IntegerType } ]
+        Rows = [ [| Integer 25L; Integer 7L |]; [| Integer 30L; Integer 7L |]; [| Integer 35L; Integer 6L |] ]
+      }
+
+    queryResult |> should equal expected
+
+  [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
     equivalentQueries
       "SELECT p.name AS n FROM products AS p WHERE id = 1"

@@ -34,6 +34,9 @@ let typeOfScalarFunction fn args =
   | Round
   | Floor
   | Ceil -> IntegerType
+  | RoundBy
+  | FloorBy
+  | CeilBy -> args |> List.item 1 |> typeOf
   | Abs -> args |> List.exactlyOne |> typeOf
   | Lower
   | Upper
@@ -104,6 +107,40 @@ let rec evaluateScalarFunction fn args =
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
   | Or, [ Boolean b1; Boolean b2 ] -> Boolean(b1 || b2)
 
+  | Round, [ Real r ] -> r |> round |> int64 |> Integer
+  | RoundBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | RoundBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | RoundBy, [ Integer value; Integer amount ] ->
+    (float value / float amount) |> round |> int64 |> (*) amount |> Integer
+  | RoundBy, [ Integer value; Real amount ] -> (float value / amount) |> round |> (*) amount |> Real
+  | RoundBy, [ Real value; Integer amount ] -> (value / float amount) |> round |> int64 |> (*) amount |> Integer
+  | RoundBy, [ Real value; Real amount ] -> (value / amount) |> round |> (*) amount |> Real
+
+  | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
+  | CeilBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | CeilBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | CeilBy, [ Integer value; Integer amount ] -> (float value / float amount) |> ceil |> int64 |> (*) amount |> Integer
+  | CeilBy, [ Integer value; Real amount ] -> (float value / amount) |> ceil |> (*) amount |> Real
+  | CeilBy, [ Real value; Integer amount ] -> (value / float amount) |> ceil |> int64 |> (*) amount |> Integer
+  | CeilBy, [ Real value; Real amount ] -> (value / amount) |> ceil |> (*) amount |> Real
+
+  | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
+  | FloorBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | FloorBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | FloorBy, [ Integer value; Integer amount ] ->
+    (float value / float amount) |> floor |> int64 |> (*) amount |> Integer
+  | FloorBy, [ Integer value; Real amount ] -> (float value / amount) |> floor |> (*) amount |> Real
+  | FloorBy, [ Real value; Integer amount ] -> (value / float amount) |> floor |> int64 |> (*) amount |> Integer
+  | FloorBy, [ Real value; Real amount ] -> (value / amount) |> floor |> (*) amount |> Real
+
+  | Abs, [ Real r ] -> r |> abs |> Real
+  | Abs, [ Integer i ] -> i |> abs |> Integer
+
+  | WidthBucket, [ Integer v; Integer b; Integer t; Integer c ] ->
+    widthBucket (float v) (float b) (float t) c |> Integer
+  | WidthBucket, [ Real v; Real b; Real t; Integer c ] -> widthBucket v b t c |> Integer
+
+  // Treat mixed integer/real binary operations as real/real operations.
   | _, [ Integer i; Real r ] -> evaluateScalarFunction fn [ Real(double i); Real r ]
   | _, [ Real r; Integer i ] -> evaluateScalarFunction fn [ Real r; Real(double i) ]
 
@@ -123,16 +160,6 @@ let rec evaluateScalarFunction fn args =
   | LtE, [ v1; v2 ] -> Boolean(v1 <= v2)
   | Gt, [ v1; v2 ] -> Boolean(v1 > v2)
   | GtE, [ v1; v2 ] -> Boolean(v1 >= v2)
-
-  | Round, [ Real r ] -> r |> round |> int64 |> Integer
-  | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
-  | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
-  | Abs, [ Real r ] -> r |> abs |> Real
-  | Abs, [ Integer i ] -> i |> abs |> Integer
-
-  | WidthBucket, [ Integer v; Integer b; Integer t; Integer c ] ->
-    widthBucket (float v) (float b) (float t) c |> Integer
-  | WidthBucket, [ Real v; Real b; Real t; Integer c ] -> widthBucket v b t c |> Integer
 
   | Length, [ String s ] -> Integer(int64 s.Length)
 

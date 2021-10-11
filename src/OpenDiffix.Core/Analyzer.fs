@@ -321,10 +321,16 @@ let rec private basicSeedMaterial rangeColumns expression =
 
 let private functionSeedMaterial =
   function
-  | Substring -> "substring"
-  | Ceil -> "ceil"
-  | Floor -> "floor"
-  | Round -> "round"
+  | Substring
+  | Ceil
+  | Floor
+  | Round
+  | Ceil
+  | Floor
+  | Round
+  | CeilBy
+  | FloorBy
+  | RoundBy -> "range"
   | WidthBucket -> "width_bucket"
   | Concat -> "concat"
   | _ -> failwith "Unsupported function used for defining buckets."
