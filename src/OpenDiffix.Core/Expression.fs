@@ -33,11 +33,10 @@ let typeOfScalarFunction fn args =
   | Length -> IntegerType
   | Round
   | Floor
-  | Ceil ->
-    match args with
-    | [ _ ] -> IntegerType
-    | [ _; amount ] -> typeOf amount
-    | _ -> failwith $"Invalid arguments supplied to function `#{fn}`."
+  | Ceil -> IntegerType
+  | RoundBy
+  | FloorBy
+  | CeilBy -> args |> List.item 1 |> typeOf
   | Abs -> args |> List.exactlyOne |> typeOf
   | Lower
   | Upper
@@ -109,28 +108,30 @@ let rec evaluateScalarFunction fn args =
   | Or, [ Boolean b1; Boolean b2 ] -> Boolean(b1 || b2)
 
   | Round, [ Real r ] -> r |> round |> int64 |> Integer
-  | Round, [ _; Integer amount ] when amount <= 0L -> Null
-  | Round, [ _; Real amount ] when amount <= 0.0 -> Null
-  | Round, [ Integer value; Integer amount ] -> (float value / float amount) |> round |> int64 |> (*) amount |> Integer
-  | Round, [ Integer value; Real amount ] -> (float value / amount) |> round |> (*) amount |> Real
-  | Round, [ Real value; Integer amount ] -> (value / float amount) |> round |> int64 |> (*) amount |> Integer
-  | Round, [ Real value; Real amount ] -> (value / amount) |> round |> (*) amount |> Real
+  | RoundBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | RoundBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | RoundBy, [ Integer value; Integer amount ] ->
+    (float value / float amount) |> round |> int64 |> (*) amount |> Integer
+  | RoundBy, [ Integer value; Real amount ] -> (float value / amount) |> round |> (*) amount |> Real
+  | RoundBy, [ Real value; Integer amount ] -> (value / float amount) |> round |> int64 |> (*) amount |> Integer
+  | RoundBy, [ Real value; Real amount ] -> (value / amount) |> round |> (*) amount |> Real
 
   | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
-  | Ceil, [ _; Integer amount ] when amount <= 0L -> Null
-  | Ceil, [ _; Real amount ] when amount <= 0.0 -> Null
-  | Ceil, [ Integer value; Integer amount ] -> (float value / float amount) |> ceil |> int64 |> (*) amount |> Integer
-  | Ceil, [ Integer value; Real amount ] -> (float value / amount) |> ceil |> (*) amount |> Real
-  | Ceil, [ Real value; Integer amount ] -> (value / float amount) |> ceil |> int64 |> (*) amount |> Integer
-  | Ceil, [ Real value; Real amount ] -> (value / amount) |> ceil |> (*) amount |> Real
+  | CeilBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | CeilBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | CeilBy, [ Integer value; Integer amount ] -> (float value / float amount) |> ceil |> int64 |> (*) amount |> Integer
+  | CeilBy, [ Integer value; Real amount ] -> (float value / amount) |> ceil |> (*) amount |> Real
+  | CeilBy, [ Real value; Integer amount ] -> (value / float amount) |> ceil |> int64 |> (*) amount |> Integer
+  | CeilBy, [ Real value; Real amount ] -> (value / amount) |> ceil |> (*) amount |> Real
 
   | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
-  | Floor, [ _; Integer amount ] when amount <= 0L -> Null
-  | Floor, [ _; Real amount ] when amount <= 0.0 -> Null
-  | Floor, [ Integer value; Integer amount ] -> (float value / float amount) |> floor |> int64 |> (*) amount |> Integer
-  | Floor, [ Integer value; Real amount ] -> (float value / amount) |> floor |> (*) amount |> Real
-  | Floor, [ Real value; Integer amount ] -> (value / float amount) |> floor |> int64 |> (*) amount |> Integer
-  | Floor, [ Real value; Real amount ] -> (value / amount) |> floor |> (*) amount |> Real
+  | FloorBy, [ _; Integer amount ] when amount <= 0L -> Null
+  | FloorBy, [ _; Real amount ] when amount <= 0.0 -> Null
+  | FloorBy, [ Integer value; Integer amount ] ->
+    (float value / float amount) |> floor |> int64 |> (*) amount |> Integer
+  | FloorBy, [ Integer value; Real amount ] -> (float value / amount) |> floor |> (*) amount |> Real
+  | FloorBy, [ Real value; Integer amount ] -> (value / float amount) |> floor |> int64 |> (*) amount |> Integer
+  | FloorBy, [ Real value; Real amount ] -> (value / amount) |> floor |> (*) amount |> Real
 
   | Abs, [ Real r ] -> r |> abs |> Real
   | Abs, [ Integer i ] -> i |> abs |> Integer

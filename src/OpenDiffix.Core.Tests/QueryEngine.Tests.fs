@@ -168,11 +168,11 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 12 - group with rounding`` () =
-    let queryResult = runQuery "SELECT round(age, 5), count(*) FROM customers_small GROUP BY 1"
+    let queryResult = runQuery "SELECT round_by(age, 5), count(*) FROM customers_small GROUP BY 1"
 
     let expected =
       {
-        Columns = [ { Name = "round"; Type = IntegerType }; { Name = "count"; Type = IntegerType } ]
+        Columns = [ { Name = "round_by"; Type = IntegerType }; { Name = "count"; Type = IntegerType } ]
         Rows = [ [| Integer 25L; Integer 7L |]; [| Integer 30L; Integer 7L |]; [| Integer 35L; Integer 6L |] ]
       }
 
