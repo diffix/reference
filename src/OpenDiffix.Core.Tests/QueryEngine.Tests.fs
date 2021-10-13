@@ -200,7 +200,7 @@ type Tests(db: DBFixture) =
         Rows = [ [| Integer 11L; Boolean false |] ]
       }
 
-    let queryResult = runQuery "SELECT diffix_count(id) AS dc, diffix_low_count(id) AS lc FROM products"
+    let queryResult = runQuery "SELECT diffix_count(*, id) AS dc, diffix_low_count(id) AS lc FROM products"
     queryResult |> should equal expected
 
   interface IClassFixture<DBFixture>
