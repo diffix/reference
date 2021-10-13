@@ -44,12 +44,22 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   (match fn, parsedArgs with
    | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
      AggregateFunction(Count, aggregateArgs), []
+   | AggregateFunction (DiffixLowCount, aggregateArgs), parsedAids ->
+     let aids = parsedAids |> List.map (mapExpression rangeColumns)
+     AggregateFunction(DiffixLowCount, aggregateArgs), [ ListExpr aids ]
+   | AggregateFunction (DiffixCount, aggregateArgs), parsedArg :: parsedAids ->
+     let aggregateArgs, args =
+       match parsedArg with
+       | ParserTypes.Star -> aggregateArgs, []
+       | ParserTypes.Distinct parsedExpr ->
+         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+
+     let aids = parsedAids |> List.map (mapExpression rangeColumns) |> ListExpr
+     AggregateFunction(DiffixCount, aggregateArgs), aids :: args
    | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
      let arg = mapExpression rangeColumns expr
      AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
-   | AggregateFunction (fn, aggregateArgs), parsedArgs when List.contains fn [ DiffixCount; DiffixLowCount ] -> //
-     let args = parsedArgs |> List.map (mapExpression rangeColumns)
-     AggregateFunction(fn, aggregateArgs), [ ListExpr args ]
    | _ ->
      let args = parsedArgs |> List.map (mapExpression rangeColumns)
      fn, args)

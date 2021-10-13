@@ -118,6 +118,7 @@ type private DiffixCount(minCount) =
   interface IAggregator with
     member this.Transition args =
       match args with
+      | Value.List [] :: _ -> invalidArgs args
       | [ aidInstances; Null ] -> updateAidMaps aidInstances 0L
       | [ aidInstances ]
       | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
@@ -140,7 +141,7 @@ type private DiffixCountDistinct(minCount) =
     member this.Transition args =
       match args with
       | [ _aidInstances; Null ] -> ()
-      | [ Value.List aidInstances; value ] ->
+      | [ Value.List aidInstances; value ] when not aidInstances.IsEmpty ->
         let aidSets =
           match aidsPerValue.TryGetValue(value) with
           | true, aidSets -> aidSets
@@ -173,7 +174,7 @@ type private DiffixLowCount() =
     member this.Transition args =
       match args with
       | [ Null ] -> ()
-      | [ Value.List aidInstances ] ->
+      | [ Value.List aidInstances ] when not aidInstances.IsEmpty ->
         if isNull state then state <- emptySets aidInstances.Length
 
         aidInstances
