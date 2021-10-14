@@ -129,7 +129,7 @@ let dryRun query filePath anonParams =
 
 let runQuery query filePath anonParams =
   use dataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
-  let context = EvaluationContext.make anonParams dataProvider
+  let context = QueryContext.make anonParams dataProvider
   QueryEngine.run context query
 
 let quoteString (string: string) =

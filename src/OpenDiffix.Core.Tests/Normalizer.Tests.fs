@@ -16,7 +16,7 @@ let testTable =
   }
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = EvaluationContext.make AnonymizationParams.Default dataProvider
+let context = QueryContext.make AnonymizationParams.Default dataProvider
 
 let queryPlan statement =
   statement |> Parser.parse |> Analyzer.analyze context |> Normalizer.normalize

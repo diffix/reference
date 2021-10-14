@@ -16,7 +16,7 @@ let testTable: Table =
 
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = EvaluationContext.make AnonymizationParams.Default dataProvider
+let context = QueryContext.make AnonymizationParams.Default dataProvider
 
 let aidColIndex = Table.findColumn testTable "int_col" |> fst
 

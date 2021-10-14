@@ -18,7 +18,7 @@ let testTable: Table =
   }
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = EvaluationContext.make AnonymizationParams.Default dataProvider
+let context = QueryContext.make AnonymizationParams.Default dataProvider
 
 let defaultQuery =
   {
@@ -277,7 +277,7 @@ type Tests(db: DBFixture) =
       NoiseSD = 0.
     }
 
-  let context = EvaluationContext.make anonParams db.DataProvider
+  let context = QueryContext.make anonParams db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
