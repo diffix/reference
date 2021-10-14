@@ -56,7 +56,7 @@ let private generateNoise salt stepName stdDev noiseLayers =
 let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
   aidSets
   |> Seq.map (fun aidSet ->
-    let anonParams = executionContext.QueryContext.AnonymizationParams
+    let anonParams = executionContext.AnonymizationParams
 
     if aidSet.Count < anonParams.Suppression.LowThreshold then
       true
@@ -101,7 +101,7 @@ let inline private aidFlattening
   (unaccountedFor: int64)
   (aidContributions: (AidHash * ^Contribution) list)
   : AidCount option =
-  let anonParams = executionContext.QueryContext.AnonymizationParams
+  let anonParams = executionContext.AnonymizationParams
 
   if aidContributions.Length < anonParams.OutlierCount.Lower + anonParams.TopCount.Lower then
     None
@@ -139,7 +139,7 @@ let inline private aidFlattening
     let flattenedAvg = flattenedSum / float aidContributions.Length
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
-    let noiseSD = executionContext.QueryContext.AnonymizationParams.NoiseSD * noiseScale
+    let noiseSD = executionContext.AnonymizationParams.NoiseSD * noiseScale
 
     let noise =
       [ executionContext.NoiseLayers.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]

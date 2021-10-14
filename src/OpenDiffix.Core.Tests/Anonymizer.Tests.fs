@@ -45,7 +45,7 @@ let anonymizedAggregationContext =
   let threshold = { Lower = 2; Upper = 2 }
 
   let anonParams =
-    { context.QueryContext.AnonymizationParams with
+    { context.AnonymizationParams with
         OutlierCount = threshold
         TopCount = threshold
     }

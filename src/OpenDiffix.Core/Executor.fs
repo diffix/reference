@@ -19,8 +19,8 @@ let private unpackAggregators aggregators =
 // Node execution
 // ----------------------------------------------------------------
 
-let private executeScan context table columnIndices =
-  context.QueryContext.DataProvider.OpenTable(table, columnIndices)
+let private executeScan (context: ExecutionContext) table columnIndices =
+  context.DataProvider.OpenTable(table, columnIndices)
 
 let private executeProject context (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions
