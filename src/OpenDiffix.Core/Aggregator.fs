@@ -124,11 +124,11 @@ type private DiffixCount(minCount) =
       | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
       | _ -> invalidArgs args
 
-    member this.Final context =
+    member this.Final executionContext =
       if isNull state then
         Integer minCount
       else
-        match Anonymizer.count context state with
+        match Anonymizer.count executionContext state with
         | Null -> Integer minCount
         | Integer value -> Integer(max value minCount)
         | value -> value
@@ -161,8 +161,8 @@ type private DiffixCountDistinct(minCount) =
         )
       | _ -> invalidArgs args
 
-    member this.Final context =
-      match Anonymizer.countDistinct context aidsCount aidsPerValue with
+    member this.Final executionContext =
+      match Anonymizer.countDistinct executionContext aidsCount aidsPerValue with
       | Null -> Integer minCount
       | Integer value -> Integer(max value minCount)
       | value -> value
@@ -188,11 +188,11 @@ type private DiffixLowCount() =
 
       | _ -> invalidArgs args
 
-    member this.Final context =
+    member this.Final executionContext =
       if isNull state then
         Boolean true
       else
-        Anonymizer.isLowCount context state |> Boolean
+        Anonymizer.isLowCount executionContext state |> Boolean
 
 type private MergeAids() =
   let state = HashSet<Value>()
@@ -213,12 +213,12 @@ type private MergeAids() =
 
 type T = IAggregator
 
-let create executionContext globalBucket fn : T =
+let create (executionContext: ExecutionContext) globalBucket fn : T =
   let minDiffixCount =
     if globalBucket then
       0L
     else
-      int64 executionContext.QueryContext.AnonymizationParams.Suppression.LowThreshold
+      int64 executionContext.AnonymizationParams.Suppression.LowThreshold
 
   match fn with
   | AggregateFunction (Count, { Distinct = false }) -> Count() :> T

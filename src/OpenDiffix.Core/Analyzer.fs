@@ -369,9 +369,9 @@ let private computeNoiseLayers anonParams query =
 // Public API
 // ----------------------------------------------------------------
 
-let analyze context (parseTree: ParserTypes.SelectQuery) : Query =
-  let schema = context.DataProvider.GetSchema()
-  let anonParams = context.AnonymizationParams
+let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
+  let schema = queryContext.DataProvider.GetSchema()
+  let anonParams = queryContext.AnonymizationParams
   let query = mapQuery schema anonParams false parseTree
   query
 

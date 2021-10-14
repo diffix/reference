@@ -16,14 +16,14 @@ let testTable: Table =
 
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = EvaluationContext.make AnonymizationParams.Default dataProvider
+let queryContext = QueryContext.make AnonymizationParams.Default dataProvider
 
 let aidColIndex = Table.findColumn testTable "int_col" |> fst
 
 let analyzeQuery queryString =
   queryString
   |> Parser.parse
-  |> Analyzer.analyze context
+  |> Analyzer.analyze queryContext
   |> QueryValidator.validateQuery
 
 let ensureFailParsedQuery queryString (errorFragment: string) =

@@ -184,4 +184,6 @@ type ExecutionContext =
     QueryContext: QueryContext
     NoiseLayers: NoiseLayers
   }
+  member this.AnonymizationParams = this.QueryContext.AnonymizationParams
+  member this.DataProvider = this.QueryContext.DataProvider
   static member Default = { QueryContext = QueryContext.Default; NoiseLayers = { BucketSeed = 0UL } }

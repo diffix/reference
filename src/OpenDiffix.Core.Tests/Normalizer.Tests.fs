@@ -16,10 +16,13 @@ let testTable =
   }
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = EvaluationContext.make AnonymizationParams.Default dataProvider
+let queryContext = QueryContext.make AnonymizationParams.Default dataProvider
 
 let queryPlan statement =
-  statement |> Parser.parse |> Analyzer.analyze context |> Normalizer.normalize
+  statement
+  |> Parser.parse
+  |> Analyzer.analyze queryContext
+  |> Normalizer.normalize
 
 let equivalentQueries expectedQuery testQuery =
   let testPlan = queryPlan testQuery

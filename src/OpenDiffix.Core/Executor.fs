@@ -19,19 +19,19 @@ let private unpackAggregators aggregators =
 // Node execution
 // ----------------------------------------------------------------
 
-let private executeScan context table columnIndices =
-  context.QueryContext.DataProvider.OpenTable(table, columnIndices)
+let private executeScan (executionContext: ExecutionContext) table columnIndices =
+  executionContext.DataProvider.OpenTable(table, columnIndices)
 
-let private executeProject context (childPlan, expressions) : seq<Row> =
+let private executeProject executionContext (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions
 
   childPlan
-  |> execute context
+  |> execute executionContext
   |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate row))
 
-let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
+let private executeProjectSet executionContext (childPlan, fn, args) : seq<Row> =
   childPlan
-  |> execute context
+  |> execute executionContext
   |> Seq.collect (fun row ->
     let args = args |> List.map (Expression.evaluate row)
 
@@ -39,33 +39,33 @@ let private executeProjectSet context (childPlan, fn, args) : seq<Row> =
     |> Seq.map (fun value -> Array.append row [| value |])
   )
 
-let private executeFilter context (childPlan, condition) : seq<Row> =
-  childPlan |> execute context |> filter condition
+let private executeFilter executionContext (childPlan, condition) : seq<Row> =
+  childPlan |> execute executionContext |> filter condition
 
-let private executeSort context (childPlan, orderings) : seq<Row> =
-  childPlan |> execute context |> Expression.sortRows orderings
+let private executeSort executionContext (childPlan, orderings) : seq<Row> =
+  childPlan |> execute executionContext |> Expression.sortRows orderings
 
-let private executeLimit context (childPlan, amount) : seq<Row> =
+let private executeLimit executionContext (childPlan, amount) : seq<Row> =
   if amount > uint Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
-  childPlan |> execute context |> Seq.truncate (int amount)
+  childPlan |> execute executionContext |> Seq.truncate (int amount)
 
 let private addValuesToSeed seed values =
   values |> Seq.map Value.hash |> Seq.fold (^^^) seed
 
-let private executeAggregate context (childPlan, groupingLabels, aggregators) : seq<Row> =
+let private executeAggregate executionContext (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let isGlobal = Array.isEmpty groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
 
   let makeAggregators () =
-    aggFns |> Array.map (Aggregator.create context isGlobal)
+    aggFns |> Array.map (Aggregator.create executionContext isGlobal)
 
   let state = Collections.Generic.Dictionary<Row, Aggregator.T array>(Row.equalityComparer)
   if isGlobal then state.Add([||], makeAggregators ())
 
-  for row in execute context childPlan do
+  for row in execute executionContext childPlan do
     let group = groupingLabels |> Array.map (Expression.evaluate row)
     let argEvaluator = Expression.evaluate row
 
@@ -82,18 +82,18 @@ let private executeAggregate context (childPlan, groupingLabels, aggregators) : 
 
   state
   |> Seq.map (fun pair ->
-    let bucketSeed = addValuesToSeed context.NoiseLayers.BucketSeed pair.Key
+    let bucketSeed = addValuesToSeed executionContext.NoiseLayers.BucketSeed pair.Key
 
-    let context =
-      { context with
-          NoiseLayers = { context.NoiseLayers with BucketSeed = bucketSeed }
+    let childExecutionContext =
+      { executionContext with
+          NoiseLayers = { executionContext.NoiseLayers with BucketSeed = bucketSeed }
       }
 
-    let values = pair.Value |> Array.map (fun acc -> acc.Final context)
+    let values = pair.Value |> Array.map (fun acc -> acc.Final childExecutionContext)
     Array.append pair.Key values
   )
 
-let private executeJoin context (leftPlan, rightPlan, joinType, on) =
+let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =
     match joinType with
     | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
@@ -101,11 +101,11 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
     | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
     | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
-  let innerRows = innerPlan |> execute context |> Seq.toList
+  let innerRows = innerPlan |> execute executionContext |> Seq.toList
   let innerColumnsCount = Plan.columnsCount innerPlan
 
   outerPlan
-  |> execute context
+  |> execute executionContext
   |> Seq.collect (fun outerRow ->
     let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter on
 
@@ -120,14 +120,14 @@ let private executeJoin context (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-let rec execute context plan : seq<Row> =
+let rec execute executionContext plan : seq<Row> =
   match plan with
-  | Plan.Scan (table, columnIndices) -> executeScan context table columnIndices
-  | Plan.Project (plan, expressions) -> executeProject context (plan, expressions)
-  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet context (plan, fn, args)
-  | Plan.Filter (plan, condition) -> executeFilter context (plan, condition)
-  | Plan.Sort (plan, orderings) -> executeSort context (plan, orderings)
-  | Plan.Aggregate (plan, labels, aggregators) -> executeAggregate context (plan, labels, aggregators)
-  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin context (leftPlan, rightPlan, joinType, on)
-  | Plan.Limit (plan, amount) -> executeLimit context (plan, amount)
+  | Plan.Scan (table, columnIndices) -> executeScan executionContext table columnIndices
+  | Plan.Project (plan, expressions) -> executeProject executionContext (plan, expressions)
+  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet executionContext (plan, fn, args)
+  | Plan.Filter (plan, condition) -> executeFilter executionContext (plan, condition)
+  | Plan.Sort (plan, orderings) -> executeSort executionContext (plan, orderings)
+  | Plan.Aggregate (plan, labels, aggregators) -> executeAggregate executionContext (plan, labels, aggregators)
+  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin executionContext (leftPlan, rightPlan, joinType, on)
+  | Plan.Limit (plan, amount) -> executeLimit executionContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"
