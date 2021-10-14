@@ -129,8 +129,8 @@ let dryRun query filePath anonParams =
 
 let runQuery query filePath anonParams =
   use dataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
-  let context = QueryContext.make anonParams dataProvider
-  QueryEngine.run context query
+  let queryContext = QueryContext.make anonParams dataProvider
+  QueryEngine.run queryContext query
 
 let quoteString (string: string) =
   "\"" + string.Replace("\"", "\"\"") + "\""

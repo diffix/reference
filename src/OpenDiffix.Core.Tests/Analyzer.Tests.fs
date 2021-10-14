@@ -18,7 +18,7 @@ let testTable: Table =
   }
 
 let dataProvider = dummyDataProvider [ testTable ]
-let context = QueryContext.make AnonymizationParams.Default dataProvider
+let queryContext = QueryContext.make AnonymizationParams.Default dataProvider
 
 let defaultQuery =
   {
@@ -32,10 +32,13 @@ let defaultQuery =
   }
 
 let testParsedQuery queryString expected =
-  queryString |> Parser.parse |> Analyzer.analyze context |> should equal expected
+  queryString
+  |> Parser.parse
+  |> Analyzer.analyze queryContext
+  |> should equal expected
 
 let testQueryError queryString =
-  (fun () -> queryString |> Parser.parse |> Analyzer.analyze context |> ignore)
+  (fun () -> queryString |> Parser.parse |> Analyzer.analyze queryContext |> ignore)
   |> shouldFail
 
 [<Fact>]
@@ -277,14 +280,19 @@ type Tests(db: DBFixture) =
       NoiseSD = 0.
     }
 
-  let context = QueryContext.make anonParams db.DataProvider
+  let queryContext = QueryContext.make anonParams db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
-    let query, _ = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
+    let query, _ =
+      query
+      |> Parser.parse
+      |> Analyzer.analyze queryContext
+      |> Analyzer.anonymize queryContext
+
     query
 
   let ensureQueryFails query error =
@@ -296,7 +304,13 @@ type Tests(db: DBFixture) =
 
   let assertSqlSeed query (seedMaterial: string) =
     let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
-    let _query, executionContext = query |> Parser.parse |> Analyzer.analyze context |> Analyzer.anonymize context
+
+    let _query, executionContext =
+      query
+      |> Parser.parse
+      |> Analyzer.analyze queryContext
+      |> Analyzer.anonymize queryContext
+
     executionContext.NoiseLayers.BucketSeed |> should equal expectedSeed
 
   [<Fact>]
