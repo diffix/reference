@@ -27,9 +27,8 @@ type Tests(db: DBFixture) =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
   let executionContext =
-    { ExecutionContext.Default with
-        QueryContext = { QueryContext.Default with DataProvider = db.DataProvider }
-    }
+    QueryContext.makeWithDataProvider db.DataProvider
+    |> ExecutionContext.fromQueryContext
 
   let execute plan =
     plan |> Executor.execute executionContext |> Seq.toList
