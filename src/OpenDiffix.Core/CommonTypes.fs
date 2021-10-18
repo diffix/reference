@@ -3,6 +3,8 @@
 module rec OpenDiffix.Core.CommonTypes
 
 open System
+open System.Diagnostics
+open System.Runtime.CompilerServices
 
 // ----------------------------------------------------------------
 // Values
@@ -161,7 +163,12 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
-type QueryContext = { AnonymizationParams: AnonymizationParams; DataProvider: IDataProvider }
+type QueryContext =
+  {
+    AnonymizationParams: AnonymizationParams
+    DataProvider: IDataProvider
+    Metadata: QueryMetadata
+  }
 
 type NoiseLayers =
   {
@@ -176,6 +183,7 @@ type ExecutionContext =
   }
   member this.AnonymizationParams = this.QueryContext.AnonymizationParams
   member this.DataProvider = this.QueryContext.DataProvider
+  member this.Metadata = this.QueryContext.Metadata
 
 // ----------------------------------------------------------------
 // Constants
@@ -276,7 +284,11 @@ module QueryContext =
     }
 
   let make anonParams dataProvider =
-    { AnonymizationParams = anonParams; DataProvider = dataProvider }
+    {
+      AnonymizationParams = anonParams
+      DataProvider = dataProvider
+      Metadata = QueryMetadata()
+    }
 
   let makeDefault () =
     make AnonymizationParams.Default defaultDataProvider
@@ -292,3 +304,106 @@ module ExecutionContext =
 
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())
+
+// ----------------------------------------------------------------
+// Logging & Instrumentation
+// ----------------------------------------------------------------
+
+// Events are relative to init time, expressed in ticks (unit of 100ns).
+type Ticks = int64
+
+type LogLevel =
+  | DebugLevel
+  | InfoLevel
+  | WarningLevel
+  | ErrorLevel
+
+type LogMessage = { Timestamp: Ticks; Level: LogLevel; Message: string }
+
+module Ticks =
+  let private ticksPerMillisecond = float TimeSpan.TicksPerMillisecond
+
+  let toTimestamp (t: Ticks) = TimeSpan.FromTicks(t).ToString("c")
+
+  let toDuration (t: Ticks) =
+    let ms = (float t / ticksPerMillisecond)
+
+    if ms >= 1000.0 then
+      (ms / 1000.0).ToString("N3") + "s"
+    else
+      ms.ToString("N3") + "ms"
+
+module LogMessage =
+  let private levelToString =
+    function
+    | DebugLevel -> "[DBG]"
+    | InfoLevel -> "[INF]"
+    | WarningLevel -> "[WRN]"
+    | ErrorLevel -> "[ERR]"
+
+  let toString (message: LogMessage) : string =
+    $"{Ticks.toTimestamp message.Timestamp} {levelToString message.Level} {message.Message}"
+
+type QueryMetadata() =
+  let globalTimer = Stopwatch.StartNew()
+  let logs = Collections.Generic.List<LogMessage>()
+  let measurements = Collections.Generic.Dictionary<string, Ticks>()
+  let counters = Collections.Generic.Dictionary<string, int>()
+
+  let makeMessage level message =
+    { Timestamp = globalTimer.Elapsed.Ticks; Level = level; Message = message }
+
+  let required opt =
+    opt |> Option.defaultWith (fun () -> failwith "Event name required.")
+
+  [<Conditional("DEBUG")>]
+  member this.LogDebug(message: string) : unit =
+    logs.Add(makeMessage DebugLevel message)
+
+  member this.Log(message: string) : unit = logs.Add(makeMessage InfoLevel message)
+
+  member this.LogWarning(message: string) : unit =
+    logs.Add(makeMessage WarningLevel message)
+
+  member this.LogError(message: string) : unit =
+    logs.Add(makeMessage ErrorLevel message)
+
+  member this.MeasureScope([<CallerMemberName>] ?event: string) : IDisposable =
+    let event = required event
+    let stopwatch = Stopwatch.StartNew()
+
+    { new IDisposable with
+        member _.Dispose() =
+          let total = stopwatch.Elapsed.Ticks + (Dictionary.getOrDefault event 0L measurements)
+          stopwatch.Reset()
+          measurements.[event] <- total
+    }
+
+  [<Conditional("DEBUG")>]
+  member this.CountDebug([<CallerMemberName>] ?event: string) : unit = this.Count(required event)
+
+  member this.Count([<CallerMemberName>] ?event: string) : unit =
+    let event = required event
+    let currentCount = Dictionary.getOrDefault event 0 counters
+    counters.[event] <- currentCount + 1
+
+  override this.ToString() =
+    let builder = Text.StringBuilder()
+
+    let addSection (section: string) =
+      builder.AppendLine($"<{section}>") |> ignore
+
+    if measurements.Count > 0 || counters.Count > 0 then
+      addSection "Profiles"
+
+      measurements
+      |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {Ticks.toDuration pair.Value}") |> ignore)
+
+      counters
+      |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {pair.Value}") |> ignore)
+
+    if logs.Count > 0 then
+      addSection "Logs"
+      logs |> Seq.iter (LogMessage.toString >> builder.AppendLine >> ignore)
+
+    builder.ToString()

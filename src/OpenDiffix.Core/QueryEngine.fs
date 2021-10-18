@@ -6,7 +6,7 @@ let rec private extractColumns query =
   query.TargetList
   |> List.filter TargetEntry.isRegular
   |> List.map (fun column -> //
-    { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
+    { Name = column.Alias; Type = Expression.typeOf column.Expression }
   )
 
 // ----------------------------------------------------------------
@@ -16,13 +16,20 @@ let rec private extractColumns query =
 type QueryResult = { Columns: Column list; Rows: Row list }
 
 let run queryContext statement : QueryResult =
-  let query, executionContext =
-    statement
-    |> Parser.parse
-    |> Analyzer.analyze queryContext
-    |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+  use _measurer = queryContext.Metadata.MeasureScope()
 
-  let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
-  let columns = extractColumns query
-  { Columns = columns; Rows = rows }
+  try
+    let query, executionContext =
+      statement
+      |> Parser.parse
+      |> Analyzer.analyze queryContext
+      |> Normalizer.normalize
+      |> Analyzer.anonymize queryContext
+
+    let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
+    let columns = extractColumns query
+    { Columns = columns; Rows = rows }
+  with
+  | e ->
+    queryContext.Metadata.LogError(e.ToString())
+    reraise ()
