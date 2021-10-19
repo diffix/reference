@@ -18,18 +18,13 @@ type QueryResult = { Columns: Column list; Rows: Row list }
 let run queryContext statement : QueryResult =
   use _measurer = queryContext.Metadata.MeasureScope()
 
-  try
-    let query, executionContext =
-      statement
-      |> Parser.parse
-      |> Analyzer.analyze queryContext
-      |> Normalizer.normalize
-      |> Analyzer.anonymize queryContext
+  let query, executionContext =
+    statement
+    |> Parser.parse
+    |> Analyzer.analyze queryContext
+    |> Normalizer.normalize
+    |> Analyzer.anonymize queryContext
 
-    let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
-    let columns = extractColumns query
-    { Columns = columns; Rows = rows }
-  with
-  | e ->
-    queryContext.Metadata.LogError(e.ToString())
-    reraise ()
+  let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
+  let columns = extractColumns query
+  { Columns = columns; Rows = rows }

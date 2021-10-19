@@ -319,7 +319,6 @@ type LogLevel =
   | DebugLevel
   | InfoLevel
   | WarningLevel
-  | ErrorLevel
 
 type LogMessage = { Timestamp: Ticks; Level: LogLevel; Message: string }
 
@@ -342,7 +341,6 @@ module LogMessage =
     | DebugLevel -> "[DBG]"
     | InfoLevel -> "[INF]"
     | WarningLevel -> "[WRN]"
-    | ErrorLevel -> "[ERR]"
 
   let toString (message: LogMessage) : string =
     $"{Ticks.toTimestamp message.Timestamp} {levelToString message.Level} {message.Message}"
@@ -367,8 +365,6 @@ type QueryMetadata(logger: LoggerCallback) =
 
   member this.LogWarning(message: string) : unit =
     logger (makeMessage WarningLevel message)
-
-  member this.LogError(message: string) : unit = logger (makeMessage ErrorLevel message)
 
   member this.MeasureScope([<CallerMemberName>] ?event: string) : IDisposable =
     let event = required event
