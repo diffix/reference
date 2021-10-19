@@ -26,20 +26,16 @@ let companyColumn = ColumnReference(2, StringType)
 let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
 let executionContext =
-  { ExecutionContext.Default with
-      QueryContext =
-        { QueryContext.Default with
-            AnonymizationParams =
-              {
-                TableSettings = Map.empty
-                Salt = [||]
-                Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
-                OutlierCount = { Lower = 1; Upper = 1 }
-                TopCount = { Lower = 1; Upper = 1 }
-                NoiseSD = 0.
-              }
-        }
-  }
+  (QueryContext.makeWithAnonParams
+    {
+      TableSettings = Map.empty
+      Salt = [||]
+      Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
+      OutlierCount = { Lower = 1; Upper = 1 }
+      TopCount = { Lower = 1; Upper = 1 }
+      NoiseSD = 0.
+    })
+  |> ExecutionContext.fromQueryContext
 
 let anonymizedAggregationContext =
   let threshold = { Lower = 2; Upper = 2 }
@@ -50,9 +46,7 @@ let anonymizedAggregationContext =
         TopCount = threshold
     }
 
-  { ExecutionContext.Default with
-      QueryContext = { QueryContext.Default with AnonymizationParams = anonParams }
-  }
+  QueryContext.makeWithAnonParams anonParams |> ExecutionContext.fromQueryContext
 
 let evaluateAggregator fn args =
   evaluateAggregator executionContext fn args

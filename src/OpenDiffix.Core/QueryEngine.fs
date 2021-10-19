@@ -6,7 +6,7 @@ let rec private extractColumns query =
   query.TargetList
   |> List.filter TargetEntry.isRegular
   |> List.map (fun column -> //
-    { Name = column.Alias; Type = Expression.typeOf (column.Expression) }
+    { Name = column.Alias; Type = Expression.typeOf column.Expression }
   )
 
 // ----------------------------------------------------------------
@@ -16,6 +16,8 @@ let rec private extractColumns query =
 type QueryResult = { Columns: Column list; Rows: Row list }
 
 let run queryContext statement : QueryResult =
+  use _measurer = queryContext.Metadata.MeasureScope()
+
   let query, executionContext =
     statement
     |> Parser.parse

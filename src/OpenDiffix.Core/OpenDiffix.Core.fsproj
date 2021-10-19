@@ -3,8 +3,8 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="CommonTypes.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="CommonTypes.fs" />
     <Compile Include="Value.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="Anonymizer.fs" />
