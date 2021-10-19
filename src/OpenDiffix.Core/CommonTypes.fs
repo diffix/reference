@@ -287,7 +287,7 @@ module QueryContext =
     {
       AnonymizationParams = anonParams
       DataProvider = dataProvider
-      Metadata = QueryMetadata()
+      Metadata = QueryMetadata(fun _msg -> ())
     }
 
   let makeDefault () =
@@ -297,6 +297,9 @@ module QueryContext =
 
   let makeWithDataProvider dataProvider =
     make AnonymizationParams.Default dataProvider
+
+  let withLogger logger queryContext =
+    { queryContext with Metadata = QueryMetadata(logger) }
 
 module ExecutionContext =
   let fromQueryContext queryContext =
@@ -344,9 +347,10 @@ module LogMessage =
   let toString (message: LogMessage) : string =
     $"{Ticks.toTimestamp message.Timestamp} {levelToString message.Level} {message.Message}"
 
-type QueryMetadata() =
+type LoggerCallback = LogMessage -> unit
+
+type QueryMetadata(logger: LoggerCallback) =
   let globalTimer = Stopwatch.StartNew()
-  let logs = Collections.Generic.List<LogMessage>()
   let measurements = Collections.Generic.Dictionary<string, Ticks>()
   let counters = Collections.Generic.Dictionary<string, int>()
 
@@ -357,16 +361,14 @@ type QueryMetadata() =
     opt |> Option.defaultWith (fun () -> failwith "Event name required.")
 
   [<Conditional("DEBUG")>]
-  member this.LogDebug(message: string) : unit =
-    logs.Add(makeMessage DebugLevel message)
+  member this.LogDebug(message: string) : unit = logger (makeMessage DebugLevel message)
 
-  member this.Log(message: string) : unit = logs.Add(makeMessage InfoLevel message)
+  member this.Log(message: string) : unit = logger (makeMessage InfoLevel message)
 
   member this.LogWarning(message: string) : unit =
-    logs.Add(makeMessage WarningLevel message)
+    logger (makeMessage WarningLevel message)
 
-  member this.LogError(message: string) : unit =
-    logs.Add(makeMessage ErrorLevel message)
+  member this.LogError(message: string) : unit = logger (makeMessage ErrorLevel message)
 
   member this.MeasureScope([<CallerMemberName>] ?event: string) : IDisposable =
     let event = required event
@@ -390,20 +392,13 @@ type QueryMetadata() =
   override this.ToString() =
     let builder = Text.StringBuilder()
 
-    let addSection (section: string) =
-      builder.AppendLine($"<{section}>") |> ignore
-
     if measurements.Count > 0 || counters.Count > 0 then
-      addSection "Profiles"
+      builder.AppendLine("<Metadata>") |> ignore
 
       measurements
       |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {Ticks.toDuration pair.Value}") |> ignore)
 
       counters
       |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {pair.Value}") |> ignore)
-
-    if logs.Count > 0 then
-      addSection "Logs"
-      logs |> Seq.iter (LogMessage.toString >> builder.AppendLine >> ignore)
 
     builder.ToString()
