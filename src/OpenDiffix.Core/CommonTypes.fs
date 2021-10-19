@@ -355,9 +355,6 @@ type QueryMetadata(logger: LoggerCallback) =
   let makeMessage level message =
     { Timestamp = globalTimer.Elapsed.Ticks; Level = level; Message = message }
 
-  let required opt =
-    opt |> Option.defaultWith (fun () -> failwith "Event name required.")
-
   [<Conditional("DEBUG")>]
   member this.LogDebug(message: string) : unit = logger (makeMessage DebugLevel message)
 
@@ -367,7 +364,7 @@ type QueryMetadata(logger: LoggerCallback) =
     logger (makeMessage WarningLevel message)
 
   member this.MeasureScope([<CallerMemberName>] ?event: string) : IDisposable =
-    let event = required event
+    let event = event.Value
     let stopwatch = Stopwatch.StartNew()
 
     { new IDisposable with
@@ -378,10 +375,10 @@ type QueryMetadata(logger: LoggerCallback) =
     }
 
   [<Conditional("DEBUG")>]
-  member this.CountDebug([<CallerMemberName>] ?event: string) : unit = this.Count(required event)
+  member this.CountDebug([<CallerMemberName>] ?event: string) : unit = this.Count(event.Value)
 
   member this.Count([<CallerMemberName>] ?event: string) : unit =
-    let event = required event
+    let event = event.Value
     let currentCount = Dictionary.getOrDefault event 0 counters
     counters.[event] <- currentCount + 1
 
