@@ -84,10 +84,14 @@ type DataProvider(dbPath: string) =
       )
 
     member this.OpenTable(table, columnIndices) =
+
       let columns =
-        columnIndices
-        |> List.map (fun index -> $"\"%s{table.Columns.[index].Name}\"")
-        |> String.join ", "
+        if columnIndices.IsEmpty then
+          "1"
+        else
+          columnIndices
+          |> List.map (fun index -> $"\"%s{table.Columns.[index].Name}\"")
+          |> String.join ", "
 
       let loadQuery = $"SELECT {columns} FROM {table.Name}"
 
