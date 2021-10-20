@@ -1,5 +1,7 @@
 module rec OpenDiffix.Core.Expression
 
+open System.Globalization
+
 // ----------------------------------------------------------------
 // Type resolution
 // ----------------------------------------------------------------
@@ -88,7 +90,7 @@ let widthBucket v b t c =
 
   ((v - b) / step) |> floor |> int64 |> max -1L |> min c |> (+) 1L
 
-let private doubleStyle = System.Globalization.NumberFormatInfo.InvariantInfo
+let private doubleStyle = NumberFormatInfo.InvariantInfo
 
 /// Evaluates the result of a scalar function invocation.
 let rec evaluateScalarFunction fn args =
@@ -174,8 +176,14 @@ let rec evaluateScalarFunction fn args =
     else s.Substring(start - 1, min (s.Length - start + 1) length) |> String
   | Concat, [ String s1; String s2 ] -> String(s1 + s2)
 
-  | Cast, [ String s; String "integer" ] -> if s = "" then Null else s |> System.Int64.Parse |> Integer
-  | Cast, [ String s; String "real" ] -> if s = "" then Null else System.Double.Parse(s, doubleStyle) |> Real
+  | Cast, [ String s; String "integer" ] ->
+    match System.Int64.TryParse(s) with
+    | true, i -> Integer i
+    | false, _ -> Null
+  | Cast, [ String s; String "real" ] ->
+    match System.Double.TryParse(s, NumberStyles.Float ||| NumberStyles.AllowThousands, doubleStyle) with
+    | true, r -> Real r
+    | false, _ -> Null
   | Cast, [ String s; String "boolean" ] ->
     match s.ToLower() with
     | "true"
