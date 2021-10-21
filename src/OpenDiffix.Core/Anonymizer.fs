@@ -99,7 +99,7 @@ type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float
 let inline private aidFlattening
   (executionContext: ExecutionContext)
   (unaccountedFor: int64)
-  (aidContributions: (AidHash * ^Contribution) list)
+  (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
   let anonParams = executionContext.AnonymizationParams
 
@@ -109,11 +109,11 @@ let inline private aidFlattening
     let outlierInterval, topInterval =
       compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount aidContributions.Length
 
-    let sortedAidContributions = aidContributions |> List.sortByDescending snd
+    let sortedAidContributions = aidContributions |> Array.sortByDescending snd
 
     let flatSeed =
       sortedAidContributions
-      |> List.take (outlierInterval.Upper + topInterval.Upper)
+      |> Seq.take (outlierInterval.Upper + topInterval.Upper)
       |> Seq.map fst
       |> seedFromAidSet
       |> cryptoHashSaltedSeed anonParams.Salt
@@ -121,18 +121,18 @@ let inline private aidFlattening
     let outlierCount = flatSeed |> mixSeed "outlier" |> randomUniform outlierInterval
     let topCount = flatSeed |> mixSeed "top" |> randomUniform topInterval
 
-    let outliersSummed = sortedAidContributions |> List.take outlierCount |> List.sumBy snd
+    let outliersSummed = sortedAidContributions |> Seq.take outlierCount |> Seq.sumBy snd
 
     let topGroupValuesSummed =
       sortedAidContributions
-      |> List.skip outlierCount
-      |> List.take topCount
-      |> List.sumBy snd
+      |> Seq.skip outlierCount
+      |> Seq.take topCount
+      |> Seq.sumBy snd
 
     let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
     let outlierReplacement = topGroupAverage * (float outlierCount)
 
-    let summedContributions = aidContributions |> List.sumBy snd
+    let summedContributions = aidContributions |> Array.sumBy snd
     let flattening = float outliersSummed - outlierReplacement
     let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
@@ -171,15 +171,35 @@ let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash
 
   result
 
-let rec private distributeValues valuesByAID =
-  match valuesByAID with
-  | [] -> [] // Done :D
-  | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
-  | (aid, value :: restValues) :: restValuesByAID ->
-    let restValuesByAID = // Drop current value from the remaining items.
-      List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
+let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<AidHash * Value> =
+  let usedValues = HashSet<Value>()
 
-    (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
+  let rec pickUnusedValue (values: Stack<Value>) =
+    match values.TryPop() with
+    | true, value -> if usedValues.Contains(value) then pickUnusedValue values else ValueSome value
+    | false, _ -> ValueNone
+
+  let result = List<AidHash * Value>()
+
+  let mutable remainingItems =
+    valuesByAID
+    |> Seq.filter (fun (_aid, values) -> values.Length > 0)
+    |> Seq.map (fun (aid, values) -> aid, Stack<Value>(values))
+    |> Seq.toArray
+
+  while remainingItems.Length > 0 do
+    remainingItems <-
+      remainingItems
+      |> Array.filter (fun (aid, values) ->
+        match pickUnusedValue values with
+        | ValueSome value ->
+          result.Add((aid, value))
+          usedValues.Add(value) |> ignore
+          values.Count > 0
+        | ValueNone -> false
+      )
+
+  result :> seq<AidHash * Value>
 
 let private countDistinctFlatteningByAid
   (executionContext: ExecutionContext)
@@ -187,12 +207,12 @@ let private countDistinctFlatteningByAid
   =
   perAidContributions
   // keep low count values in sorted order to ensure the algorithm is deterministic
-  |> Seq.map (fun pair -> pair.Key, pair.Value |> Seq.toList)
+  |> Seq.map (fun pair -> pair.Key, pair.Value |> Seq.toArray)
   |> Seq.sortBy (fun (aid, values) -> values.Length, aid)
-  |> Seq.toList
   |> distributeValues
-  |> List.countBy fst
-  |> List.map (fun (aid, count) -> aid, int64 count)
+  |> Seq.countBy fst
+  |> Seq.map (fun (aid, count) -> aid, int64 count)
+  |> Seq.toArray
   |> aidFlattening executionContext 0L
 
 let private anonymizedSum (byAidSum: AidCount seq) =
@@ -230,8 +250,8 @@ let countDistinct
   // without any additional noise.
   let lowCountValues, highCountValues =
     aidsPerValue
-    |> Seq.toList
-    |> List.partition (fun pair -> isLowCount executionContext pair.Value)
+    |> Seq.toArray
+    |> Array.partition (fun pair -> isLowCount executionContext pair.Value)
 
   let byAid =
     [ 0 .. aidsCount - 1 ]
@@ -262,7 +282,7 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
     |> Array.map (fun aidState ->
       aidState.AidContributions
       |> Seq.map (fun pair -> pair.Key, pair.Value)
-      |> Seq.toList
+      |> Seq.toArray
       |> aidFlattening executionContext aidState.UnaccountedFor
     )
 
