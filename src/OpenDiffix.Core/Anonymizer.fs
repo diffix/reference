@@ -183,9 +183,9 @@ let rec private distributeValuesAcc valuesByAID valuesByAID2 acc (usedSet: Set<V
     if (Set.contains value usedSet) then
       distributeValuesAcc ((aid, restValues) :: restValuesByAID) valuesByAID2 acc usedSet
     else
-      let new_acc = (aid, value) :: acc
-      // distributeValuesAcc (restValuesByAID @ [ aid, restValues ]) new_acc
-      distributeValuesAcc restValuesByAID ((aid, restValues) :: valuesByAID2) new_acc (usedSet.Add value)
+      let newAcc = (aid, value) :: acc
+      let newUsedSet = usedSet.Add value
+      distributeValuesAcc restValuesByAID ((aid, restValues) :: valuesByAID2) newAcc newUsedSet
 
 let rec private distributeValues valuesByAID =
   distributeValuesAcc valuesByAID [] [] (Set.empty)
