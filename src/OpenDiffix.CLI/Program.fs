@@ -1,4 +1,6 @@
-﻿open System
+﻿module OpenDiffix.CLI.Program
+
+open System
 open System.IO
 open Argu
 open OpenDiffix.CLI
