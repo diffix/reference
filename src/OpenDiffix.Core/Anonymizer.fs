@@ -172,20 +172,23 @@ let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash
   result
 
 
-let rec private distributeValuesAcc valuesByAID acc =
+let rec private distributeValuesAcc valuesByAID valuesByAID2 acc (usedSet: Set<Value>) =
   match valuesByAID with
-  | [] -> acc // Done :D
-  | (_aid, []) :: restValuesByAID -> distributeValuesAcc restValuesByAID acc
+  | [] ->
+    match valuesByAID2 with
+    | [] -> acc // Done :D
+    | newValuesByAID -> distributeValuesAcc (List.rev newValuesByAID) [] acc usedSet
+  | (_aid, []) :: restValuesByAID -> distributeValuesAcc restValuesByAID valuesByAID2 acc usedSet
   | (aid, value :: restValues) :: restValuesByAID ->
-    let restValuesByAID = // Drop current value from the remaining items.
-      List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
+    if (Set.contains value usedSet) then
+      distributeValuesAcc ((aid, restValues) :: restValuesByAID) valuesByAID2 acc usedSet
+    else
+      let new_acc = (aid, value) :: acc
+      // distributeValuesAcc (restValuesByAID @ [ aid, restValues ]) new_acc
+      distributeValuesAcc restValuesByAID ((aid, restValues) :: valuesByAID2) new_acc (usedSet.Add value)
 
-    let new_acc = (aid, value) :: acc
-    // distributeValuesAcc (restValuesByAID @ [ aid, restValues ]) new_acc
-    distributeValuesAcc ((aid, restValues) :: restValuesByAID) new_acc
-
-
-let rec private distributeValues valuesByAID = distributeValuesAcc valuesByAID []
+let rec private distributeValues valuesByAID =
+  distributeValuesAcc valuesByAID [] [] (Set.empty)
 
 let private countDistinctFlatteningByAid
   (executionContext: ExecutionContext)
