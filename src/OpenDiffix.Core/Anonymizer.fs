@@ -171,15 +171,21 @@ let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash
 
   result
 
-let rec private distributeValues valuesByAID =
+
+let rec private distributeValuesAcc valuesByAID acc =
   match valuesByAID with
-  | [] -> [] // Done :D
-  | (_aid, []) :: restValuesByAID -> distributeValues restValuesByAID
+  | [] -> acc // Done :D
+  | (_aid, []) :: restValuesByAID -> distributeValuesAcc restValuesByAID acc
   | (aid, value :: restValues) :: restValuesByAID ->
     let restValuesByAID = // Drop current value from the remaining items.
       List.map (fun (aid, values) -> aid, values |> List.filter ((<>) value)) restValuesByAID
 
-    (aid, value) :: distributeValues (restValuesByAID @ [ aid, restValues ])
+    let new_acc = (aid, value) :: acc
+    // distributeValuesAcc (restValuesByAID @ [ aid, restValues ]) new_acc
+    distributeValuesAcc ((aid, restValues) :: restValuesByAID) new_acc
+
+
+let rec private distributeValues valuesByAID = distributeValuesAcc valuesByAID []
 
 let private countDistinctFlatteningByAid
   (executionContext: ExecutionContext)
