@@ -176,8 +176,8 @@ let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<Ai
 
   let rec pickUnusedValue (values: Stack<Value>) =
     match values.TryPop() with
-    | true, value -> if usedValues.Contains(value) then pickUnusedValue values else Some value
-    | false, _ -> None
+    | true, value -> if usedValues.Contains(value) then pickUnusedValue values else ValueSome value
+    | false, _ -> ValueNone
 
   let result = List<AidHash * Value>()
 
@@ -192,11 +192,11 @@ let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<Ai
       remainingItems
       |> Array.filter (fun (aid, values) ->
         match pickUnusedValue values with
-        | Some value ->
+        | ValueSome value ->
           result.Add((aid, value))
           usedValues.Add(value) |> ignore
           values.Count > 0
-        | None -> false
+        | ValueNone -> false
       )
 
   result :> seq<AidHash * Value>
