@@ -29,8 +29,6 @@ type QueryRange =
   | Join of Join
   | RangeTable of RangeTable
 
-type JoinType = ParserTypes.JoinType
-
 type Join = { Type: JoinType; Left: QueryRange; Right: QueryRange; On: Expression }
 
 type RangeTable = Table * string

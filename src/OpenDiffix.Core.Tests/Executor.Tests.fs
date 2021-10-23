@@ -4,7 +4,6 @@ open Xunit
 open FsUnit.Xunit
 
 open CommonTypes
-open PlannerTypes
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema()

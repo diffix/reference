@@ -4,7 +4,6 @@ open Xunit
 open FsUnit.Xunit
 
 open AnalyzerTypes
-open PlannerTypes
 
 let constTrue = Constant(Boolean true)
 

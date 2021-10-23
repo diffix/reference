@@ -1,7 +1,6 @@
 module rec OpenDiffix.Core.Executor
 
 open System
-open PlannerTypes
 
 let private filter condition rows =
   rows
@@ -96,10 +95,10 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =
     match joinType with
-    | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
-    | ParserTypes.LeftJoin -> true, leftPlan, rightPlan, Array.append
-    | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
-    | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+    | InnerJoin -> false, leftPlan, rightPlan, Array.append
+    | LeftJoin -> true, leftPlan, rightPlan, Array.append
+    | RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
+    | FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
   let innerRows = innerPlan |> execute executionContext |> Seq.toList
   let innerColumnsCount = Plan.columnsCount innerPlan
