@@ -134,4 +134,26 @@ type Tests(db: DBFixture) =
 
     plan |> execute |> List.take 4 |> should equal expected
 
+  [<Fact>]
+  let ``executor hook`` () =
+    let row value = [| Integer value |]
+
+    let customExecutor executionContext plan =
+      match plan with
+      | Plan.Scan _ -> [ row 10L; row 11L; row 12L ] :> seq<Row>
+      | plan -> Executor.executePlanNode executionContext plan
+
+    let isEven =
+      Expression.makeEquals
+        (Expression.makeFunction Modulo [ ColumnReference(0, IntegerType); Constant(Integer 2L) ])
+        (Constant(Integer 0L))
+
+    let plan = Plan.Filter(Plan.Scan(products, [ 1 ]), isEven)
+    let customExecutionContext = { executionContext with ExecutorHook = Some customExecutor }
+
+    plan
+    |> Executor.execute customExecutionContext
+    |> Seq.toList
+    |> should equal [ row 10L; row 12L ]
+
   interface IClassFixture<DBFixture>
