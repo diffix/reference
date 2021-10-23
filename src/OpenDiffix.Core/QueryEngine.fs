@@ -22,8 +22,6 @@ type QueryHooks =
 type QueryResult = { Columns: Column list; Rows: Row list }
 
 let run hooks queryContext statement : QueryResult =
-  use _measurer = queryContext.Metadata.MeasureScope()
-
   let query, noiseLayers =
     statement
     |> Parser.parse

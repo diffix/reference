@@ -3,6 +3,7 @@
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Logger.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="CommonTypes.fs" />
     <Compile Include="Value.fs" />
