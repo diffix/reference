@@ -23,7 +23,7 @@ type Tests(db: DBFixture) =
 
   let runQueryWithCustomAnonParams anonymizationParams query =
     let queryContext = QueryContext.make anonymizationParams db.DataProvider
-    run queryContext query
+    run QueryHooks.Default queryContext query
 
   let runQuery = runQueryWithCustomAnonParams anonParams
 
@@ -138,6 +138,7 @@ type Tests(db: DBFixture) =
       }
 
     runQuery "SELECT p.name AS n FROM products AS p WHERE id = 1"
+    |> should equal expected
 
   let equivalentQueries expectedQuery testQuery =
     let testResult = runQuery testQuery

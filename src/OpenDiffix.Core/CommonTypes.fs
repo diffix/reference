@@ -163,31 +163,22 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
-type QueryContext =
-  {
-    AnonymizationParams: AnonymizationParams
-    DataProvider: IDataProvider
-    Metadata: QueryMetadata
-  }
-
 type NoiseLayers =
   {
     BucketSeed: Hash
   }
   static member Default = { BucketSeed = 0UL }
 
-type ExecutionContext =
-  {
-    QueryContext: QueryContext
-    NoiseLayers: NoiseLayers
-  }
-  member this.AnonymizationParams = this.QueryContext.AnonymizationParams
-  member this.DataProvider = this.QueryContext.DataProvider
-  member this.Metadata = this.QueryContext.Metadata
-
 // ----------------------------------------------------------------
 // Query plan
 // ----------------------------------------------------------------
+
+type QueryContext =
+  {
+    AnonymizationParams: AnonymizationParams
+    DataProvider: IDataProvider
+    Metadata: QueryMetadata
+  }
 
 type JoinType =
   | InnerJoin
@@ -207,6 +198,22 @@ type Plan =
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
   | Limit of Plan * amount: uint
+
+// ----------------------------------------------------------------
+// Query execution
+// ----------------------------------------------------------------
+
+type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
+
+type ExecutionContext =
+  {
+    QueryContext: QueryContext
+    NoiseLayers: NoiseLayers
+    ExecutorHook: ExecutorHook option
+  }
+  member this.AnonymizationParams = this.QueryContext.AnonymizationParams
+  member this.DataProvider = this.QueryContext.DataProvider
+  member this.Metadata = this.QueryContext.Metadata
 
 // ----------------------------------------------------------------
 // Constants
@@ -326,7 +333,11 @@ module QueryContext =
 
 module ExecutionContext =
   let fromQueryContext queryContext =
-    { QueryContext = queryContext; NoiseLayers = NoiseLayers.Default }
+    {
+      QueryContext = queryContext
+      NoiseLayers = NoiseLayers.Default
+      ExecutorHook = None
+    }
 
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())

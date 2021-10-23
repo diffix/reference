@@ -13,17 +13,30 @@ let rec private extractColumns query =
 // Public API
 // ----------------------------------------------------------------
 
+type QueryHooks =
+  {
+    ExecutorHook: ExecutorHook option
+  }
+  static member Default = { ExecutorHook = None }
+
 type QueryResult = { Columns: Column list; Rows: Row list }
 
-let run queryContext statement : QueryResult =
+let run hooks queryContext statement : QueryResult =
   use _measurer = queryContext.Metadata.MeasureScope()
 
-  let query, executionContext =
+  let query, noiseLayers =
     statement
     |> Parser.parse
     |> Analyzer.analyze queryContext
     |> Normalizer.normalize
     |> Analyzer.anonymize queryContext
+
+  let executionContext =
+    {
+      QueryContext = queryContext
+      NoiseLayers = noiseLayers
+      ExecutorHook = hooks.ExecutorHook
+    }
 
   let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
   let columns = extractColumns query
