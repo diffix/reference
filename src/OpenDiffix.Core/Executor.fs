@@ -1,7 +1,6 @@
 module rec OpenDiffix.Core.Executor
 
 open System
-open PlannerTypes
 
 let private filter condition rows =
   rows
@@ -96,10 +95,10 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =
     match joinType with
-    | ParserTypes.InnerJoin -> false, leftPlan, rightPlan, Array.append
-    | ParserTypes.LeftJoin -> true, leftPlan, rightPlan, Array.append
-    | ParserTypes.RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
-    | ParserTypes.FullJoin -> failwith "`FULL JOIN` execution not implemented"
+    | InnerJoin -> false, leftPlan, rightPlan, Array.append
+    | LeftJoin -> true, leftPlan, rightPlan, Array.append
+    | RightJoin -> true, rightPlan, leftPlan, (fun a b -> Array.append b a)
+    | FullJoin -> failwith "`FULL JOIN` execution not implemented"
 
   let innerRows = innerPlan |> execute executionContext |> Seq.toList
   let innerColumnsCount = Plan.columnsCount innerPlan
@@ -120,7 +119,8 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-let rec execute executionContext plan : seq<Row> =
+/// Runs the default execution logic for a plan node.
+let executePlanNode executionContext plan : seq<Row> =
   match plan with
   | Plan.Scan (table, columnIndices) -> executeScan executionContext table columnIndices
   | Plan.Project (plan, expressions) -> executeProject executionContext (plan, expressions)
@@ -131,3 +131,8 @@ let rec execute executionContext plan : seq<Row> =
   | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin executionContext (leftPlan, rightPlan, joinType, on)
   | Plan.Limit (plan, amount) -> executeLimit executionContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"
+
+let execute executionContext plan : seq<Row> =
+  match executionContext.QueryContext.ExecutorHook with
+  | Some executorHook -> executorHook executionContext plan
+  | None -> executePlanNode executionContext plan

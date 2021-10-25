@@ -240,6 +240,9 @@ let sortRows orderings (rows: Row seq) =
 // Factory functions
 // ----------------------------------------------------------------
 
+let makeFunction functionType args =
+  FunctionExpr(ScalarFunction(functionType), args)
+
 let makeSetFunction setFunctionType args =
   FunctionExpr(SetFunction(setFunctionType), args)
 
@@ -251,6 +254,9 @@ let makeAnd left right =
 
 let makeNot expr =
   FunctionExpr(ScalarFunction Not, [ expr ])
+
+let makeEquals left right =
+  FunctionExpr(ScalarFunction Equals, [ left; right ])
 
 // ----------------------------------------------------------------
 // Misc

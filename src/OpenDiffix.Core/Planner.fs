@@ -1,7 +1,6 @@
 module rec OpenDiffix.Core.Planner
 
 open AnalyzerTypes
-open PlannerTypes
 open NodeUtils
 
 // ----------------------------------------------------------------

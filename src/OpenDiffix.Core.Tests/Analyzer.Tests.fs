@@ -305,13 +305,13 @@ type Tests(db: DBFixture) =
   let assertSqlSeed query (seedMaterial: string) =
     let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
 
-    let _query, executionContext =
+    let _query, noiseLayers =
       query
       |> Parser.parse
       |> Analyzer.analyze queryContext
       |> Analyzer.anonymize queryContext
 
-    executionContext.NoiseLayers.BucketSeed |> should equal expectedSeed
+    noiseLayers.BucketSeed |> should equal expectedSeed
 
   [<Fact>]
   let ``Analyze count transforms`` () =

@@ -4,7 +4,6 @@ open Xunit
 open FsUnit.Xunit
 
 open CommonTypes
-open PlannerTypes
 
 type Tests(db: DBFixture) =
   let schema = db.DataProvider.GetSchema()
@@ -103,7 +102,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), ParserTypes.InnerJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), InnerJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
@@ -114,7 +113,7 @@ type Tests(db: DBFixture) =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
     let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
-    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), ParserTypes.LeftJoin, condition)
+    let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), LeftJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
     let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
@@ -134,5 +133,31 @@ type Tests(db: DBFixture) =
       ]
 
     plan |> execute |> List.take 4 |> should equal expected
+
+  [<Fact>]
+  let ``executor hook`` () =
+    let row value = [| Integer value |]
+
+    let customExecutor executionContext plan =
+      match plan with
+      | Plan.Scan _ -> [ row 10L; row 11L; row 12L ] :> seq<Row>
+      | plan -> Executor.executePlanNode executionContext plan
+
+    let isEven =
+      Expression.makeEquals
+        (Expression.makeFunction Modulo [ ColumnReference(0, IntegerType); Constant(Integer 2L) ])
+        (Constant(Integer 0L))
+
+    let plan = Plan.Filter(Plan.Scan(products, [ 1 ]), isEven)
+
+    let customExecutionContext =
+      { executionContext with
+          QueryContext = { executionContext.QueryContext with ExecutorHook = Some customExecutor }
+      }
+
+    plan
+    |> Executor.execute customExecutionContext
+    |> Seq.toList
+    |> should equal [ row 10L; row 12L ]
 
   interface IClassFixture<DBFixture>

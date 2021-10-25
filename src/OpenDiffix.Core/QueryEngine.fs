@@ -16,14 +16,14 @@ let rec private extractColumns query =
 type QueryResult = { Columns: Column list; Rows: Row list }
 
 let run queryContext statement : QueryResult =
-  use _measurer = queryContext.Metadata.MeasureScope()
-
-  let query, executionContext =
+  let query, noiseLayers =
     statement
     |> Parser.parse
     |> Analyzer.analyze queryContext
     |> Normalizer.normalize
     |> Analyzer.anonymize queryContext
+
+  let executionContext = { QueryContext = queryContext; NoiseLayers = noiseLayers }
 
   let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
   let columns = extractColumns query

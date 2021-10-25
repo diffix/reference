@@ -5,12 +5,6 @@ type Constant =
   | String of string
   | Boolean of bool
 
-type JoinType =
-  | InnerJoin
-  | LeftJoin
-  | RightJoin
-  | FullJoin
-
 type SelectQuery =
   {
     SelectDistinct: bool

@@ -3,8 +3,6 @@
 module rec OpenDiffix.Core.CommonTypes
 
 open System
-open System.Diagnostics
-open System.Runtime.CompilerServices
 
 // ----------------------------------------------------------------
 // Values
@@ -163,12 +161,41 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
+// ----------------------------------------------------------------
+// Query & Planner
+// ----------------------------------------------------------------
+
+type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
+
 type QueryContext =
   {
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
-    Metadata: QueryMetadata
+    ExecutorHook: ExecutorHook option
   }
+
+type JoinType =
+  | InnerJoin
+  | LeftJoin
+  | RightJoin
+  | FullJoin
+
+[<RequireQualifiedAccess>]
+type Plan =
+  | Scan of Table * int list
+  | Project of Plan * expressions: Expression list
+  | ProjectSet of Plan * setGenerator: SetFunction * args: Expression list
+  | Filter of Plan * condition: Expression
+  | Sort of Plan * OrderBy list
+  | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list
+  | Unique of Plan
+  | Join of left: Plan * right: Plan * JoinType * on: Expression
+  | Append of first: Plan * second: Plan
+  | Limit of Plan * amount: uint
+
+// ----------------------------------------------------------------
+// Executor
+// ----------------------------------------------------------------
 
 type NoiseLayers =
   {
@@ -183,7 +210,6 @@ type ExecutionContext =
   }
   member this.AnonymizationParams = this.QueryContext.AnonymizationParams
   member this.DataProvider = this.QueryContext.DataProvider
-  member this.Metadata = this.QueryContext.Metadata
 
 // ----------------------------------------------------------------
 // Constants
@@ -287,7 +313,7 @@ module QueryContext =
     {
       AnonymizationParams = anonParams
       DataProvider = dataProvider
-      Metadata = QueryMetadata(fun _msg -> ())
+      ExecutorHook = None
     }
 
   let makeDefault () =
@@ -298,9 +324,6 @@ module QueryContext =
   let makeWithDataProvider dataProvider =
     make AnonymizationParams.Default dataProvider
 
-  let withLogger logger queryContext =
-    { queryContext with Metadata = QueryMetadata(logger) }
-
 module ExecutionContext =
   let fromQueryContext queryContext =
     { QueryContext = queryContext; NoiseLayers = NoiseLayers.Default }
@@ -308,90 +331,16 @@ module ExecutionContext =
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())
 
-// ----------------------------------------------------------------
-// Logging & Instrumentation
-// ----------------------------------------------------------------
-
-// Events are relative to init time, expressed in ticks (unit of 100ns).
-type Ticks = int64
-
-type LogLevel =
-  | DebugLevel
-  | InfoLevel
-  | WarningLevel
-
-type LogMessage = { Timestamp: Ticks; Level: LogLevel; Message: string }
-
-module Ticks =
-  let private ticksPerMillisecond = float TimeSpan.TicksPerMillisecond
-
-  let toTimestamp (t: Ticks) = TimeSpan.FromTicks(t).ToString("c")
-
-  let toDuration (t: Ticks) =
-    let ms = (float t / ticksPerMillisecond)
-
-    if ms >= 1000.0 then
-      (ms / 1000.0).ToString("N3") + "s"
-    else
-      ms.ToString("N3") + "ms"
-
-module LogMessage =
-  let private levelToString =
-    function
-    | DebugLevel -> "[DBG]"
-    | InfoLevel -> "[INF]"
-    | WarningLevel -> "[WRN]"
-
-  let toString (message: LogMessage) : string =
-    $"{Ticks.toTimestamp message.Timestamp} {levelToString message.Level} {message.Message}"
-
-type LoggerCallback = LogMessage -> unit
-
-type QueryMetadata(logger: LoggerCallback) =
-  let globalTimer = Stopwatch.StartNew()
-  let measurements = Collections.Generic.Dictionary<string, Ticks>()
-  let counters = Collections.Generic.Dictionary<string, int>()
-
-  let makeMessage level message =
-    { Timestamp = globalTimer.Elapsed.Ticks; Level = level; Message = message }
-
-  [<Conditional("DEBUG")>]
-  member this.LogDebug(message: string) : unit = logger (makeMessage DebugLevel message)
-
-  member this.Log(message: string) : unit = logger (makeMessage InfoLevel message)
-
-  member this.LogWarning(message: string) : unit =
-    logger (makeMessage WarningLevel message)
-
-  member this.MeasureScope([<CallerMemberName>] ?event: string) : IDisposable =
-    let event = event.Value
-    let stopwatch = Stopwatch.StartNew()
-
-    { new IDisposable with
-        member _.Dispose() =
-          let total = stopwatch.Elapsed.Ticks + (Dictionary.getOrDefault event 0L measurements)
-          stopwatch.Reset()
-          measurements.[event] <- total
-    }
-
-  [<Conditional("DEBUG")>]
-  member this.CountDebug([<CallerMemberName>] ?event: string) : unit = this.Count(event.Value)
-
-  member this.Count([<CallerMemberName>] ?event: string) : unit =
-    let event = event.Value
-    let currentCount = Dictionary.getOrDefault event 0 counters
-    counters.[event] <- currentCount + 1
-
-  override this.ToString() =
-    let builder = Text.StringBuilder()
-
-    if measurements.Count > 0 || counters.Count > 0 then
-      builder.AppendLine("<Metadata>") |> ignore
-
-      measurements
-      |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {Ticks.toDuration pair.Value}") |> ignore)
-
-      counters
-      |> Seq.iter (fun pair -> builder.AppendLine($"{pair.Key}: {pair.Value}") |> ignore)
-
-    builder.ToString()
+module Plan =
+  let rec columnsCount (plan: Plan) =
+    match plan with
+    | Plan.Scan (table, _) -> table.Columns.Length
+    | Plan.Project (_, expressions) -> expressions.Length
+    | Plan.ProjectSet (plan, _, _) -> (columnsCount plan) + 1
+    | Plan.Filter (plan, _) -> columnsCount plan
+    | Plan.Sort (plan, _) -> columnsCount plan
+    | Plan.Aggregate (_, groupingLabels, aggregators) -> groupingLabels.Length + aggregators.Length
+    | Plan.Unique plan -> columnsCount plan
+    | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
+    | Plan.Append (first, _) -> columnsCount first
+    | Plan.Limit (plan, _) -> columnsCount plan
