@@ -161,17 +161,18 @@ type AnonymizationParams =
       NoiseSD = 1.0
     }
 
-type NoiseLayers =
+// ----------------------------------------------------------------
+// Query & Planner
+// ----------------------------------------------------------------
+
+type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
+
+type QueryContext =
   {
-    BucketSeed: Hash
+    AnonymizationParams: AnonymizationParams
+    DataProvider: IDataProvider
+    ExecutorHook: ExecutorHook option
   }
-  static member Default = { BucketSeed = 0UL }
-
-// ----------------------------------------------------------------
-// Query plan
-// ----------------------------------------------------------------
-
-type QueryContext = { AnonymizationParams: AnonymizationParams; DataProvider: IDataProvider }
 
 type JoinType =
   | InnerJoin
@@ -193,16 +194,19 @@ type Plan =
   | Limit of Plan * amount: uint
 
 // ----------------------------------------------------------------
-// Query execution
+// Executor
 // ----------------------------------------------------------------
 
-type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
+type NoiseLayers =
+  {
+    BucketSeed: Hash
+  }
+  static member Default = { BucketSeed = 0UL }
 
 type ExecutionContext =
   {
     QueryContext: QueryContext
     NoiseLayers: NoiseLayers
-    ExecutorHook: ExecutorHook option
   }
   member this.AnonymizationParams = this.QueryContext.AnonymizationParams
   member this.DataProvider = this.QueryContext.DataProvider
@@ -306,7 +310,11 @@ module QueryContext =
     }
 
   let make anonParams dataProvider =
-    { AnonymizationParams = anonParams; DataProvider = dataProvider }
+    {
+      AnonymizationParams = anonParams
+      DataProvider = dataProvider
+      ExecutorHook = None
+    }
 
   let makeDefault () =
     make AnonymizationParams.Default defaultDataProvider
@@ -318,11 +326,7 @@ module QueryContext =
 
 module ExecutionContext =
   let fromQueryContext queryContext =
-    {
-      QueryContext = queryContext
-      NoiseLayers = NoiseLayers.Default
-      ExecutorHook = None
-    }
+    { QueryContext = queryContext; NoiseLayers = NoiseLayers.Default }
 
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())

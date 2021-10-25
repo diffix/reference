@@ -133,6 +133,6 @@ let executePlanNode executionContext plan : seq<Row> =
   | _ -> failwith "Plan execution not implemented"
 
 let execute executionContext plan : seq<Row> =
-  match executionContext.ExecutorHook with
+  match executionContext.QueryContext.ExecutorHook with
   | Some executorHook -> executorHook executionContext plan
   | None -> executePlanNode executionContext plan

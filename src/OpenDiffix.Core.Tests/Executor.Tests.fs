@@ -149,7 +149,11 @@ type Tests(db: DBFixture) =
         (Constant(Integer 0L))
 
     let plan = Plan.Filter(Plan.Scan(products, [ 1 ]), isEven)
-    let customExecutionContext = { executionContext with ExecutorHook = Some customExecutor }
+
+    let customExecutionContext =
+      { executionContext with
+          QueryContext = { executionContext.QueryContext with ExecutorHook = Some customExecutor }
+      }
 
     plan
     |> Executor.execute customExecutionContext

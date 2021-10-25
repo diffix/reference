@@ -23,7 +23,7 @@ type Tests(db: DBFixture) =
 
   let runQueryWithCustomAnonParams anonymizationParams query =
     let queryContext = QueryContext.make anonymizationParams db.DataProvider
-    run QueryHooks.Default queryContext query
+    run queryContext query
 
   let runQuery = runQueryWithCustomAnonParams anonParams
 
