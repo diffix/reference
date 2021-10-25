@@ -20,51 +20,10 @@ let ``Counts all rows`` () =
   main argv |> should equal 0
 
 [<Fact>]
-let ``Counts all protected entities`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv =
-    [|
-      "-f"
-      dataDirectory
-      "--aid-columns"
-      "customers.id"
-      "-q"
-      "SELECT count(DISTINCT customers.id) FROM customers"
-    |]
-
-  main argv |> should equal 0
-
-[<Fact>]
 let ``Counts in non-anonymized tables`` () =
   let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
 
-  let argv =
-    [|
-      "-f"
-      dataDirectory
-      "--aid-columns"
-      "customers.id"
-      "-q"
-      // note here that the aid column is on a different table
-      "SELECT count(*) FROM purchases"
-    |]
-
-  main argv |> should equal 0
-
-[<Fact>]
-let ``Counts some buckets`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv =
-    [|
-      "-f"
-      dataDirectory
-      "--aid-columns"
-      "customers.id"
-      "-q"
-      "SELECT age, city, company_name, count(*) FROM customers GROUP BY age, city, company_name"
-    |]
+  let argv = [| "-f"; dataDirectory; "-q"; "SELECT count(*) FROM purchases" |]
 
   main argv |> should equal 0
 
@@ -81,14 +40,6 @@ let ``Rejects invalid SQL`` () =
       "-q"
       "SELECT no_such_column, count(*) FROM customers GROUP BY no_such_column"
     |]
-
-  main argv |> should equal 1
-
-[<Fact>]
-let ``Rejects malformed SQL`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv = [| "-f"; dataDirectory; "--aid-columns"; "customers.id"; "-q"; "foo" |]
 
   main argv |> should equal 1
 
