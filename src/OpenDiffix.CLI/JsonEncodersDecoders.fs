@@ -18,13 +18,6 @@ type QueryResponse =
   | Success of QuerySuccessResponse
   | Error of QueryErrorResponse
 
-type BatchRunResult =
-  {
-    Version: AssemblyInfo.Version
-    Time: string
-    QueryResults: QueryResponse list
-  }
-
 let rec encodeValue =
   function
   | Null -> Encode.nil
@@ -111,11 +104,11 @@ let encodeVersionResult (version: AssemblyInfo.Version) =
 
 let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version) (queryResults: QueryResponse list) =
   let batchRunResult =
-    {
+    {|
       Version = version
       Time = time.ToLongDateString()
       QueryResults = queryResults
-    }
+    |}
 
   Encode.Auto.toString (2, batchRunResult, caseStrategy = SnakeCase, extra = extraCoders)
 
