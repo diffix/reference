@@ -38,11 +38,17 @@ let rec typeName =
 
 let private encodeType = typeName >> Encode.string
 
-let encodeInterval (i: Interval) =
-  Encode.object [ "lower", Encode.int i.Lower; "upper", Encode.int i.Upper ]
-
 let encodeTableSettings (ts: TableSettings) =
   Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
+
+let private generateDecoder<'T> = Decode.Auto.generateDecoder<'T> SnakeCase
+
+let private extraCoders =
+  Extra.empty
+  |> Extra.withCustom encodeType generateDecoder<ExpressionType>
+  |> Extra.withCustom encodeValue generateDecoder<Value>
+
+let private generateEncoder<'T> = Encode.Auto.generateEncoder<'T> (caseStrategy = SnakeCase, extra = extraCoders)
 
 let encodeAnonParams (ap: AnonymizationParams) =
   Encode.object [
@@ -57,36 +63,23 @@ let encodeAnonParams (ap: AnonymizationParams) =
     "low_threshold", Encode.int ap.Suppression.LowThreshold
     "low_mean_gap", Encode.float ap.Suppression.LowMeanGap
     "low_sd", Encode.float ap.Suppression.SD
-    "outlier_count", encodeInterval ap.OutlierCount
-    "top_count", encodeInterval ap.TopCount
+    "outlier_count", generateEncoder<Interval> ap.OutlierCount
+    "top_count", generateEncoder<Interval> ap.TopCount
     "noise_sd", Encode.float ap.NoiseSD
   ]
-
-let private generateDecoder<'T> = Decode.Auto.generateDecoder<'T> SnakeCase
-
-let private generateEncoder<'T> =
-  Encode.Auto.generateEncoder<'T> (
-    caseStrategy = SnakeCase,
-    extra =
-      (Extra.empty
-       |> Extra.withCustom encodeType generateDecoder<ExpressionType>
-       |> Extra.withCustom encodeValue generateDecoder<Value>
-       |> Extra.withCustom encodeAnonParams generateDecoder<AnonymizationParams>)
-  )
 
 let private encodeResponse response =
   match response with
   | Success response -> generateEncoder<QuerySuccessResponse> response
   | Error response -> generateEncoder<QueryErrorResponse> response
 
-let private extraCoders =
-  Extra.empty
-  |> Extra.withCustom encodeType generateDecoder<ExpressionType>
-  |> Extra.withCustom encodeValue generateDecoder<Value>
-  |> Extra.withCustom encodeResponse generateDecoder<QueryResponse>
-
 let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
-  Encode.Auto.toString (2, queryResult, caseStrategy = SnakeCase, extra = extraCoders)
+  Encode.Auto.toString (
+    2,
+    queryResult,
+    caseStrategy = SnakeCase,
+    extra = (extraCoders |> Extra.withCustom encodeResponse generateDecoder<QueryResponse>)
+  )
 
 let buildQueryErrorResponse (errorMsg: string) =
   Error { Success = false; Error = errorMsg }
@@ -110,7 +103,14 @@ let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version)
       QueryResults = queryResults
     |}
 
-  Encode.Auto.toString (2, batchRunResult, caseStrategy = SnakeCase, extra = extraCoders)
+  Encode.Auto.toString (
+    2,
+    batchRunResult,
+    caseStrategy = SnakeCase,
+    extra =
+      (extraCoders
+       |> Extra.withCustom encodeAnonParams generateDecoder<AnonymizationParams>)
+  )
 
 let decodeRequestParams content =
   Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase)
