@@ -11,7 +11,7 @@ open Thoth.Json.Net
 
 type QueryRequest = { Query: string; DbPath: string; AnonymizationParameters: AnonymizationParams }
 
-type QueryResponse =
+type QuerySuccessResponse =
   {
     Success: bool
     AnonymizationParameters: AnonymizationParams
@@ -21,8 +21,12 @@ type QueryResponse =
 // FIXME: why do we need this?
 type QueryErrorResponse = { Success: bool; Error: string }
 
+type QueryResponse =
+  | Success of QuerySuccessResponse
+  | Error of QueryErrorResponse
+
 // FIXME: hunt down the encoding in AssemblyInfo.fs
-type BatchRunResult = { Version: string; Time: string; QueryResults: string list }
+type BatchRunResult = { Version: string; Time: string; QueryResults: QueryResponse list }
 
 let rec encodeValue =
   function
@@ -51,9 +55,6 @@ let private extraCoders =
   Extra.empty
   |> Extra.withCustom encodeType generateDecoder<ExpressionType>
   |> Extra.withCustom encodeValue generateDecoder<Value>
-  |> (fun x ->
-    printfn "%A" x
-    x)
 
 let encodeRow values =
   // Encode.list (values |> Array.toList |> List.map encodeValue)
@@ -102,19 +103,16 @@ let encodeRequestParams query dbPath anonParams =
     "database_path", Encode.string dbPath
   ]
 
-let encodeErrorMsg (errorMsg: string) =
-  let queryErrorResponse = { Success = false; Error = errorMsg }
-  Encode.Auto.toString (2, queryErrorResponse, caseStrategy = CamelCase, extra = extraCoders)
+let buildQueryErrorResponse (errorMsg: string) =
+  Error { Success = false; Error = errorMsg }
 
-let encodeIndividualQueryResponse (queryRequest: QueryRequest) queryResult =
-  let queryResponse =
+let buildQuerySuccessResponse (queryRequest: QueryRequest) queryResult =
+  Success
     {
       Success = true
       AnonymizationParameters = queryRequest.AnonymizationParameters
       Result = queryResult
     }
-
-  Encode.Auto.toString (2, queryResponse, caseStrategy = CamelCase, extra = extraCoders)
 
 // Encode.object [
 //   "success", Encode.bool true
@@ -122,7 +120,7 @@ let encodeIndividualQueryResponse (queryRequest: QueryRequest) queryResult =
 //   "result", encodeQueryResult queryResult
 // ]
 
-let encodeBatchRunResult (time: System.DateTime) (version: JsonValue) (queryResults: string list) =
+let encodeBatchRunResult (time: System.DateTime) (version: JsonValue) (queryResults: QueryResponse list) =
   let batchRunResult =
     {
       Version = version.ToString()

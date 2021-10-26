@@ -161,6 +161,15 @@ let private deriveDbPath (queriesPath: string) (queryRequest: JsonEncodersDecode
   let queriesDir = System.IO.Path.GetDirectoryName(queriesPath)
   System.IO.Path.Combine(queriesDir, queryRequest.DbPath)
 
+let private runSingleQueryRequest queriesPath queryRequest : JsonEncodersDecoders.QueryResponse =
+  try
+    let fullDbPath = deriveDbPath queriesPath queryRequest
+
+    runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
+    |> JsonEncodersDecoders.buildQuerySuccessResponse queryRequest
+  with
+  | (exn: Exception) -> JsonEncodersDecoders.buildQueryErrorResponse exn.Message
+
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
     failWithUsageInfo $"Could not find a queries file at %s{queriesPath}"
@@ -174,17 +183,7 @@ let batchExecuteQueries (queriesPath: string) =
 
   let time = DateTime.Now
 
-  let results =
-    querySpecs
-    |> List.map (fun queryRequest ->
-      try
-        let fullDbPath = deriveDbPath queriesPath queryRequest
-
-        runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
-        |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
-      with
-      | (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message
-    )
+  let results = querySpecs |> List.map (runSingleQueryRequest queriesPath)
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
   printfn $"%s{jsonValue}"
