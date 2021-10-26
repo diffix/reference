@@ -25,8 +25,12 @@ type QueryResponse =
   | Success of QuerySuccessResponse
   | Error of QueryErrorResponse
 
-// FIXME: hunt down the encoding in AssemblyInfo.fs
-type BatchRunResult = { Version: string; Time: string; QueryResults: QueryResponse list }
+type BatchRunResult =
+  {
+    Version: AssemblyInfo.Version
+    Time: string
+    QueryResults: QueryResponse list
+  }
 
 let rec encodeValue =
   function
@@ -120,10 +124,13 @@ let buildQuerySuccessResponse (queryRequest: QueryRequest) queryResult =
 //   "result", encodeQueryResult queryResult
 // ]
 
-let encodeBatchRunResult (time: System.DateTime) (version: JsonValue) (queryResults: QueryResponse list) =
+let encodeVersionResult (version: AssemblyInfo.Version) =
+  Encode.Auto.toString (2, version, caseStrategy = CamelCase)
+
+let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version) (queryResults: QueryResponse list) =
   let batchRunResult =
     {
-      Version = version.ToString()
+      Version = version
       Time = time.ToLongDateString()
       QueryResults = queryResults
     }

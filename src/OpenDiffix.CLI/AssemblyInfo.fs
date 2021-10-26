@@ -28,20 +28,29 @@ open System.Reflection
 
 do ()
 
-open Thoth.Json.Net
+type VersionDetails =
+  {
+    Version: string
+    CommitNumber: int
+    Branch: string
+    Sha: string
+    DirtyBuild: bool
+  }
 
-let versionJsonValue =
-  Encode.object [
-    "name", Encode.string "OpenDiffix Reference implementation"
-    "version",
-    Encode.object [
-      "version",
-      Encode.string (
-        sprintf "%s.%s.%s" ThisAssembly.Git.SemVer.Major ThisAssembly.Git.SemVer.Minor ThisAssembly.Git.SemVer.Patch
-      )
-      "commit_number", Encode.int (int ThisAssembly.Git.Commits)
-      "branch", Encode.string ThisAssembly.Git.Branch
-      "sha", Encode.string ThisAssembly.Git.Commit
-      "dirty_build", Encode.bool ThisAssembly.Git.IsDirty
-    ]
-  ]
+type Version = { Name: string; Version: VersionDetails }
+
+let version =
+  let semVerString =
+    sprintf "%s.%s.%s" ThisAssembly.Git.SemVer.Major ThisAssembly.Git.SemVer.Minor ThisAssembly.Git.SemVer.Patch
+
+  {
+    Name = "OpenDiffix Reference implementation"
+    Version =
+      {
+        Version = semVerString
+        CommitNumber = (int ThisAssembly.Git.Commits)
+        Branch = ThisAssembly.Git.Branch
+        Sha = ThisAssembly.Git.Commit
+        DirtyBuild = ThisAssembly.Git.IsDirty
+      }
+  }

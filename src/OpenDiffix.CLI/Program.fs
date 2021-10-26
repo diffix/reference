@@ -185,7 +185,7 @@ let batchExecuteQueries (queriesPath: string) =
 
   let results = querySpecs |> List.map (runSingleQueryRequest queriesPath)
 
-  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
+  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.version results
   printfn $"%s{jsonValue}"
 
   0
@@ -197,7 +197,7 @@ let main argv =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
     if parsedArguments.Contains(Version) then
-      let version = Thoth.Json.Net.Encode.toString 2 AssemblyInfo.versionJsonValue
+      let version = JsonEncodersDecoders.encodeVersionResult AssemblyInfo.version
       printfn $"%s{version}"
       0
     else if parsedArguments.Contains(Queries_Path) then
