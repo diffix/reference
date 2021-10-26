@@ -155,7 +155,7 @@ let csvFormatter result =
 
   header :: rows |> String.join "\n"
 
-let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
+let jsonFormatter = JsonEncodersDecoders.encodeQueryResult
 
 let private deriveDbPath (queriesPath: string) (queryRequest: JsonEncodersDecoders.QueryRequest) =
   let queriesDir = System.IO.Path.GetDirectoryName(queriesPath)
@@ -187,8 +187,7 @@ let batchExecuteQueries (queriesPath: string) =
     )
 
   let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
-  let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
-  printfn $"%s{resultJsonEncoded}"
+  printfn $"%s{jsonValue}"
 
   0
 
