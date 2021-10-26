@@ -53,29 +53,6 @@ let rec typeName =
 // FIXME: 3 lets copied from publisher OpenDiffix.Service project
 let private encodeType = typeName >> Encode.string
 
-let private generateDecoder<'T> = Decode.Auto.generateDecoder<'T> CamelCase
-
-let private extraCoders =
-  Extra.empty
-  |> Extra.withCustom encodeType generateDecoder<ExpressionType>
-  |> Extra.withCustom encodeValue generateDecoder<Value>
-
-let encodeRow values =
-  // Encode.list (values |> Array.toList |> List.map encodeValue)
-  Encode.Auto.toString (2, values, caseStrategy = CamelCase, extra = extraCoders)
-
-let encodeColumn column =
-  // Encode.object [ "name", Encode.string column.Name; "type", column.Type |> typeName |> Encode.string ]
-  Encode.Auto.toString (2, column, caseStrategy = CamelCase, extra = extraCoders)
-
-let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
-  // Encode.object [
-  //   "columns", Encode.list (queryResult.Columns |> List.map encodeColumn)
-  //   "rows", Encode.list (queryResult.Rows |> List.map encodeRow)
-  // ]
-  // let encodableQueryResult = { Rows = queryResult.Rows; Columns = queryResult.Columns }
-  Encode.Auto.toString (2, queryResult, caseStrategy = CamelCase, extra = extraCoders)
-
 let encodeInterval (i: Interval) =
   Encode.object [ "lower", Encode.int i.Lower; "upper", Encode.int i.Upper ]
 
@@ -99,6 +76,45 @@ let encodeAnonParams (ap: AnonymizationParams) =
     "top_count", encodeInterval ap.TopCount
     "noise_sd", Encode.float ap.NoiseSD
   ]
+
+let private generateDecoder<'T> = Decode.Auto.generateDecoder<'T> SnakeCase
+
+let private generateEncoder<'T> =
+  Encode.Auto.generateEncoder<'T> (
+    caseStrategy = SnakeCase,
+    extra =
+      (Extra.empty
+       |> Extra.withCustom encodeType generateDecoder<ExpressionType>
+       |> Extra.withCustom encodeValue generateDecoder<Value>
+       |> Extra.withCustom encodeAnonParams generateDecoder<AnonymizationParams>)
+  )
+
+let private encodeResponse response =
+  match response with
+  | Success response -> generateEncoder<QuerySuccessResponse> response
+  | Error response -> generateEncoder<QueryErrorResponse> response
+
+let private extraCoders =
+  Extra.empty
+  |> Extra.withCustom encodeType generateDecoder<ExpressionType>
+  |> Extra.withCustom encodeValue generateDecoder<Value>
+  |> Extra.withCustom encodeResponse generateDecoder<QueryResponse>
+
+let encodeRow values =
+  // Encode.list (values |> Array.toList |> List.map encodeValue)
+  Encode.Auto.toString (2, values, caseStrategy = SnakeCase, extra = extraCoders)
+
+let encodeColumn column =
+  // Encode.object [ "name", Encode.string column.Name; "type", column.Type |> typeName |> Encode.string ]
+  Encode.Auto.toString (2, column, caseStrategy = SnakeCase, extra = extraCoders)
+
+let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
+  // Encode.object [
+  //   "columns", Encode.list (queryResult.Columns |> List.map encodeColumn)
+  //   "rows", Encode.list (queryResult.Rows |> List.map encodeRow)
+  // ]
+  // let encodableQueryResult = { Rows = queryResult.Rows; Columns = queryResult.Columns }
+  Encode.Auto.toString (2, queryResult, caseStrategy = SnakeCase, extra = extraCoders)
 
 let encodeRequestParams query dbPath anonParams =
   Encode.object [
@@ -125,7 +141,7 @@ let buildQuerySuccessResponse (queryRequest: QueryRequest) queryResult =
 // ]
 
 let encodeVersionResult (version: AssemblyInfo.Version) =
-  Encode.Auto.toString (2, version, caseStrategy = CamelCase)
+  Encode.Auto.toString (2, version, caseStrategy = SnakeCase)
 
 let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version) (queryResults: QueryResponse list) =
   let batchRunResult =
@@ -139,7 +155,7 @@ let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version)
   //   "time", Encode.string (time.ToLongDateString())
   //   "query_results", queryResults
   // ]
-  Encode.Auto.toString (2, batchRunResult, caseStrategy = CamelCase, extra = extraCoders)
+  Encode.Auto.toString (2, batchRunResult, caseStrategy = SnakeCase, extra = extraCoders)
 
 let decodeRequestParams content =
   Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase)
