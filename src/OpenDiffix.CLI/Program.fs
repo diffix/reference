@@ -1,4 +1,6 @@
-﻿open System
+﻿module OpenDiffix.CLI.Program
+
+open System
 open System.IO
 open Argu
 open OpenDiffix.CLI
@@ -33,7 +35,8 @@ type CliArguments =
       | Aid_Columns _ -> "Specifies the AID column(s). Each AID should follow the format tableName.columnName."
       | Query _ -> "The SQL query to execute."
       | Queries_Path _ ->
-        "Path to a file containing a list of query specifications. All queries will be executed in batch mode."
+        "Path to a file containing a list of query specifications. All queries will be executed in batch mode. "
+        + "The db_path inside should be relative to this file's path."
       | Query_Stdin -> "Reads the query from standard in."
       | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
@@ -154,6 +157,10 @@ let csvFormatter result =
 
 let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
 
+let private deriveDbPath (queriesPath: string) (queryRequest: JsonEncodersDecoders.QueryRequest) =
+  let queriesDir = System.IO.Path.GetDirectoryName(queriesPath)
+  System.IO.Path.Combine(queriesDir, queryRequest.DbPath)
+
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
     failWithUsageInfo $"Could not find a queries file at %s{queriesPath}"
@@ -171,7 +178,9 @@ let batchExecuteQueries (queriesPath: string) =
     querySpecs
     |> List.map (fun queryRequest ->
       try
-        runQuery queryRequest.Query queryRequest.DbPath queryRequest.AnonymizationParameters
+        let fullDbPath = deriveDbPath queriesPath queryRequest
+
+        runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
         |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
       with
       | (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message

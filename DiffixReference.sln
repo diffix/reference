@@ -6,6 +6,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.Core.Tests", "sr
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.CLI", "src\OpenDiffix.CLI\OpenDiffix.CLI.fsproj", "{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "OpenDiffix.CLI.Tests", "src\OpenDiffix.CLI.Tests\OpenDiffix.CLI.Tests.fsproj", "{7CF8FE82-2724-43D1-A025-226812EE2256}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{62F75DA8-12D4-4FFA-B778-E0DFD77F6AC8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7CF8FE82-2724-43D1-A025-226812EE2256}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7CF8FE82-2724-43D1-A025-226812EE2256}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7CF8FE82-2724-43D1-A025-226812EE2256}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7CF8FE82-2724-43D1-A025-226812EE2256}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
