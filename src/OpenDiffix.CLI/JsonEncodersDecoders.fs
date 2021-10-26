@@ -92,21 +92,8 @@ let private extraCoders =
   |> Extra.withCustom encodeValue generateDecoder<Value>
   |> Extra.withCustom encodeResponse generateDecoder<QueryResponse>
 
-let encodeRow values =
-  Encode.Auto.toString (2, values, caseStrategy = SnakeCase, extra = extraCoders)
-
-let encodeColumn column =
-  Encode.Auto.toString (2, column, caseStrategy = SnakeCase, extra = extraCoders)
-
 let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
   Encode.Auto.toString (2, queryResult, caseStrategy = SnakeCase, extra = extraCoders)
-
-let encodeRequestParams query dbPath anonParams =
-  Encode.object [
-    "anonymization_parameters", encodeAnonParams anonParams
-    "query", Encode.string query
-    "database_path", Encode.string dbPath
-  ]
 
 let buildQueryErrorResponse (errorMsg: string) =
   Error { Success = false; Error = errorMsg }

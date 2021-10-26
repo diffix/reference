@@ -126,10 +126,6 @@ let getFilePath (parsedArgs: ParseResults<CliArguments>) =
       failWithUsageInfo $"Could not find a file at %s{filePath}"
   | None -> failWithUsageInfo "Please specify the file path."
 
-let dryRun query filePath anonParams =
-  let encodedRequest = JsonEncodersDecoders.encodeRequestParams query filePath anonParams
-  Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
-
 let runQuery query filePath anonParams =
   use dataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
   let queryContext = QueryContext.make anonParams dataProvider
