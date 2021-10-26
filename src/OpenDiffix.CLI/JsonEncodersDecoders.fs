@@ -18,7 +18,7 @@ type QueryResponse =
   | Success of QuerySuccessResponse
   | Error of QueryErrorResponse
 
-let rec encodeValue =
+let rec private encodeValue =
   function
   | Null -> Encode.nil
   | Boolean bool -> Encode.bool bool
@@ -27,7 +27,7 @@ let rec encodeValue =
   | String string -> Encode.string string
   | List values -> Encode.list (values |> List.map encodeValue)
 
-let rec typeName =
+let rec private typeName =
   function
   | BooleanType -> "boolean"
   | IntegerType -> "integer"
@@ -38,9 +38,6 @@ let rec typeName =
 
 let private encodeType = typeName >> Encode.string
 
-let encodeTableSettings (ts: TableSettings) =
-  Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
-
 let private generateDecoder<'T> = Decode.Auto.generateDecoder<'T> SnakeCase
 
 let private extraCoders =
@@ -50,23 +47,22 @@ let private extraCoders =
 
 let private generateEncoder<'T> = Encode.Auto.generateEncoder<'T> (caseStrategy = SnakeCase, extra = extraCoders)
 
-let encodeAnonParams (ap: AnonymizationParams) =
-  Encode.object [
-    "table_settings",
-    Encode.list (
-      ap.TableSettings
-      |> Map.toList
-      |> List.map (fun (table, settings) ->
-        Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
-      )
-    )
-    "low_threshold", Encode.int ap.Suppression.LowThreshold
-    "low_mean_gap", Encode.float ap.Suppression.LowMeanGap
-    "low_sd", Encode.float ap.Suppression.SD
-    "outlier_count", generateEncoder<Interval> ap.OutlierCount
-    "top_count", generateEncoder<Interval> ap.TopCount
-    "noise_sd", Encode.float ap.NoiseSD
-  ]
+let private encodeAnonParams (ap: AnonymizationParams) =
+  let anonParams =
+    {|
+      TableSettings =
+        (ap.TableSettings
+         |> Map.toList
+         |> List.map (fun (table, settings) -> {| Table = table; Settings = settings |}))
+      LowThreshold = ap.Suppression.LowThreshold
+      LowMeanGap = ap.Suppression.LowMeanGap
+      LowSd = ap.Suppression.SD
+      OutlierCount = ap.OutlierCount
+      TopCount = ap.TopCount
+      NoiseSd = ap.NoiseSD
+    |}
+
+  generateEncoder anonParams
 
 let private encodeResponse response =
   match response with
