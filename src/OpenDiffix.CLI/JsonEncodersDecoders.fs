@@ -3,12 +3,6 @@ module OpenDiffix.CLI.JsonEncodersDecoders
 open OpenDiffix.Core
 open Thoth.Json.Net
 
-// type Row = Value []
-
-// type Column = { Name: string; Type: string }
-
-// type QueryResult = { Rows: Row list; Columns: Column list }
-
 type QueryRequest = { Query: string; DbPath: string; AnonymizationParameters: AnonymizationParams }
 
 type QuerySuccessResponse =
@@ -18,7 +12,6 @@ type QuerySuccessResponse =
     Result: QueryEngine.QueryResult
   }
 
-// FIXME: why do we need this?
 type QueryErrorResponse = { Success: bool; Error: string }
 
 type QueryResponse =
@@ -50,7 +43,6 @@ let rec typeName =
   | ListType itemType -> typeName itemType + "[]"
   | UnknownType _ -> "unknown"
 
-// FIXME: 3 lets copied from publisher OpenDiffix.Service project
 let private encodeType = typeName >> Encode.string
 
 let encodeInterval (i: Interval) =
@@ -101,19 +93,12 @@ let private extraCoders =
   |> Extra.withCustom encodeResponse generateDecoder<QueryResponse>
 
 let encodeRow values =
-  // Encode.list (values |> Array.toList |> List.map encodeValue)
   Encode.Auto.toString (2, values, caseStrategy = SnakeCase, extra = extraCoders)
 
 let encodeColumn column =
-  // Encode.object [ "name", Encode.string column.Name; "type", column.Type |> typeName |> Encode.string ]
   Encode.Auto.toString (2, column, caseStrategy = SnakeCase, extra = extraCoders)
 
 let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
-  // Encode.object [
-  //   "columns", Encode.list (queryResult.Columns |> List.map encodeColumn)
-  //   "rows", Encode.list (queryResult.Rows |> List.map encodeRow)
-  // ]
-  // let encodableQueryResult = { Rows = queryResult.Rows; Columns = queryResult.Columns }
   Encode.Auto.toString (2, queryResult, caseStrategy = SnakeCase, extra = extraCoders)
 
 let encodeRequestParams query dbPath anonParams =
@@ -134,12 +119,6 @@ let buildQuerySuccessResponse (queryRequest: QueryRequest) queryResult =
       Result = queryResult
     }
 
-// Encode.object [
-//   "success", Encode.bool true
-//   "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
-//   "result", encodeQueryResult queryResult
-// ]
-
 let encodeVersionResult (version: AssemblyInfo.Version) =
   Encode.Auto.toString (2, version, caseStrategy = SnakeCase)
 
@@ -150,11 +129,7 @@ let encodeBatchRunResult (time: System.DateTime) (version: AssemblyInfo.Version)
       Time = time.ToLongDateString()
       QueryResults = queryResults
     }
-  // Encode.object [
-  //   "version", version
-  //   "time", Encode.string (time.ToLongDateString())
-  //   "query_results", queryResults
-  // ]
+
   Encode.Auto.toString (2, batchRunResult, caseStrategy = SnakeCase, extra = extraCoders)
 
 let decodeRequestParams content =
