@@ -5,83 +5,92 @@ open Thoth.Json.Net
 
 type QueryRequest = { Query: string; DbPath: string; AnonymizationParameters: AnonymizationParams }
 
-let rec encodeValue =
-  function
-  | Null -> Encode.nil
-  | Boolean bool -> Encode.bool bool
-  | Integer int64 -> Encode.float (float int64)
-  | Real float -> Encode.float float
-  | String string -> Encode.string string
-  | List values -> Encode.list (values |> List.map encodeValue)
+module private rec Encoders =
+  // each successful query result is decorated with data provided in the request
+  type QueryResponseRequest = Result<QueryEngine.QueryResult * QueryRequest, string>
 
-let rec typeName =
-  function
-  | BooleanType -> "boolean"
-  | IntegerType -> "integer"
-  | RealType -> "real"
-  | StringType -> "text"
-  | ListType itemType -> typeName itemType + "[]"
-  | UnknownType _ -> "unknown"
+  let private noDecoder<'T> () : Decoder<'T> =
+    (fun _str _obj -> failwith "Decoder not implemented")
 
-let encodeRow values =
-  Encode.list (values |> Array.toList |> List.map encodeValue)
+  let rec private encodeValue =
+    function
+    | Null -> Encode.nil
+    | Boolean bool -> Encode.bool bool
+    | Integer int64 -> Encode.float (float int64)
+    | Real float -> Encode.float float
+    | String string -> Encode.string string
+    | List values -> Encode.list (values |> List.map encodeValue)
 
-let encodeColumn (column: Column) =
-  Encode.object [ "name", Encode.string column.Name; "type", column.Type |> typeName |> Encode.string ]
+  let rec private typeName =
+    function
+    | BooleanType -> "boolean"
+    | IntegerType -> "integer"
+    | RealType -> "real"
+    | StringType -> "text"
+    | ListType itemType -> typeName itemType + "[]"
+    | UnknownType _ -> "unknown"
 
-let encodeQueryResult (queryResult: QueryEngine.QueryResult) =
-  Encode.object [
-    "columns", Encode.list (queryResult.Columns |> List.map encodeColumn)
-    "rows", Encode.list (queryResult.Rows |> List.map encodeRow)
-  ]
+  let private encodeType = typeName >> Encode.string
 
-let encodeInterval (i: Interval) =
-  Encode.object [ "lower", Encode.int i.Lower; "upper", Encode.int i.Upper ]
+  let private extraCoders () =
+    Extra.empty
+    |> Extra.withCustom encodeType (noDecoder ())
+    |> Extra.withCustom encodeValue (noDecoder ())
+    |> Extra.withCustom encodeAnonParams (noDecoder ())
+    |> Extra.withCustom encodeResponse (noDecoder ())
 
-let encodeTableSettings (ts: TableSettings) =
-  Encode.object [ "aid_columns", Encode.list (ts.AidColumns |> List.map Encode.string) ]
+  let autoEncode<'T> = Encode.Auto.generateEncoder<'T> (caseStrategy = SnakeCase, extra = extraCoders ())
 
-let encodeAnonParams (ap: AnonymizationParams) =
-  Encode.object [
-    "table_settings",
-    Encode.list (
-      ap.TableSettings
-      |> Map.toList
-      |> List.map (fun (table, settings) ->
-        Encode.object [ "table", Encode.string table; "settings", encodeTableSettings settings ]
-      )
-    )
-    "low_threshold", Encode.int ap.Suppression.LowThreshold
-    "low_mean_gap", Encode.float ap.Suppression.LowMeanGap
-    "low_sd", Encode.float ap.Suppression.SD
-    "outlier_count", encodeInterval ap.OutlierCount
-    "top_count", encodeInterval ap.TopCount
-    "noise_sd", Encode.float ap.NoiseSD
-  ]
+  let private encodeAnonParams (ap: AnonymizationParams) =
+    let anonParams =
+      {|
+        TableSettings =
+          (ap.TableSettings
+           |> Map.toList
+           |> List.map (fun (table, settings) -> {| Table = table; Settings = settings |}))
+        LowThreshold = ap.Suppression.LowThreshold
+        LowMeanGap = ap.Suppression.LowMeanGap
+        LowSd = ap.Suppression.SD
+        OutlierCount = ap.OutlierCount
+        TopCount = ap.TopCount
+        NoiseSd = ap.NoiseSD
+      |}
 
-let encodeRequestParams query dbPath anonParams =
-  Encode.object [
-    "anonymization_parameters", encodeAnonParams anonParams
-    "query", Encode.string query
-    "database_path", Encode.string dbPath
-  ]
+    autoEncode anonParams
 
-let encodeErrorMsg errorMsg =
-  Encode.object [ "success", Encode.bool false; "error", Encode.string errorMsg ]
+  let private encodeResponse (response: QueryResponseRequest) =
+    match response with
+    | Ok (queryResult, queryRequest) ->
+      let response =
+        {|
+          Success = true
+          AnonymizationParameters = queryRequest.AnonymizationParameters
+          Result = queryResult
+        |}
 
-let encodeIndividualQueryResponse queryRequest queryResult =
-  Encode.object [
-    "success", Encode.bool true
-    "anonymization_parameters", encodeAnonParams queryRequest.AnonymizationParameters
-    "result", encodeQueryResult queryResult
-  ]
+      autoEncode response
+    | Error errorMsg ->
+      let response = {| Success = false; error = errorMsg |}
+      autoEncode response
 
-let encodeBatchRunResult (time: System.DateTime) version queryResults =
-  Encode.object [
-    "version", version
-    "time", Encode.string (time.ToLongDateString())
-    "query_results", Encode.list queryResults
-  ]
+// ----------------------------------------------------------------
+// Public API
+// ----------------------------------------------------------------
+
+open Encoders
+
+let encodeVersionResult version = (version |> autoEncode).ToString()
+
+let encodeQueryResult (queryResult: QueryEngine.QueryResult) = (queryResult |> autoEncode).ToString()
+
+let encodeBatchRunResult (time: System.DateTime) version (queryResults: QueryResponseRequest list) =
+  ({|
+     Version = version
+     Time = time.ToLongDateString()
+     QueryResults = queryResults
+   |}
+   |> autoEncode)
+    .ToString()
 
 let decodeRequestParams content =
   Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase)

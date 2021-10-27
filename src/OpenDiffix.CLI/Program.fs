@@ -126,10 +126,6 @@ let getFilePath (parsedArgs: ParseResults<CliArguments>) =
       failWithUsageInfo $"Could not find a file at %s{filePath}"
   | None -> failWithUsageInfo "Please specify the file path."
 
-let dryRun query filePath anonParams =
-  let encodedRequest = JsonEncodersDecoders.encodeRequestParams query filePath anonParams
-  Thoth.Json.Net.Encode.toString 2 encodedRequest, 0
-
 let runQuery query filePath anonParams =
   use dataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
   let queryContext = QueryContext.make anonParams dataProvider
@@ -155,11 +151,21 @@ let csvFormatter result =
 
   header :: rows |> String.join "\n"
 
-let jsonFormatter = JsonEncodersDecoders.encodeQueryResult >> Thoth.Json.Net.Encode.toString 2
+let jsonFormatter = JsonEncodersDecoders.encodeQueryResult
 
 let private deriveDbPath (queriesPath: string) (queryRequest: JsonEncodersDecoders.QueryRequest) =
   let queriesDir = System.IO.Path.GetDirectoryName(queriesPath)
   System.IO.Path.Combine(queriesDir, queryRequest.DbPath)
+
+let private runSingleQueryRequest queriesPath queryRequest =
+  try
+    let fullDbPath = deriveDbPath queriesPath queryRequest
+
+    runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
+    |> (fun result -> (result, queryRequest))
+    |> Ok
+  with
+  | (exn: Exception) -> Error exn.Message
 
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
@@ -174,21 +180,10 @@ let batchExecuteQueries (queriesPath: string) =
 
   let time = DateTime.Now
 
-  let results =
-    querySpecs
-    |> List.map (fun queryRequest ->
-      try
-        let fullDbPath = deriveDbPath queriesPath queryRequest
+  let results = querySpecs |> List.map (runSingleQueryRequest queriesPath)
 
-        runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
-        |> JsonEncodersDecoders.encodeIndividualQueryResponse queryRequest
-      with
-      | (exn: Exception) -> JsonEncodersDecoders.encodeErrorMsg exn.Message
-    )
-
-  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.versionJsonValue results
-  let resultJsonEncoded = Thoth.Json.Net.Encode.toString 2 jsonValue
-  printfn $"%s{resultJsonEncoded}"
+  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.version results
+  printfn $"%s{jsonValue}"
 
   0
 
@@ -199,7 +194,7 @@ let main argv =
       parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
     if parsedArguments.Contains(Version) then
-      let version = Thoth.Json.Net.Encode.toString 2 AssemblyInfo.versionJsonValue
+      let version = JsonEncodersDecoders.encodeVersionResult AssemblyInfo.version
       printfn $"%s{version}"
       0
     else if parsedArguments.Contains(Queries_Path) then
