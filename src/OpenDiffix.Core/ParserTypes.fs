@@ -14,6 +14,7 @@ type SelectQuery =
     GroupBy: Expression list
     Having: Expression option
     Limit: uint option
+    OrderBy: Expression list
   }
 
 and Expression =

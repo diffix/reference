@@ -91,6 +91,8 @@ module QueryParser =
 
   let limitClause = word "LIMIT" >>. puint32
 
+  let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated expr
+
   let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 
   let distinct = opt (word "distinct") |>> Option.isSome
@@ -147,18 +149,21 @@ module QueryParser =
                                            >>= fun having ->
                                                  opt limitClause
                                                  >>= fun limit ->
-                                                       let query =
-                                                         {
-                                                           SelectDistinct = distinct
-                                                           Expressions = columns
-                                                           From = from
-                                                           Where = whereClause
-                                                           GroupBy = groupBy |> Option.defaultValue []
-                                                           Having = having
-                                                           Limit = limit
-                                                         }
+                                                       opt orderBy
+                                                       >>= fun orderBy ->
+                                                             let query =
+                                                               {
+                                                                 SelectDistinct = distinct
+                                                                 Expressions = columns
+                                                                 From = from
+                                                                 Where = whereClause
+                                                                 GroupBy = groupBy |> Option.defaultValue []
+                                                                 Having = having
+                                                                 Limit = limit
+                                                                 OrderBy = orderBy |> Option.defaultValue []
+                                                               }
 
-                                                       preturn (Expression.SelectQuery query)
+                                                             preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore

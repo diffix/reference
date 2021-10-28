@@ -204,6 +204,13 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     |> List.map (mapExpression rangeColumns)
     |> mapGroupByIndices targetList
 
+  let simpleOrderBy =
+    selectQuery.OrderBy
+    // FIXME: what is this?
+    |> List.map (mapExpression rangeColumns)
+    // FIXME: why this wrapping here?
+    |> List.map (fun expression -> OrderBy(expression, Ascending, NullsFirst))
+
   let isAggregating = not (List.isEmpty groupBy && List.isEmpty (collectAggregates targetList))
 
   let aidTargets =
@@ -235,7 +242,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     From = range
     GroupBy = groupBy
     Having = havingClause
-    OrderBy = []
+    OrderBy = simpleOrderBy
     Limit = selectQuery.Limit
   }
 

@@ -17,6 +17,7 @@ let defaultSelect =
     GroupBy = []
     Having = None
     Limit = None
+    OrderBy = []
   }
 
 let expectFail query =
@@ -181,6 +182,15 @@ let ``Parses GROUP BY statement`` () =
   expectFailWithParser groupBy "GROUP BY"
 
 [<Fact>]
+let ``Parses ORDER BY statement`` () =
+  parseFragment orderBy "ORDER BY a, b, c"
+  |> should equal [ Identifier(None, "a"); Identifier(None, "b"); Identifier(None, "c") ]
+
+  parseFragment orderBy "ORDER BY a" |> should equal [ Identifier(None, "a") ]
+
+  expectFailWithParser orderBy "ORDER BY"
+
+[<Fact>]
 let ``Parses SELECT by itself`` () =
   parseFragment selectQuery "SELECT col FROM table"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] })
@@ -254,6 +264,7 @@ let ``Parse complex aggregate query`` () =
        WHERE col1 = 1 AND col2 = 2 or col2 = 3
        GROUP BY col1
        HAVING count(distinct aid) > 1
+       ORDER BY col2
        """
   |> should
        equal
@@ -272,6 +283,7 @@ let ``Parse complex aggregate query`` () =
              )
            GroupBy = [ Identifier(None, "col1") ]
            Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
+           OrderBy = [ Identifier(None, "col2") ]
        }
 
 [<Fact>]
