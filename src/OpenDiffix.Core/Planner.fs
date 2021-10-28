@@ -105,7 +105,11 @@ let private planQuery query =
   let orderByExpressions = query.OrderBy |> map (projectExpression aggregatedColumns)
   let havingExpression = projectExpression aggregatedColumns query.Having
 
-  let columnIndices = query.Where :: expressions |> collectColumnIndices |> List.distinct |> List.sort
+  let columnIndices =
+    query.Where :: expressions @ groupingLabels
+    |> collectColumnIndices
+    |> List.distinct
+    |> List.sort
 
   planFrom query.From columnIndices
   |> planFilter query.Where
