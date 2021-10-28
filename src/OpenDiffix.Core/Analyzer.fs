@@ -126,6 +126,23 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
   groupByExpressions |> List.map (mapGroupByIndex selectedExpressions)
 
 // ----------------------------------------------------------------
+// Order by
+// ----------------------------------------------------------------
+
+let private mapOrderByIndex (expressions: Expression list) orderByExpression =
+  match orderByExpression with
+  | (Constant (Integer index), direction, nullsBehavior) ->
+    if index < 1L || index > int64 expressions.Length then
+      failwith $"Invalid `ORDER BY` index: {index}"
+    else
+      expressions |> List.item (int index - 1), direction, nullsBehavior
+  | _ -> orderByExpression
+
+let private mapOrderByIndices (targetList: TargetEntry list) orderByExpressions =
+  let selectedExpressions = targetList |> List.map (fun targetEntry -> targetEntry.Expression)
+  orderByExpressions |> List.map (mapOrderByIndex selectedExpressions)
+
+// ----------------------------------------------------------------
 // Query range
 // ----------------------------------------------------------------
 
@@ -206,10 +223,18 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
 
   let simpleOrderBy =
     selectQuery.OrderBy
-    // FIXME: what is this?
-    |> List.map (mapExpression rangeColumns)
-    // FIXME: why this wrapping here?
-    |> List.map (fun expression -> OrderBy(expression, Ascending, NullsFirst))
+    |> List.map (fun expression ->
+      // FIXME dat warning
+      match expression with
+      | ParserTypes.OrderSpec (expression, b, c) ->
+        OrderBy(
+          // FIXME: what is this?
+          mapExpression rangeColumns expression,
+          // FIXME think about our defaults here
+          (if b = Some(ParserTypes.Asc) then Ascending else Descending),
+          (if c = Some(ParserTypes.NullsFirst) then NullsFirst else NullsLast)
+        )
+    )
 
   let isAggregating = not (List.isEmpty groupBy && List.isEmpty (collectAggregates targetList))
 

@@ -44,6 +44,10 @@ module QueryParser =
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   let star = word "*" |>> fun _ -> Expression.Star
+  let asc = word "ASC" |>> fun _ -> Expression.Asc
+  let desc = word "DESC" |>> fun _ -> Expression.Desc
+  let nullsFirst = word "NULLS FIRST" |>> fun _ -> Expression.NullsFirst
+  let nullsLast = word "NULLS LAST" |>> fun _ -> Expression.NullsLast
 
   let alias = word "AS" >>. identifier
 
@@ -91,7 +95,11 @@ module QueryParser =
 
   let limitClause = word "LIMIT" >>. puint32
 
-  let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated expr
+  let orderSpec =
+    expr .>>. opt (asc <|> desc) .>>. opt (nullsFirst <|> nullsLast) .>> spaces
+    |>> (fun ((expr, direction), nullsBehavior) -> Expression.OrderSpec(expr, direction, nullsBehavior))
+
+  let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated orderSpec
 
   let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 

@@ -184,11 +184,23 @@ let ``Parses GROUP BY statement`` () =
 [<Fact>]
 let ``Parses ORDER BY statement`` () =
   parseFragment orderBy "ORDER BY a, b, c"
-  |> should equal [ Identifier(None, "a"); Identifier(None, "b"); Identifier(None, "c") ]
+  |> should
+       equal
+       [
+         OrderSpec(Identifier(None, "a"), None, None)
+         OrderSpec(Identifier(None, "b"), None, None)
+         OrderSpec(Identifier(None, "c"), None, None)
+       ]
 
-  parseFragment orderBy "ORDER BY a" |> should equal [ Identifier(None, "a") ]
+  parseFragment orderBy "ORDER BY a"
+  |> should equal [ OrderSpec(Identifier(None, "a"), None, None) ]
 
   expectFailWithParser orderBy "ORDER BY"
+
+  expectFailWithParser orderBy "ORDER BY a DESZCZ"
+
+  // bad order
+  expectFailWithParser orderBy "ORDER BY a NULLS FIRST ASC"
 
 [<Fact>]
 let ``Parses SELECT by itself`` () =
@@ -264,7 +276,7 @@ let ``Parse complex aggregate query`` () =
        WHERE col1 = 1 AND col2 = 2 or col2 = 3
        GROUP BY col1
        HAVING count(distinct aid) > 1
-       ORDER BY col2
+       ORDER BY col2 DESC NULLS FIRST
        LIMIT 42
        """
   |> should
@@ -284,7 +296,7 @@ let ``Parse complex aggregate query`` () =
              )
            GroupBy = [ Identifier(None, "col1") ]
            Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
-           OrderBy = [ Identifier(None, "col2") ]
+           OrderBy = [ OrderSpec(Identifier(None, "col2"), Some(Desc), Some(NullsFirst)) ]
            Limit = Some(42u)
        }
 

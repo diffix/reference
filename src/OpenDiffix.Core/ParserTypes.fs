@@ -20,6 +20,10 @@ type SelectQuery =
 and Expression =
   | Star
   | Null
+  | Asc
+  | Desc
+  | NullsFirst
+  | NullsLast
   | Integer of int64
   | Float of float
   | String of string
@@ -40,6 +44,7 @@ and Expression =
   | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
   | SubQuery of subQuery: SelectQuery * alias: string
   | Function of functionName: string * Expression list
+  | OrderSpec of expr: Expression * direction: Expression option * nullsBehavior: Expression option
   | SelectQuery of SelectQuery
 // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
 // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then
