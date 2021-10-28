@@ -302,16 +302,16 @@ type Tests(db: DBFixture) =
     with
     | ex -> ex.Message |> should equal error
 
+  let sqlNoiseLayers query =
+    query
+    |> Parser.parse
+    |> Analyzer.analyze queryContext
+    |> Analyzer.anonymize queryContext
+    |> snd
+
   let assertSqlSeed query (seedMaterial: string) =
     let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
-
-    let _query, noiseLayers =
-      query
-      |> Parser.parse
-      |> Analyzer.analyze queryContext
-      |> Analyzer.anonymize queryContext
-
-    noiseLayers.BucketSeed |> should equal expectedSeed
+    (sqlNoiseLayers query).BucketSeed |> should equal expectedSeed
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -443,6 +443,17 @@ type Tests(db: DBFixture) =
   let ``SQL seed from multiple groupings from multiple tables`` () =
     assertSqlSeed
       "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      "customers_small.city,range,purchases.amount"
+      "customers_small.city,range,purchases.amount,1"
+
+  [<Fact>]
+  let ``SQL seeds from numeric ranges are consistent`` () =
+    (sqlNoiseLayers "SELECT round(age) FROM customers_small GROUP BY 1")
+    |> should equal (sqlNoiseLayers "SELECT floor(cast(age AS real)) FROM customers_small GROUP BY 1")
+
+    (sqlNoiseLayers "SELECT round(cast(age AS real)) FROM customers_small GROUP BY 1")
+    |> should equal (sqlNoiseLayers "SELECT round_by(age, 1.0) FROM customers_small GROUP BY 1")
+
+    (sqlNoiseLayers "SELECT ceil_by(age, 1.0) FROM customers_small GROUP BY 1")
+    |> should equal (sqlNoiseLayers "SELECT floor_by(age, 1) FROM customers_small GROUP BY 1")
 
   interface IClassFixture<DBFixture>

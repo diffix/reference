@@ -329,27 +329,25 @@ let rec private basicSeedMaterial rangeColumns expression =
   | Constant (Boolean value) -> value.ToString()
   | _ -> failwith "Unsupported expression used for defining buckets."
 
-let private functionSeedMaterial =
-  function
+let private functionSeedMaterial rangeColumns fn args =
+  let argsSeedMaterials = List.map (basicSeedMaterial rangeColumns) args
+
+  match fn with
+  | Ceil
+  | Floor
+  | Round -> "range" :: argsSeedMaterials @ [ "1" ]
   | Substring
-  | Ceil
-  | Floor
-  | Round
-  | Ceil
-  | Floor
-  | Round
   | CeilBy
   | FloorBy
-  | RoundBy -> "range"
-  | WidthBucket -> "width_bucket"
-  | Concat -> "concat"
+  | RoundBy -> "range" :: argsSeedMaterials
+  | WidthBucket -> "width_bucket" :: argsSeedMaterials
+  | Concat -> "concat" :: argsSeedMaterials
   | _ -> failwith "Unsupported function used for defining buckets."
 
 let rec private collectSeedMaterials rangeColumns expression =
   match expression with
   | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> collectSeedMaterials rangeColumns expression
-  | FunctionExpr (ScalarFunction fn, args) ->
-    (functionSeedMaterial fn) :: (List.map (basicSeedMaterial rangeColumns) args)
+  | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial rangeColumns fn args
   | _ -> [ basicSeedMaterial rangeColumns expression ]
 
 let private computeNoiseLayers anonParams query =
