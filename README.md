@@ -1,34 +1,22 @@
-# open-diffix reference implementation
+# Open Diffix reference implementation
 
-- [open-diffix reference implementation](#open-diffix-reference-implementation)
-  - [Purpose](#purpose)
-  - [Gotcha](#gotcha)
-  - [Development process](#development-process)
-    - [Anonymization design](#anonymization-design)
-    - [Design considerations](#design-considerations)
-    - [Organization](#organization)
-    - [Branches](#branches)
-  - [Creating a release](#creating-a-release)
-  - [Using CLI](#using-cli)
+- [Purpose](#purpose)
+- [Development process](#development-process)
+  - [Anonymization design](#anonymization-design)
+  - [Design considerations](#design-considerations)
+  - [Organization](#organization)
+  - [Branches](#branches)
+- [Creating a release](#creating-a-release)
+- [Using CLI](#using-cli)
 
 
 ## Purpose
 
-This is a reference implementation of open-diffix.
+This is a reference implementation of Open Diffix.
 As such, this serves as a sandbox in which we can quickly try, and validate, new ideas for anonymization.
 The reference implementation is meant to offer anonymization quality matching that of a final product - however
-not necessarily SQL parity. It is not mean to be be used in production. As such it will not receive the type of polish
-and usability work a commercial product would. It can safely be used to anonymize data, but there will be rough
-edges.
-
-## Gotcha
-
-Due to the way hashes are generated from the AID values, please take the following into consideration when generating
-test data for the reference implementation:
-
-**If you use numerical AIDs please make sure they are all positive, or all negative. Failing to do so will result in
-the AID space collapsing and the anonymization going wrong. More specifically user -1 will be seen as identical to
-user 0, user -2 will be seen as identical to user 1, etc.**
+not necessarily SQL parity. It will not receive the type of polish and usability work a commercial product would.
+It can safely be used to anonymize data, but there will be rough edges.
 
 ## Development process
 
@@ -63,7 +51,7 @@ around the complex and large codebase of a real world database engine.
 
 The codebase is currently organized in a number of projects:
 
-- `OpenDiffix.Core` and `OpenDiffix.Core.Tests`: Contains the meat of this project. It is the query and anonymization engine.
+- `OpenDiffix.Core`: Contains the meat of this project. It is the query and anonymization engine.
 - `OpenDiffix.CLI`: A command line interface that can be used to exercise the reference implementation.
 
 ### Branches
@@ -73,8 +61,8 @@ or merged into `master`.
 
 ### Formatting
 
-We use fantomas for formatting.
-It might be benefitial to have a `pre-commit` git hook like the following to ensure the code
+We use `fantomas` for formatting.
+It might be beneficial to have a `pre-commit` git hook like the following to ensure the code
 you commit to the repository has been formatted:
 
 `.git/hooks/pre-commit`:
@@ -113,4 +101,3 @@ two following sample commands:
   please consult [queries-sample.json].
 
 In both cases the query result will be written back to the terminal (standard out).
-
