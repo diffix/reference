@@ -89,6 +89,18 @@ let ``plan aggregation`` () =
   select |> Planner.plan |> should equal expected
 
 [<Fact>]
+let ``plan aggregation without selection`` () =
+  let groupBy = [ column 1 ]
+  let selectedColumns = [ { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
+
+  let select = { emptySelect with TargetList = selectedColumns; GroupBy = groupBy }
+
+  let expected =
+    Plan.Project(Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ]), [ ColumnReference(1, IntegerType) ])
+
+  select |> Planner.plan |> should equal expected
+
+[<Fact>]
 let ``plan all`` () =
   let groupBy = [ column 0 ]
 
