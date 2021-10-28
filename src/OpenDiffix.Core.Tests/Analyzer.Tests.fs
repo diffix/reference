@@ -303,13 +303,11 @@ type Tests(db: DBFixture) =
     | ex -> ex.Message |> should equal error
 
   let sqlNoiseLayers query =
-    let _query, noiseLayers =
-      query
-      |> Parser.parse
-      |> Analyzer.analyze queryContext
-      |> Analyzer.anonymize queryContext
-
-    noiseLayers
+    query
+    |> Parser.parse
+    |> Analyzer.analyze queryContext
+    |> Analyzer.anonymize queryContext
+    |> snd
 
   let assertSqlSeed query (seedMaterial: string) =
     let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
