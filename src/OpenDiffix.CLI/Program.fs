@@ -182,34 +182,28 @@ let batchExecuteQueries (queriesPath: string) =
 
   let results = querySpecs |> List.map (runSingleQueryRequest queriesPath)
 
-  let jsonValue = JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.version results
-  printfn $"%s{jsonValue}"
+  JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.version results
 
-  0
+let mainCore argv =
+  let parsedArguments =
+    parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
+
+  if parsedArguments.Contains(Version) then
+    JsonEncodersDecoders.encodeVersionResult AssemblyInfo.version
+  else if parsedArguments.Contains(Queries_Path) then
+    batchExecuteQueries (parsedArguments.GetResult Queries_Path)
+  else
+    let query = getQuery parsedArguments
+    let filePath = getFilePath parsedArguments
+    let anonParams = constructAnonParameters parsedArguments
+    let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
+    runQuery query filePath anonParams |> outputFormatter
 
 [<EntryPoint>]
 let main argv =
   try
-    let parsedArguments =
-      parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
-
-    if parsedArguments.Contains(Version) then
-      let version = JsonEncodersDecoders.encodeVersionResult AssemblyInfo.version
-      printfn $"%s{version}"
-      0
-    else if parsedArguments.Contains(Queries_Path) then
-      batchExecuteQueries (parsedArguments.GetResult Queries_Path)
-
-    else
-      let query = getQuery parsedArguments
-      let filePath = getFilePath parsedArguments
-      let anonParams = constructAnonParameters parsedArguments
-      let outputFormatter = if parsedArguments.Contains Json then jsonFormatter else csvFormatter
-      let output = runQuery query filePath anonParams |> outputFormatter
-
-      printfn $"%s{output}"
-      0
-
+    argv |> mainCore |> printfn "%s"
+    0
   with
   | e ->
     eprintfn $"ERROR: %s{e.Message}"

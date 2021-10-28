@@ -5,33 +5,27 @@ open FsUnit.Xunit
 
 open OpenDiffix.CLI.Program
 
+let private dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
+
 [<Fact>]
 let ``Prints version`` () =
-  let argv = [| "--version" |]
-
-  main argv |> should equal 0
+  [| "--version" |] |> mainCore |> should not' (be Empty)
 
 [<Fact>]
 let ``Counts all rows`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv = [| "-f"; dataDirectory; "--aid-columns"; "customers.id"; "-q"; "SELECT count(*) FROM customers" |]
-
-  main argv |> should equal 0
+  [| "-f"; dataDirectory; "--aid-columns"; "customers.id"; "-q"; "SELECT count(*) FROM customers" |]
+  |> mainCore
+  |> should not' (be Empty)
 
 [<Fact>]
 let ``Counts in non-anonymized tables`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv = [| "-f"; dataDirectory; "-q"; "SELECT count(*) FROM purchases" |]
-
-  main argv |> should equal 0
+  [| "-f"; dataDirectory; "-q"; "SELECT count(*) FROM purchases" |]
+  |> mainCore
+  |> should not' (be Empty)
 
 [<Fact>]
 let ``Rejects invalid SQL`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv =
+  shouldFail (fun () ->
     [|
       "-f"
       dataDirectory
@@ -40,55 +34,50 @@ let ``Rejects invalid SQL`` () =
       "-q"
       "SELECT no_such_column, count(*) FROM customers GROUP BY no_such_column"
     |]
-
-  main argv |> should equal 1
+    |> mainCore
+    |> ignore
+  )
 
 [<Fact>]
 let ``Guards against unknown params`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv = [| "-f"; dataDirectory; "--foo"; "customers.id"; "-q"; "SELECT count(*) FROM customers" |]
-
-  main argv |> should equal 1
+  shouldFail (fun () ->
+    [| "-f"; dataDirectory; "--foo"; "customers.id"; "-q"; "SELECT count(*) FROM customers" |]
+    |> mainCore
+    |> ignore
+  )
 
 [<Fact>]
 let ``Accepts supported CLI parameters`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-
-  let argv =
-    [|
-      "-f"
-      dataDirectory
-      "--salt"
-      "1"
-      "--json"
-      "--outlier-count"
-      "1"
-      "2"
-      "--top-count"
-      "12"
-      "14"
-      "--low-threshold"
-      "3"
-      "--low-sd"
-      "1.2"
-      "--low-mean-gap"
-      "1"
-      "--noise-sd"
-      "2.4"
-      "--aid-columns"
-      "customers.id"
-      "-q"
-      "SELECT count(*) FROM customers"
-    |]
-
-  main argv |> should equal 0
+  [|
+    "-f"
+    dataDirectory
+    "--salt"
+    "1"
+    "--json"
+    "--outlier-count"
+    "1"
+    "2"
+    "--top-count"
+    "12"
+    "14"
+    "--low-threshold"
+    "3"
+    "--low-sd"
+    "1.2"
+    "--low-mean-gap"
+    "1"
+    "--noise-sd"
+    "2.4"
+    "--aid-columns"
+    "customers.id"
+    "-q"
+    "SELECT count(*) FROM customers"
+  |]
+  |> mainCore
+  |> should not' (be Empty)
 
 [<Fact>]
 let ``Executes example batch query`` () =
-  let dataDirectory = __SOURCE_DIRECTORY__ + "/../../data/data.sqlite"
-  let batchDirectory = __SOURCE_DIRECTORY__ + "/../../queries-sample.json"
-
-  let argv = [| "-f"; dataDirectory; "--aid-columns"; "customers.id"; "--queries-path"; batchDirectory |]
-
-  main argv |> should equal 0
+  [| "--queries-path"; __SOURCE_DIRECTORY__ + "/../../queries-sample.json" |]
+  |> mainCore
+  |> should not' (be Empty)
