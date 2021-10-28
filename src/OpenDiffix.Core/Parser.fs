@@ -147,10 +147,10 @@ module QueryParser =
                                      >>= fun groupBy ->
                                            opt havingClause
                                            >>= fun having ->
-                                                 opt limitClause
-                                                 >>= fun limit ->
-                                                       opt orderBy
-                                                       >>= fun orderBy ->
+                                                 opt orderBy
+                                                 >>= fun orderBy ->
+                                                       opt limitClause
+                                                       >>= fun limit ->
                                                              let query =
                                                                {
                                                                  SelectDistinct = distinct

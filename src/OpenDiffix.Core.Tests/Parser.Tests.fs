@@ -265,6 +265,7 @@ let ``Parse complex aggregate query`` () =
        GROUP BY col1
        HAVING count(distinct aid) > 1
        ORDER BY col2
+       LIMIT 42
        """
   |> should
        equal
@@ -284,6 +285,7 @@ let ``Parse complex aggregate query`` () =
            GroupBy = [ Identifier(None, "col1") ]
            Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
            OrderBy = [ Identifier(None, "col2") ]
+           Limit = Some(42u)
        }
 
 [<Fact>]
