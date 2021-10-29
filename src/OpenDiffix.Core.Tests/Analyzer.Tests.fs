@@ -437,23 +437,23 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``SQL seed from column generalization`` () =
-    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "range,customers_small.city,1,2"
+    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "substring,customers_small.city,1,2"
 
   [<Fact>]
   let ``SQL seed from multiple groupings from multiple tables`` () =
     assertSqlSeed
       "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      "customers_small.city,range,purchases.amount,1"
+      "customers_small.city,round,purchases.amount,1"
 
   [<Fact>]
   let ``SQL seeds from numeric ranges are consistent`` () =
-    (sqlNoiseLayers "SELECT round(age) FROM customers_small GROUP BY 1")
-    |> should equal (sqlNoiseLayers "SELECT floor(cast(age AS real)) FROM customers_small GROUP BY 1")
+    (sqlNoiseLayers "SELECT floor(age) FROM customers_small GROUP BY 1")
+    |> should equal (sqlNoiseLayers "SELECT floor_by(cast(age AS real), 1.0) FROM customers_small GROUP BY 1")
 
     (sqlNoiseLayers "SELECT round(cast(age AS real)) FROM customers_small GROUP BY 1")
     |> should equal (sqlNoiseLayers "SELECT round_by(age, 1.0) FROM customers_small GROUP BY 1")
 
     (sqlNoiseLayers "SELECT ceil_by(age, 1.0) FROM customers_small GROUP BY 1")
-    |> should equal (sqlNoiseLayers "SELECT floor_by(age, 1) FROM customers_small GROUP BY 1")
+    |> should equal (sqlNoiseLayers "SELECT ceil_by(age, 1) FROM customers_small GROUP BY 1")
 
   interface IClassFixture<DBFixture>
