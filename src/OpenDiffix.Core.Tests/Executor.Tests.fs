@@ -160,4 +160,21 @@ type Tests(db: DBFixture) =
     |> Seq.toList
     |> should equal [ row 10L; row 12L ]
 
+  [<Fact>]
+  let ``execute consistent noise`` () =
+    let price = column products 2
+    // These specific grouping expresions result in different noisy counts
+    // without bucket label normalization during seeding, do not change them.
+    let priceInteger = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Integer 1000L) ])
+    let priceReal = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Real 1000.0) ])
+    let idColumn = column products 0
+    let diffixCount = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ ListExpr [ idColumn ] ])
+    let scanProducts = Plan.Scan(products, [ 0; 2 ])
+
+    let makePlan groupBy =
+      Plan.Project(Plan.Aggregate(scanProducts, [ groupBy ], [ diffixCount ]), [ ColumnReference(1, IntegerType) ])
+
+    (priceInteger |> makePlan |> execute)
+    |> should equal (priceReal |> makePlan |> execute)
+
   interface IClassFixture<DBFixture>
