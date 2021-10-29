@@ -17,9 +17,9 @@ type Tests(db: DBFixture) =
     ColumnReference(index, column.Type)
 
   let plus1 expression =
-    FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
+    Expression.makeFunction Add [ expression; Constant(Integer 1L) ]
 
-  let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
+  let nameLength = Expression.makeFunction Length [ column products 1 ]
   let countStar = Expression.makeAggregate Count []
 
   let countDistinct expression =
@@ -46,7 +46,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute filter`` () =
-    let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "Milk") ])
+    let condition = Expression.makeFunction Equals [ column products 1; Constant(String "Milk") ]
     let plan = Plan.Filter(Plan.Scan(products, [ 1 ]), condition)
     let expected = [ [| Null; String "Milk"; Null |] ]
     plan |> execute |> should equal expected
@@ -83,7 +83,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute grouping aggregate over nothing`` () =
-    let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
+    let condition = Expression.makeFunction Equals [ column products 1; Constant(String "xxx") ]
     let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [ nameLength ], [ countStar ])
 
     let expected: Row list = []
@@ -91,7 +91,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute global aggregate over nothing`` () =
-    let condition = FunctionExpr(ScalarFunction Equals, [ column products 1; Constant(String "xxx") ])
+    let condition = Expression.makeFunction Equals [ column products 1; Constant(String "xxx") ]
     let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [], [ countStar ])
 
     let expected = [ [| Integer 0L |] ]
@@ -101,7 +101,7 @@ type Tests(db: DBFixture) =
   let ``execute inner join`` () =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
-    let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
+    let condition = Expression.makeFunction Equals [ plus1 idColumn1; idColumn2 ]
     let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), InnerJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
@@ -112,7 +112,7 @@ type Tests(db: DBFixture) =
   let ``execute outer join`` () =
     let idColumn1 = column products 0
     let idColumn2 = ColumnReference(products.Columns.Length, IntegerType)
-    let condition = FunctionExpr(ScalarFunction Equals, [ plus1 idColumn1; idColumn2 ])
+    let condition = Expression.makeFunction Equals [ plus1 idColumn1; idColumn2 ]
     let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), LeftJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
@@ -165,8 +165,8 @@ type Tests(db: DBFixture) =
     let price = column products 2
     // These specific grouping expresions result in different noisy counts
     // without bucket label normalization during seeding, do not change them.
-    let priceInteger = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Integer 1000L) ])
-    let priceReal = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Real 1000.0) ])
+    let priceInteger = Expression.makeFunction CeilBy [ price; Constant(Integer 1000L) ]
+    let priceReal = Expression.makeFunction CeilBy [ price; Constant(Real 1000.0) ]
     let idColumn = column products 0
     let diffixCount = Expression.makeAggregate DiffixCount [ ListExpr [ idColumn ] ]
     let scanProducts = Plan.Scan(products, [ 0; 2 ])
