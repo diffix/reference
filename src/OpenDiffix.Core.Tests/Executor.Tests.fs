@@ -20,7 +20,7 @@ type Tests(db: DBFixture) =
     FunctionExpr(ScalarFunction Add, [ expression; Constant(Integer 1L) ])
 
   let nameLength = FunctionExpr(ScalarFunction Length, [ column products 1 ])
-  let countStar = FunctionExpr(AggregateFunction(Count, { Distinct = false; OrderBy = [] }), [])
+  let countStar = Expression.makeAggregate Count []
 
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
@@ -168,7 +168,7 @@ type Tests(db: DBFixture) =
     let priceInteger = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Integer 1000L) ])
     let priceReal = FunctionExpr(ScalarFunction CeilBy, [ price; Constant(Real 1000.0) ])
     let idColumn = column products 0
-    let diffixCount = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ ListExpr [ idColumn ] ])
+    let diffixCount = Expression.makeAggregate DiffixCount [ ListExpr [ idColumn ] ]
     let scanProducts = Plan.Scan(products, [ 0; 2 ])
 
     let makePlan groupBy =
