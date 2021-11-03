@@ -44,7 +44,7 @@ and Expression =
   | Join of joinType: JoinType * left: Expression * right: Expression * on: Expression
   | SubQuery of subQuery: SelectQuery * alias: string
   | Function of functionName: string * Expression list
-  | OrderSpec of expr: Expression * direction: Expression option * nullsBehavior: Expression option
+  | OrderSpec of expr: Expression * direction: Expression * nullsBehavior: Expression
   | SelectQuery of SelectQuery
 // Please notice the lack of the BETWEEN WHERE-clause construct. I couldn't get it to work!!! :/
 // If added as a Ternary parser with "BETWEEN" and "AND" being the phrases to look for, then

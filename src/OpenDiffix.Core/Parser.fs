@@ -97,7 +97,19 @@ module QueryParser =
 
   let orderSpec =
     expr .>>. opt (asc <|> desc) .>>. opt (nullsFirst <|> nullsLast) .>> spaces
-    |>> (fun ((expr, direction), nullsBehavior) -> Expression.OrderSpec(expr, direction, nullsBehavior))
+    |>> (fun ((expr, optDirection), optNullsBehavior) ->
+
+      let (direction, nullsBehavior) =
+        // we want the default nulls behavior to be "NULL values are largest", `ORDER BY x DESC` is a special case
+        match (optDirection, optNullsBehavior) with
+        | None, None -> Asc, NullsLast
+        | Some Asc, None -> Asc, NullsLast
+        | Some Desc, None -> Desc, NullsFirst
+        | None, Some nullsBehavior -> Asc, nullsBehavior
+        | Some direction, Some nullsBehavior -> direction, nullsBehavior
+        | _ -> failwith "Invalid `ORDER BY` clause"
+
+      OrderSpec(expr, direction, nullsBehavior))
 
   let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated orderSpec
 

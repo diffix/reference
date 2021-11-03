@@ -187,13 +187,13 @@ let ``Parses ORDER BY statement`` () =
   |> should
        equal
        [
-         OrderSpec(Identifier(None, "a"), None, None)
-         OrderSpec(Identifier(None, "b"), None, None)
-         OrderSpec(Identifier(None, "c"), None, None)
+         OrderSpec(Identifier(None, "a"), Asc, NullsLast)
+         OrderSpec(Identifier(None, "b"), Asc, NullsLast)
+         OrderSpec(Identifier(None, "c"), Asc, NullsLast)
        ]
 
   parseFragment orderBy "ORDER BY a"
-  |> should equal [ OrderSpec(Identifier(None, "a"), None, None) ]
+  |> should equal [ OrderSpec(Identifier(None, "a"), Asc, NullsLast) ]
 
   expectFailWithParser orderBy "ORDER BY"
 
@@ -296,7 +296,7 @@ let ``Parse complex aggregate query`` () =
              )
            GroupBy = [ Identifier(None, "col1") ]
            Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
-           OrderBy = [ OrderSpec(Identifier(None, "col2"), Some(Desc), Some(NullsFirst)) ]
+           OrderBy = [ OrderSpec(Identifier(None, "col2"), Desc, NullsFirst) ]
            Limit = Some(42u)
        }
 

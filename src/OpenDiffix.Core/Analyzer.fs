@@ -142,37 +142,22 @@ let private mapOrderByIndices (targetList: TargetEntry list) orderByExpressions 
   let selectedExpressions = targetList |> List.map (fun targetEntry -> targetEntry.Expression)
   orderByExpressions |> List.map (mapOrderByIndex selectedExpressions)
 
-let private interpretDirection optDirection =
-  optDirection
-  |> Option.map (
-    function
-    | ParserTypes.Asc -> Ascending
-    | ParserTypes.Desc -> Descending
-    | _ -> failwith "Invalid `ORDER BY` clause"
-  )
+let private interpretDirection direction =
+  match direction with
+  | ParserTypes.Asc -> Ascending
+  | ParserTypes.Desc -> Descending
+  | _ -> failwith "Invalid `ORDER BY` clause"
 
-let private interpretNullsBehavior optNullsBehavior =
-  optNullsBehavior
-  |> Option.map (
-    function
-    | ParserTypes.NullsFirst -> NullsFirst
-    | ParserTypes.NullsLast -> NullsLast
-    | _ -> failwith "Invalid `ORDER BY` clause"
-  )
+let private interpretNullsBehavior nullsBehavior =
+  match nullsBehavior with
+  | ParserTypes.NullsFirst -> NullsFirst
+  | ParserTypes.NullsLast -> NullsLast
+  | _ -> failwith "Invalid `ORDER BY` clause"
 
 let private interpretOrderByExpression rangeColumns expression =
   match expression with
-  | ParserTypes.OrderSpec (expression, optDirection, optNullsBehavior) ->
-    let (direction, nullsBehavior) =
-      // we want the default nulls behavior to be "NULL values are largest", `ORDER BY x DESC` is a special case
-      match (interpretDirection optDirection, interpretNullsBehavior optNullsBehavior) with
-      | None, None -> Ascending, NullsLast
-      | Some Ascending, None -> Ascending, NullsLast
-      | Some Descending, None -> Descending, NullsFirst
-      | None, Some nullsBehavior -> Ascending, nullsBehavior
-      | Some direction, Some nullsBehavior -> direction, nullsBehavior
-
-    (mapExpression rangeColumns expression), direction, nullsBehavior
+  | ParserTypes.OrderSpec (expression, direction, nullsBehavior) ->
+    (mapExpression rangeColumns expression), (interpretDirection direction), (interpretNullsBehavior nullsBehavior)
   | _ -> failwith "Invalid `ORDER BY` clause"
 
 // ----------------------------------------------------------------
