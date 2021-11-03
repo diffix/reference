@@ -180,6 +180,18 @@ type Tests(db: DBFixture) =
     queryResult |> should equal expected
 
   [<Fact>]
+  let ``query 13 - order by`` () =
+    let queryResult = runQuery "SELECT age, count(*) FROM customers_small GROUP BY 1 ORDER BY 1"
+
+    let expected =
+      {
+        Columns = [ { Name = "age"; Type = IntegerType }; { Name = "count"; Type = IntegerType } ]
+        Rows = [ [| Integer 25L; Integer 7L |]; [| Integer 30L; Integer 7L |]; [| Integer 35L; Integer 6L |] ]
+      }
+
+    queryResult |> should equal expected
+
+  [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
     equivalentQueries
       "SELECT p.name AS n FROM products AS p WHERE id = 1"

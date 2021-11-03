@@ -126,6 +126,41 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
   groupByExpressions |> List.map (mapGroupByIndex selectedExpressions)
 
 // ----------------------------------------------------------------
+// Order by
+// ----------------------------------------------------------------
+
+let private mapOrderByIndex (expressions: Expression list) orderByExpression =
+  match orderByExpression with
+  | (Constant (Integer index), direction, nullsBehavior) ->
+    if index < 1L || index > int64 expressions.Length then
+      failwith $"Invalid `ORDER BY` index: {index}"
+    else
+      expressions |> List.item (int index - 1), direction, nullsBehavior
+  | _ -> orderByExpression
+
+let private mapOrderByIndices (targetList: TargetEntry list) orderByExpressions =
+  let selectedExpressions = targetList |> List.map (fun targetEntry -> targetEntry.Expression)
+  orderByExpressions |> List.map (mapOrderByIndex selectedExpressions)
+
+let private interpretDirection direction =
+  match direction with
+  | ParserTypes.Asc -> Ascending
+  | ParserTypes.Desc -> Descending
+  | _ -> failwith "Invalid `ORDER BY` clause"
+
+let private interpretNullsBehavior nullsBehavior =
+  match nullsBehavior with
+  | ParserTypes.NullsFirst -> NullsFirst
+  | ParserTypes.NullsLast -> NullsLast
+  | _ -> failwith "Invalid `ORDER BY` clause"
+
+let private interpretOrderByExpression rangeColumns expression =
+  match expression with
+  | ParserTypes.OrderSpec (expression, direction, nullsBehavior) ->
+    (mapExpression rangeColumns expression), (interpretDirection direction), (interpretNullsBehavior nullsBehavior)
+  | _ -> failwith "Invalid `ORDER BY` clause"
+
+// ----------------------------------------------------------------
 // Query range
 // ----------------------------------------------------------------
 
@@ -204,6 +239,12 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     |> List.map (mapExpression rangeColumns)
     |> mapGroupByIndices targetList
 
+  let simpleOrderBy =
+    selectQuery.OrderBy
+    |> List.map (interpretOrderByExpression rangeColumns)
+    |> mapOrderByIndices targetList
+    |> List.map (fun (expression, direction, nullsBehavior) -> OrderBy(expression, direction, nullsBehavior))
+
   let isAggregating = not (List.isEmpty groupBy && List.isEmpty (collectAggregates targetList))
 
   let aidTargets =
@@ -235,7 +276,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     From = range
     GroupBy = groupBy
     Having = havingClause
-    OrderBy = []
+    OrderBy = simpleOrderBy
     Limit = selectQuery.Limit
   }
 

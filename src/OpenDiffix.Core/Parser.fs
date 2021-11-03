@@ -44,6 +44,10 @@ module QueryParser =
   let commaSeparated p = sepBy1 p (pchar ',' .>> spaces)
 
   let star = word "*" |>> fun _ -> Expression.Star
+  let asc = word "ASC" |>> fun _ -> Expression.Asc
+  let desc = word "DESC" |>> fun _ -> Expression.Desc
+  let nullsFirst = word "NULLS FIRST" |>> fun _ -> Expression.NullsFirst
+  let nullsLast = word "NULLS LAST" |>> fun _ -> Expression.NullsLast
 
   let alias = word "AS" >>. identifier
 
@@ -90,6 +94,24 @@ module QueryParser =
   let havingClause = word "HAVING" >>. expr
 
   let limitClause = word "LIMIT" >>. puint32
+
+  let orderSpec =
+    expr .>>. opt (asc <|> desc) .>>. opt (nullsFirst <|> nullsLast) .>> spaces
+    |>> (fun ((expr, optDirection), optNullsBehavior) ->
+
+      let (direction, nullsBehavior) =
+        // we want the default nulls behavior to be "NULL values are largest", `ORDER BY x DESC` is a special case
+        match (optDirection, optNullsBehavior) with
+        | None, None -> Asc, NullsLast
+        | Some Asc, None -> Asc, NullsLast
+        | Some Desc, None -> Desc, NullsFirst
+        | None, Some nullsBehavior -> Asc, nullsBehavior
+        | Some direction, Some nullsBehavior -> direction, nullsBehavior
+        | _ -> failwith "Invalid `ORDER BY` clause"
+
+      OrderSpec(expr, direction, nullsBehavior))
+
+  let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated orderSpec
 
   let groupBy = words [ "GROUP"; "BY" ] .>> spaces >>. commaSeparated expr
 
@@ -145,20 +167,23 @@ module QueryParser =
                                      >>= fun groupBy ->
                                            opt havingClause
                                            >>= fun having ->
-                                                 opt limitClause
-                                                 >>= fun limit ->
-                                                       let query =
-                                                         {
-                                                           SelectDistinct = distinct
-                                                           Expressions = columns
-                                                           From = from
-                                                           Where = whereClause
-                                                           GroupBy = groupBy |> Option.defaultValue []
-                                                           Having = having
-                                                           Limit = limit
-                                                         }
+                                                 opt orderBy
+                                                 >>= fun orderBy ->
+                                                       opt limitClause
+                                                       >>= fun limit ->
+                                                             let query =
+                                                               {
+                                                                 SelectDistinct = distinct
+                                                                 Expressions = columns
+                                                                 From = from
+                                                                 Where = whereClause
+                                                                 GroupBy = groupBy |> Option.defaultValue []
+                                                                 Having = having
+                                                                 Limit = limit
+                                                                 OrderBy = orderBy |> Option.defaultValue []
+                                                               }
 
-                                                       preturn (Expression.SelectQuery query)
+                                                             preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore

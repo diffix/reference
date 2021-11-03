@@ -17,6 +17,7 @@ let defaultSelect =
     GroupBy = []
     Having = None
     Limit = None
+    OrderBy = []
   }
 
 let expectFail query =
@@ -181,6 +182,27 @@ let ``Parses GROUP BY statement`` () =
   expectFailWithParser groupBy "GROUP BY"
 
 [<Fact>]
+let ``Parses ORDER BY statement`` () =
+  parseFragment orderBy "ORDER BY a, b, c"
+  |> should
+       equal
+       [
+         OrderSpec(Identifier(None, "a"), Asc, NullsLast)
+         OrderSpec(Identifier(None, "b"), Asc, NullsLast)
+         OrderSpec(Identifier(None, "c"), Asc, NullsLast)
+       ]
+
+  parseFragment orderBy "ORDER BY a"
+  |> should equal [ OrderSpec(Identifier(None, "a"), Asc, NullsLast) ]
+
+  expectFailWithParser orderBy "ORDER BY"
+
+  expectFailWithParser orderBy "ORDER BY a DESZCZ"
+
+  // bad order
+  expectFailWithParser orderBy "ORDER BY a NULLS FIRST ASC"
+
+[<Fact>]
 let ``Parses SELECT by itself`` () =
   parseFragment selectQuery "SELECT col FROM table"
   |> should equal (SelectQuery { defaultSelect with Expressions = [ As(Identifier(None, "col"), None) ] })
@@ -254,6 +276,8 @@ let ``Parse complex aggregate query`` () =
        WHERE col1 = 1 AND col2 = 2 or col2 = 3
        GROUP BY col1
        HAVING count(distinct aid) > 1
+       ORDER BY col2 DESC NULLS FIRST
+       LIMIT 42
        """
   |> should
        equal
@@ -272,6 +296,8 @@ let ``Parse complex aggregate query`` () =
              )
            GroupBy = [ Identifier(None, "col1") ]
            Having = Some <| Gt(Function("count", [ Distinct(Identifier(None, "aid")) ]), Integer 1L)
+           OrderBy = [ OrderSpec(Identifier(None, "col2"), Desc, NullsFirst) ]
+           Limit = Some(42u)
        }
 
 [<Fact>]
