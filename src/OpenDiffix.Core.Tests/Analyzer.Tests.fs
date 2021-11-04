@@ -309,8 +309,12 @@ type Tests(db: DBFixture) =
     |> Analyzer.anonymize queryContext
     |> snd
 
-  let assertSqlSeed query (seedMaterial: string) =
-    let expectedSeed = seedMaterial |> System.Text.Encoding.UTF8.GetBytes |> Hash.bytes
+  let assertSqlSeed query (seedMaterial: string seq) =
+    let expectedSeed =
+      seedMaterial
+      |> Seq.map (System.Text.Encoding.UTF8.GetBytes >> Hash.bytes)
+      |> Seq.fold (^^^) 0UL
+
     (sqlNoiseLayers query).BucketSeed |> should equal expectedSeed
 
   [<Fact>]
@@ -433,17 +437,17 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``SQL seed from column selection`` () =
-    assertSqlSeed "SELECT city FROM customers_small" "customers_small.city"
+    assertSqlSeed "SELECT city FROM customers_small" [ "customers_small.city" ]
 
   [<Fact>]
   let ``SQL seed from column generalization`` () =
-    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" "substring,customers_small.city,1,2"
+    assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" [ "substring,customers_small.city,1,2" ]
 
   [<Fact>]
   let ``SQL seed from multiple groupings from multiple tables`` () =
     assertSqlSeed
       "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      "customers_small.city,round,purchases.amount,1"
+      [ "customers_small.city"; "round,purchases.amount,1" ]
 
   [<Fact>]
   let ``SQL seeds from numeric ranges are consistent`` () =

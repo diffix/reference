@@ -220,4 +220,10 @@ type Tests(db: DBFixture) =
     let queryResult = runQuery "SELECT diffix_count(*, id) AS dc, diffix_low_count(id) AS lc FROM products"
     queryResult |> should equal expected
 
+  [<Fact>]
+  let ``Grouping order doesn't change results`` () =
+    equivalentQueries
+      "SELECT count(*) FROM customers_small GROUP BY round_by(age, 10), city ORDER BY 1"
+      "SELECT count(*) FROM customers_small GROUP BY city, round_by(age, 10) ORDER BY 1"
+
   interface IClassFixture<DBFixture>
