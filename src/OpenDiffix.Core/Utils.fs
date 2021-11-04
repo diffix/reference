@@ -35,8 +35,10 @@ module Dictionary =
       dict.[key] <- value
       value
 
+type Hash = uint64
+
 module Hash =
-  let bytes (data: byte []) =
+  let bytes (data: byte []) : Hash =
     // Implementation of FNV-1a hash algorithm: http://www.isthe.com/chongo/tech/comp/fnv/index.html
     let fnvPrime = 1099511628211UL
     let offsetBasis = 14695981039346656037UL
@@ -48,3 +50,9 @@ module Hash =
       hash <- hash * fnvPrime
 
     hash
+
+  let string (data: string) =
+    data |> Text.Encoding.UTF8.GetBytes |> bytes
+
+  let strings start data =
+    data |> Seq.map string |> Seq.fold (^^^) start

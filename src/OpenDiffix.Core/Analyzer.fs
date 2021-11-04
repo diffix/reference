@@ -407,10 +407,8 @@ let private computeNoiseLayers anonParams query =
       normalizeNoiseLayerExpression
       >> collectSeedMaterials rangeColumns
       >> String.join ","
-      >> System.Text.Encoding.UTF8.GetBytes
-      >> Hash.bytes
     )
-    |> Seq.fold (^^^) 0UL
+    |> Hash.strings 0UL
 
   { BucketSeed = sqlSeed }
 

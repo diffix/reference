@@ -120,7 +120,6 @@ type IDataProvider =
 // Anonymizer types
 // ----------------------------------------------------------------
 
-type Hash = uint64
 type AidHash = Hash
 
 type Interval =

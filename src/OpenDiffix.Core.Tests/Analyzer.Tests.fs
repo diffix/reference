@@ -309,12 +309,8 @@ type Tests(db: DBFixture) =
     |> Analyzer.anonymize queryContext
     |> snd
 
-  let assertSqlSeed query (seedMaterial: string seq) =
-    let expectedSeed =
-      seedMaterial
-      |> Seq.map (System.Text.Encoding.UTF8.GetBytes >> Hash.bytes)
-      |> Seq.fold (^^^) 0UL
-
+  let assertSqlSeed query (seedMaterials: string seq) =
+    let expectedSeed = Hash.strings 0UL seedMaterials
     (sqlNoiseLayers query).BucketSeed |> should equal expectedSeed
 
   [<Fact>]
