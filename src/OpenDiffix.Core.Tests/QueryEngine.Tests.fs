@@ -13,7 +13,7 @@ type Tests(db: DBFixture) =
       "customers_small", { AidColumns = [ "id" ] } //
     ]
 
-  let noislessAnonParams =
+  let noiselessAnonParams =
     {
       TableSettings = tableSettings
       Salt = [||]
@@ -29,7 +29,7 @@ type Tests(db: DBFixture) =
     let queryContext = QueryContext.make anonymizationParams db.DataProvider
     run queryContext query
 
-  let runQuery = runQueryWithCustomAnonParams noislessAnonParams
+  let runQuery = runQueryWithCustomAnonParams noiselessAnonParams
 
   [<Fact>]
   let ``query 1`` () =
