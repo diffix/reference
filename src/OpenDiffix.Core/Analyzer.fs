@@ -388,6 +388,8 @@ let rec private collectSeedMaterials rangeColumns expression =
 
 let rec private normalizeNoiseLayerExpression expression =
   match expression with
+  | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) ->
+    FunctionExpr(ScalarFunction RoundBy, [ expression; 1.0 |> Real |> Constant ])
   | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeNoiseLayerExpression expression
   | FunctionExpr (ScalarFunction fn, args) ->
     match fn with

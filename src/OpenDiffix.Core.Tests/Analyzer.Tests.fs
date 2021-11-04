@@ -456,4 +456,8 @@ type Tests(db: DBFixture) =
     (sqlNoiseLayers "SELECT ceil_by(age, 1.0) FROM customers_small GROUP BY 1")
     |> should equal (sqlNoiseLayers "SELECT ceil_by(age, 1) FROM customers_small GROUP BY 1")
 
+  [<Fact>]
+  let ``SQL seed from rounding cast`` () =
+    assertSqlSeed "SELECT cast(price AS integer) FROM products" [ "round,products.price,1" ]
+
   interface IClassFixture<DBFixture>
