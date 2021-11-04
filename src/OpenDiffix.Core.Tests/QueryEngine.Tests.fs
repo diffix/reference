@@ -6,14 +6,16 @@ open FsUnit.Xunit
 open QueryEngine
 
 type Tests(db: DBFixture) =
-  let anonParams =
+  let tableSettings =
+    Map [
+      "customers", { AidColumns = [ "id" ] } //
+      "purchases", { AidColumns = [ "cid" ] } //
+      "customers_small", { AidColumns = [ "id" ] } //
+    ]
+
+  let noislessAnonParams =
     {
-      TableSettings =
-        Map [
-          "customers", { AidColumns = [ "id" ] } //
-          "purchases", { AidColumns = [ "cid" ] } //
-          "customers_small", { AidColumns = [ "id" ] } //
-        ]
+      TableSettings = tableSettings
       Salt = [||]
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
@@ -21,11 +23,13 @@ type Tests(db: DBFixture) =
       NoiseSD = 0.
     }
 
+  let noisyAnonParams = { AnonymizationParams.Default with TableSettings = tableSettings }
+
   let runQueryWithCustomAnonParams anonymizationParams query =
     let queryContext = QueryContext.make anonymizationParams db.DataProvider
     run queryContext query
 
-  let runQuery = runQueryWithCustomAnonParams anonParams
+  let runQuery = runQueryWithCustomAnonParams noislessAnonParams
 
   [<Fact>]
   let ``query 1`` () =
@@ -141,8 +145,8 @@ type Tests(db: DBFixture) =
     |> should equal expected
 
   let equivalentQueries expectedQuery testQuery =
-    let testResult = runQuery testQuery
-    let expected = runQuery expectedQuery
+    let testResult = runQueryWithCustomAnonParams noisyAnonParams testQuery
+    let expected = runQueryWithCustomAnonParams noisyAnonParams expectedQuery
     testResult |> should equal expected
 
   [<Fact>]
