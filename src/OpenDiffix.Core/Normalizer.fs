@@ -59,6 +59,17 @@ let private normalizeBooleanExpression expr =
     (fn |> invertComparison |> ScalarFunction, args) |> FunctionExpr
   | _ -> expr
 
+let private normalizeCasts expr =
+  match expr with
+  | FunctionExpr (ScalarFunction Cast, [ arg; Constant (String typeName) ]) ->
+    match (typeName, Expression.typeOf arg) with
+    | "boolean", BooleanType
+    | "integer", IntegerType
+    | "real", RealType
+    | "string", StringType -> arg
+    | _ -> expr
+  | _ -> expr
+
 let rec normalize (query: Query) : Query =
   match query with
   | { From = SubQuery (subquery, alias) } -> { query with From = SubQuery(normalize subquery, alias) }
@@ -66,3 +77,4 @@ let rec normalize (query: Query) : Query =
   |> map (mapBottomUp normalizeConstant)
   |> map (mapBottomUp normalizeComparison)
   |> map (mapBottomUp normalizeBooleanExpression)
+  |> map (mapBottomUp normalizeCasts)
