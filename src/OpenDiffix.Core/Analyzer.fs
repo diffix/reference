@@ -386,11 +386,11 @@ let rec private collectSeedMaterials rangeColumns expression =
   | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
   | _ -> [ basicSeedMaterial rangeColumns expression ]
 
-let rec private normalizeNoiseLayerExpression expression =
+let rec private normalizeBucketLabelExpression expression =
   match expression with
   | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) ->
     FunctionExpr(ScalarFunction RoundBy, [ expression; 1.0 |> Real |> Constant ])
-  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeNoiseLayerExpression expression
+  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketLabelExpression expression
   | FunctionExpr (ScalarFunction fn, args) ->
     match fn with
     | Ceil -> FunctionExpr(ScalarFunction CeilBy, args @ [ 1.0 |> Real |> Constant ])
@@ -406,7 +406,7 @@ let private computeNoiseLayers anonParams query =
     query
     |> collectGroupingExpressions
     |> Seq.map (
-      normalizeNoiseLayerExpression
+      normalizeBucketLabelExpression
       >> collectSeedMaterials rangeColumns
       >> String.join ","
     )
