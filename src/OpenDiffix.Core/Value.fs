@@ -56,5 +56,5 @@ let rec hash value =
   | Boolean true -> 1UL
   | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
   | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
-  | String s -> s |> Text.Encoding.UTF8.GetBytes |> Hash.bytes
+  | String s -> s |> Hash.string
   | List l -> l |> List.map hash |> List.fold (^^^) 0UL

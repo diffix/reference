@@ -51,12 +51,7 @@ let private executeLimit executionContext (childPlan, amount) : seq<Row> =
   childPlan |> execute executionContext |> Seq.truncate (int amount)
 
 let private addValuesToSeed seed values =
-  values
-  |> Seq.map (Value.toString)
-  |> String.join ","
-  |> Text.Encoding.UTF8.GetBytes
-  |> Hash.bytes
-  |> (^^^) seed
+  values |> Seq.map (Value.toString) |> Hash.strings seed
 
 let private executeAggregate executionContext (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
