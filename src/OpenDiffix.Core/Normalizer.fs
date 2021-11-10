@@ -59,6 +59,35 @@ let private normalizeBooleanExpression expr =
     (fn |> invertComparison |> ScalarFunction, args) |> FunctionExpr
   | _ -> expr
 
+let private normalizeCasts expr =
+  match expr with
+  | FunctionExpr (ScalarFunction Cast, [ arg; Constant (String typeName) ]) ->
+    match (typeName, Expression.typeOf arg) with
+    | "boolean", BooleanType
+    | "integer", IntegerType
+    | "real", RealType
+    | "string", StringType -> arg
+    | _ -> expr
+  | _ -> expr
+
+let private normalizeRanges expr =
+  match expr with
+  | FunctionExpr (ScalarFunction fn, [ arg ]) when
+    List.contains fn [ Round; Floor; Ceil ] && Expression.typeOf arg = IntegerType
+    ->
+    arg
+  | FunctionExpr (ScalarFunction fn, [ arg; Constant (Integer 1L) ]) when
+    List.contains fn [ RoundBy; FloorBy; CeilBy ]
+    && Expression.typeOf arg = IntegerType
+    ->
+    arg
+  | FunctionExpr (ScalarFunction fn, [ arg; Constant (Real 1.0) ]) when
+    List.contains fn [ RoundBy; FloorBy; CeilBy ]
+    && Expression.typeOf arg = IntegerType
+    ->
+    FunctionExpr(ScalarFunction Cast, [ arg; Constant(String "real") ])
+  | _ -> expr
+
 let rec normalize (query: Query) : Query =
   match query with
   | { From = SubQuery (subquery, alias) } -> { query with From = SubQuery(normalize subquery, alias) }
@@ -66,3 +95,5 @@ let rec normalize (query: Query) : Query =
   |> map (mapBottomUp normalizeConstant)
   |> map (mapBottomUp normalizeComparison)
   |> map (mapBottomUp normalizeBooleanExpression)
+  |> map (mapBottomUp normalizeRanges)
+  |> map (mapBottomUp normalizeCasts)

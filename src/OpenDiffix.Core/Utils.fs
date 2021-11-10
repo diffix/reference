@@ -55,4 +55,4 @@ module Hash =
     data |> Text.Encoding.UTF8.GetBytes |> bytes
 
   let strings start data =
-    data |> Seq.map string |> Seq.fold (^^^) start
+    data |> Seq.distinct |> Seq.map string |> Seq.fold (^^^) start

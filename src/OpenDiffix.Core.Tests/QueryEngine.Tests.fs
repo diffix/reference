@@ -226,4 +226,10 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers_small GROUP BY round_by(age, 10), city ORDER BY 1"
       "SELECT count(*) FROM customers_small GROUP BY city, round_by(age, 10) ORDER BY 1"
 
+  [<Fact>]
+  let ``Duplicated grouping doesn't change results`` () =
+    equivalentQueries
+      "SELECT count(*) FROM customers_small GROUP BY city, city ORDER BY 1"
+      "SELECT count(*) FROM customers_small GROUP BY city ORDER BY 1"
+
   interface IClassFixture<DBFixture>

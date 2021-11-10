@@ -94,3 +94,33 @@ let ``normalize boolean comparisons (4)`` () =
   equivalentQueries //
     "SELECT valid = FALSE AS b FROM table"
     "SELECT NOT valid AS b FROM table"
+
+[<Fact>]
+let ``normalize casts (1)`` () =
+  equivalentQueries //
+    "SELECT cast(valid AS boolean) AS c FROM table"
+    "SELECT valid as c FROM table"
+
+[<Fact>]
+let ``normalize casts (2)`` () =
+  equivalentQueries //
+    "SELECT cast(cast(age AS integer) as real) AS c FROM table"
+    "SELECT cast(age as real) as c FROM table"
+
+[<Fact>]
+let ``normalize ranges (1)`` () =
+  equivalentQueries //
+    "SELECT round(age) AS x FROM table"
+    "SELECT floor(age) AS x FROM table"
+
+[<Fact>]
+let ``normalize ranges (2)`` () =
+  equivalentQueries //
+    "SELECT round_by(age, 1) AS x FROM table"
+    "SELECT age AS x FROM table"
+
+[<Fact>]
+let ``normalize ranges (3)`` () =
+  equivalentQueries //
+    "SELECT ceil_by(age, 1.0) AS x FROM table"
+    "SELECT cast(age AS real) AS x FROM table"
