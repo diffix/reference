@@ -22,6 +22,16 @@ let fieldToString field =
   | Integer value -> string value
   | Real value -> string value
 
+let fieldToCSVString field =
+  match field with
+  | Null -> ""
+  | Text value -> $"\"{value}\""
+  | Integer value -> string value
+  | Real value -> string value
+
+let quoteString (string: string) =
+  "\"" + string.Replace("\"", "\"\"") + "\""
+
 type Column = { Name: string; Type: Type }
 
 type Table =
@@ -269,6 +279,12 @@ let purchases =
       ]
   }
 
+let rowsSequence table =
+  let generators = List.map statefulGenerator table.Generators
+  let rowGenerator = fun _ -> List.map (fun generator -> generator ()) generators
+  let genericRows = Seq.init table.GeneratedRowsCount rowGenerator
+  Seq.append table.StaticRows genericRows
+
 let generate conn table =
   let columns =
     table.Columns
@@ -283,20 +299,25 @@ let generate conn table =
 
   let columns = table.Columns |> List.map (fun column -> column.Name) |> String.concat ", "
 
-  let generators = List.map statefulGenerator table.Generators
-
-  let rowGenerator = fun _ -> List.map (fun generator -> generator ()) generators
-
-  let genericRows = Seq.init table.GeneratedRowsCount rowGenerator
-
-  let rows = Seq.append table.StaticRows genericRows
-
-  for row in rows do
+  for row in (rowsSequence table) do
     let values = row |> List.map fieldToString |> String.concat ", "
 
     use command = new SQLiteCommand($"INSERT INTO {table.Name} (%s{columns}) VALUES (%s{values})", conn)
 
     command.ExecuteNonQuery() |> ignore
+
+let csvGenerate table =
+  let header =
+    table.Columns
+    |> List.map (fun column -> quoteString column.Name)
+    |> String.concat ","
+
+  let csvRows =
+    (rowsSequence table)
+    |> Seq.map (fun row -> row |> List.map fieldToCSVString |> String.concat ",")
+    |> Seq.toList
+
+  header :: csvRows |> String.concat "\n"
 
 // Main Body
 
@@ -314,6 +335,16 @@ generate conn purchases
 generate conn customersSmall
 
 conn.Close()
+
+printfn "SQLite file done!"
+
+let csvFilePath = Path.Combine(__SOURCE_DIRECTORY__, "customers.csv")
+
+File.Delete(csvFilePath)
+
+printfn "Creating table %A as CSV" customers.Name
+
+File.WriteAllText(csvFilePath, csvGenerate customers)
 
 printfn "Done!"
 
