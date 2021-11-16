@@ -2,17 +2,21 @@ module rec OpenDiffix.Core.Executor
 
 open System
 
-let private filter condition rows =
-  rows
-  |> Seq.filter (fun row -> condition |> Expression.evaluate row |> Value.unwrapBoolean)
+module Utils =
+  let filter condition rows =
+    rows
+    |> Seq.filter (fun row -> condition |> Expression.evaluate row |> Value.unwrapBoolean)
 
-let private unpackAggregator =
-  function
-  | FunctionExpr (AggregateFunction _ as fn, args) -> fn, args
-  | _ -> failwith "Expression is not an aggregator"
+  let unpackAggregator =
+    function
+    | FunctionExpr (AggregateFunction _ as fn, args) -> fn, args
+    | _ -> failwith "Expression is not an aggregator"
 
-let private unpackAggregators aggregators =
-  aggregators |> Array.map unpackAggregator |> Array.unzip
+  let unpackAggregators aggregators =
+    aggregators |> Array.map unpackAggregator |> Array.unzip
+
+  let addValuesToSeed seed values =
+    values |> Seq.map (Value.toString) |> Hash.strings seed
 
 // ----------------------------------------------------------------
 // Node execution
@@ -39,7 +43,7 @@ let private executeProjectSet executionContext (childPlan, fn, args) : seq<Row> 
   )
 
 let private executeFilter executionContext (childPlan, condition) : seq<Row> =
-  childPlan |> execute executionContext |> filter condition
+  childPlan |> execute executionContext |> Utils.filter condition
 
 let private executeSort executionContext (childPlan, orderings) : seq<Row> =
   childPlan |> execute executionContext |> Expression.sortRows orderings
@@ -50,13 +54,10 @@ let private executeLimit executionContext (childPlan, amount) : seq<Row> =
 
   childPlan |> execute executionContext |> Seq.truncate (int amount)
 
-let private addValuesToSeed seed values =
-  values |> Seq.map (Value.toString) |> Hash.strings seed
-
 let private executeAggregate executionContext (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let isGlobal = Array.isEmpty groupingLabels
-  let aggFns, aggArgs = aggregators |> Array.ofList |> unpackAggregators
+  let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
 
   let makeAggregators () =
     aggFns |> Array.map (Aggregator.create executionContext isGlobal)
@@ -81,7 +82,7 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
 
   state
   |> Seq.map (fun pair ->
-    let bucketSeed = addValuesToSeed executionContext.NoiseLayers.BucketSeed pair.Key
+    let bucketSeed = Utils.addValuesToSeed executionContext.NoiseLayers.BucketSeed pair.Key
 
     let childExecutionContext =
       { executionContext with
@@ -106,7 +107,7 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   outerPlan
   |> execute executionContext
   |> Seq.collect (fun outerRow ->
-    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> filter on
+    let joinedRows = innerRows |> List.map (rowJoiner outerRow) |> Utils.filter on
 
     if isOuterJoin && Seq.isEmpty joinedRows then
       let nullInnerRow = Array.create innerColumnsCount Null
