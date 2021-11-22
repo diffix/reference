@@ -4,11 +4,20 @@ open System.Collections.Generic
 
 type IAggregator =
   abstract Transition : Value list -> unit
+  abstract Merge : IAggregator -> unit
   abstract Final : ExecutionContext -> Value
 
 // ----------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------
+
+let private mergingNotSupported () =
+  raise (System.NotSupportedException("Merging is not supported for this aggregator."))
+
+let private castAggregator<'TAgg when 'TAgg :> IAggregator> (agg: IAggregator) =
+  match agg with
+  | :? 'TAgg as tAgg -> tAgg
+  | _ -> failwith "Cannot merge incompatible aggregators."
 
 let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
@@ -39,6 +48,8 @@ type private Count() =
       | [ Null ] -> ()
       | _ -> state <- state + 1L
 
+    member this.Merge _aggregator = mergingNotSupported ()
+
     member this.Final _ctx = Integer state
 
 type private CountDistinct() =
@@ -50,6 +61,8 @@ type private CountDistinct() =
       | [ Null ] -> ()
       | [ value ] -> state.Add(value) |> ignore
       | _ -> invalidArgs args
+
+    member this.Merge _aggregator = mergingNotSupported ()
 
     member this.Final _ctx = state.Count |> int64 |> Integer
 
@@ -65,6 +78,8 @@ type private Sum() =
         | Integer oldValue, [ Integer value ] -> Integer(oldValue + value)
         | Real oldValue, [ Real value ] -> Real(oldValue + value)
         | _ -> invalidArgs args
+
+    member this.Merge _aggregator = mergingNotSupported ()
 
     member this.Final _ctx = state
 
@@ -124,6 +139,8 @@ type private DiffixCount(minCount) =
       | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
       | _ -> invalidArgs args
 
+    member this.Merge _aggregator = mergingNotSupported ()
+
     member this.Final executionContext =
       if isNull state then
         Integer minCount
@@ -161,6 +178,8 @@ type private DiffixCountDistinct(minCount) =
         )
       | _ -> invalidArgs args
 
+    member this.Merge _aggregator = mergingNotSupported ()
+
     member this.Final executionContext =
       match Anonymizer.countDistinct executionContext aidsCount aidsPerValue with
       | Null -> Integer minCount
@@ -188,6 +207,8 @@ type private DiffixLowCount() =
 
       | _ -> invalidArgs args
 
+    member this.Merge _aggregator = mergingNotSupported ()
+
     member this.Final executionContext =
       if isNull state then
         Boolean true
@@ -204,6 +225,8 @@ type private MergeAids() =
       | [ Value.List aidValues ] -> state.UnionWith(aidValues)
       | [ aidValue ] -> state.Add(aidValue) |> ignore
       | _ -> invalidArgs args
+
+    member this.Merge _aggregator = mergingNotSupported ()
 
     member this.Final _ctx = state |> Seq.toList |> Value.List
 
