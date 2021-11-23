@@ -19,6 +19,11 @@ let private castAggregator<'TAgg when 'TAgg :> IAggregator> (agg: IAggregator) =
   | :? 'TAgg as tAgg -> tAgg
   | _ -> failwith "Cannot merge incompatible aggregators."
 
+let mergeHashSetsInto (destination: HashSet<_> array) (source: HashSet<_> array) =
+  source |> Array.iteri (fun i -> destination.[i].UnionWith)
+
+let cloneHashSet (hashSet: HashSet<'T>) = HashSet<'T>(hashSet, hashSet.Comparer)
+
 let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
 
@@ -86,6 +91,9 @@ type private Sum() =
 type private DiffixCount(minCount) =
   let mutable state: Anonymizer.AidCountState array = null
 
+  let initialState length : Anonymizer.AidCountState array =
+    Array.init length (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0L })
+
   /// Increases contribution of a single AID value.
   let increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidHash, float>) =
     let aidHash = hashAid aidValue
@@ -99,11 +107,7 @@ type private DiffixCount(minCount) =
 
   /// Increases contribution of all AID instances.
   let increaseContributions valueIncrease (aidInstances: Value list) =
-    if isNull state then
-      state <-
-        Array.init
-          aidInstances.Length
-          (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0L })
+    if isNull state then state <- initialState aidInstances.Length
 
     aidInstances
     |> List.iteri (fun i aidValue ->
@@ -130,6 +134,8 @@ type private DiffixCount(minCount) =
     | Value.List aidInstances -> increaseContributions valueIncrease aidInstances
     | _ -> failwith "Expecting a list as input"
 
+  member this.State = state
+
   interface IAggregator with
     member this.Transition args =
       match args with
@@ -139,7 +145,23 @@ type private DiffixCount(minCount) =
       | [ aidInstances; _ ] -> updateAidMaps aidInstances 1L
       | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      let otherState = (castAggregator<DiffixCount> aggregator).State
+
+      if otherState <> null then
+        if isNull state then state <- initialState otherState.Length
+
+        otherState
+        |> Array.iteri (fun i otherAidCountState ->
+          let aidCountState = state.[i]
+          let aidContributions = aidCountState.AidContributions
+          aidCountState.UnaccountedFor <- aidCountState.UnaccountedFor + otherAidCountState.UnaccountedFor
+
+          otherAidCountState.AidContributions
+          |> Seq.iter (fun pair ->
+            aidContributions.[pair.Key] <- (aidContributions |> Dictionary.getOrDefault pair.Key 0.0) + pair.Value
+          )
+        )
 
     member this.Final executionContext =
       if isNull state then
@@ -153,6 +175,10 @@ type private DiffixCount(minCount) =
 type private DiffixCountDistinct(minCount) =
   let mutable aidsCount = 0
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
+
+  member this.AidsCount = aidsCount
+
+  member this.State = aidsPerValue
 
   interface IAggregator with
     member this.Transition args =
@@ -178,7 +204,18 @@ type private DiffixCountDistinct(minCount) =
         )
       | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      let other = (castAggregator<DiffixCountDistinct> aggregator)
+      let otherAidsPerValue = other.State
+
+      if aidsCount = 0 then aidsCount <- other.AidsCount
+
+      otherAidsPerValue
+      |> Seq.iter (fun pair ->
+        match aidsPerValue.TryGetValue(pair.Key) with
+        | true, aidSets -> pair.Value |> mergeHashSetsInto aidSets
+        | false, _ -> aidsPerValue.[pair.Key] <- pair.Value |> Array.map cloneHashSet
+      )
 
     member this.Final executionContext =
       match Anonymizer.countDistinct executionContext aidsCount aidsPerValue with
@@ -188,6 +225,8 @@ type private DiffixCountDistinct(minCount) =
 
 type private DiffixLowCount() =
   let mutable state: HashSet<AidHash> [] = null
+
+  member this.State = state
 
   interface IAggregator with
     member this.Transition args =
@@ -207,7 +246,14 @@ type private DiffixLowCount() =
 
       | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      let otherState = (castAggregator<DiffixLowCount> aggregator).State
+
+      if otherState <> null then
+        if state = null then
+          state <- otherState |> Array.map cloneHashSet
+        else
+          otherState |> mergeHashSetsInto state
 
     member this.Final executionContext =
       if isNull state then
