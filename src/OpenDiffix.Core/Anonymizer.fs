@@ -29,9 +29,8 @@ let private randomNormal stdDev (seed: Hash) =
   let randomNormal = Math.Sqrt(-2.0 * log u1) * Math.Sin(2.0 * Math.PI * u2)
   stdDev * randomNormal
 
-let private sha256 = SHA256.Create()
-
 let private cryptoHashSaltedSeed salt (seed: Hash) : Hash =
+  use sha256 = SHA256.Create()
   let seedBytes = BitConverter.GetBytes(seed)
   let hash = sha256.ComputeHash(Array.append salt seedBytes)
   BitConverter.ToUInt64(hash, 0)
