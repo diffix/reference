@@ -7,10 +7,10 @@ open QueryEngine
 
 type Tests(db: DBFixture) =
   let tableSettings =
-    Map [
-      "customers", { AidColumns = [ "id" ] } //
-      "purchases", { AidColumns = [ "cid" ] } //
-      "customers_small", { AidColumns = [ "id" ] } //
+    Map [ //
+      "customers", { AidColumns = [ "id" ] }
+      "purchases", { AidColumns = [ "cid" ] }
+      "customers_small", { AidColumns = [ "id" ] }
     ]
 
   let noiselessAnonParams =
