@@ -10,8 +10,8 @@ let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Defa
 let diffixLowCount = AggregateFunction(DiffixLowCount, AggregateOptions.Default)
 
 let randomNullableInteger (random: System.Random) =
-  let x = random.Next(100) - 10 // ~10% chance to get a NULL
-  if x < 1 then Null else Integer(int64 x)
+  // 10% chance to get a NULL
+  if random.Next(10) = 0 then Null else Integer(random.Next(100) |> int64)
 
 let buildAidInstancesSequence numAids (random: System.Random) =
   Seq.initInfinite (fun _ -> List.init numAids (fun _ -> randomNullableInteger random) |> Value.List)
