@@ -217,6 +217,7 @@ type AggregationBucket =
     Group: Row
     Aggregators: IAggregator array
     ExecutionContext: ExecutionContext
+    LowCount: bool
   }
 
 type NoiseLayers =

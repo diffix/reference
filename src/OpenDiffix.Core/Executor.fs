@@ -59,11 +59,22 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
   let isGlobal = Array.isEmpty groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
 
+  let lowCountAggs =
+    aggFns
+    |> Seq.indexed
+    |> Seq.choose (fun (i, fn) ->
+      match fn with
+      | AggregateFunction (DiffixLowCount, _) -> Some i
+      | _ -> None
+    )
+    |> Seq.toArray
+
   let makeBucket group executionContext =
     {
       Group = group
       Aggregators = aggFns |> Array.map (Aggregator.create executionContext isGlobal)
       ExecutionContext = executionContext
+      LowCount = false // Computed later
     }
 
   let state = Collections.Generic.Dictionary<Row, AggregationBucket>(Row.equalityComparer)
@@ -96,7 +107,19 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
   state
-  |> Seq.map (fun pair -> pair.Value)
+  |> Seq.map (fun pair ->
+    let bucket = pair.Value
+
+    { bucket with
+        // A bucket is low count if any low count aggregator in scope returns true.
+        LowCount =
+          lowCountAggs
+          |> Array.exists (fun aggIndex ->
+            bucket.Aggregators.[aggIndex].Final bucket.ExecutionContext
+            |> Value.unwrapBoolean
+          )
+    }
+  )
   |> executionContext.QueryContext.PostAggregationHook
        {
          BaseExecutionContext = executionContext
