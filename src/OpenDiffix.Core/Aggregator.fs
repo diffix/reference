@@ -2,11 +2,6 @@ module OpenDiffix.Core.Aggregator
 
 open System.Collections.Generic
 
-type IAggregator =
-  abstract Transition : Value list -> unit
-  abstract Merge : IAggregator -> unit
-  abstract Final : ExecutionContext -> Value
-
 // ----------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------

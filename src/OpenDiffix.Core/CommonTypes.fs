@@ -166,10 +166,13 @@ type AnonymizationParams =
 
 type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
 
+type PostAggregationHook = AggregationContext -> seq<AggregationBucket> -> seq<AggregationBucket>
+
 type QueryContext =
   {
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
+    PostAggregationHook: PostAggregationHook
     ExecutorHook: ExecutorHook option
   }
 
@@ -195,6 +198,26 @@ type Plan =
 // ----------------------------------------------------------------
 // Executor
 // ----------------------------------------------------------------
+
+type IAggregator =
+  abstract Transition : Value list -> unit
+  abstract Merge : IAggregator -> unit
+  abstract Final : ExecutionContext -> Value
+
+type AggregationContext =
+  {
+    BaseExecutionContext: ExecutionContext
+    GroupingLabels: Expression array
+    AggregatorFunctions: Function array
+    AggregatorArgs: array<Expression list>
+  }
+
+type AggregationBucket =
+  {
+    Group: Row
+    Aggregators: IAggregator array
+    ExecutionContext: ExecutionContext
+  }
 
 type NoiseLayers =
   {
@@ -312,6 +335,7 @@ module QueryContext =
     {
       AnonymizationParams = anonParams
       DataProvider = dataProvider
+      PostAggregationHook = fun _aggregationContext -> id
       ExecutorHook = None
     }
 
