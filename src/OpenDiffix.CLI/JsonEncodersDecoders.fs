@@ -53,7 +53,7 @@ module private rec Encoders =
         LowSd = ap.Suppression.SD
         OutlierCount = ap.OutlierCount
         TopCount = ap.TopCount
-        NoiseSd = ap.NoiseSD
+        LayerNoiseSd = ap.LayerNoiseSD
       |}
 
     autoEncode anonParams

@@ -25,7 +25,7 @@ type CliArguments =
   | [<Unique>] Low_Mean_Gap of float
 
   // General anonymization parameters
-  | [<Unique>] Noise_SD of float
+  | [<Unique>] Layer_Noise_SD of float
 
   interface IArgParserTemplate with
     member this.Usage =
@@ -52,7 +52,8 @@ type CliArguments =
       | Low_SD _ -> "Sets the standard deviation for the low count filter threshold."
       | Low_Mean_Gap _ ->
         "Sets the number of standard deviations between the lower bound and the mean of the low count filter threshold."
-      | Noise_SD _ -> "Specifies the standard deviation used when calculating the noise throughout the system."
+      | Layer_Noise_SD _ ->
+        "Specifies the standard deviation used when calculating aggregation noise for each noise layer."
 
 let executableName = "OpenDiffix.CLI"
 
@@ -69,7 +70,7 @@ let toInterval =
 let toNoise =
   function
   | Some stdDev -> stdDev
-  | _ -> AnonymizationParams.Default.NoiseSD
+  | _ -> AnonymizationParams.Default.LayerNoiseSD
 
 let private toTableSettings (aidColumns: string list option) =
   aidColumns
@@ -108,7 +109,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     Suppression = suppression
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
-    NoiseSD = parsedArgs.TryGetResult Noise_SD |> toNoise
+    LayerNoiseSD = parsedArgs.TryGetResult Layer_Noise_SD |> toNoise
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =

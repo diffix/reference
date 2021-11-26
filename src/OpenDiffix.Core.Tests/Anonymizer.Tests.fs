@@ -33,7 +33,7 @@ let executionContext =
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
-      NoiseSD = 0.
+      LayerNoiseSD = 0.
     })
   |> ExecutionContext.fromQueryContext
 

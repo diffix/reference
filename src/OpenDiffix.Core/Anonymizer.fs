@@ -138,11 +138,11 @@ let inline private aidFlattening
     let flattenedAvg = flattenedSum / float aidContributions.Length
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
-    let noiseSD = executionContext.AnonymizationParams.NoiseSD * noiseScale
+    let noiseSD = executionContext.AnonymizationParams.LayerNoiseSD * noiseScale
 
     let noise =
       [ executionContext.NoiseLayers.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
-      |> generateNoise anonParams.Salt "noise" anonParams.NoiseSD
+      |> generateNoise anonParams.Salt "noise" anonParams.LayerNoiseSD
 
     Some
       {
