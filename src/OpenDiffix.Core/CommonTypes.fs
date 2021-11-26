@@ -209,7 +209,6 @@ type AggregationContext =
     ExecutionContext: ExecutionContext
     GroupingLabels: Expression array
     Aggregators: (Function * Expression list) array
-    LowCountIndex: int option
   }
 
 type AggregationBucket =

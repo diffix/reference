@@ -102,12 +102,6 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
          ExecutionContext = executionContext
          GroupingLabels = groupingLabels
          Aggregators = Array.zip aggFns aggArgs
-         LowCountIndex =
-           aggFns
-           |> Array.tryFindIndex
-                (function
-                | AggregateFunction (DiffixLowCount, _) -> true
-                | _ -> false)
        }
   |> Seq.map (fun bucket ->
     Array.append bucket.Group (bucket.Aggregators |> Array.map (fun agg -> agg.Final bucket.ExecutionContext))
