@@ -3,6 +3,20 @@ module rec OpenDiffix.Core.QueryValidator
 open AnalyzerTypes
 open NodeUtils
 
+let private validateSingleLowCount query =
+  let lowCountAggregators =
+    query
+    |> collectAggregates
+    |> List.filter (
+      function
+      | FunctionExpr (AggregateFunction (DiffixLowCount, _), _) -> true
+      | _ -> false
+    )
+    |> List.distinct
+
+  if List.length lowCountAggregators > 1 then
+    failwith "A single low count aggregator is allowed in a query"
+
 let private validateOnlyCount query =
   query
   |> visitAggregates (
@@ -51,8 +65,11 @@ let private validateLimitUsage selectQuery =
 // Public API
 // ----------------------------------------------------------------
 
-/// Validates a top-level anonymizing query.
-let validateQuery (selectQuery: SelectQuery) =
-  validateOnlyCount selectQuery
-  allowedCountUsage selectQuery
-  validateSelectTarget selectQuery
+/// Validates a top-level query.
+let validateQuery isAnonymizing (selectQuery: SelectQuery) =
+  validateSingleLowCount selectQuery
+
+  if isAnonymizing then
+    validateOnlyCount selectQuery
+    allowedCountUsage selectQuery
+    validateSelectTarget selectQuery

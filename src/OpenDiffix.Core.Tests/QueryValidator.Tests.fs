@@ -20,15 +20,15 @@ let queryContext = QueryContext.make AnonymizationParams.Default dataProvider
 
 let aidColIndex = Table.findColumn testTable "int_col" |> fst
 
-let analyzeQuery queryString =
+let analyzeQuery isAnonymizing queryString =
   queryString
   |> Parser.parse
   |> Analyzer.analyze queryContext
-  |> QueryValidator.validateQuery
+  |> QueryValidator.validateQuery isAnonymizing
 
-let ensureFailParsedQuery queryString (errorFragment: string) =
+let ensureFailParsedQuery isAnonymizing queryString (errorFragment: string) =
   try
-    analyzeQuery queryString
+    analyzeQuery isAnonymizing queryString
     failwith "Was expecting query analysis to fail"
   with
   | ex ->
@@ -39,11 +39,20 @@ let ensureFailParsedQuery queryString (errorFragment: string) =
     else
       failwith $"Expecting error to contain '%s{errorFragment}'. Got '%s{str}' instead."
 
-let ensureAnalyzeValid queryString = analyzeQuery queryString
+let ANONYMIZING = true
+let NOT_ANONYMIZING = false
+
+let ensureAnalyzeValid queryString = analyzeQuery ANONYMIZING queryString
+
+let ensureAnalyzeFails queryString errorFragment =
+  ensureFailParsedQuery ANONYMIZING queryString errorFragment
+
+let ensureAnalyzeNotAnonFails queryString errorFragment =
+  ensureFailParsedQuery NOT_ANONYMIZING queryString errorFragment
 
 [<Fact>]
 let ``Fail on sum aggregate`` () =
-  ensureFailParsedQuery "SELECT sum(int_col) FROM table" "only count"
+  ensureAnalyzeFails "SELECT sum(int_col) FROM table" "only count"
 
 [<Fact>]
 let ``Only allow count(*) and count(distinct column)`` () =
@@ -53,9 +62,17 @@ let ``Only allow count(*) and count(distinct column)`` () =
 [<Fact>]
 let ``Disallow aggregates in subqueries`` () =
   let errorFragment = "aggregates in subqueries"
-  ensureFailParsedQuery "SELECT c FROM (SELECT count(*) as c FROM table) x" errorFragment
+  ensureAnalyzeFails "SELECT c FROM (SELECT count(*) as c FROM table) x" errorFragment
 
 [<Fact>]
 let ``Disallow group by in subqueries`` () =
   let errorFragment = "grouping in subqueries"
-  ensureFailParsedQuery "SELECT count(*) FROM (SELECT int_col FROM table GROUP BY 1) x" errorFragment
+  ensureAnalyzeFails "SELECT count(*) FROM (SELECT int_col FROM table GROUP BY 1) x" errorFragment
+
+[<Fact>]
+let ``Disallow multiple low count aggregators`` () =
+  let errorFragment = "single low count aggregator is allowed"
+
+  ensureAnalyzeNotAnonFails
+    "SELECT count(*), diffix_low_count(int_col), diffix_low_count(str_col) FROM table"
+    errorFragment

@@ -16,7 +16,7 @@ module Utils =
     aggregators |> Array.map unpackAggregator |> Array.unzip
 
   let addValuesToSeed seed values =
-    values |> Seq.map (Value.toString) |> Hash.strings seed
+    values |> Seq.map Value.toString |> Hash.strings seed
 
 // ----------------------------------------------------------------
 // Node execution
@@ -59,38 +59,52 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
   let isGlobal = Array.isEmpty groupingLabels
   let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
 
-  let makeAggregators () =
-    aggFns |> Array.map (Aggregator.create executionContext isGlobal)
+  let makeBucket group executionContext =
+    {
+      Group = group
+      Aggregators = aggFns |> Array.map (Aggregator.create executionContext isGlobal)
+      ExecutionContext = executionContext
+    }
 
-  let state = Collections.Generic.Dictionary<Row, Aggregator.T array>(Row.equalityComparer)
-  if isGlobal then state.Add([||], makeAggregators ())
+  let state = Collections.Generic.Dictionary<Row, AggregationBucket>(Row.equalityComparer)
+
+  if isGlobal then
+    let emptyGroup = [||]
+    state.Add(emptyGroup, makeBucket emptyGroup executionContext)
 
   for row in execute executionContext childPlan do
-    let group = groupingLabels |> Array.map (Expression.evaluate row)
     let argEvaluator = Expression.evaluate row
+    let group = groupingLabels |> Array.map argEvaluator
 
-    let aggregators =
+    let bucket =
       match state.TryGetValue(group) with
       | true, aggregators -> aggregators
       | false, _ ->
-        let aggregators = makeAggregators ()
-        state.[group] <- aggregators
-        aggregators
+        let bucketExecutionContext =
+          { executionContext with
+              NoiseLayers =
+                { executionContext.NoiseLayers with
+                    BucketSeed = Utils.addValuesToSeed executionContext.NoiseLayers.BucketSeed group
+                }
+          }
 
-    aggregators
+        let bucket = makeBucket group bucketExecutionContext
+        state.[group] <- bucket
+        bucket
+
+    bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
   state
-  |> Seq.map (fun pair ->
-    let bucketSeed = Utils.addValuesToSeed executionContext.NoiseLayers.BucketSeed pair.Key
-
-    let childExecutionContext =
-      { executionContext with
-          NoiseLayers = { executionContext.NoiseLayers with BucketSeed = bucketSeed }
-      }
-
-    let values = pair.Value |> Array.map (fun acc -> acc.Final childExecutionContext)
-    Array.append pair.Key values
+  |> Seq.map (fun pair -> pair.Value)
+  |> executionContext.QueryContext.PostAggregationHook
+       {
+         ExecutionContext = executionContext
+         GroupingLabels = groupingLabels
+         Aggregators = Array.zip aggFns aggArgs
+       }
+  |> Seq.map (fun bucket ->
+    Array.append bucket.Group (bucket.Aggregators |> Array.map (fun agg -> agg.Final bucket.ExecutionContext))
   )
 
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =

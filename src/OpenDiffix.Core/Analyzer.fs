@@ -131,7 +131,7 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
 
 let private mapOrderByIndex (expressions: Expression list) orderByExpression =
   match orderByExpression with
-  | (Constant (Integer index), direction, nullsBehavior) ->
+  | Constant (Integer index), direction, nullsBehavior ->
     if index < 1L || index > int64 expressions.Length then
       failwith $"Invalid `ORDER BY` index: {index}"
     else
@@ -337,9 +337,9 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
   let aidColumnsExpression = makeAidColumnsExpression rangeColumns
   let isAnonymizing = aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
-  if isAnonymizing then
-    QueryValidator.validateQuery selectQuery
+  QueryValidator.validateQuery isAnonymizing selectQuery
 
+  if isAnonymizing then
     selectQuery
     |> rewriteToDiffixAggregate aidColumnsExpression
     |> addLowCountFilter aidColumnsExpression
