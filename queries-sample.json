@@ -22,7 +22,7 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_s_d": 3
+      "layer_noise_s_d": 3
     }
   },
   {
@@ -48,7 +48,7 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_s_d": 3
+      "layer_noise_s_d": 3
     }
   },
   {
@@ -74,7 +74,7 @@
         "lower": 1,
         "upper": 2
       },
-      "noise_s_d": 3
+      "layer_noise_s_d": 3
     }
   }
 ]

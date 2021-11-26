@@ -148,7 +148,7 @@ type AnonymizationParams =
     // Count params
     OutlierCount: Interval
     TopCount: Interval
-    NoiseSD: float
+    LayerNoiseSD: float
   }
   static member Default =
     {
@@ -157,7 +157,7 @@ type AnonymizationParams =
       Suppression = SuppressionParams.Default
       OutlierCount = Interval.Default
       TopCount = Interval.Default
-      NoiseSD = 1.0
+      LayerNoiseSD = 1.0
     }
 
 // ----------------------------------------------------------------

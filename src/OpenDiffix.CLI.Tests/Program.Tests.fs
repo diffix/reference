@@ -66,7 +66,7 @@ let ``Accepts supported CLI parameters`` () =
     "1.2"
     "--low-mean-gap"
     "1"
-    "--noise-sd"
+    "--layer-noise-sd"
     "2.4"
     "--aid-columns"
     "customers.id"
