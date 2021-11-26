@@ -206,10 +206,10 @@ type IAggregator =
 
 type AggregationContext =
   {
-    BaseExecutionContext: ExecutionContext
+    ExecutionContext: ExecutionContext
     GroupingLabels: Expression array
-    AggregatorFunctions: Function array
-    AggregatorArgs: array<Expression list>
+    Aggregators: (Function * Expression list) array
+    LowCountIndex: int option
   }
 
 type AggregationBucket =
@@ -217,7 +217,6 @@ type AggregationBucket =
     Group: Row
     Aggregators: IAggregator array
     ExecutionContext: ExecutionContext
-    LowCount: bool
   }
 
 type NoiseLayers =
