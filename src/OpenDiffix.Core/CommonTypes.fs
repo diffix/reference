@@ -172,7 +172,7 @@ type QueryContext =
   {
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
-    PostAggregationHook: PostAggregationHook
+    PostAggregationHooks: PostAggregationHook list
     ExecutorHook: ExecutorHook option
   }
 
@@ -334,7 +334,7 @@ module QueryContext =
     {
       AnonymizationParams = anonParams
       DataProvider = dataProvider
-      PostAggregationHook = fun _aggregationContext -> id
+      PostAggregationHooks = []
       ExecutorHook = None
     }
 

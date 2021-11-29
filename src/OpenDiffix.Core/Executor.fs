@@ -95,14 +95,17 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
     bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
-  state
-  |> Seq.map (fun pair -> pair.Value)
-  |> executionContext.QueryContext.PostAggregationHook
-       {
-         ExecutionContext = executionContext
-         GroupingLabels = groupingLabels
-         Aggregators = Array.zip aggFns aggArgs
-       }
+  let aggregationContext =
+    {
+      ExecutionContext = executionContext
+      GroupingLabels = groupingLabels
+      Aggregators = Array.zip aggFns aggArgs
+    }
+
+  let buckets = state |> Seq.map (fun pair -> pair.Value)
+
+  executionContext.QueryContext.PostAggregationHooks
+  |> List.fold (fun buckets hook -> hook aggregationContext buckets) buckets
   |> Seq.map (fun bucket ->
     Array.append bucket.Group (bucket.Aggregators |> Array.map (fun agg -> agg.Final bucket.ExecutionContext))
   )
