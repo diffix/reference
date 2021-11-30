@@ -137,8 +137,7 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-/// Runs the default execution logic for a plan node.
-let executePlanNode executionContext plan : seq<Row> =
+let execute executionContext plan : seq<Row> =
   match plan with
   | Plan.Scan (table, columnIndices) -> executeScan executionContext table columnIndices
   | Plan.Project (plan, expressions) -> executeProject executionContext (plan, expressions)
@@ -149,8 +148,3 @@ let executePlanNode executionContext plan : seq<Row> =
   | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin executionContext (leftPlan, rightPlan, joinType, on)
   | Plan.Limit (plan, amount) -> executeLimit executionContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"
-
-let execute executionContext plan : seq<Row> =
-  match executionContext.QueryContext.ExecutorHook with
-  | Some executorHook -> executorHook executionContext plan
-  | None -> executePlanNode executionContext plan

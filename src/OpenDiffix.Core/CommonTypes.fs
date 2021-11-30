@@ -164,8 +164,6 @@ type AnonymizationParams =
 // Query & Planner
 // ----------------------------------------------------------------
 
-type ExecutorHook = ExecutionContext -> Plan -> seq<Row>
-
 type PostAggregationHook = AggregationContext -> seq<AggregationBucket> -> seq<AggregationBucket>
 
 type QueryContext =
@@ -173,7 +171,6 @@ type QueryContext =
     AnonymizationParams: AnonymizationParams
     DataProvider: IDataProvider
     PostAggregationHooks: PostAggregationHook list
-    ExecutorHook: ExecutorHook option
   }
 
 type JoinType =
@@ -335,7 +332,6 @@ module QueryContext =
       AnonymizationParams = anonParams
       DataProvider = dataProvider
       PostAggregationHooks = []
-      ExecutorHook = None
     }
 
   let makeDefault () =
