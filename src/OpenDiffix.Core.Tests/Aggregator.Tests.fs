@@ -13,25 +13,35 @@ let randomNullableInteger (random: System.Random) =
   if random.Next(10) = 0 then Null else Integer(random.Next(100) |> int64)
 
 let buildAidInstancesSequence numAids (random: System.Random) =
+  // Infinite sequence of (Value.List [aid1, aid2, ...])
   Seq.initInfinite (fun _ -> List.init numAids (fun _ -> randomNullableInteger random) |> Value.List)
 
 let buildIntegerSequence (random: System.Random) =
+  // Infinite sequence of (Value.Integer int | Null)
   Seq.initInfinite (fun _ -> randomNullableInteger random)
 
+/// Builds a list of given length with aggregator transitions.
+/// Each transition contains AID instances as the first argument
+/// and an optional random integer as the second argument.
 let makeAnonArgs hasValueArg random numAids length =
   (if hasValueArg then
+     // Generates a sequence of [ Value.List [aid1, aid2, ...]; Value.Integer int ]
      (buildAidInstancesSequence numAids random, buildIntegerSequence random)
      ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ])
    else
+     // Generates a sequence of [ Value.List [aid1, aid2, ...] ]
      buildAidInstancesSequence numAids random
      |> Seq.map (fun aidInstances -> [ aidInstances ]))
   |> Seq.truncate length
   |> Seq.toList
 
+/// Like `makeAnonArgs` but without the AID instances.
 let makeStandardArgs hasValueArg random length =
   (if hasValueArg then
+     // Generates a sequence of [ Value.Integer int ]
      buildIntegerSequence random |> Seq.map (fun argValue -> [ argValue ])
    else
+     // Generates a sequence of [ ]
      Seq.initInfinite (fun _ -> []))
   |> Seq.truncate length
   |> Seq.toList
@@ -52,6 +62,7 @@ let ensureConsistentMerging ctx fn sourceArgs destinationArgs =
   (destinationArgs @ sourceArgs) |> List.iter replayedAggregator.Transition
   let replayedFinal = replayedAggregator.Final ctx
 
+  // agg2(args2) -> merge_to -> agg1(args1) == agg(args1 ++ args2)
   mergedFinal |> should equal replayedFinal
 
 let makeRandom fn hasValueArg =
@@ -100,9 +111,11 @@ let testStandardAggregatorMerging fn hasValueArg =
 let WITH_VALUE_ARG, WITHOUT_VALUE_ARG = true, false
 let DISTINCT, NON_DISTINCT = true, false
 
+/// Verifies correct merging of an anonymizing aggregator (where first argument is the aid instances).
 let testAnon distinct hasArg fn =
   testAnonAggregatorMerging (makeAgg distinct fn) hasArg
 
+/// Verifies correct merging of a standard aggregator.
 let testStandard distinct hasArg fn =
   testStandardAggregatorMerging (makeAgg distinct fn) hasArg
 
