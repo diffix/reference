@@ -6,9 +6,6 @@ open System.Collections.Generic
 // Helpers
 // ----------------------------------------------------------------
 
-let private mergingNotSupported () =
-  raise (System.NotSupportedException("Merging is not supported for this aggregator."))
-
 let private castAggregator<'TAgg when 'TAgg :> IAggregator> (agg: IAggregator) =
   match agg with
   | :? 'TAgg as tAgg -> tAgg
@@ -42,18 +39,23 @@ let private emptySets length =
 type private Count() =
   let mutable state = 0L
 
+  member this.State = state
+
   interface IAggregator with
     member this.Transition args =
       match args with
       | [ Null ] -> ()
       | _ -> state <- state + 1L
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      state <- state + (castAggregator<Count> aggregator).State
 
     member this.Final _ctx = Integer state
 
 type private CountDistinct() =
   let state = HashSet<Value>()
+
+  member this.State = state
 
   interface IAggregator with
     member this.Transition args =
@@ -62,12 +64,15 @@ type private CountDistinct() =
       | [ value ] -> state.Add(value) |> ignore
       | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      state.UnionWith((castAggregator<CountDistinct> aggregator).State)
 
     member this.Final _ctx = state.Count |> int64 |> Integer
 
 type private Sum() =
   let mutable state = Null
+
+  member this.State = state
 
   interface IAggregator with
     member this.Transition args =
@@ -79,7 +84,8 @@ type private Sum() =
         | Real oldValue, [ Real value ] -> Real(oldValue + value)
         | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      (this :> IAggregator).Transition [ (castAggregator<Sum> aggregator).State ]
 
     member this.Final _ctx = state
 
@@ -259,6 +265,8 @@ type private DiffixLowCount() =
 type private MergeAids() =
   let state = HashSet<Value>()
 
+  member this.State = state
+
   interface IAggregator with
     member this.Transition args =
       match args with
@@ -267,7 +275,8 @@ type private MergeAids() =
       | [ aidValue ] -> state.Add(aidValue) |> ignore
       | _ -> invalidArgs args
 
-    member this.Merge _aggregator = mergingNotSupported ()
+    member this.Merge aggregator =
+      state.UnionWith((castAggregator<MergeAids> aggregator).State)
 
     member this.Final _ctx = state |> Seq.toList |> Value.List
 
