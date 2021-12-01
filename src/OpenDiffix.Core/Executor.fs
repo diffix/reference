@@ -60,13 +60,9 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
   let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
 
   let makeBucket group executionContext =
-    {
-      Group = group
-      Aggregators = aggFns |> Array.map (Aggregator.create executionContext isGlobal)
-      ExecutionContext = executionContext
-    }
+    Bucket.make group (aggFns |> Array.map (Aggregator.create executionContext isGlobal)) executionContext
 
-  let state = Collections.Generic.Dictionary<Row, AggregationBucket>(Row.equalityComparer)
+  let state = Dictionary<Row, Bucket>(Row.equalityComparer)
 
   if isGlobal then
     let emptyGroup = [||]
@@ -95,14 +91,17 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
     bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
-  state
-  |> Seq.map (fun pair -> pair.Value)
-  |> executionContext.QueryContext.PostAggregationHook
-       {
-         ExecutionContext = executionContext
-         GroupingLabels = groupingLabels
-         Aggregators = Array.zip aggFns aggArgs
-       }
+  let aggregationContext =
+    {
+      ExecutionContext = executionContext
+      GroupingLabels = groupingLabels
+      Aggregators = Array.zip aggFns aggArgs
+    }
+
+  let buckets = state |> Seq.map (fun pair -> pair.Value)
+
+  executionContext.QueryContext.PostAggregationHooks
+  |> List.fold (fun buckets hook -> hook aggregationContext buckets) buckets
   |> Seq.map (fun bucket ->
     Array.append bucket.Group (bucket.Aggregators |> Array.map (fun agg -> agg.Final bucket.ExecutionContext))
   )
@@ -134,8 +133,7 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-/// Runs the default execution logic for a plan node.
-let executePlanNode executionContext plan : seq<Row> =
+let execute executionContext plan : seq<Row> =
   match plan with
   | Plan.Scan (table, columnIndices) -> executeScan executionContext table columnIndices
   | Plan.Project (plan, expressions) -> executeProject executionContext (plan, expressions)
@@ -146,8 +144,3 @@ let executePlanNode executionContext plan : seq<Row> =
   | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin executionContext (leftPlan, rightPlan, joinType, on)
   | Plan.Limit (plan, amount) -> executeLimit executionContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"
-
-let execute executionContext plan : seq<Row> =
-  match executionContext.QueryContext.ExecutorHook with
-  | Some executorHook -> executorHook executionContext plan
-  | None -> executePlanNode executionContext plan

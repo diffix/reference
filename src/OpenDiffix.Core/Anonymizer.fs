@@ -1,7 +1,6 @@
 module OpenDiffix.Core.Anonymizer
 
 open System
-open System.Collections.Generic
 open System.Security.Cryptography
 
 // ----------------------------------------------------------------
@@ -178,7 +177,7 @@ let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<Ai
     | true, value -> if usedValues.Contains(value) then pickUnusedValue values else ValueSome value
     | false, _ -> ValueNone
 
-  let result = List<AidHash * Value>()
+  let result = MutableList<AidHash * Value>()
 
   let mutable remainingItems =
     valuesByAID
