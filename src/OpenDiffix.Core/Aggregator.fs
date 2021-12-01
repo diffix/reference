@@ -284,6 +284,12 @@ type private MergeAids() =
 
 type T = IAggregator
 
+let isAnonymizing ((fn, _args): AggregatorSpec) =
+  match fn with
+  | DiffixCount
+  | DiffixLowCount -> true
+  | _ -> false
+
 let create (executionContext: ExecutionContext) globalBucket (aggSpec: AggregatorSpec) : T =
   let minDiffixCount =
     if globalBucket then
