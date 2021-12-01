@@ -3,6 +3,13 @@ module OpenDiffix.Core.Utils
 
 open System
 
+// Aliases for common mutable collections
+type MutableList<'T> = Collections.Generic.List<'T>
+type Dictionary<'K, 'V> = Collections.Generic.Dictionary<'K, 'V>
+type KeyValuePair<'K, 'V> = Collections.Generic.KeyValuePair<'K, 'V>
+type HashSet<'T> = Collections.Generic.HashSet<'T>
+type Stack<'T> = Collections.Generic.Stack<'T>
+
 module String =
   let join (sep: string) (values: seq<'T>) = String.Join<'T>(sep, values)
 
@@ -22,12 +29,12 @@ module Result =
     | Error err -> failwith err
 
 module Dictionary =
-  let getOrDefault key defaultValue (dict: Collections.Generic.Dictionary<'K, 'V>) =
+  let getOrDefault key defaultValue (dict: Dictionary<'K, 'V>) =
     match dict.TryGetValue(key) with
     | true, value -> value
     | false, _ -> defaultValue
 
-  let getOrInit key initFn (dict: Collections.Generic.Dictionary<'K, 'V>) =
+  let getOrInit key initFn (dict: Dictionary<'K, 'V>) =
     match dict.TryGetValue(key) with
     | true, value -> value
     | false, _ ->

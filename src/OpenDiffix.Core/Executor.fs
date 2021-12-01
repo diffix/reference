@@ -60,13 +60,9 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
   let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
 
   let makeBucket group executionContext =
-    {
-      Group = group
-      Aggregators = aggFns |> Array.map (Aggregator.create executionContext isGlobal)
-      ExecutionContext = executionContext
-    }
+    Bucket.make group (aggFns |> Array.map (Aggregator.create executionContext isGlobal)) executionContext
 
-  let state = Collections.Generic.Dictionary<Row, AggregationBucket>(Row.equalityComparer)
+  let state = Dictionary<Row, Bucket>(Row.equalityComparer)
 
   if isGlobal then
     let emptyGroup = [||]

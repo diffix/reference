@@ -164,7 +164,7 @@ type AnonymizationParams =
 // Query & Planner
 // ----------------------------------------------------------------
 
-type PostAggregationHook = AggregationContext -> seq<AggregationBucket> -> seq<AggregationBucket>
+type PostAggregationHook = AggregationContext -> seq<Bucket> -> seq<Bucket>
 
 type QueryContext =
   {
@@ -196,25 +196,6 @@ type Plan =
 // Executor
 // ----------------------------------------------------------------
 
-type IAggregator =
-  abstract Transition : Value list -> unit
-  abstract Merge : IAggregator -> unit
-  abstract Final : ExecutionContext -> Value
-
-type AggregationContext =
-  {
-    ExecutionContext: ExecutionContext
-    GroupingLabels: Expression array
-    Aggregators: (Function * Expression list) array
-  }
-
-type AggregationBucket =
-  {
-    Group: Row
-    Aggregators: IAggregator array
-    ExecutionContext: ExecutionContext
-  }
-
 type NoiseLayers =
   {
     BucketSeed: Hash
@@ -228,6 +209,26 @@ type ExecutionContext =
   }
   member this.AnonymizationParams = this.QueryContext.AnonymizationParams
   member this.DataProvider = this.QueryContext.DataProvider
+
+type IAggregator =
+  abstract Transition : Value list -> unit
+  abstract Merge : IAggregator -> unit
+  abstract Final : ExecutionContext -> Value
+
+type AggregationContext =
+  {
+    ExecutionContext: ExecutionContext
+    GroupingLabels: Expression array
+    Aggregators: (Function * Expression list) array
+  }
+
+type Bucket =
+  {
+    Group: Row
+    Aggregators: IAggregator array
+    ExecutionContext: ExecutionContext
+    Attributes: Dictionary<string, Value>
+  }
 
 // ----------------------------------------------------------------
 // Constants
@@ -348,6 +349,20 @@ module ExecutionContext =
 
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())
+
+module Bucket =
+  let make group aggregators executionContext =
+    {
+      Group = group
+      Aggregators = aggregators
+      ExecutionContext = executionContext
+      Attributes = Dictionary<string, Value>()
+    }
+
+  let getAttribute attr bucket =
+    bucket.Attributes |> Dictionary.getOrDefault attr Null
+
+  let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
 
 module Plan =
   let rec columnsCount (plan: Plan) =
