@@ -284,19 +284,19 @@ type private MergeAids() =
 
 type T = IAggregator
 
-let create (executionContext: ExecutionContext) globalBucket fn : T =
+let create (executionContext: ExecutionContext) globalBucket (aggSpec: AggregatorSpec) : T =
   let minDiffixCount =
     if globalBucket then
       0L
     else
       int64 executionContext.AnonymizationParams.Suppression.LowThreshold
 
-  match fn with
-  | AggregateFunction (Count, { Distinct = false }) -> Count() :> T
-  | AggregateFunction (Count, { Distinct = true }) -> CountDistinct() :> T
-  | AggregateFunction (Sum, { Distinct = false }) -> Sum() :> T
-  | AggregateFunction (DiffixCount, { Distinct = false }) -> DiffixCount(minDiffixCount) :> T
-  | AggregateFunction (DiffixCount, { Distinct = true }) -> DiffixCountDistinct(minDiffixCount) :> T
-  | AggregateFunction (DiffixLowCount, _) -> DiffixLowCount() :> T
-  | AggregateFunction (MergeAids, _) -> MergeAids() :> T
+  match aggSpec with
+  | Count, { Distinct = false } -> Count() :> T
+  | Count, { Distinct = true } -> CountDistinct() :> T
+  | Sum, { Distinct = false } -> Sum() :> T
+  | DiffixCount, { Distinct = false } -> DiffixCount(minDiffixCount) :> T
+  | DiffixCount, { Distinct = true } -> DiffixCountDistinct(minDiffixCount) :> T
+  | DiffixLowCount, _ -> DiffixLowCount() :> T
+  | MergeAids, _ -> MergeAids() :> T
   | _ -> failwith "Invalid aggregator"

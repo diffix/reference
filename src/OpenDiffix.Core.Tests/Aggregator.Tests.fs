@@ -6,7 +6,7 @@ open FsUnit.Xunit
 open CommonTypes
 
 let makeAgg distinct fn =
-  AggregateFunction(fn, { AggregateOptions.Default with Distinct = distinct })
+  fn, { AggregateOptions.Default with Distinct = distinct }
 
 let randomNullableInteger (random: System.Random) =
   // 10% chance to get a NULL

@@ -9,11 +9,11 @@ module Utils =
 
   let unpackAggregator =
     function
-    | FunctionExpr (AggregateFunction _ as fn, args) -> fn, args
+    | FunctionExpr (AggregateFunction (fn, opts), args) -> ((fn, opts), args)
     | _ -> failwith "Expression is not an aggregator"
 
   let unpackAggregators aggregators =
-    aggregators |> Array.map unpackAggregator |> Array.unzip
+    aggregators |> Seq.map unpackAggregator |> Seq.toArray
 
   let addValuesToSeed seed values =
     values |> Seq.map Value.toString |> Hash.strings seed
@@ -57,10 +57,11 @@ let private executeLimit executionContext (childPlan, amount) : seq<Row> =
 let private executeAggregate executionContext (childPlan, groupingLabels, aggregators) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let isGlobal = Array.isEmpty groupingLabels
-  let aggFns, aggArgs = aggregators |> Array.ofList |> Utils.unpackAggregators
+  let aggregators = Utils.unpackAggregators aggregators
+  let aggSpecs, aggArgs = Array.unzip aggregators
 
   let makeBucket group executionContext =
-    Bucket.make group (aggFns |> Array.map (Aggregator.create executionContext isGlobal)) executionContext
+    Bucket.make group (aggSpecs |> Array.map (Aggregator.create executionContext isGlobal)) executionContext
 
   let state = Dictionary<Row, Bucket>(Row.equalityComparer)
 
@@ -95,7 +96,7 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
     {
       ExecutionContext = executionContext
       GroupingLabels = groupingLabels
-      Aggregators = Array.zip aggFns aggArgs
+      Aggregators = aggregators
     }
 
   let buckets = state |> Seq.map (fun pair -> pair.Value)

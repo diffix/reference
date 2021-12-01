@@ -534,8 +534,8 @@ let colRef2 = ColumnReference(2, RealType)
 
 let evaluate expr = Expression.evaluate testRow expr
 
-let evaluateAggregator fn args =
-  evaluateAggregator (ExecutionContext.makeDefault ()) fn args testRows
+let evaluateAggregator aggSpec args =
+  evaluateAggregator (ExecutionContext.makeDefault ()) aggSpec args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =
@@ -548,9 +548,9 @@ let ``evaluate scalar expressions`` () =
 
 [<Fact>]
 let ``evaluate standard aggregators`` () =
-  let count = AggregateFunction(Count, AggregateOptions.Default)
-  let sum = AggregateFunction(Sum, AggregateOptions.Default)
-  let countDistinct = AggregateFunction(Count, { AggregateOptions.Default with Distinct = true })
+  let count = Count, AggregateOptions.Default
+  let sum = Sum, AggregateOptions.Default
+  let countDistinct = Count, { AggregateOptions.Default with Distinct = true }
 
   // select sum(val_float - val_int)
   evaluateAggregator sum [ FunctionExpr(ScalarFunction Subtract, [ colRef2; colRef1 ]) ]

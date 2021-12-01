@@ -51,10 +51,10 @@ let anonymizedAggregationContext =
 let evaluateAggregator fn args =
   evaluateAggregator executionContext fn args
 
-let mergeAids = AggregateFunction(MergeAids, AggregateOptions.Default)
-let distinctDiffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = true })
-let diffixCount = AggregateFunction(DiffixCount, { AggregateOptions.Default with Distinct = false })
-let diffixLowCount = AggregateFunction(DiffixLowCount, AggregateOptions.Default)
+let mergeAids = MergeAids, AggregateOptions.Default
+let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
+let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
+let diffixLowCount = DiffixLowCount, AggregateOptions.Default
 
 [<Fact>]
 let ``merge bucket aids`` () =
