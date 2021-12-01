@@ -89,8 +89,6 @@ type AggregateOptions =
   }
   static member Default = { Distinct = false; OrderBy = [] }
 
-type AggregateArgs = seq<Value list>
-
 type OrderBy = OrderBy of Expression * OrderByDirection * OrderByNullsBehavior
 
 type OrderByDirection =
@@ -215,11 +213,14 @@ type IAggregator =
   abstract Merge : IAggregator -> unit
   abstract Final : ExecutionContext -> Value
 
+type AggregatorSpec = AggregateFunction * AggregateOptions
+type AggregatorArgs = Expression list
+
 type AggregationContext =
   {
     ExecutionContext: ExecutionContext
     GroupingLabels: Expression array
-    Aggregators: (Function * Expression list) array
+    Aggregators: (AggregatorSpec * AggregatorArgs) array
   }
 
 type Bucket =
