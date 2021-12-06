@@ -63,3 +63,30 @@ module Hash =
 
   let strings start data =
     data |> Seq.distinct |> Seq.map string |> Seq.fold (^^^) start
+
+type BloomFilter() =
+  let bytes: byte array = Array.zeroCreate 8192
+
+  let putHash hash16 =
+    let byteIndex = hash16 / 8
+    let bitIndex = hash16 % 8
+    bytes.[byteIndex] <- bytes.[byteIndex] ||| (1uy <<< bitIndex)
+
+  let checkHash hash16 =
+    let byteIndex = hash16 / 8
+    let bitIndex = hash16 % 8
+    (bytes.[byteIndex] &&& (1uy <<< bitIndex)) <> 0uy
+
+  let sliceAt offset (hash: Hash) = int ((hash >>> offset) &&& 0xFFUL)
+
+  member this.PutHash(hash: Hash) =
+    hash |> sliceAt 0 |> putHash
+    hash |> sliceAt 16 |> putHash
+    hash |> sliceAt 32 |> putHash
+    hash |> sliceAt 48 |> putHash
+
+  member this.CheckHash(hash: Hash) =
+    (hash |> sliceAt 0 |> checkHash)
+    && (hash |> sliceAt 16 |> checkHash)
+    && (hash |> sliceAt 32 |> checkHash)
+    && (hash |> sliceAt 48 |> checkHash)

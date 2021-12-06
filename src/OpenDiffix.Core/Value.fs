@@ -51,9 +51,9 @@ let comparer direction nulls =
 /// Computes a 64 bit hash of the given value.
 let rec hash value =
   match value with
-  | Null -> 0UL
-  | Boolean false -> 0UL
-  | Boolean true -> 1UL
+  | Null -> 0x0001000200030004UL
+  | Boolean false -> 0x0005000600070008UL
+  | Boolean true -> 0x0009000A000B000CUL
   | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
   | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
   | String s -> s |> Hash.string
