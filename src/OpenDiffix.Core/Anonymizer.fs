@@ -61,7 +61,7 @@ let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> s
     else
       let thresholdNoise =
         [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
-        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.SD
+        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
 
       let thresholdMean = anonParams.Suppression.LowMeanGap + float anonParams.Suppression.LowThreshold
       let threshold = thresholdNoise + thresholdMean

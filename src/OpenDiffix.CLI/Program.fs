@@ -21,7 +21,7 @@ type CliArguments =
   | [<Unique>] Outlier_Count of int * int
   | [<Unique>] Top_Count of int * int
   | [<Unique>] Low_Threshold of int
-  | [<Unique>] Low_SD of float
+  | [<Unique>] Low_Layer_SD of float
   | [<Unique>] Low_Mean_Gap of float
 
   // General anonymization parameters
@@ -49,11 +49,12 @@ type CliArguments =
         + "excluded users. A number is picked from a uniform distribution between the upper and lower limit."
       | Low_Threshold _ ->
         "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the low count filter."
-      | Low_SD _ -> "Sets the standard deviation for the low count filter threshold."
+      | Low_Layer_SD _ ->
+        "Specifies the standard deviation for each noise layer used when calculating the low count filter noisy threshold."
       | Low_Mean_Gap _ ->
-        "Sets the number of standard deviations between the lower bound and the mean of the low count filter threshold."
+        "Specifies the number of standard deviations between the lower bound and the mean of the low count filter threshold."
       | Layer_Noise_SD _ ->
-        "Specifies the standard deviation used when calculating aggregation noise for each noise layer."
+        "Specifies the standard deviation for each noise layer used when calculating aggregation noise."
 
 let executableName = "OpenDiffix.CLI"
 
@@ -95,9 +96,9 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
       LowThreshold =
         parsedArgs.TryGetResult Low_Threshold
         |> Option.defaultValue SuppressionParams.Default.LowThreshold
-      SD =
-        parsedArgs.TryGetResult Low_SD
-        |> Option.defaultValue SuppressionParams.Default.SD
+      LayerSD =
+        parsedArgs.TryGetResult Low_Layer_SD
+        |> Option.defaultValue SuppressionParams.Default.LayerSD
       LowMeanGap =
         parsedArgs.TryGetResult Low_Mean_Gap
         |> Option.defaultValue SuppressionParams.Default.LowMeanGap
