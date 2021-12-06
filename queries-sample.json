@@ -11,7 +11,7 @@
       "salt": [],
       "suppression": {
         "low_threshold": 2,
-        "s_d": 1,
+        "layer_s_d": 1,
         "low_mean_gap": 2
       },
       "outlier_count": {
@@ -37,7 +37,7 @@
       "salt": [],
       "suppression": {
         "low_threshold": 2,
-        "s_d": 1,
+        "layer_s_d": 1,
         "low_mean_gap": 2
       },
       "outlier_count": {
@@ -63,7 +63,7 @@
       "salt": [],
       "suppression": {
         "low_threshold": 2,
-        "s_d": 1,
+        "layer_s_d": 1,
         "low_mean_gap": 2
       },
       "outlier_count": {

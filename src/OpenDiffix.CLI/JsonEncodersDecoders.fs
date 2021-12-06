@@ -50,7 +50,7 @@ module private rec Encoders =
            |> List.map (fun (table, settings) -> {| Table = table; Settings = settings |}))
         LowThreshold = ap.Suppression.LowThreshold
         LowMeanGap = ap.Suppression.LowMeanGap
-        LowSd = ap.Suppression.SD
+        LowLayerSd = ap.Suppression.LayerSD
         OutlierCount = ap.OutlierCount
         TopCount = ap.TopCount
         LayerNoiseSd = ap.LayerNoiseSD

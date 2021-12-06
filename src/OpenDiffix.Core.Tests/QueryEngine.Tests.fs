@@ -17,7 +17,7 @@ type Tests(db: DBFixture) =
     {
       TableSettings = tableSettings
       Salt = [||]
-      Suppression = { LowThreshold = 2; LowMeanGap = 0.0; SD = 0. }
+      Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       LayerNoiseSD = 0.

@@ -132,10 +132,10 @@ type TableSettings = { AidColumns: string list }
 type SuppressionParams =
   {
     LowThreshold: int
-    SD: float
+    LayerSD: float
     LowMeanGap: float
   }
-  static member Default = { LowThreshold = 2; SD = 1.; LowMeanGap = 2. }
+  static member Default = { LowThreshold = 2; LayerSD = 1.; LowMeanGap = 2. }
 
 type AnonymizationParams =
   {

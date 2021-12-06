@@ -62,7 +62,7 @@ let ``Accepts supported CLI parameters`` () =
     "14"
     "--low-threshold"
     "3"
-    "--low-sd"
+    "--low-layer-sd"
     "1.2"
     "--low-mean-gap"
     "1"
