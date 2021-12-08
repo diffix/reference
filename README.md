@@ -52,6 +52,7 @@ around the complex and large codebase of a real world database engine.
 The codebase is currently organized in a number of projects:
 
 - `OpenDiffix.Core`: Contains the meat of this project. It is the query and anonymization engine.
+  The main public interface to it is the [`QueryEngine.run` function here](src/OpenDiffix.Core/QueryEngine.fs)
 - `OpenDiffix.CLI`: A command line interface that can be used to exercise the reference implementation.
 
 ### Branches
@@ -91,7 +92,7 @@ It is self-contained and can be moved anywhere you desire.
 The reference implementation can be used through the provided command line interface offered as part of the solution.
 See "Creating a release" for more information on how to build the command line interface.
 
-The `-h` command gives you an overview of the available paramters. Typical usage should achievable with one of the
+The `-h` command gives you an overview of the available parameters. Typical usage should achievable with one of the
 two following sample commands:
 
 - Run a single query: `OpenDiffix.CLI -f data/data.sqlite --aid-columns customers.id -q "SELECT city, count(*) FROM
