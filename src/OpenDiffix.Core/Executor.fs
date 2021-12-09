@@ -89,6 +89,8 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
         state.[group] <- bucket
         bucket
 
+    bucket.RowCount <- bucket.RowCount + 1
+
     bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
