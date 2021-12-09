@@ -208,9 +208,15 @@ type ExecutionContext =
   member this.AnonymizationParams = this.QueryContext.AnonymizationParams
   member this.DataProvider = this.QueryContext.DataProvider
 
+// Responsible for accumulating the state of the aggregation function while
+// scanning the rows, and delivering the final result as a query result `Value`
 type IAggregator =
+  // Process an instance of the aggregation function's arguments and transition
+  // the aggregator state
   abstract Transition : Value list -> unit
+  // Merge state with that of a compatible aggregator
   abstract Merge : IAggregator -> unit
+  // Extract the final value of the aggregation function from the state
   abstract Final : ExecutionContext -> Value
 
 type AggregatorSpec = AggregateFunction * AggregateOptions
