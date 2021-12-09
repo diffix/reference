@@ -232,6 +232,7 @@ type AggregationContext =
 type Bucket =
   {
     Group: Row
+    mutable RowCount: int
     Aggregators: IAggregator array
     ExecutionContext: ExecutionContext
     Attributes: Dictionary<string, Value>
@@ -361,6 +362,7 @@ module Bucket =
   let make group aggregators executionContext =
     {
       Group = group
+      RowCount = 0
       Aggregators = aggregators
       ExecutionContext = executionContext
       Attributes = Dictionary<string, Value>()
