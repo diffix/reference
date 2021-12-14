@@ -358,21 +358,6 @@ module ExecutionContext =
   let makeDefault () =
     fromQueryContext (QueryContext.makeDefault ())
 
-module Bucket =
-  let make group aggregators executionContext =
-    {
-      Group = group
-      RowCount = 0
-      Aggregators = aggregators
-      ExecutionContext = executionContext
-      Attributes = Dictionary<string, Value>()
-    }
-
-  let getAttribute attr bucket =
-    bucket.Attributes |> Dictionary.getOrDefault attr Null
-
-  let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
-
 module Plan =
   let rec columnsCount (plan: Plan) =
     match plan with

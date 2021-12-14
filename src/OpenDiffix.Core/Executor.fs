@@ -15,9 +15,6 @@ module Utils =
   let unpackAggregators aggregators =
     aggregators |> Seq.map unpackAggregator |> Seq.toArray
 
-  let addValuesToSeed seed values =
-    values |> Seq.map Value.toString |> Hash.strings seed
-
 // ----------------------------------------------------------------
 // Node execution
 // ----------------------------------------------------------------
@@ -77,15 +74,7 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
       match state.TryGetValue(group) with
       | true, aggregators -> aggregators
       | false, _ ->
-        let bucketExecutionContext =
-          { executionContext with
-              NoiseLayers =
-                { executionContext.NoiseLayers with
-                    BucketSeed = Utils.addValuesToSeed executionContext.NoiseLayers.BucketSeed group
-                }
-          }
-
-        let bucket = makeBucket group bucketExecutionContext
+        let bucket = makeBucket group executionContext
         state.[group] <- bucket
         bucket
 
