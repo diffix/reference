@@ -43,7 +43,11 @@ type Table =
     StaticRows: Field list list
   }
 
-let gRNG = System.Random(123) // Fixed seed because we want constant values
+// Fixed seed because we want constant values
+// mutable because we want to easily reset and generate identical tables in CSV, easily
+// TODO: make this more robust, since this makes things depend on the order of generations
+let rngSeed = 123
+let mutable gRNG = System.Random(rngSeed)
 
 let sequentialGenerator () =
   seq {
@@ -343,6 +347,10 @@ let csvFilePath = Path.Combine(__SOURCE_DIRECTORY__, "customers.csv")
 File.Delete(csvFilePath)
 
 printfn "Creating table %A as CSV" customers.Name
+
+// reset the RNG, and be careful about the same order of generated tables,
+// see comment on `gRNG`
+gRNG <- System.Random(rngSeed)
 
 File.WriteAllText(csvFilePath, csvGenerate customers)
 
