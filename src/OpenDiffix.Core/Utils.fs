@@ -42,6 +42,12 @@ module Dictionary =
       dict.[key] <- value
       value
 
+  let increment key (dict: Dictionary<'K, int>) =
+    dict.[key] <-
+      match dict.TryGetValue(key) with
+      | true, count -> count + 1
+      | false, _ -> 1
+
 type Hash = uint64
 
 module Hash =
