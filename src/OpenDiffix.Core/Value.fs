@@ -46,6 +46,7 @@ let comparer direction nulls =
     | Null, Null -> 0
     | Null, _ -> nullsValue
     | _, Null -> -nullsValue
+    | String x, String y -> directionValue * (StringComparer.OrdinalIgnoreCase.Compare(x, y))
     | x, y -> directionValue * Operators.compare x y
 
 /// Computes a 64 bit hash of the given value.
