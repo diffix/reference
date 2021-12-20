@@ -1,6 +1,7 @@
 module OpenDiffix.Core.Value
 
 open System
+open System.Globalization
 
 /// Converts a value to its string representation.
 let rec toString value =
@@ -46,7 +47,20 @@ let comparer direction nulls =
     | Null, Null -> 0
     | Null, _ -> nullsValue
     | _, Null -> -nullsValue
-    | String x, String y -> directionValue * (StringComparer.OrdinalIgnoreCase.Compare(x, y))
+    | String x, String y ->
+      // Using PostgreSQL string comparison as a template
+      let compareInfo = CompareInfo.GetCompareInfo("en-US")
+      // we want whitespace & punctuation comparison ("symbols" in .NET) to have smaller priority,
+      // so we ignore first.
+      let comparisonIgnoreSymbols =
+        directionValue
+        * compareInfo.Compare(x, y, CompareOptions.IgnoreSymbols + CompareOptions.StringSort)
+      // if the former gives a tie, we include symbols.  `StringSort` means they come last and we group letter cases together
+      // reference: https://wiki.postgresql.org/wiki/FAQ#Why_do_my_strings_sort_incorrectly.3F
+      if (comparisonIgnoreSymbols <> 0) then
+        comparisonIgnoreSymbols
+      else
+        directionValue * compareInfo.Compare(x, y, CompareOptions.StringSort)
     | x, y -> directionValue * Operators.compare x y
 
 /// Computes a 64 bit hash of the given value.

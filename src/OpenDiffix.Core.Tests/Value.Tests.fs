@@ -44,3 +44,21 @@ module ComparerTests =
     [ Integer 10L; Null; Integer 1L; Null; Integer 5L ]
     |> sort Descending NullsLast
     |> should equal [ Integer 10L; Integer 5L; Integer 1L; Null; Null ]
+
+  [<Fact>]
+  let ``String sort groups by letter case`` () =
+    [ String "a"; String "C"; String "A"; String "c" ]
+    |> sort Ascending NullsLast
+    |> should equal [ String "a"; String "A"; String "c"; String "C" ]
+
+  [<Fact>]
+  let ``String sort ignores whitespace and symbols`` () =
+    [ String " a"; String "  C"; String "+  A"; String "   c" ]
+    |> sort Ascending NullsLast
+    |> should equal [ String " a"; String "+  A"; String "   c"; String "  C" ]
+
+  [<Fact>]
+  let ``String sort uses whitespace and symbols comparison on conflict`` () =
+    [ String "+a"; String "a"; String " a"; String "b" ]
+    |> sort Ascending NullsLast
+    |> should equal [ String " a"; String "+a"; String "a"; String "b" ]
