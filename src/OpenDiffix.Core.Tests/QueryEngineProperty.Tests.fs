@@ -263,8 +263,15 @@ type Tests(db: DBFixture) =
     finally
       connection.Dispose()
 
-  [<Fact>]
+  let checkSkip =
+    let shouldRunEnvVar = System.Environment.GetEnvironmentVariable("OPEN_DIFFIX_RUN_PROPERTY_BASED_TESTS")
+    Skip.IfNot(isNull (shouldRunEnvVar) |> not && shouldRunEnvVar.ToLower() = "true")
+
+  // run with `OPEN_DIFFIX_RUN_PROPERTY_BASED_TESTS=true` to run these tests
+  [<SkippableFact>]
   let ``Check pg_diffix to give same query results`` () =
+    checkSkip
+
     // this makes our generators and shrinkers available for custom types we've prepared
     Arb.register<DiffixGenerators> () |> ignore
 
