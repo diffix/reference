@@ -34,23 +34,14 @@ type BucketColumnSpec = { Name: string; Function: FunctionSpec }
 
 type ColumnSpec = BucketColumn of BucketColumnSpec
 
-let wrap (nameList, fList) =
-  List.zip nameList fList
-  |> List.map (fun (name, f) -> BucketColumn { Name = name; Function = f })
-
 let availableColumns = [ "first_name"; "last_name"; "age"; "city"; "company_name" ]
 let stringColumns = [ "first_name"; "last_name"; "city"; "company_name" ]
 
-let isListOfDistinct l = (l = List.distinct l)
-let areListsSameSize (list1, list2) = List.length list1 = List.length list2
-
-let doListsMatch (list1, list2) =
-  List.zip list1 list2
-  |> List.forall (fun e ->
-    match e with
-    | (_, NoFunction) -> true
-    | (columnName, Substring (_, _)) -> List.contains columnName stringColumns
-  )
+let functionGeneratorFor name =
+  if stringColumns |> List.contains name then
+    Arb.from<FunctionSpec>.Generator
+  else
+    Gen.constant NoFunction
 
 let removeAt list index =
   list |> List.indexed |> List.filter (fun (i, _) -> i <> index) |> List.map snd
@@ -69,17 +60,16 @@ type DiffixGenerators =
   static member UniqueColumnSpecList() =
     { new Arbitrary<ColumnSpec list>() with
         member x.Generator =
-          let columnListGenerator =
-            Gen.elements availableColumns
-            |> Gen.nonEmptyListOf
-            |> Gen.filter isListOfDistinct
+          gen {
+            let! nameList = Gen.subListOf availableColumns |> Gen.filter (List.isEmpty >> not)
+            let! fList = nameList |> List.map functionGeneratorFor |> Gen.sequence
 
-          let functionListGenerator = Arb.from<FunctionSpec>.Generator |> Gen.nonEmptyListOf
+            let specList =
+              List.zip nameList fList
+              |> List.map (fun (name, f) -> BucketColumn { Name = name; Function = f })
 
-          Gen.zip columnListGenerator functionListGenerator
-          |> Gen.filter areListsSameSize
-          |> Gen.filter doListsMatch
-          |> Gen.map wrap
+            return specList
+          }
 
         member x.Shrinker columnSpecList =
           // NOTE: `Arb.Default.FsList<ColumnSpec>().Shrinker` is too generic, it chops column names
@@ -275,6 +265,7 @@ type Tests(db: DBFixture) =
     // this makes our generators and shrinkers available for custom types we've prepared
     Arb.register<DiffixGenerators> () |> ignore
 
-    Check.VerboseThrowOnFailure(Prop.forAll Arb.from<Query> queryGivesSameResult)
+    let config = { Config.VerboseThrowOnFailure with MaxTest = 200; EndSize = 100 }
+    Check.One(config, Prop.forAll Arb.from<Query> queryGivesSameResult)
 
   interface IClassFixture<DBFixture>
