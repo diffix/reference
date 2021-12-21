@@ -50,7 +50,7 @@ let removeAt list index =
 // Other clauses' specifications
 // ----------------------------------------------------------------
 
-type LimitClauseSpec = NonNegativeInt option
+type LimitClauseSpec = { Value: NonNegativeInt; Include: bool }
 
 // ----------------------------------------------------------------
 // Final `FsCheck` generators
@@ -103,7 +103,7 @@ type Query =
     let selectClause = selectColumns @ aggregatorColumns |> String.join ", "
     let groupByClause = $"""GROUP BY %s{String.join ", " [ 1 .. x.ColumnSpecs.Length ]}"""
     let orderByClause = $"""ORDER BY %s{String.join ", " [ 1 .. x.ColumnSpecs.Length ]}"""
-    let limitClause = if (x.LimitClause.IsNone) then "" else $"LIMIT %i{x.LimitClause.Value.Get}"
+    let limitClause = if (x.LimitClause.Include) then $"LIMIT %i{x.LimitClause.Value.Get}" else ""
 
     $"SELECT {selectClause} FROM customers {groupByClause} {orderByClause} {limitClause};"
 
