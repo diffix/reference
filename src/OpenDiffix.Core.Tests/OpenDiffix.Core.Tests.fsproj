@@ -18,6 +18,9 @@
     <Compile Include="Executor.Tests.fs" />
     <Compile Include="Normalizer.Tests.fs" />
     <Compile Include="QueryEngine.Tests.fs" />
+    <Compile Include="HookTestHelpers.fs" />
+    <Compile Include="Led.Tests.fs" />
+    <Compile Include="StarBucket.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

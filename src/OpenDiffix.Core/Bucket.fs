@@ -24,3 +24,7 @@ let getAttribute attr bucket =
   bucket.Attributes |> Dictionary.getOrDefault attr Null
 
 let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
+
+let isLowCount lowCountIndex bucket =
+  bucket.Aggregators.[lowCountIndex].Final(bucket.ExecutionContext)
+  |> Value.unwrapBoolean
