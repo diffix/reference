@@ -246,6 +246,10 @@ let NULL_TYPE = UnknownType "null_type"
 let MISSING_TYPE = UnknownType "missing_type"
 let MIXED_TYPE = UnknownType "mixed_type"
 
+module BucketAttributes =
+  let IS_LED_MERGED = "is_led_merged"
+  let IS_STAR_BUCKET = "is_star_bucket"
+
 // ----------------------------------------------------------------
 // Functions
 // ----------------------------------------------------------------
@@ -371,3 +375,25 @@ module Plan =
     | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
     | Plan.Append (first, _) -> columnsCount first
     | Plan.Limit (plan, _) -> columnsCount plan
+
+module AggregationContext =
+  let private findSingleIndex cond arr =
+    arr
+    |> Array.indexed
+    |> Array.filter (snd >> cond)
+    |> function
+      | [| index, _item |] -> Some index
+      | _ -> None
+
+  let private findAggregator aggFn aggregators =
+    aggregators |> findSingleIndex (fun ((fn, _), _) -> fn = aggFn)
+
+  let lowCountIndex (aggregationContext: AggregationContext) =
+    match findAggregator DiffixLowCount aggregationContext.Aggregators with
+    | Some index -> index
+    | None -> failwith "Cannot find required DiffixLowCount aggregator"
+
+  let diffixCountIndex (aggregationContext: AggregationContext) =
+    match findAggregator DiffixCount aggregationContext.Aggregators with
+    | Some index -> index
+    | None -> failwith "Cannot find required DiffixCount aggregator"
