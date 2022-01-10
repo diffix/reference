@@ -220,18 +220,22 @@ let rec evaluate (row: Row) (expr: Expression) =
 
 /// Sorts a row sequence based on the given orderings.
 let sortRows orderings (rows: Row seq) =
-  let rec compare orderings rowA rowB =
-    match orderings with
+  let exprsComparers =
+    orderings
+    |> List.map (fun (OrderBy (expr, direction, nulls)) -> expr, Value.comparer direction nulls)
+
+  let rec compare exprsComparers rowA rowB =
+    match exprsComparers with
     | [] -> 0
-    | OrderBy (expr, direction, nulls) :: tail ->
+    | (expr, comparer) :: tail ->
       let valueA = evaluate rowA expr
       let valueB = evaluate rowB expr
 
-      match Value.comparer direction nulls valueA valueB with
+      match comparer valueA valueB with
       | 0 -> compare tail rowA rowB
       | order -> order
 
-  rows |> Seq.sortWith (compare orderings)
+  rows |> Seq.sortWith (compare exprsComparers)
 
 
 // ----------------------------------------------------------------
