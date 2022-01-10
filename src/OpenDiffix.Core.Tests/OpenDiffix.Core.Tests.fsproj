@@ -21,11 +21,14 @@
     <Compile Include="HookTestHelpers.fs" />
     <Compile Include="Led.Tests.fs" />
     <Compile Include="StarBucket.Tests.fs" />
+    <Compile Include="QueryEngineProperty.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FsUnit.xUnit" Version="4.0.4" />
+    <PackageReference Include="FsCheck" Version="2.16.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
+    <PackageReference Include="Npgsql.FSharp" Version="4.1.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" />
   </ItemGroup>
