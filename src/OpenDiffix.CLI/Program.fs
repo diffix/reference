@@ -52,7 +52,8 @@ type CliArguments =
       | Low_Layer_SD _ ->
         "Specifies the standard deviation for each noise layer used when calculating the low count filter noisy threshold."
       | Low_Mean_Gap _ ->
-        "Specifies the number of standard deviations between the lower bound and the mean of the low count filter threshold."
+        "Specifies the number of (total) standard deviations between the lower bound and the mean of the low count filter threshold."
+        + "Total standard deviation is the combined standard deviation of two noise layers with `--low-layer-sd` standard deviation each."
       | Layer_Noise_SD _ ->
         "Specifies the standard deviation for each noise layer used when calculating aggregation noise."
 
