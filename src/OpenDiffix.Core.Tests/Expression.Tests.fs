@@ -266,6 +266,7 @@ module DefaultFunctionsTests =
       Round
       [
         Real 1.5, Integer 2L
+        Real 2.5, Integer 3L
         Real 2.2, Integer 2L
         Real 0., Integer 0L
         Real -0.2, Integer 0L

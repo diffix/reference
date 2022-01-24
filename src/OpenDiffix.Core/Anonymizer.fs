@@ -270,7 +270,7 @@ let countDistinct
     |> List.choose id
     |> anonymizedSum
     |> Option.defaultValue 0.
-    |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
+    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Integer)
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
@@ -292,5 +292,5 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
     byAid
     |> Array.choose id
     |> anonymizedSum
-    |> Option.map (round >> int64 >> Integer)
+    |> Option.map (Math.roundAwayFromZero >> int64 >> Integer)
     |> Option.defaultValue Null

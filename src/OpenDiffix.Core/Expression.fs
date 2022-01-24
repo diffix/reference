@@ -1,6 +1,7 @@
 module rec OpenDiffix.Core.Expression
 
 open System.Globalization
+open OpenDiffix.Core.Utils.Math
 
 // ----------------------------------------------------------------
 // Type resolution
@@ -109,14 +110,19 @@ let rec evaluateScalarFunction fn args =
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
   | Or, [ Boolean b1; Boolean b2 ] -> Boolean(b1 || b2)
 
-  | Round, [ Real r ] -> r |> round |> int64 |> Integer
+  | Round, [ Real r ] -> r |> roundAwayFromZero |> int64 |> Integer
   | RoundBy, [ _; Integer amount ] when amount <= 0L -> Null
   | RoundBy, [ _; Real amount ] when amount <= 0.0 -> Null
   | RoundBy, [ Integer value; Integer amount ] ->
-    (float value / float amount) |> round |> int64 |> (*) amount |> Integer
-  | RoundBy, [ Integer value; Real amount ] -> (float value / amount) |> round |> (*) amount |> Real
-  | RoundBy, [ Real value; Integer amount ] -> (value / float amount) |> round |> int64 |> (*) amount |> Integer
-  | RoundBy, [ Real value; Real amount ] -> (value / amount) |> round |> (*) amount |> Real
+    (float value / float amount)
+    |> roundAwayFromZero
+    |> int64
+    |> (*) amount
+    |> Integer
+  | RoundBy, [ Integer value; Real amount ] -> (float value / amount) |> roundAwayFromZero |> (*) amount |> Real
+  | RoundBy, [ Real value; Integer amount ] ->
+    (value / float amount) |> roundAwayFromZero |> int64 |> (*) amount |> Integer
+  | RoundBy, [ Real value; Real amount ] -> (value / amount) |> roundAwayFromZero |> (*) amount |> Real
 
   | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
   | CeilBy, [ _; Integer amount ] when amount <= 0L -> Null
@@ -193,7 +199,7 @@ let rec evaluateScalarFunction fn args =
     | "" -> Null
     | _ -> failwith "Input value is not a valid boolean string."
   | Cast, [ Integer i; String "real" ] -> i |> float |> Real
-  | Cast, [ Real r; String "integer" ] -> r |> round |> int64 |> Integer
+  | Cast, [ Real r; String "integer" ] -> r |> roundAwayFromZero |> int64 |> Integer
   | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
   | Cast, [ Integer _; String "boolean" ] -> Boolean true
   | Cast, [ Integer i; String "text" ] -> i.ToString() |> String

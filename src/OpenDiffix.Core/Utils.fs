@@ -69,3 +69,8 @@ module Hash =
 
   let strings start data =
     data |> Seq.distinct |> Seq.map string |> Seq.fold (^^^) start
+
+// introduced for compatibility of math-related functions with C (PostgreSQL)
+module Math =
+  let roundAwayFromZero (x: float) : float =
+    System.Math.Round(x, MidpointRounding.AwayFromZero)
