@@ -50,30 +50,6 @@ let private generateNoise salt stepName stdDev noiseLayers =
 // AID processing
 // ----------------------------------------------------------------
 
-/// Returns whether any of the AID value sets has a low count.
-let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
-  aidSets
-  |> Seq.map (fun aidSet ->
-    let anonParams = executionContext.AnonymizationParams
-
-    if aidSet.Count < anonParams.Suppression.LowThreshold then
-      true
-    else
-      let thresholdNoise =
-        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
-        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
-
-      // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
-      let thresholdMean =
-        anonParams.Suppression.LowMeanGap * anonParams.Suppression.LayerSD * sqrt (2.0)
-        + float anonParams.Suppression.LowThreshold
-
-      let threshold = thresholdNoise + thresholdMean
-
-      float aidSet.Count < threshold
-  )
-  |> Seq.reduce (||)
-
 // Compacts flattening intervals to fit into the total count of contributors.
 // Both intervals are reduced proportionally, with `topCount` taking priority.
 let private compactFlatteningIntervals outlierCount topCount totalCount =
@@ -246,6 +222,30 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
+
+/// Returns whether any of the AID value sets has a low count.
+let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
+  aidSets
+  |> Seq.map (fun aidSet ->
+    let anonParams = executionContext.AnonymizationParams
+
+    if aidSet.Count < anonParams.Suppression.LowThreshold then
+      true
+    else
+      let thresholdNoise =
+        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
+        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
+
+      // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
+      let thresholdMean =
+        anonParams.Suppression.LowMeanGap * anonParams.Suppression.LayerSD * sqrt (2.0)
+        + float anonParams.Suppression.LowThreshold
+
+      let threshold = thresholdNoise + thresholdMean
+
+      float aidSet.Count < threshold
+  )
+  |> Seq.reduce (||)
 
 let countDistinct
   (executionContext: ExecutionContext)
