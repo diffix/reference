@@ -155,6 +155,10 @@ let inline private aidFlattening
         Noise = noise
       }
 
+let private sortByValue (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) =
+  let comparer = Value.comparer Ascending NullsFirst
+  aidsPerValue |> (Seq.sortWith (fun kvA kvB -> comparer kvA.Key kvB.Key))
+
 let private transposeToPerAid (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) aidIndex =
   let result = Dictionary<AidHash, HashSet<Value>>()
 
@@ -255,10 +259,12 @@ let countDistinct
     |> Seq.toArray
     |> Array.partition (fun pair -> isLowCount executionContext pair.Value)
 
+  let sortedLowCountValues = sortByValue lowCountValues
+
   let byAid =
     [ 0 .. aidsCount - 1 ]
     |> List.map (
-      transposeToPerAid lowCountValues
+      transposeToPerAid sortedLowCountValues
       >> countDistinctFlatteningByAid executionContext
     )
 
@@ -274,7 +280,7 @@ let countDistinct
     |> List.choose id
     |> anonymizedSum
     |> Option.defaultValue 0.
-    |> (round >> int64 >> (+) safeCount >> max 0L >> Integer)
+    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Integer)
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
@@ -296,5 +302,5 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
     byAid
     |> Array.choose id
     |> anonymizedSum
-    |> Option.map (round >> int64 >> Integer)
+    |> Option.map (Math.roundAwayFromZero >> int64 >> Integer)
     |> Option.defaultValue Null
