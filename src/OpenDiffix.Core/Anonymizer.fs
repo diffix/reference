@@ -285,7 +285,6 @@ let countDistinct
     |> Math.roundAwayFromZero
     |> int64
     |> (+) safeCount
-    |> max 0L
     |> Result.Count
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
