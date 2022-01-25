@@ -247,6 +247,10 @@ let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> s
   )
   |> Seq.reduce (||)
 
+type Result =
+  | NotEnoughAIDVs
+  | Count of int64
+
 let countDistinct
   (executionContext: ExecutionContext)
   aidsCount
@@ -274,13 +278,13 @@ let countDistinct
   // we can only report the count of values we already know to be safe as they
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
-    if safeCount > 0L then Integer safeCount else Null
+    if safeCount > 0L then safeCount |> Result.Count else NotEnoughAIDVs
   else
     byAid
     |> List.choose id
     |> anonymizedSum
     |> Option.defaultValue 0.
-    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Integer)
+    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Result.Count)
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
@@ -297,10 +301,10 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we have to abort anonymization.
   if byAid |> Array.exists ((=) None) then
-    Null
+    NotEnoughAIDVs
   else
     byAid
     |> Array.choose id
     |> anonymizedSum
-    |> Option.map (Math.roundAwayFromZero >> int64 >> Integer)
-    |> Option.defaultValue Null
+    |> Option.map (Math.roundAwayFromZero >> int64 >> Result.Count)
+    |> Option.defaultValue NotEnoughAIDVs
