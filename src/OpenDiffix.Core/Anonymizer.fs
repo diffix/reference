@@ -34,10 +34,7 @@ let private cryptoHashSaltedSeed salt (seed: Hash) : Hash =
 
 let private seedFromAidSet (aidSet: AidHash seq) = Seq.fold (^^^) 0UL aidSet
 
-let private mixSeed (text: string) (seed: Hash) =
-  let seedBytes = BitConverter.GetBytes(seed)
-  let textBytes = System.Text.Encoding.UTF8.GetBytes text
-  Array.append seedBytes textBytes |> Hash.bytes
+let private mixSeed (text: string) (seed: Hash) = text |> Hash.string |> ((^^^) seed)
 
 let private generateNoise salt stepName stdDev noiseLayers =
   noiseLayers
