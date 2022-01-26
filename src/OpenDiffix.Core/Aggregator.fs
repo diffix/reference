@@ -167,8 +167,8 @@ type private DiffixCount(minCount) =
         Integer minCount
       else
         match Anonymizer.count executionContext state with
-        | Anonymizer.Result.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.Result.Count value -> Integer(max value minCount)
+        | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
 
 type private DiffixCountDistinct(minCount) =
   let mutable aidsCount = Option<int>.None
@@ -220,8 +220,8 @@ type private DiffixCountDistinct(minCount) =
         Integer minCount
       else
         match Anonymizer.countDistinct executionContext aidsCount.Value aidsPerValue with
-        | Anonymizer.Result.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.Result.Count value -> Integer(max value minCount)
+        | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
 
 type private DiffixLowCount() =
   let mutable state: HashSet<AidHash> [] = null
