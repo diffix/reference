@@ -13,14 +13,12 @@ open System.Security.Cryptography
 // Hence, we only need to limit the seed to the requested interval to get a uniform random integer.
 // To get a normal random float, we use the Box-Muller method on two uniformly distributed integers.
 
-// While using modulo to bound values produces biased output, we are using very small ranges
-// (typically less than 10), for which the bias is insignificant.
-let private boundRandomUniform random range = random % range
-
 let private randomUniform (interval: Interval) (seed: Hash) =
-  let randomUniform = abs (int ((seed >>> 32) ^^^ seed))
-  let boundedRandomUniform = boundRandomUniform randomUniform (interval.Upper - interval.Lower + 1)
-  interval.Lower + boundedRandomUniform
+  let randomUniform = uint32 ((seed >>> 32) ^^^ seed)
+  // While using modulo to bound values produces biased output, we are using very small ranges
+  // (typically less than 10), for which the bias is insignificant.
+  let boundedRandomUniform = randomUniform % uint32 (interval.Upper - interval.Lower + 1)
+  interval.Lower + int boundedRandomUniform
 
 let private randomNormal stdDev (seed: Hash) =
   let u1 = float (uint32 seed) / float UInt32.MaxValue
