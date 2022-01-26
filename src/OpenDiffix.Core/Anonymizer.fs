@@ -45,30 +45,6 @@ let private generateNoise salt stepName stdDev noiseLayers =
 // AID processing
 // ----------------------------------------------------------------
 
-/// Returns whether any of the AID value sets has a low count.
-let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
-  aidSets
-  |> Seq.map (fun aidSet ->
-    let anonParams = executionContext.AnonymizationParams
-
-    if aidSet.Count < anonParams.Suppression.LowThreshold then
-      true
-    else
-      let thresholdNoise =
-        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
-        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
-
-      // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
-      let thresholdMean =
-        anonParams.Suppression.LowMeanGap * anonParams.Suppression.LayerSD * sqrt (2.0)
-        + float anonParams.Suppression.LowThreshold
-
-      let threshold = thresholdNoise + thresholdMean
-
-      float aidSet.Count < threshold
-  )
-  |> Seq.reduce (||)
-
 // Compacts flattening intervals to fit into the total count of contributors.
 // Both intervals are reduced proportionally, with `topCount` taking priority.
 let private compactFlatteningIntervals outlierCount topCount totalCount =
@@ -216,31 +192,59 @@ let private countDistinctFlatteningByAid
   |> Seq.toArray
   |> aidFlattening executionContext 0L
 
+// Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
-  let aidForFlattening =
+  let flattening =
     byAidSum
     |> Seq.sortByDescending (fun aggregate -> aggregate.Flattening)
     |> Seq.groupBy (fun aggregate -> aggregate.Flattening)
-    |> Seq.tryHead
+    |> Seq.head
     // We might end up with multiple different flattened sums that have the same amount of flattening.
     // This could be the result of some AID values being null for one of the AIDs, while there were still
     // overall enough AIDs to produce a flattened sum.
     // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
-    |> Option.map (fun (_, values) -> values |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum))
+    |> snd
+    |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum)
 
   let noise =
     byAidSum
-    |> Seq.sortByDescending (fun aggregate -> aggregate.NoiseSD)
-    |> Seq.tryHead
-    |> Option.map (fun aggregate -> aggregate.Noise)
+    |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD)
+    |> (fun aggregate -> aggregate.Noise)
 
-  match aidForFlattening, noise with
-  | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
-  | _ -> None
+  flattening.FlattenedSum + noise
 
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
+
+/// Returns whether any of the AID value sets has a low count.
+let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
+  aidSets
+  |> Seq.map (fun aidSet ->
+    let anonParams = executionContext.AnonymizationParams
+
+    if aidSet.Count < anonParams.Suppression.LowThreshold then
+      true
+    else
+      let thresholdNoise =
+        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
+        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
+
+      // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
+      let thresholdMean =
+        anonParams.Suppression.LowMeanGap * anonParams.Suppression.LayerSD * sqrt (2.0)
+        + float anonParams.Suppression.LowThreshold
+
+      let threshold = thresholdNoise + thresholdMean
+
+      float aidSet.Count < threshold
+  )
+  |> Seq.reduce (||)
+
+[<RequireQualifiedAccess>]
+type CountResult =
+  | NotEnoughAIDVs
+  | Ok of int64
 
 let countDistinct
   (executionContext: ExecutionContext)
@@ -269,13 +273,12 @@ let countDistinct
   // we can only report the count of values we already know to be safe as they
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
-    if safeCount > 0L then Integer safeCount else Null
+    if safeCount > 0L then CountResult.Ok safeCount else CountResult.NotEnoughAIDVs
   else
     byAid
     |> List.choose id
     |> anonymizedSum
-    |> Option.defaultValue 0.
-    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Integer)
+    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> CountResult.Ok)
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
@@ -292,10 +295,9 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we have to abort anonymization.
   if byAid |> Array.exists ((=) None) then
-    Null
+    CountResult.NotEnoughAIDVs
   else
     byAid
     |> Array.choose id
     |> anonymizedSum
-    |> Option.map (Math.roundAwayFromZero >> int64 >> Integer)
-    |> Option.defaultValue Null
+    |> (Math.roundAwayFromZero >> int64 >> CountResult.Ok)
