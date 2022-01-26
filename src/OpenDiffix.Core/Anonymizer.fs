@@ -197,27 +197,26 @@ let private countDistinctFlatteningByAid
   |> Seq.toArray
   |> aidFlattening executionContext 0L
 
+// Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
-  let aidForFlattening =
+  let flattening =
     byAidSum
     |> Seq.sortByDescending (fun aggregate -> aggregate.Flattening)
     |> Seq.groupBy (fun aggregate -> aggregate.Flattening)
-    |> Seq.tryHead
+    |> Seq.head
     // We might end up with multiple different flattened sums that have the same amount of flattening.
     // This could be the result of some AID values being null for one of the AIDs, while there were still
     // overall enough AIDs to produce a flattened sum.
     // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
-    |> Option.map (fun (_, values) -> values |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum))
+    |> snd
+    |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum)
 
   let noise =
     byAidSum
-    |> Seq.sortByDescending (fun aggregate -> aggregate.NoiseSD)
-    |> Seq.tryHead
-    |> Option.map (fun aggregate -> aggregate.Noise)
+    |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD)
+    |> (fun aggregate -> aggregate.Noise)
 
-  match aidForFlattening, noise with
-  | Some flattening, Some noise -> Some <| flattening.FlattenedSum + noise
-  | _ -> None
+  flattening.FlattenedSum + noise
 
 // ----------------------------------------------------------------
 // Public API
@@ -283,8 +282,11 @@ let countDistinct
     byAid
     |> List.choose id
     |> anonymizedSum
-    |> Option.defaultValue 0.
-    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> max 0L >> Result.Count)
+    |> Math.roundAwayFromZero
+    |> int64
+    |> (+) safeCount
+    |> max 0L
+    |> Result.Count
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
@@ -306,5 +308,6 @@ let count (executionContext: ExecutionContext) (perAidContributions: AidCountSta
     byAid
     |> Array.choose id
     |> anonymizedSum
-    |> Option.map (Math.roundAwayFromZero >> int64 >> Result.Count)
-    |> Option.defaultValue NotEnoughAIDVs
+    |> Math.roundAwayFromZero
+    |> int64
+    |> Result.Count

@@ -171,7 +171,7 @@ type private DiffixCount(minCount) =
         | Anonymizer.Result.Count value -> Integer(max value minCount)
 
 type private DiffixCountDistinct(minCount) =
-  let mutable aidsCount = 0
+  let mutable aidsCount = Option<int>.None
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
 
   member this.AidsCount = aidsCount
@@ -187,8 +187,8 @@ type private DiffixCountDistinct(minCount) =
           match aidsPerValue.TryGetValue(value) with
           | true, aidSets -> aidSets
           | false, _ ->
-            if aidsCount = 0 then aidsCount <- aidInstances.Length
-            let aidSets = emptySets aidsCount
+            if Option.isNone aidsCount then aidsCount <- Some aidInstances.Length
+            let aidSets = emptySets aidsCount.Value
             aidsPerValue.[value] <- aidSets
             aidSets
 
@@ -206,7 +206,7 @@ type private DiffixCountDistinct(minCount) =
       let other = (castAggregator<DiffixCountDistinct> aggregator)
       let otherAidsPerValue = other.State
 
-      if aidsCount = 0 then aidsCount <- other.AidsCount
+      if Option.isNone aidsCount then aidsCount <- other.AidsCount
 
       otherAidsPerValue
       |> Seq.iter (fun pair ->
@@ -216,9 +216,12 @@ type private DiffixCountDistinct(minCount) =
       )
 
     member this.Final executionContext =
-      match Anonymizer.countDistinct executionContext aidsCount aidsPerValue with
-      | Anonymizer.Result.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.Result.Count value -> Integer(max value minCount)
+      if Option.isNone aidsCount then
+        Integer minCount
+      else
+        match Anonymizer.countDistinct executionContext aidsCount.Value aidsPerValue with
+        | Anonymizer.Result.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.Result.Count value -> Integer(max value minCount)
 
 type private DiffixLowCount() =
   let mutable state: HashSet<AidHash> [] = null
