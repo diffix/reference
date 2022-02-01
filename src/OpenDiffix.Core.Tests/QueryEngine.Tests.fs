@@ -157,7 +157,7 @@ type Tests(db: DBFixture) =
         Rows = [ [| String "1Water" |] ]
       }
 
-    let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1"
+    let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1 GROUP BY id, name"
     queryResult |> should equal expected
 
   [<Fact>]
