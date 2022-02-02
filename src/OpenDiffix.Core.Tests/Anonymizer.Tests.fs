@@ -382,3 +382,60 @@ let ``count distinct accepts rows with shared contribution`` () =
   rows
   |> TestHelpers.evaluateAggregator executionContext distinctDiffixCount [ aidsExpression; dataColumn ]
   |> should equal (Integer 5L)
+
+[<Fact>]
+let ``compacting top/outlier interval respects rules`` () =
+  let totalCount = 5
+
+  let assertCorrectCompaction (originalOutlier, originalTop) =
+    let (compactOutlier, compactTop) =
+      (Anonymizer.compactFlatteningIntervals originalOutlier originalTop totalCount).Value
+    // only upper bounds are compacted and only change downwards
+    compactOutlier.Lower |> should equal originalOutlier.Lower
+    compactTop.Lower |> should equal originalTop.Lower
+    compactOutlier.Upper |> should be (lessThanOrEqualTo originalOutlier.Upper)
+    compactTop.Upper |> should be (lessThanOrEqualTo originalTop.Upper)
+
+    // still valid intervals
+    compactOutlier.Lower |> should be (lessThanOrEqualTo compactOutlier.Upper)
+    compactTop.Lower |> should be (lessThanOrEqualTo compactTop.Upper)
+
+    // compaction succeeded
+    totalCount
+    |> should be (greaterThanOrEqualTo (compactTop.Upper + compactOutlier.Upper))
+
+    // same rate, if possible; `topCount` takes priority and might compact more by 1
+    ((compactTop.Upper = compactTop.Lower)
+     || (compactOutlier.Upper = compactOutlier.Lower)
+     || (originalTop.Upper - compactTop.Upper = originalOutlier.Upper - compactOutlier.Upper)
+     || (originalTop.Upper - compactTop.Upper = originalOutlier.Upper - compactOutlier.Upper + 1))
+    |> should equal true
+
+  let rec cartesian LL =
+    match LL with
+    | [] -> Seq.singleton []
+    | L :: Ls ->
+      seq {
+        for x in L do
+          for xs in cartesian Ls -> x :: xs
+      }
+
+  cartesian [ seq { 1 .. 5 }; seq { 1 .. 5 }; seq { 1 .. 5 }; seq { 1 .. 5 } ]
+  |> Seq.map (fun l -> ({ Lower = l.[0]; Upper = l.[1] }, { Lower = l.[2]; Upper = l.[3] }))
+  // Pick only valid intervals which have a flattening for `totalCount`
+  |> Seq.filter (fun (outlier, top) ->
+    outlier.Lower <= outlier.Upper
+    && top.Lower <= top.Upper
+    && outlier.Lower + top.Lower <= totalCount
+  )
+  |> Seq.iter assertCorrectCompaction
+
+[<Fact>]
+let ``compacting top/outlier interval finds cases of not enough AIDVs`` () =
+  let assertNotEnoughAIDVs (originalOutlier, originalTop) =
+    (Anonymizer.compactFlatteningIntervals originalOutlier originalTop 4)
+    |> should equal None
+
+  ({ Lower = 4; Upper = 4 }, { Lower = 1; Upper = 1 }) |> assertNotEnoughAIDVs
+  ({ Lower = 1; Upper = 1 }, { Lower = 4; Upper = 4 }) |> assertNotEnoughAIDVs
+  ({ Lower = 2; Upper = 3 }, { Lower = 3; Upper = 4 }) |> assertNotEnoughAIDVs
