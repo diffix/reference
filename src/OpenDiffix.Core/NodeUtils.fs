@@ -18,7 +18,14 @@ type NodeFunctions =
     List.map f expressions
 
   // Query
-  static member Map(query: Query, f: SelectQuery -> SelectQuery) = f query
+  static member Map(query: SelectQuery, f: Query -> Query) =
+    let rec mapSubQueries range =
+      match range with
+      | SubQuery (subQuery, alias) -> SubQuery(f subQuery, alias)
+      | Join join -> Join(NodeFunctions.Map(join, mapSubQueries))
+      | rangeTable -> rangeTable
+
+    { query with From = mapSubQueries query.From }
 
   static member Map(query: SelectQuery, f: Expression -> Expression) =
     {

@@ -48,14 +48,7 @@ let private validateSubQuery selectQuery =
   validateSelectTarget selectQuery
   validateLimitUsage selectQuery
 
-let validateSelectTarget selectQuery =
-  let rec rangeVisitor range =
-    match range with
-    | SubQuery (subQuery, _alias) -> validateSubQuery subQuery
-    | Join join -> join |> visit rangeVisitor
-    | RangeTable _ -> ()
-
-  selectQuery |> visit rangeVisitor
+let validateSelectTarget selectQuery = selectQuery |> visit validateSubQuery
 
 let private validateLimitUsage selectQuery =
   if selectQuery.Limit <> None then
