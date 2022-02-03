@@ -34,7 +34,7 @@ let private allowedCountUsage query =
       match args with
       | []
       | [ ColumnReference _ ] -> ()
-      | _ -> failwith "Only count(*) and count(distinct column) are supported"
+      | _ -> failwith "Only count(*), count(column) and count(distinct column) are supported"
     | _ -> ()
   )
 
@@ -48,7 +48,7 @@ let private validateSubQuery selectQuery =
   validateSelectTarget selectQuery
   validateLimitUsage selectQuery
 
-let validateSelectTarget selectQuery = selectQuery |> visit validateSubQuery
+let private validateSelectTarget selectQuery = selectQuery |> visit validateSubQuery
 
 let private validateLimitUsage selectQuery =
   if selectQuery.Limit <> None then

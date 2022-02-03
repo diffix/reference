@@ -377,7 +377,6 @@ let private functionSeedMaterial =
   | FloorBy -> "floor"
   | RoundBy -> "round"
   | WidthBucket -> "width_bucket"
-  | Concat -> "concat"
   | _ -> failwith "Unsupported function used for defining buckets."
 
 let rec private collectSeedMaterials rangeColumns expression =
