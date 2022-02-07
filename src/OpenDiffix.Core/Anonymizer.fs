@@ -47,25 +47,47 @@ let private generateNoise salt stepName stdDev noiseLayers =
 
 // Compacts flattening intervals to fit into the total count of contributors.
 // Both intervals are reduced proportionally, with `topCount` taking priority.
-let private compactFlatteningIntervals outlierCount topCount totalCount =
-  let totalAdjustment = outlierCount.Upper + topCount.Upper - totalCount
-
-  if totalAdjustment <= 0 then
-    outlierCount, topCount // no adjustment needed
+// `None` is returned in case there's not enough AIDVs for a sensible flattening.
+// `public` just to test the low-level algorithm
+let compactFlatteningIntervals outlierCount topCount totalCount =
+  if totalCount < outlierCount.Lower + topCount.Lower then
+    None
   else
-    let outlierRange = outlierCount.Upper - outlierCount.Lower
+    let totalAdjustment = outlierCount.Upper + topCount.Upper - totalCount
 
-    if outlierRange > topCount.Upper - topCount.Lower then
-      failwith "Invalid config: OutlierCount interval is larger than TopCount interval."
-
-    let outlierAdjustment, topAdjustment =
-      if outlierRange < totalAdjustment / 2 then
-        outlierRange, totalAdjustment - outlierRange
+    let compactIntervals =
+      if totalAdjustment <= 0 then
+        outlierCount, topCount // no adjustment needed
       else
-        totalAdjustment / 2, totalAdjustment - totalAdjustment / 2
+        // NOTE: at this point we know `0 < totalAdjustment <= outlierRange + topRange` (*)
+        //       because `totalAdjustment = outlierCount.Upper + topCount.Upper - totalCount
+        //                               <= outlierCount.Upper + topCount.Upper - outlierCount.Lower - topCount.Lower`
+        let outlierRange = outlierCount.Upper - outlierCount.Lower
+        let topRange = topCount.Upper - topCount.Lower
+        // `topAdjustment` will be half of `totalAdjustment` rounded up, so it takes priority as it should
+        let outlierAdjustment = totalAdjustment / 2
+        let topAdjustment = totalAdjustment - outlierAdjustment
 
-    { outlierCount with Upper = outlierCount.Upper - outlierAdjustment },
-    { topCount with Upper = topCount.Upper - topAdjustment }
+        // adjust, depending on how the adjustments "fit" in the ranges
+        match outlierRange >= outlierAdjustment, topRange >= topAdjustment with
+        | true, true ->
+          // both ranges are compacted at same rate
+          { outlierCount with Upper = outlierCount.Upper - outlierAdjustment },
+          { topCount with Upper = topCount.Upper - topAdjustment }
+        | false, true ->
+          // `outlierCount` is compacted as much as possible by `outlierRange`, `topCount` takes the surplus adjustment
+          { outlierCount with Upper = outlierCount.Lower },
+          { topCount with Upper = topCount.Upper - totalAdjustment + outlierRange }
+        | true, false ->
+          // vice versa
+          { outlierCount with Upper = outlierCount.Upper - totalAdjustment + topRange },
+          { topCount with Upper = topCount.Lower }
+        | false, false ->
+          // Not possible. Otherwise `outlierRange + topRange < outlierAdjustment + topAdjustment = totalAdjustment` but we
+          // knew the opposite was true in (*) above
+          failwith "Internal error - impossible interval compacting"
+
+    Some compactIntervals
 
 type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
 
@@ -75,13 +97,11 @@ let inline private aidFlattening
   (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
   let anonParams = executionContext.AnonymizationParams
+  let totalCount = aidContributions.Length
 
-  if aidContributions.Length < anonParams.OutlierCount.Lower + anonParams.TopCount.Lower then
-    None
-  else
-    let outlierInterval, topInterval =
-      compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount aidContributions.Length
-
+  match compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount totalCount with
+  | None -> None // not enough AIDVs for a sensible flattening
+  | Some (outlierInterval, topInterval) ->
     let sortedAidContributions = aidContributions |> Array.sortByDescending snd
 
     let flatSeed =
@@ -109,7 +129,7 @@ let inline private aidFlattening
     let flattening = float outliersSummed - outlierReplacement
     let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
-    let flattenedAvg = flattenedSum / float aidContributions.Length
+    let flattenedAvg = flattenedSum / float totalCount
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
     let noiseSD = anonParams.LayerNoiseSD * noiseScale
