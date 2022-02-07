@@ -66,7 +66,8 @@ let failWithUsageInfo errorMsg =
 
 let toInterval =
   function
-  | Some (lower, upper) -> { Lower = lower; Upper = upper }
+  | Some (lower, upper) when lower <= upper -> { Lower = lower; Upper = upper }
+  | Some (lower, upper) -> failwith $"Invalid request: interval lower bound exceeds upper bound: (%i{lower}, %i{upper})"
   | _ -> Interval.Default
 
 let toNoise =
