@@ -39,6 +39,14 @@ let ``Rejects invalid SQL`` () =
   )
 
 [<Fact>]
+let ``Rejects invalid intervals`` () =
+  shouldFail (fun () ->
+    [| "-f"; dataDirectory; "--outlier-count"; "2"; "1"; "-q"; "SELECT count(*) FROM customers" |]
+    |> mainCore
+    |> ignore
+  )
+
+[<Fact>]
 let ``Guards against unknown params`` () =
   shouldFail (fun () ->
     [| "-f"; dataDirectory; "--foo"; "customers.id"; "-q"; "SELECT count(*) FROM customers" |]
