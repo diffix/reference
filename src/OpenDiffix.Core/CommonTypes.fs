@@ -454,7 +454,7 @@ module Plan =
         + $"{propLine depth}Group Keys: {String.joinWithComma groupingLabels}"
         + $"{propLine depth}Aggregates: {String.joinWithComma aggregators}"
         + childToString childPlan
-      | Plan.Unique childPlan -> "Unique" + NEWLINE + (toString (depth + 1) childPlan)
+      | Plan.Unique childPlan -> "Unique" + childToString childPlan
       | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
         $"{joinType} on {condition}" + childToString leftPlan + childToString rightPlan
       | Plan.Append (leftPlan, rightPlan) -> "Append" + childToString leftPlan + childToString rightPlan
