@@ -13,6 +13,8 @@ type Stack<'T> = Collections.Generic.Stack<'T>
 module String =
   let join (sep: string) (values: seq<'T>) = String.Join<'T>(sep, values)
 
+  let joinWithComma (values: seq<'T>) = join ", " values
+
   let equalsI s1 s2 =
     String.Equals(s1, s2, StringComparison.InvariantCultureIgnoreCase)
 

@@ -35,6 +35,7 @@ type Expression =
   | ColumnReference of index: int * exprType: ExpressionType
   | Constant of value: Value
   | ListExpr of Expression list
+  override this.ToString() = Expression.toString this
 
 type Function =
   | ScalarFunction of fn: ScalarFunction
@@ -89,7 +90,9 @@ type AggregateOptions =
   }
   static member Default = { Distinct = false; OrderBy = [] }
 
-type OrderBy = OrderBy of Expression * OrderByDirection * OrderByNullsBehavior
+type OrderBy =
+  | OrderBy of Expression * OrderByDirection * OrderByNullsBehavior
+  override this.ToString() = OrderBy.toString this
 
 type OrderByDirection =
   | Ascending
@@ -189,6 +192,7 @@ type Plan =
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
   | Limit of Plan * amount: uint
+  override this.ToString() = Plan.explain this
 
 // ----------------------------------------------------------------
 // Executor
@@ -266,6 +270,52 @@ module ExpressionType =
       | [] -> MISSING_TYPE
       | [ t ] -> t
       | _ -> MIXED_TYPE
+
+module OrderBy =
+  let toString (OrderBy (expr, direction, nullsBehavior)) =
+    let directionString =
+      match direction with
+      | Ascending -> "ASC"
+      | Descending -> "DESC"
+
+    let nullsBehaviorString =
+      match nullsBehavior with
+      | NullsFirst -> "NULLS FIRST"
+      | NullsLast -> "NULLS LAST"
+
+    $"{expr} {directionString} {nullsBehaviorString}"
+
+module Expression =
+  // Slightly different from Value.toString.
+  let rec private valueToString value =
+    match value with
+    | Null -> "NULL"
+    | Boolean b -> b.ToString()
+    | Integer i -> i.ToString()
+    | Real r -> r.ToString()
+    | String s -> "'" + s.Replace("'", "''") + "'"
+    | List values -> "[" + (values |> List.map valueToString |> String.joinWithComma) + "]"
+
+  let toString expr =
+    match expr with
+    | FunctionExpr (AggregateFunction (fn, opts), args) ->
+      let argsStr = if List.isEmpty args then "*" else args |> String.join ", "
+      let distinct = if opts.Distinct then "DISTINCT " else ""
+
+      let orderBy =
+        if List.isEmpty opts.OrderBy then
+          ""
+        else
+          $" WITHIN GROUP (ORDER BY {String.joinWithComma opts.OrderBy})"
+
+      $"{fn}({distinct}{argsStr}){orderBy}"
+    | FunctionExpr (ScalarFunction fn, args) -> $"{fn}({String.joinWithComma args})"
+    | FunctionExpr (SetFunction fn, args) -> $"{fn}({String.joinWithComma args})"
+    | ColumnReference (index, _) ->
+      // Without some context we can't know column names.
+      $"${index}"
+    | Constant value -> valueToString value
+    | ListExpr exprs -> $"[{String.joinWithComma exprs}]"
 
 module Function =
   let fromString name =
@@ -375,6 +425,43 @@ module Plan =
     | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
     | Plan.Append (first, _) -> columnsCount first
     | Plan.Limit (plan, _) -> columnsCount plan
+
+  let private NEWLINE = Environment.NewLine
+
+  let private indent depth =
+    if depth > 0 then String.replicate (4 * (depth - 1)) " " else ""
+
+  let private nodeLine depth =
+    if depth > 0 then indent depth + " -> " else ""
+
+  let private propLine depth = NEWLINE + indent (depth + 1) + " "
+
+  let rec private toString depth plan =
+    let childToString childPlan =
+      NEWLINE + (toString (depth + 1) childPlan)
+
+    (nodeLine depth)
+    + (
+      match plan with
+      | Plan.Scan (table, _) -> $"Seq Scan on {table.Name}"
+      | Plan.Project (childPlan, expressions) -> $"Project {String.joinWithComma expressions}" + childToString childPlan
+      | Plan.ProjectSet (childPlan, fn, args) ->
+        $"ProjectSet {fn}({String.joinWithComma args})" + childToString childPlan
+      | Plan.Filter (childPlan, condition) -> $"Filter {condition})" + childToString childPlan
+      | Plan.Sort (childPlan, orderings) -> $"Sort {String.joinWithComma orderings}" + childToString childPlan
+      | Plan.Aggregate (childPlan, groupingLabels, aggregators) ->
+        "Aggregate"
+        + $"{propLine depth}Group Keys: {String.joinWithComma groupingLabels}"
+        + $"{propLine depth}Aggregates: {String.joinWithComma aggregators}"
+        + childToString childPlan
+      | Plan.Unique childPlan -> "Unique" + NEWLINE + (toString (depth + 1) childPlan)
+      | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+        $"{joinType} on {condition}" + childToString leftPlan + childToString rightPlan
+      | Plan.Append (leftPlan, rightPlan) -> "Append" + childToString leftPlan + childToString rightPlan
+      | Plan.Limit (childPlan, amount) -> $"Limit {amount}" + childToString childPlan
+    )
+
+  let explain (plan: Plan) = toString 0 plan
 
 module AggregationContext =
   let private findSingleIndex cond arr =
