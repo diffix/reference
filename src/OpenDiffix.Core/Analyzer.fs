@@ -99,7 +99,10 @@ let private mapTargetEntry rangeColumns parsedExpr =
     [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
   | ParserTypes.Star ->
     rangeColumns
-    |> List.mapi (fun index rangeColumn ->
+    |> List.indexed
+    // Ignore AIDs because they are collected in a separate pass.
+    |> List.filter (fun (_index, rangeColumn) -> not rangeColumn.IsAid)
+    |> List.map (fun (index, rangeColumn) ->
       {
         Expression = ColumnReference(index, rangeColumn.Type)
         Alias = rangeColumn.ColumnName
