@@ -19,6 +19,10 @@ let private normalizeConstant expr =
     [ value ] |> Expression.evaluateScalarFunction fn |> Constant
   | FunctionExpr (ScalarFunction fn, [ Constant value1; Constant value2 ]) ->
     [ value1; value2 ] |> Expression.evaluateScalarFunction fn |> Constant
+  | FunctionExpr (ScalarFunction And, [ Constant (Boolean false); _arg ]) -> Constant(Boolean false)
+  | FunctionExpr (ScalarFunction And, [ _arg; Constant (Boolean false) ]) -> Constant(Boolean false)
+  | FunctionExpr (ScalarFunction Or, [ Constant (Boolean true); _arg ]) -> Constant(Boolean true)
+  | FunctionExpr (ScalarFunction Or, [ _arg; Constant (Boolean true) ]) -> Constant(Boolean true)
   | _ -> expr
 
 let private isInequality fn =
@@ -57,6 +61,10 @@ let private normalizeBooleanExpression expr =
   | FunctionExpr (ScalarFunction Not, [ FunctionExpr (ScalarFunction Not, [ expr ]) ]) -> expr
   | FunctionExpr (ScalarFunction Not, [ FunctionExpr (ScalarFunction fn, args) ]) when isInequality fn ->
     (fn |> invertComparison |> ScalarFunction, args) |> FunctionExpr
+  | FunctionExpr (ScalarFunction And, [ Constant (Boolean true); arg ]) -> arg
+  | FunctionExpr (ScalarFunction And, [ arg; Constant (Boolean true) ]) -> arg
+  | FunctionExpr (ScalarFunction Or, [ Constant (Boolean false); arg ]) -> arg
+  | FunctionExpr (ScalarFunction Or, [ arg; Constant (Boolean false) ]) -> arg
   | _ -> expr
 
 let private normalizeCasts expr =
