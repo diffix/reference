@@ -265,6 +265,7 @@ module DefaultFunctionsTests =
     runsUnary
       Round
       [
+        Integer 2L, Integer 2L
         Real 1.5, Integer 2L
         Real 2.5, Integer 3L
         Real 2.2, Integer 2L
@@ -276,7 +277,6 @@ module DefaultFunctionsTests =
     fails
       Round
       [ //
-        [ Integer 5L ]
         [ Boolean true ]
         [ String "a" ]
       ]
@@ -307,6 +307,7 @@ module DefaultFunctionsTests =
     runsUnary
       Ceil
       [
+        Integer 2L, Integer 2L
         Real 1.5, Integer 2L
         Real 2.2, Integer 3L
         Real 0., Integer 0L
@@ -317,7 +318,6 @@ module DefaultFunctionsTests =
     fails
       Ceil
       [ //
-        [ Integer 5L ]
         [ Boolean true ]
         [ String "a" ]
       ]
@@ -348,6 +348,7 @@ module DefaultFunctionsTests =
     runsUnary
       Floor
       [
+        Integer 2L, Integer 2L
         Real 1.5, Integer 1L
         Real 2.2, Integer 2L
         Real 0., Integer 0L
@@ -358,13 +359,12 @@ module DefaultFunctionsTests =
     fails
       Floor
       [ //
-        [ Integer 5L ]
         [ Boolean true ]
         [ String "a" ]
       ]
 
   [<Fact>]
-  let FloorbY () =
+  let FloorBy () =
     runsBinary
       FloorBy
       [

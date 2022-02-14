@@ -361,9 +361,8 @@ let private collectGroupingExpressions selectQuery : Expression list =
   else
     selectQuery.GroupBy
 
-let rec private basicSeedMaterial rangeColumns expression =
+let private basicSeedMaterial rangeColumns expression =
   match expression with
-  | FunctionExpr (ScalarFunction Cast, [ expression; _ ]) -> basicSeedMaterial rangeColumns expression
   | ColumnReference (index, _type) ->
     let rangeColumn = List.item index rangeColumns
     $"%s{rangeColumn.RangeName}.%s{rangeColumn.ColumnName}"
@@ -382,23 +381,26 @@ let private functionSeedMaterial =
   | WidthBucket -> "width_bucket"
   | _ -> failwith "Unsupported function used for defining buckets."
 
-let rec private collectSeedMaterials rangeColumns expression =
+let private collectSeedMaterials rangeColumns expression =
   match expression with
-  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> collectSeedMaterials rangeColumns expression
   | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
+  | Constant _ -> failwith "Constant expressions can not be used for defining buckets."
   | _ -> [ basicSeedMaterial rangeColumns expression ]
 
 let rec private normalizeBucketLabelExpression expression =
   match expression with
   | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) ->
-    FunctionExpr(ScalarFunction RoundBy, [ expression; 1.0 |> Real |> Constant ])
+    FunctionExpr(ScalarFunction RoundBy, [ normalizeBucketLabelExpression expression; 1.0 |> Real |> Constant ])
   | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketLabelExpression expression
   | FunctionExpr (ScalarFunction fn, args) ->
-    match fn with
-    | Ceil -> FunctionExpr(ScalarFunction CeilBy, args @ [ 1.0 |> Real |> Constant ])
-    | Floor -> FunctionExpr(ScalarFunction FloorBy, args @ [ 1.0 |> Real |> Constant ])
-    | Round -> FunctionExpr(ScalarFunction RoundBy, args @ [ 1.0 |> Real |> Constant ])
-    | _ -> expression
+    let fn, extraArgs =
+      match fn with
+      | Ceil -> CeilBy, [ 1.0 |> Real |> Constant ]
+      | Floor -> FloorBy, [ 1.0 |> Real |> Constant ]
+      | Round -> RoundBy, [ 1.0 |> Real |> Constant ]
+      | _ -> fn, []
+
+    FunctionExpr(ScalarFunction fn, List.map normalizeBucketLabelExpression args @ extraArgs)
   | _ -> expression
 
 let private computeNoiseLayers anonParams query =
