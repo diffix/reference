@@ -44,6 +44,10 @@ let private validateSelectTarget (selectQuery: SelectQuery) =
   | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported"
   | _ -> ()
 
+let private validateNoWhere (selectQuery: SelectQuery) =
+  if selectQuery.Where <> Constant(Boolean true) then
+    failwith "WHERE in anonymizing queries is not currently supported"
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -55,4 +59,5 @@ let validateQuery isAnonymizing (selectQuery: SelectQuery) =
   if isAnonymizing then
     validateOnlyCount selectQuery
     allowedCountUsage selectQuery
+    validateNoWhere selectQuery
     validateSelectTarget selectQuery

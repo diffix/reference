@@ -87,6 +87,12 @@ let ``Allow limiting top query`` () =
   ensureAnalyzeValid "SELECT count(*) FROM table LIMIT 1"
 
 [<Fact>]
+let ``Disallow anonymizing queries with WHERE`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM table WHERE str_col=''"
+    "WHERE in anonymizing queries is not currently supported"
+
+[<Fact>]
 let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
   // Subqueries, JOINs, WHEREs, other aggregators etc.
   ensureAnalyzeNotAnonValid
