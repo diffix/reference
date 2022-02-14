@@ -338,94 +338,25 @@ type Tests(db: DBFixture) =
     result.Having |> should equal expected
 
   [<Fact>]
-  let ``Analyze JOINs`` () =
-    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
-
-    let condition =
-      FunctionExpr(ScalarFunction Equals, [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ])
-
-    let customers = getTable "customers_small"
-    let purchases = getTable "purchases"
-
-    let expectedFrom =
-      Join
-        {
-          Type = JoinType.InnerJoin
-          Left = RangeTable(customers, customers.Name)
-          Right = RangeTable(purchases, purchases.Name)
-          On = condition
-        }
-
-    result.From |> should equal expectedFrom
-
-  [<Fact>]
-  let ``Analyze subqueries`` () =
-    analyzeQuery "SELECT count(*) FROM (SELECT 1 FROM customers_small JOIN purchases ON id = purchases.cid) x"
-    |> should
-         equal
-         { defaultQuery with
-             TargetList =
-               [
-                 {
-                   Expression =
-                     FunctionExpr(
-                       AggregateFunction(DiffixCount, AggregateOptions.Default),
-                       [
-                         ListExpr [
-                           ColumnReference(1, StringType)
-                           ColumnReference(2, IntegerType)
-                           ColumnReference(3, IntegerType)
-                         ]
-                       ]
-                     )
-                   Alias = "count"
-                   Tag = RegularTargetEntry
-                 }
-               ]
-             From =
-               SubQuery(
-                 { defaultQuery with
-                     TargetList =
-                       [
-                         { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
-                         {
-                           Expression = ColumnReference(2, StringType)
-                           Alias = "__aid_0"
-                           Tag = AidTargetEntry
-                         }
-                         {
-                           Expression = ColumnReference(4, IntegerType)
-                           Alias = "__aid_1"
-                           Tag = AidTargetEntry
-                         }
-                         {
-                           Expression = ColumnReference(7, IntegerType)
-                           Alias = "__aid_2"
-                           Tag = AidTargetEntry
-                         }
-                       ]
-                     From =
-                       Join
-                         {
-                           Type = JoinType.InnerJoin
-                           Left = RangeTable(getTable "customers_small", "customers_small")
-                           Right = RangeTable(getTable "purchases", "purchases")
-                           On =
-                             FunctionExpr(
-                               ScalarFunction Equals,
-                               [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
-                             )
-                         }
-                 },
-                 "x"
-               )
-         }
-
-  [<Fact>]
-  let ``Reject limiting anonymizing subquery`` () =
+  let ``Disallow anonymizing queries with JOINs`` () =
     ensureQueryFails
-      "SELECT count(*) FROM (SELECT city FROM customers_small LIMIT 1) t"
-      "Limit is not allowed in anonymizing subqueries"
+      "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
+      "JOIN in anonymizing queries is not currently supported"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with subqueries`` () =
+    ensureQueryFails
+      "SELECT count(*) FROM (SELECT 1 FROM customers_small) x"
+      "Subqueries in anonymizing queries are not currently supported"
+
+  [<Fact>]
+  let ``Allow non-anonymizing queries with JOINs`` () =
+    analyzeQuery "SELECT count(*) FROM products as a JOIN products as b ON a.id = b.id"
+    |> ignore
+
+  [<Fact>]
+  let ``Allow non-anonymizing queries with subqueries`` () =
+    analyzeQuery "SELECT count(*) FROM (SELECT 1 FROM products) x" |> ignore
 
   [<Fact>]
   let ``Allow limiting top query`` () =
@@ -438,12 +369,6 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``SQL seed from column generalization`` () =
     assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" [ "substring,customers_small.city,1,2" ]
-
-  [<Fact>]
-  let ``SQL seed from multiple groupings from multiple tables`` () =
-    assertSqlSeed
-      "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      [ "customers_small.city"; "round,purchases.amount,1" ]
 
   [<Fact>]
   let ``SQL seeds from numeric ranges are consistent`` () =

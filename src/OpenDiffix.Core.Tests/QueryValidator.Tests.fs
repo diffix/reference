@@ -60,16 +60,6 @@ let ``Only allow count(*) and count(distinct column)`` () =
   ensureAnalyzeValid "SELECT count(distinct int_col) FROM table"
 
 [<Fact>]
-let ``Disallow aggregates in subqueries`` () =
-  let errorFragment = "aggregates in subqueries"
-  ensureAnalyzeFails "SELECT c FROM (SELECT count(*) as c FROM table) x" errorFragment
-
-[<Fact>]
-let ``Disallow group by in subqueries`` () =
-  let errorFragment = "grouping in subqueries"
-  ensureAnalyzeFails "SELECT count(*) FROM (SELECT int_col FROM table GROUP BY 1) x" errorFragment
-
-[<Fact>]
 let ``Disallow multiple low count aggregators`` () =
   let errorFragment = "single low count aggregator is allowed"
 
