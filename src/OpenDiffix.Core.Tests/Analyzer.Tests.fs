@@ -465,6 +465,6 @@ type Tests(db: DBFixture) =
   let ``constant bucket labels are rejected`` () =
     ensureQueryFails
       "SELECT age, round(1) FROM customers_small"
-      "Constant expressions cand be used for defining buckets."
+      "Constant expressions can not be used for defining buckets."
 
   interface IClassFixture<DBFixture>
