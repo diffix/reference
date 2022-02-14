@@ -384,6 +384,7 @@ let private functionSeedMaterial =
 let private collectSeedMaterials rangeColumns expression =
   match expression with
   | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
+  | Constant _ -> failwith "Constant expressions cand be used for defining buckets."
   | _ -> [ basicSeedMaterial rangeColumns expression ]
 
 let rec private normalizeBucketLabelExpression expression =

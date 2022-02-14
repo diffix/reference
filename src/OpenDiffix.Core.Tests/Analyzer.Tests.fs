@@ -291,6 +291,7 @@ type Tests(db: DBFixture) =
       query
       |> Parser.parse
       |> Analyzer.analyze queryContext
+      |> Normalizer.normalize
       |> Analyzer.anonymize queryContext
 
     query
@@ -459,5 +460,11 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``SQL seed from rounding cast`` () =
     assertSqlSeed "SELECT cast(price AS integer) FROM products" [ "round,products.price,1" ]
+
+  [<Fact>]
+  let ``constant bucket labels are rejected`` () =
+    ensureQueryFails
+      "SELECT age, round(1) FROM customers_small"
+      "Constant expressions cand be used for defining buckets."
 
   interface IClassFixture<DBFixture>
