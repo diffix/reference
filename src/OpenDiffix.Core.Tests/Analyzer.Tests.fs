@@ -337,30 +337,19 @@ type Tests(db: DBFixture) =
 
     result.Having |> should equal expected
 
+  // NOTE: We do QueryValidator testing in its respective test module. Here we just check, if it's invoked at all based
+  // on whether the query is anonymizing.
   [<Fact>]
-  let ``Disallow anonymizing queries with JOINs`` () =
-    ensureQueryFails
-      "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
-      "JOIN in anonymizing queries is not currently supported"
-
-  [<Fact>]
-  let ``Disallow anonymizing queries with subqueries`` () =
+  let ``Detect subqueries touching tables with AID columns`` () =
     ensureQueryFails
       "SELECT count(*) FROM (SELECT 1 FROM customers_small) x"
       "Subqueries in anonymizing queries are not currently supported"
 
   [<Fact>]
-  let ``Allow non-anonymizing queries with JOINs`` () =
-    analyzeQuery "SELECT count(*) FROM products as a JOIN products as b ON a.id = b.id"
-    |> ignore
-
-  [<Fact>]
-  let ``Allow non-anonymizing queries with subqueries`` () =
-    analyzeQuery "SELECT count(*) FROM (SELECT 1 FROM products) x" |> ignore
-
-  [<Fact>]
-  let ``Allow limiting top query`` () =
-    analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
+  let ``Detect queries joining tables with AID columns`` () =
+    ensureQueryFails
+      "SELECT 1 FROM products JOIN customers_small ON true"
+      "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
   let ``SQL seed from column selection`` () =

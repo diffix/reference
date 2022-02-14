@@ -44,6 +44,9 @@ let NOT_ANONYMIZING = false
 
 let ensureAnalyzeValid queryString = analyzeQuery ANONYMIZING queryString
 
+let ensureAnalyzeNotAnonValid queryString =
+  analyzeQuery NOT_ANONYMIZING queryString
+
 let ensureAnalyzeFails queryString errorFragment =
   ensureFailParsedQuery ANONYMIZING queryString errorFragment
 
@@ -66,3 +69,25 @@ let ``Disallow multiple low count aggregators`` () =
   ensureAnalyzeNotAnonFails
     "SELECT count(*), diffix_low_count(int_col), diffix_low_count(str_col) FROM table"
     errorFragment
+
+[<Fact>]
+let ``Disallow anonymizing queries with JOINs`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM table JOIN table AS t ON true"
+    "JOIN in anonymizing queries is not currently supported"
+
+[<Fact>]
+let ``Disallow anonymizing queries with subqueries`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM (SELECT 1 FROM table) x"
+    "Subqueries in anonymizing queries are not currently supported"
+
+[<Fact>]
+let ``Allow limiting top query`` () =
+  ensureAnalyzeValid "SELECT count(*) FROM table LIMIT 1"
+
+[<Fact>]
+let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
+  // Subqueries, JOINs, WHEREs, other aggregators etc.
+  ensureAnalyzeNotAnonValid
+    "SELECT sum(z.int_col) FROM (SELECT t.int_col FROM table JOIN table AS t ON true) z WHERE z.int_col=0"
