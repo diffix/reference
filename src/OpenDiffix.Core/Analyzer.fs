@@ -315,6 +315,9 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
       |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
     if selectedExpressions |> List.forall Expression.isScalar then
+      // No need to group implicitly by constants, which are invalid bucket definitions anyway.
+      let implicitGroupExpressions = selectedExpressions |> List.filter (Expression.isConstant >> not)
+
       // Non-grouping & non-aggregating query; group implicitly and expand
       let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
       let bucketExpand = Expression.makeSetFunction GenerateSeries [ bucketCount ]
@@ -323,7 +326,7 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
           TargetList =
             { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
             :: selectQuery.TargetList
-          GroupBy = selectedExpressions
+          GroupBy = implicitGroupExpressions
           Having = Expression.makeAnd lowCountFilter selectQuery.Having
       }
     else
@@ -352,14 +355,6 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
 // ----------------------------------------------------------------
 // Noise layers
 // ----------------------------------------------------------------
-
-let private collectGroupingExpressions selectQuery : Expression list =
-  if List.isEmpty selectQuery.GroupBy then
-    selectQuery.TargetList
-    |> List.map (fun selectedColumn -> selectedColumn.Expression)
-    |> List.filter Expression.isScalar
-  else
-    selectQuery.GroupBy
 
 let private basicSeedMaterial rangeColumns expression =
   match expression with
@@ -407,8 +402,7 @@ let private computeNoiseLayers anonParams query =
   let rangeColumns = collectRangeColumns anonParams query.From
 
   let sqlSeed =
-    query
-    |> collectGroupingExpressions
+    query.GroupBy
     |> Seq.map (
       normalizeBucketLabelExpression
       >> collectSeedMaterials rangeColumns

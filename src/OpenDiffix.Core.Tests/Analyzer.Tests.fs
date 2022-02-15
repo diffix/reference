@@ -392,9 +392,17 @@ type Tests(db: DBFixture) =
     assertDefaultSqlSeed "SELECT cast(price AS integer) FROM products"
 
   [<Fact>]
-  let ``constant bucket labels are rejected`` () =
+  let ``Constant bucket labels are rejected`` () =
     ensureQueryFails
-      "SELECT age, round(1) FROM customers_small"
+      "SELECT age, round(1) FROM customers_small GROUP BY 2"
       "Constant expressions can not be used for defining buckets."
+
+  [<Fact>]
+  let ``Constants targets aren't used for implicit bucket grouping and don't impact the seed`` () =
+    (sqlNoiseLayers "SELECT round(1) FROM customers_small")
+    |> should equal (sqlNoiseLayers "SELECT round(2) FROM customers_small")
+
+    (sqlNoiseLayers "SELECT age, round(1) FROM customers_small")
+    |> should equal (sqlNoiseLayers "SELECT age, round(2) FROM customers_small")
 
   interface IClassFixture<DBFixture>
