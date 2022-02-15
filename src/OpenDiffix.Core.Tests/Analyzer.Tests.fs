@@ -338,99 +338,19 @@ type Tests(db: DBFixture) =
 
     result.Having |> should equal expected
 
+  // NOTE: We do QueryValidator testing in its respective test module. Here we just check, if it's invoked at all based
+  // on whether the query is anonymizing.
   [<Fact>]
-  let ``Analyze JOINs`` () =
-    let result = analyzeQuery "SELECT count(*) FROM customers_small JOIN purchases ON id = purchases.cid"
-
-    let condition =
-      FunctionExpr(ScalarFunction Equals, [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ])
-
-    let customers = getTable "customers_small"
-    let purchases = getTable "purchases"
-
-    let expectedFrom =
-      Join
-        {
-          Type = JoinType.InnerJoin
-          Left = RangeTable(customers, customers.Name)
-          Right = RangeTable(purchases, purchases.Name)
-          On = condition
-        }
-
-    result.From |> should equal expectedFrom
-
-  [<Fact>]
-  let ``Analyze subqueries`` () =
-    analyzeQuery "SELECT count(*) FROM (SELECT 1 FROM customers_small JOIN purchases ON id = purchases.cid) x"
-    |> should
-         equal
-         { defaultQuery with
-             TargetList =
-               [
-                 {
-                   Expression =
-                     FunctionExpr(
-                       AggregateFunction(DiffixCount, AggregateOptions.Default),
-                       [
-                         ListExpr [
-                           ColumnReference(1, StringType)
-                           ColumnReference(2, IntegerType)
-                           ColumnReference(3, IntegerType)
-                         ]
-                       ]
-                     )
-                   Alias = "count"
-                   Tag = RegularTargetEntry
-                 }
-               ]
-             From =
-               SubQuery(
-                 { defaultQuery with
-                     TargetList =
-                       [
-                         { Expression = Constant(Integer 1L); Alias = ""; Tag = RegularTargetEntry }
-                         {
-                           Expression = ColumnReference(2, StringType)
-                           Alias = "__aid_0"
-                           Tag = AidTargetEntry
-                         }
-                         {
-                           Expression = ColumnReference(4, IntegerType)
-                           Alias = "__aid_1"
-                           Tag = AidTargetEntry
-                         }
-                         {
-                           Expression = ColumnReference(7, IntegerType)
-                           Alias = "__aid_2"
-                           Tag = AidTargetEntry
-                         }
-                       ]
-                     From =
-                       Join
-                         {
-                           Type = JoinType.InnerJoin
-                           Left = RangeTable(getTable "customers_small", "customers_small")
-                           Right = RangeTable(getTable "purchases", "purchases")
-                           On =
-                             FunctionExpr(
-                               ScalarFunction Equals,
-                               [ ColumnReference(4, IntegerType); ColumnReference(7, IntegerType) ]
-                             )
-                         }
-                 },
-                 "x"
-               )
-         }
-
-  [<Fact>]
-  let ``Reject limiting anonymizing subquery`` () =
+  let ``Detect subqueries touching tables with AID columns`` () =
     ensureQueryFails
-      "SELECT count(*) FROM (SELECT city FROM customers_small LIMIT 1) t"
-      "Limit is not allowed in anonymizing subqueries"
+      "SELECT count(*) FROM (SELECT 1 FROM customers_small) x"
+      "Subqueries in anonymizing queries are not currently supported"
 
   [<Fact>]
-  let ``Allow limiting top query`` () =
-    analyzeQuery "SELECT count(*) FROM customers_small LIMIT 1" |> ignore
+  let ``Detect queries joining tables with AID columns`` () =
+    ensureQueryFails
+      "SELECT price FROM products JOIN customers_small ON true"
+      "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
   let ``SQL seed from column selection`` () =
@@ -439,12 +359,6 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``SQL seed from column generalization`` () =
     assertSqlSeed "SELECT substring(city, 1, 2) FROM customers_small" [ "substring,customers_small.city,1,2" ]
-
-  [<Fact>]
-  let ``SQL seed from multiple groupings from multiple tables`` () =
-    assertSqlSeed
-      "SELECT count(*) FROM customers_small JOIN purchases ON id = cid GROUP BY city, round(amount)"
-      [ "customers_small.city"; "round,purchases.amount,1" ]
 
   [<Fact>]
   let ``SQL seeds from numeric ranges are consistent`` () =

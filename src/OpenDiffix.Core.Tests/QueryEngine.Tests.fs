@@ -96,43 +96,7 @@ type Tests(db: DBFixture) =
            | Integer i -> Integer i
            | other -> failwith $"Unexpected return '%A{other}'"
 
-  [<Fact>]
-  let ``query 6 - cross join`` () =
-    "SELECT count(*) FROM customers_small, purchases WHERE id = cid"
-    |> runQueryToInteger
-    |> should equal (Integer 72L)
-
-  [<Fact>]
-  let ``query 7 - inner join`` () =
-    "SELECT count(*) FROM purchases join customers_small ON id = cid"
-    |> runQueryToInteger
-    |> should equal (Integer 72L)
-
-  [<Fact>]
-  let ``query 8 - left join`` () =
-    "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
-    |> runQueryToInteger
-    |> should equal (Integer 72L)
-
-  [<Fact>]
-  let ``query 9 - right join`` () =
-    // The underlying data looks like this:
-    //
-    // customer.ID = null, purchases.CID = null, COUNT
-    // false,              false,                73
-    // true,               false,                445
-    // true,               true,                 1
-    //
-    // The query should yield the 73 + 445 values,
-    // There are no flattening needed for purchases,
-    // and a flattening of 1 for the customers table.
-    // When anonymizing the customers table we have 445
-    // unaccounted for values
-    // This should give us: 73 - 1 + 445 - 1 = 516
-    "SELECT count(*) FROM customers_small RIGHT JOIN purchases ON id = cid"
-    |> runQueryToInteger
-    |> should equal (Integer 516L)
-
+  // query 6 - query 9 removed (anonymizing JOINs, which are not supported now)
   [<Fact>]
   let ``query 10`` () =
     let expected =
@@ -206,8 +170,8 @@ type Tests(db: DBFixture) =
       "SELECT count(*) AS c1, count(DISTINCT length(name)) AS c2 FROM (SELECT name FROM products) x"
 
     equivalentQueries
-      "SELECT count(*) FROM customers_small LEFT JOIN purchases ON id = cid"
-      "SELECT count(*) FROM (SELECT id, cid FROM customers_small LEFT JOIN purchases ON id = cid) x"
+      "SELECT count(*) FROM products as a LEFT JOIN products as b ON a.id = b.id"
+      "SELECT count(*) FROM (SELECT a.id, b.id FROM products as a LEFT JOIN products as b ON a.id = b.id) x"
 
   [<Fact>]
   let ``standard query can use diffix functions`` () =

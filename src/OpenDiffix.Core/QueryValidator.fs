@@ -38,21 +38,15 @@ let private allowedCountUsage query =
     | _ -> ()
   )
 
-let private validateSubQuery selectQuery =
-  selectQuery
-  |> visitAggregates (fun _ -> failwith "Aggregates in subqueries are not currently supported")
+let private validateSelectTarget (selectQuery: SelectQuery) =
+  match selectQuery.From with
+  | Join _ -> failwith "JOIN in anonymizing queries is not currently supported"
+  | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported"
+  | _ -> ()
 
-  if not (List.isEmpty selectQuery.GroupBy) then
-    failwith "Grouping in subqueries is not currently supported"
-
-  validateSelectTarget selectQuery
-  validateLimitUsage selectQuery
-
-let private validateSelectTarget selectQuery = selectQuery |> visit validateSubQuery
-
-let private validateLimitUsage selectQuery =
-  if selectQuery.Limit <> None then
-    failwith "Limit is not allowed in anonymizing subqueries"
+let private validateNoWhere (selectQuery: SelectQuery) =
+  if selectQuery.Where <> Constant(Boolean true) then
+    failwith "WHERE in anonymizing queries is not currently supported"
 
 // ----------------------------------------------------------------
 // Public API
@@ -65,4 +59,5 @@ let validateQuery isAnonymizing (selectQuery: SelectQuery) =
   if isAnonymizing then
     validateOnlyCount selectQuery
     allowedCountUsage selectQuery
+    validateNoWhere selectQuery
     validateSelectTarget selectQuery

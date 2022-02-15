@@ -44,6 +44,9 @@ let NOT_ANONYMIZING = false
 
 let ensureAnalyzeValid queryString = analyzeQuery ANONYMIZING queryString
 
+let ensureAnalyzeNotAnonValid queryString =
+  analyzeQuery NOT_ANONYMIZING queryString
+
 let ensureAnalyzeFails queryString errorFragment =
   ensureFailParsedQuery ANONYMIZING queryString errorFragment
 
@@ -60,19 +63,37 @@ let ``Only allow count(*) and count(distinct column)`` () =
   ensureAnalyzeValid "SELECT count(distinct int_col) FROM table"
 
 [<Fact>]
-let ``Disallow aggregates in subqueries`` () =
-  let errorFragment = "aggregates in subqueries"
-  ensureAnalyzeFails "SELECT c FROM (SELECT count(*) as c FROM table) x" errorFragment
-
-[<Fact>]
-let ``Disallow group by in subqueries`` () =
-  let errorFragment = "grouping in subqueries"
-  ensureAnalyzeFails "SELECT count(*) FROM (SELECT int_col FROM table GROUP BY 1) x" errorFragment
-
-[<Fact>]
 let ``Disallow multiple low count aggregators`` () =
   let errorFragment = "single low count aggregator is allowed"
 
   ensureAnalyzeNotAnonFails
     "SELECT count(*), diffix_low_count(int_col), diffix_low_count(str_col) FROM table"
     errorFragment
+
+[<Fact>]
+let ``Disallow anonymizing queries with JOINs`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM table JOIN table AS t ON true"
+    "JOIN in anonymizing queries is not currently supported"
+
+[<Fact>]
+let ``Disallow anonymizing queries with subqueries`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM (SELECT 1 FROM table) x"
+    "Subqueries in anonymizing queries are not currently supported"
+
+[<Fact>]
+let ``Allow limiting top query`` () =
+  ensureAnalyzeValid "SELECT count(*) FROM table LIMIT 1"
+
+[<Fact>]
+let ``Disallow anonymizing queries with WHERE`` () =
+  ensureAnalyzeFails
+    "SELECT count(*) FROM table WHERE str_col=''"
+    "WHERE in anonymizing queries is not currently supported"
+
+[<Fact>]
+let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
+  // Subqueries, JOINs, WHEREs, other aggregators etc.
+  ensureAnalyzeNotAnonValid
+    "SELECT sum(z.int_col) FROM (SELECT t.int_col FROM table JOIN table AS t ON true) z WHERE z.int_col=0"

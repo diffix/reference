@@ -46,7 +46,7 @@ let rec private collectSetFunctions expression =
 
 let private planJoin join columnIndices =
   let leftColumnCount = QueryRange.columnsCount join.Left
-  let leftIndices, rightIndices = List.partition ((>=) leftColumnCount) columnIndices
+  let leftIndices, rightIndices = List.partition (fun x -> x < leftColumnCount) columnIndices
   let rightIndices = List.map (fun i -> i - leftColumnCount) rightIndices
   Plan.Join(planFrom join.Left leftIndices, planFrom join.Right rightIndices, join.Type, join.On)
 
