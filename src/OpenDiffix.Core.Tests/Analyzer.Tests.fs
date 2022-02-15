@@ -349,7 +349,7 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``Detect queries joining tables with AID columns`` () =
     ensureQueryFails
-      "SELECT 1 FROM products JOIN customers_small ON true"
+      "SELECT price FROM products JOIN customers_small ON true"
       "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
