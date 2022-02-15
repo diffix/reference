@@ -110,6 +110,7 @@ let rec evaluateScalarFunction fn args =
   | And, [ Boolean b1; Boolean b2 ] -> Boolean(b1 && b2)
   | Or, [ Boolean b1; Boolean b2 ] -> Boolean(b1 || b2)
 
+  | Round, [ Integer i ] -> Integer i
   | Round, [ Real r ] -> r |> roundAwayFromZero |> int64 |> Integer
   | RoundBy, [ _; Integer amount ] when amount <= 0L -> Null
   | RoundBy, [ _; Real amount ] when amount <= 0.0 -> Null
@@ -124,6 +125,7 @@ let rec evaluateScalarFunction fn args =
     (value / float amount) |> roundAwayFromZero |> int64 |> (*) amount |> Integer
   | RoundBy, [ Real value; Real amount ] -> (value / amount) |> roundAwayFromZero |> (*) amount |> Real
 
+  | Ceil, [ Integer i ] -> Integer i
   | Ceil, [ Real r ] -> r |> ceil |> int64 |> Integer
   | CeilBy, [ _; Integer amount ] when amount <= 0L -> Null
   | CeilBy, [ _; Real amount ] when amount <= 0.0 -> Null
@@ -132,6 +134,7 @@ let rec evaluateScalarFunction fn args =
   | CeilBy, [ Real value; Integer amount ] -> (value / float amount) |> ceil |> int64 |> (*) amount |> Integer
   | CeilBy, [ Real value; Real amount ] -> (value / amount) |> ceil |> (*) amount |> Real
 
+  | Floor, [ Integer i ] -> Integer i
   | Floor, [ Real r ] -> r |> floor |> int64 |> Integer
   | FloorBy, [ _; Integer amount ] when amount <= 0L -> Null
   | FloorBy, [ _; Real amount ] when amount <= 0.0 -> Null
