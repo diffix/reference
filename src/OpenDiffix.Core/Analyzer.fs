@@ -418,6 +418,18 @@ let private computeNoiseLayers anonParams query =
 
   { BucketSeed = sqlSeed }
 
+// NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
+let private hasAnonymizingAggregates query =
+  query
+  |> collectAggregates
+  |> List.filter (
+    function
+    | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
+    | _ -> false
+  )
+  |> List.isEmpty
+  |> not
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -429,6 +441,15 @@ let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
   query
 
 let anonymize queryContext (query: Query) =
-  let noiseLayers = computeNoiseLayers queryContext.AnonymizationParams query
   let query = rewriteQuery queryContext.AnonymizationParams query
+
+  // Noise is needed only when we anonymize. If we don't, we also don't need to do the validations which are done deep
+  // in `computeNoiseLayers`. This includes anonymization injected in `rewriteQuery` and explicit use of anonymizing
+  // aggregates like `diffix_low_count`.
+  let noiseLayers =
+    if hasAnonymizingAggregates query then
+      computeNoiseLayers queryContext.AnonymizationParams query
+    else
+      NoiseLayers.Default
+
   query, noiseLayers

@@ -314,6 +314,9 @@ type Tests(db: DBFixture) =
     let expectedSeed = Hash.strings 0UL seedMaterials
     (sqlNoiseLayers query).BucketSeed |> should equal expectedSeed
 
+  let assertDefaultSqlSeed query =
+    (sqlNoiseLayers query) |> should equal NoiseLayers.Default
+
   [<Fact>]
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
@@ -353,6 +356,15 @@ type Tests(db: DBFixture) =
       "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
+  let ``Default SQL seed from non-anonymizing queries`` () =
+    assertDefaultSqlSeed "SELECT * FROM products"
+    assertDefaultSqlSeed "SELECT count(*) FROM products"
+
+  [<Fact>]
+  let ``SQL seed from non-anonymizing queries using anonymizing aggregates`` () =
+    assertSqlSeed "SELECT diffix_low_count(products.id), name FROM products GROUP BY name" [ "products.name" ]
+
+  [<Fact>]
   let ``SQL seed from column selection`` () =
     assertSqlSeed "SELECT city FROM customers_small" [ "customers_small.city" ]
 
@@ -373,7 +385,11 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``SQL seed from rounding cast`` () =
-    assertSqlSeed "SELECT cast(price AS integer) FROM products" [ "round,products.price,1" ]
+    assertSqlSeed "SELECT cast(amount AS integer) FROM purchases" [ "round,purchases.amount,1" ]
+
+  [<Fact>]
+  let ``Default SQL seed from non-anonymizing rounding cast`` () =
+    assertDefaultSqlSeed "SELECT cast(price AS integer) FROM products"
 
   [<Fact>]
   let ``constant bucket labels are rejected`` () =
