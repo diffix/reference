@@ -304,35 +304,56 @@ let private rewriteToDiffixAggregate aidColumnsExpression query =
 
   query |> map exprMapper
 
+let private bucketExpand aidColumnsExpression =
+  let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
+  Expression.makeSetFunction GenerateSeries [ bucketCount ]
+
 let private addLowCountFilter aidColumnsExpression selectQuery =
   let lowCountFilter =
     Expression.makeAggregate DiffixLowCount [ aidColumnsExpression ]
     |> Expression.makeNot
 
-  if List.isEmpty selectQuery.GroupBy then
-    let selectedExpressions =
-      selectQuery.TargetList
-      |> List.map (fun selectedColumn -> selectedColumn.Expression)
+  let selectedExpressions =
+    selectQuery.TargetList
+    |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-    if selectedExpressions |> List.forall Expression.isScalar then
-      // No need to group implicitly by constants, which are invalid bucket definitions anyway.
-      let implicitGroupExpressions = selectedExpressions |> List.filter (Expression.isConstant >> not)
+  let nonConstantExpressions = selectedExpressions |> List.filter (Expression.isConstant >> not)
 
-      // Non-grouping & non-aggregating query; group implicitly and expand
-      let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
-      let bucketExpand = Expression.makeSetFunction GenerateSeries [ bucketCount ]
+  let isGrouping = List.isEmpty selectQuery.GroupBy |> not
+  let isAggregate = selectedExpressions |> List.forall Expression.isScalar |> not
+  let onlyConstantsSelected = List.isEmpty nonConstantExpressions
 
-      { selectQuery with
-          TargetList =
-            { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
-            :: selectQuery.TargetList
-          GroupBy = implicitGroupExpressions
-          Having = Expression.makeAnd lowCountFilter selectQuery.Having
-      }
-    else
-      // Non-grouping aggregate query; do nothing
-      selectQuery
-  else
+  match (isGrouping, isAggregate, onlyConstantsSelected) with
+  | (false, false, false) ->
+    // Non-grouping, non-aggregate query; group implicitly and expand
+
+    { selectQuery with
+        TargetList =
+          {
+            Expression = bucketExpand aidColumnsExpression
+            Alias = ""
+            Tag = JunkTargetEntry
+          }
+          :: selectQuery.TargetList
+        // No need to group implicitly by constants, which are invalid bucket definitions anyway.
+        GroupBy = nonConstantExpressions
+        Having = Expression.makeAnd lowCountFilter selectQuery.Having
+    }
+  | (false, false, true) ->
+    // All selected expressions are constants, we expand for a result in line with global anonymized count.
+    { selectQuery with
+        TargetList =
+          {
+            Expression = bucketExpand aidColumnsExpression
+            Alias = ""
+            Tag = JunkTargetEntry
+          }
+          :: selectQuery.TargetList
+    }
+  | (false, true, _) ->
+    // Non-grouping aggregate query; do nothing.
+    selectQuery
+  | (true, _, _) ->
     // Grouping query; add LCF to HAVING
     { selectQuery with
         Having = Expression.makeAnd lowCountFilter selectQuery.Having

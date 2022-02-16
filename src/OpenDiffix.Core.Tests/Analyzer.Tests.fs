@@ -317,6 +317,9 @@ type Tests(db: DBFixture) =
   let assertDefaultSqlSeed query =
     (sqlNoiseLayers query) |> should equal NoiseLayers.Default
 
+  let assertNoLCF query =
+    (analyzeQuery query).Having |> should equal (Boolean true |> Constant)
+
   [<Fact>]
   let ``Analyze count transforms`` () =
     let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
@@ -404,5 +407,9 @@ type Tests(db: DBFixture) =
 
     (sqlNoiseLayers "SELECT age, round(1) FROM customers_small")
     |> should equal (sqlNoiseLayers "SELECT age, round(2) FROM customers_small")
+
+  [<Fact>]
+  let ``No low-count filtering for non-grouping, non-aggregate queries with only constants`` () =
+    assertNoLCF "SELECT round(1) FROM customers_small"
 
   interface IClassFixture<DBFixture>
