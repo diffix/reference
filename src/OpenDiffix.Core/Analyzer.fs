@@ -304,31 +304,55 @@ let private rewriteToDiffixAggregate aidColumnsExpression query =
 
   query |> map exprMapper
 
+let private bucketExpand aidColumnsExpression =
+  let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
+  Expression.makeSetFunction GenerateSeries [ bucketCount ]
+
 let private addLowCountFilter aidColumnsExpression selectQuery =
   let lowCountFilter =
     Expression.makeAggregate DiffixLowCount [ aidColumnsExpression ]
     |> Expression.makeNot
 
-  if List.isEmpty selectQuery.GroupBy then
-    let selectedExpressions =
-      selectQuery.TargetList
-      |> List.map (fun selectedColumn -> selectedColumn.Expression)
+  let selectedExpressions =
+    selectQuery.TargetList
+    |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-    if selectedExpressions |> List.forall Expression.isScalar then
-      // Non-grouping & non-aggregating query; group implicitly and expand
-      let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
-      let bucketExpand = Expression.makeSetFunction GenerateSeries [ bucketCount ]
+  let nonConstantExpressions =
+    selectedExpressions
+    |> List.filter (
+      function
+      | Constant _ -> false
+      | _ -> true
+    )
 
-      { selectQuery with
-          TargetList =
-            { Expression = bucketExpand; Alias = ""; Tag = JunkTargetEntry }
-            :: selectQuery.TargetList
-          GroupBy = selectedExpressions
-          Having = Expression.makeAnd lowCountFilter selectQuery.Having
-      }
-    else
-      // Non-grouping aggregate query; do nothing
-      selectQuery
+  let doesGrouping = List.isEmpty selectQuery.GroupBy |> not
+  let doesAggregation = selectedExpressions |> List.forall Expression.isScalar |> not
+  let onlyConstantsSelected = List.isEmpty nonConstantExpressions
+
+  if not doesGrouping && not doesAggregation then
+    // Non-grouping, non-aggregate query; group implicitly and expand
+    let having =
+      if not onlyConstantsSelected then
+        Expression.makeAnd lowCountFilter selectQuery.Having
+      else
+        // All selected expressions are constants; no low-count filter in line with global anonymized count.
+        selectQuery.Having
+
+    { selectQuery with
+        TargetList =
+          {
+            Expression = bucketExpand aidColumnsExpression
+            Alias = ""
+            Tag = JunkTargetEntry
+          }
+          :: selectQuery.TargetList
+        // No need to group implicitly by constants, which are invalid bucket definitions anyway.
+        GroupBy = nonConstantExpressions
+        Having = having
+    }
+  else if not doesGrouping && doesAggregation then
+    // Non-grouping aggregate query; do nothing.
+    selectQuery
   else
     // Grouping query; add LCF to HAVING
     { selectQuery with
@@ -352,14 +376,6 @@ let private rewriteQuery anonParams (selectQuery: SelectQuery) =
 // ----------------------------------------------------------------
 // Noise layers
 // ----------------------------------------------------------------
-
-let private collectGroupingExpressions selectQuery : Expression list =
-  if List.isEmpty selectQuery.GroupBy then
-    selectQuery.TargetList
-    |> List.map (fun selectedColumn -> selectedColumn.Expression)
-    |> List.filter Expression.isScalar
-  else
-    selectQuery.GroupBy
 
 let private basicSeedMaterial rangeColumns expression =
   match expression with
@@ -407,8 +423,7 @@ let private computeNoiseLayers anonParams query =
   let rangeColumns = collectRangeColumns anonParams query.From
 
   let sqlSeed =
-    query
-    |> collectGroupingExpressions
+    query.GroupBy
     |> Seq.map (
       normalizeBucketLabelExpression
       >> collectSeedMaterials rangeColumns
@@ -417,6 +432,16 @@ let private computeNoiseLayers anonParams query =
     |> Hash.strings 0UL
 
   { BucketSeed = sqlSeed }
+
+// NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
+let private hasAnonymizingAggregates query =
+  query
+  |> collectAggregates
+  |> Seq.exists (
+    function
+    | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
+    | _ -> false
+  )
 
 // ----------------------------------------------------------------
 // Public API
@@ -429,6 +454,15 @@ let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
   query
 
 let anonymize queryContext (query: Query) =
-  let noiseLayers = computeNoiseLayers queryContext.AnonymizationParams query
   let query = rewriteQuery queryContext.AnonymizationParams query
+
+  // Noise is needed only when we anonymize. If we don't, we also don't need to do the validations which are done deep
+  // in `computeNoiseLayers`. This includes anonymization injected in `rewriteQuery` and explicit use of anonymizing
+  // aggregates like `diffix_low_count`.
+  let noiseLayers =
+    if hasAnonymizingAggregates query then
+      computeNoiseLayers queryContext.AnonymizationParams query
+    else
+      NoiseLayers.Default
+
   query, noiseLayers
