@@ -319,11 +319,11 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
 
   let nonConstantExpressions = selectedExpressions |> List.filter (Expression.isConstant >> not)
 
-  let isGrouping = List.isEmpty selectQuery.GroupBy |> not
-  let isAggregate = selectedExpressions |> List.forall Expression.isScalar |> not
+  let doesGrouping = List.isEmpty selectQuery.GroupBy |> not
+  let doesAggregation = selectedExpressions |> List.forall Expression.isScalar |> not
   let onlyConstantsSelected = List.isEmpty nonConstantExpressions
 
-  match (isGrouping, isAggregate, onlyConstantsSelected) with
+  match (doesGrouping, doesAggregation, onlyConstantsSelected) with
   | (false, false, false) ->
     // Non-grouping, non-aggregate query; group implicitly and expand
 
@@ -437,13 +437,11 @@ let private computeNoiseLayers anonParams query =
 let private hasAnonymizingAggregates query =
   query
   |> collectAggregates
-  |> List.filter (
+  |> Seq.exists (
     function
     | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
     | _ -> false
   )
-  |> List.isEmpty
-  |> not
 
 // ----------------------------------------------------------------
 // Public API
