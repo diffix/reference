@@ -323,9 +323,14 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
   let doesAggregation = selectedExpressions |> List.forall Expression.isScalar |> not
   let onlyConstantsSelected = List.isEmpty nonConstantExpressions
 
-  match (doesGrouping, doesAggregation, onlyConstantsSelected) with
-  | (false, false, false) ->
+  if not doesGrouping && not doesAggregation then
     // Non-grouping, non-aggregate query; group implicitly and expand
+    let having =
+      if not onlyConstantsSelected then
+        Expression.makeAnd lowCountFilter selectQuery.Having
+      else
+        // All selected expressions are constants; no low-count filter in line with global anonymized count.
+        selectQuery.Having
 
     { selectQuery with
         TargetList =
@@ -337,23 +342,12 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
           :: selectQuery.TargetList
         // No need to group implicitly by constants, which are invalid bucket definitions anyway.
         GroupBy = nonConstantExpressions
-        Having = Expression.makeAnd lowCountFilter selectQuery.Having
+        Having = having
     }
-  | (false, false, true) ->
-    // All selected expressions are constants, we expand for a result in line with global anonymized count.
-    { selectQuery with
-        TargetList =
-          {
-            Expression = bucketExpand aidColumnsExpression
-            Alias = ""
-            Tag = JunkTargetEntry
-          }
-          :: selectQuery.TargetList
-    }
-  | (false, true, _) ->
+  else if not doesGrouping && doesAggregation then
     // Non-grouping aggregate query; do nothing.
     selectQuery
-  | (true, _, _) ->
+  else
     // Grouping query; add LCF to HAVING
     { selectQuery with
         Having = Expression.makeAnd lowCountFilter selectQuery.Having
