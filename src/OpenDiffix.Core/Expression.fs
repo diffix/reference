@@ -283,10 +283,3 @@ let unwrapListExpr expr =
   match expr with
   | ListExpr list -> list
   | _ -> failwith "Expected a list expression"
-
-let rec isConstant expr =
-  match expr with
-  | Constant _ -> true
-  | FunctionExpr (_, args) -> List.forall isConstant args
-  | ListExpr exprs -> List.forall isConstant exprs
-  | _ -> false

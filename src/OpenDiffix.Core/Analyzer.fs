@@ -317,7 +317,13 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
     selectQuery.TargetList
     |> List.map (fun selectedColumn -> selectedColumn.Expression)
 
-  let nonConstantExpressions = selectedExpressions |> List.filter (Expression.isConstant >> not)
+  let nonConstantExpressions =
+    selectedExpressions
+    |> List.filter (
+      function
+      | Constant _ -> false
+      | _ -> true
+    )
 
   let doesGrouping = List.isEmpty selectQuery.GroupBy |> not
   let doesAggregation = selectedExpressions |> List.forall Expression.isScalar |> not
