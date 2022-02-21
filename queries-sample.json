@@ -9,6 +9,7 @@
         }
       },
       "salt": [],
+      "access_level": "publish_trusted",
       "suppression": {
         "low_threshold": 2,
         "layer_s_d": 1,
@@ -35,6 +36,7 @@
         }
       },
       "salt": [],
+      "access_level": "publish_trusted",
       "suppression": {
         "low_threshold": 2,
         "layer_s_d": 1,
@@ -61,6 +63,7 @@
         }
       },
       "salt": [],
+      "access_level": "publish_trusted",
       "suppression": {
         "low_threshold": 2,
         "layer_s_d": 1,

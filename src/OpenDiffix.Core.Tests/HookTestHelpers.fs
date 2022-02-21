@@ -6,6 +6,7 @@ let private noiselessAnonParams: AnonymizationParams =
   {
     TableSettings = Map []
     Salt = [||]
+    AccessLevel = Direct
     Suppression = { LowThreshold = 3; LowMeanGap = 0.; LayerSD = 0. }
     OutlierCount = { Lower = 1; Upper = 1 }
     TopCount = { Lower = 1; Upper = 1 }
