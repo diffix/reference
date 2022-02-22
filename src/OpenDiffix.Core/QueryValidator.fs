@@ -53,7 +53,7 @@ let private validateNoWhere (selectQuery: SelectQuery) =
 // ----------------------------------------------------------------
 
 /// Validates a top-level query.
-let validateQuery isAnonymizing (selectQuery: SelectQuery) =
+let validateQuery isAnonymizing accessLevel (selectQuery: SelectQuery) =
   validateSingleLowCount selectQuery
 
   if isAnonymizing then

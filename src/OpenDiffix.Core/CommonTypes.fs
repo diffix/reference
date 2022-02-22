@@ -140,11 +140,17 @@ type SuppressionParams =
   }
   static member Default = { LowThreshold = 2; LayerSD = 1.; LowMeanGap = 2. }
 
+type AccessLevel =
+  | PublishTrusted
+  | PublishUntrusted
+  | Direct
+
 type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
     Salt: byte []
     Suppression: SuppressionParams
+    AccessLevel: AccessLevel
 
     // Count params
     OutlierCount: Interval
@@ -156,6 +162,7 @@ type AnonymizationParams =
       TableSettings = Map.empty
       Salt = [||]
       Suppression = SuppressionParams.Default
+      AccessLevel = PublishTrusted
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0

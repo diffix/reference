@@ -48,6 +48,7 @@ module private rec Encoders =
           (ap.TableSettings
            |> Map.toList
            |> List.map (fun (table, settings) -> {| Table = table; Settings = settings |}))
+        AccessLevel = ap.AccessLevel
         LowThreshold = ap.Suppression.LowThreshold
         LowMeanGap = ap.Suppression.LowMeanGap
         LowLayerSd = ap.Suppression.LayerSD
@@ -73,6 +74,27 @@ module private rec Encoders =
       let response = {| Success = false; error = errorMsg |}
       autoEncode response
 
+let private anonymizationModeDecoder: Decoder<AccessLevel> =
+  Decode.string
+  |> Decode.andThen (
+    function
+    | "publish_trusted" -> Decode.succeed PublishTrusted
+    | "publish_untrusted" -> Decode.succeed PublishUntrusted
+    | "direct" -> Decode.succeed Direct
+    | invalid -> Decode.fail $"Failed to decode {invalid}, not a valid `AccessLevel`"
+  )
+
+let private anonymizationModeEncoder (accessLevel: AccessLevel) =
+  match accessLevel with
+  | PublishTrusted -> "publish_trusted"
+  | PublishUntrusted -> "publish_untrusted"
+  | Direct -> "direct"
+  |> Encode.string
+
+let private anonymizationModeExtra =
+  Extra.empty
+  |> Extra.withCustom anonymizationModeEncoder anonymizationModeDecoder
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -93,4 +115,4 @@ let encodeBatchRunResult (time: System.DateTime) version (queryResults: QueryRes
     .ToString()
 
 let decodeRequestParams content =
-  Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase)
+  Decode.Auto.fromString<QueryRequest list> (content, caseStrategy = SnakeCase, extra = anonymizationModeExtra)

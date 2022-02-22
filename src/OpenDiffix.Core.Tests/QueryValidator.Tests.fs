@@ -24,7 +24,7 @@ let analyzeQuery isAnonymizing queryString =
   queryString
   |> Parser.parse
   |> Analyzer.analyze queryContext
-  |> QueryValidator.validateQuery isAnonymizing
+  |> QueryValidator.validateQuery isAnonymizing queryContext.AnonymizationParams
 
 let ensureFailParsedQuery isAnonymizing queryString (errorFragment: string) =
   try

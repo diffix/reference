@@ -15,6 +15,7 @@ type CliArguments =
   | Queries_Path of string
   | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Salt of string
+  | Access_Level of string
   | Json
 
   // Threshold values
@@ -39,6 +40,9 @@ type CliArguments =
         + "The db_path inside should be relative to this file's path."
       | Query_Stdin -> "Reads the query from standard in."
       | Salt _ -> "The salt value to use when anonymizing the data. Changing the salt will change the result."
+      | Access_Level _ ->
+        "Controls the access level to the data: 'publish_trusted' - protects against accidental re-identification; "
+        + "'publish_untrusted' - protects against intentional re-identification; 'direct' - no anonymization."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Outlier_Count _ ->
         "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -92,6 +96,14 @@ let toSalt =
   | Some (salt: string) -> Text.Encoding.UTF8.GetBytes(salt)
   | _ -> [||]
 
+let toAccessLevel =
+  function
+  | Some "publish_untrusted" -> PublishUntrusted
+  | None
+  | Some "publish_trusted" -> PublishTrusted
+  | Some "direct" -> Direct
+  | Some _ -> failWithUsageInfo "--access-level must be one of: 'publish_trusted', 'publish_untrusted', 'direct'."
+
 let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : AnonymizationParams =
   let suppression =
     {
@@ -109,6 +121,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
+    AccessLevel = parsedArgs.TryGetResult Access_Level |> toAccessLevel
     Suppression = suppression
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval

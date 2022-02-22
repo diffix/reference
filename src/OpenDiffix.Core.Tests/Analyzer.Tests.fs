@@ -274,6 +274,7 @@ type Tests(db: DBFixture) =
           "purchases", { AidColumns = [ "cid" ] }
         ]
       Salt = [||]
+      AccessLevel = PublishTrusted
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
@@ -281,6 +282,7 @@ type Tests(db: DBFixture) =
     }
 
   let queryContext = QueryContext.make anonParams db.DataProvider
+  let queryContextUntrusted = QueryContext.make { anonParams with AccessLevel = PublishUntrusted } db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
@@ -296,9 +298,26 @@ type Tests(db: DBFixture) =
 
     query
 
+  let analyzeQueryUntrusted query =
+    let query, _ =
+      query
+      |> Parser.parse
+      |> Analyzer.analyze queryContextUntrusted
+      |> Normalizer.normalize
+      |> Analyzer.anonymize queryContextUntrusted
+
+    query
+
   let ensureQueryFails query error =
     try
       query |> analyzeQuery |> ignore
+      failwith "Expected query to fail"
+    with
+    | ex -> ex.Message |> should equal error
+
+  let ensureQueryFailsUntrusted query error =
+    try
+      query |> analyzeQueryUntrusted |> ignore
       failwith "Expected query to fail"
     with
     | ex -> ex.Message |> should equal error
@@ -358,6 +377,46 @@ type Tests(db: DBFixture) =
     ensureQueryFails
       "SELECT price FROM products JOIN customers_small ON true"
       "JOIN in anonymizing queries is not currently supported"
+
+  [<Fact>]
+  let ``Detect queries with disallowed generalizations in untrusted access level`` () =
+    ensureQueryFailsUntrusted
+      "SELECT substring(city, 2, 2) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT floor_by(age, 3) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT floor_by(age, 3.0) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT floor_by(age, 5000000000.1) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT round_by(age, 2) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT ceil_by(age, 2) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT width_bucket(age, 2, 200, 5) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+  [<Fact>]
+  let ``Analyze queries with allowed generalizations in untrusted access level`` () =
+    analyzeQueryUntrusted "SELECT substring(city, 1, 2) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 2) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 20) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 2.0) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 0.2) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 20.0) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT floor_by(age, 50.0) from customers" |> ignore
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =

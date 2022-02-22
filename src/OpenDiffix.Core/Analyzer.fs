@@ -1,5 +1,6 @@
 module rec OpenDiffix.Core.Analyzer
 
+open System.Text.RegularExpressions
 open AnalyzerTypes
 open NodeUtils
 
@@ -362,9 +363,12 @@ let private addLowCountFilter aidColumnsExpression selectQuery =
 let private rewriteQuery anonParams (selectQuery: SelectQuery) =
   let rangeColumns = collectRangeColumns anonParams selectQuery.From
   let aidColumnsExpression = makeAidColumnsExpression rangeColumns
-  let isAnonymizing = aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
-  QueryValidator.validateQuery isAnonymizing selectQuery
+  let isAnonymizing =
+    anonParams.AccessLevel <> Direct
+    && aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
+
+  QueryValidator.validateQuery isAnonymizing anonParams.AccessLevel selectQuery
 
   if isAnonymizing then
     selectQuery
@@ -419,6 +423,22 @@ let rec private normalizeBucketLabelExpression expression =
     FunctionExpr(ScalarFunction fn, List.map normalizeBucketLabelExpression args @ extraArgs)
   | _ -> expression
 
+let private untrustedAllowsRange arg =
+  match arg with
+  // "money-style" numbers, i.e. 1, 2, or 5 preceeded by or followed by zeros: ⟨... 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, ...⟩
+  | Constant (Real c) -> Regex.IsMatch($"%.15e{c}", "^[125]\.0+e[-+]\d+$")
+  | Constant (Integer c) -> Regex.IsMatch($"%i{c}", "^[125]0*$")
+  | _ -> false
+
+let private validateBucketLabelExpression accessLevel expression =
+  if accessLevel = PublishUntrusted then
+    match expression with
+    | FunctionExpr (ScalarFunction FloorBy, [ _; arg ]) when untrustedAllowsRange arg -> ()
+    | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
+    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level"
+
+  expression
+
 let private computeNoiseLayers anonParams query =
   let rangeColumns = collectRangeColumns anonParams query.From
 
@@ -426,6 +446,7 @@ let private computeNoiseLayers anonParams query =
     query.GroupBy
     |> Seq.map (
       normalizeBucketLabelExpression
+      >> validateBucketLabelExpression anonParams.AccessLevel
       >> collectSeedMaterials rangeColumns
       >> String.join ","
     )
