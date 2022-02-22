@@ -1,7 +1,6 @@
 module rec OpenDiffix.Core.Analyzer
 
 open System.Text.RegularExpressions
-
 open AnalyzerTypes
 open NodeUtils
 
@@ -436,7 +435,7 @@ let private validateBucketLabelExpression accessLevel expression =
     match expression with
     | FunctionExpr (ScalarFunction FloorBy, [ _; arg ]) when untrustedAllowsRange arg -> ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
-    | _ -> failwith "Generalization used in the query is not allowed in untrusted analyst mode"
+    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level"
 
   expression
 

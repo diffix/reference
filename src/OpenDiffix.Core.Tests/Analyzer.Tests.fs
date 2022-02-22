@@ -379,37 +379,37 @@ type Tests(db: DBFixture) =
       "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
-  let ``Detect queries with disallowed generalizations in untrusted mode`` () =
+  let ``Detect queries with disallowed generalizations in untrusted access level`` () =
     ensureQueryFailsUntrusted
       "SELECT substring(city, 2, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3.0) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 5000000000.1) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT round_by(age, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT ceil_by(age, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
       "SELECT width_bucket(age, 2, 200, 5) from customers"
-      "Generalization used in the query is not allowed in untrusted analyst mode"
+      "Generalization used in the query is not allowed in untrusted access level"
 
   [<Fact>]
-  let ``Analyze queries with allowed generalizations in untrusted mode`` () =
+  let ``Analyze queries with allowed generalizations in untrusted access level`` () =
     analyzeQueryUntrusted "SELECT substring(city, 1, 2) from customers" |> ignore
     analyzeQueryUntrusted "SELECT floor_by(age, 2) from customers" |> ignore
     analyzeQueryUntrusted "SELECT floor_by(age, 20) from customers" |> ignore

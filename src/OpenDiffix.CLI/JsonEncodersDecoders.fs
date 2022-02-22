@@ -81,11 +81,11 @@ let private anonymizationModeDecoder: Decoder<AccessLevel> =
     | "publish_trusted" -> Decode.succeed PublishTrusted
     | "publish_untrusted" -> Decode.succeed PublishUntrusted
     | "direct" -> Decode.succeed Direct
-    | invalid -> Decode.fail (sprintf "Failed to decode `%s`, not a valid `AnonymizationMode`" invalid)
+    | invalid -> Decode.fail $"Failed to decode {invalid}, not a valid `AccessLevel`"
   )
 
-let private anonymizationModeEncoder (point: AccessLevel) =
-  match point with
+let private anonymizationModeEncoder (accessLevel: AccessLevel) =
+  match accessLevel with
   | PublishTrusted -> "publish_trusted"
   | PublishUntrusted -> "publish_untrusted"
   | Direct -> "direct"
