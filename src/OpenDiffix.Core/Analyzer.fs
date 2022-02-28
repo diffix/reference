@@ -423,7 +423,7 @@ let rec private normalizeBucketLabelExpression expression =
     FunctionExpr(ScalarFunction fn, List.map normalizeBucketLabelExpression args @ extraArgs)
   | _ -> expression
 
-let private untrustedAllowsRange arg =
+let private isMoneyStyle arg =
   match arg with
   // "money-style" numbers, i.e. 1, 2, or 5 preceeded by or followed by zeros: ⟨... 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, ...⟩
   | Constant (Real c) -> Regex.IsMatch($"%.15e{c}", "^[125]\.0+e[-+]\d+$")
@@ -433,7 +433,7 @@ let private untrustedAllowsRange arg =
 let private validateBucketLabelExpression accessLevel expression =
   if accessLevel = PublishUntrusted then
     match expression with
-    | FunctionExpr (ScalarFunction FloorBy, [ _; arg ]) when untrustedAllowsRange arg -> ()
+    | FunctionExpr (ScalarFunction FloorBy, [ _; arg ]) when isMoneyStyle arg -> ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level"
 

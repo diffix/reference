@@ -405,6 +405,14 @@ type Tests(db: DBFixture) =
       "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
+      "SELECT round(age) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
+      "SELECT ceil(age) from customers"
+      "Generalization used in the query is not allowed in untrusted access level"
+
+    ensureQueryFailsUntrusted
       "SELECT width_bucket(age, 2, 200, 5) from customers"
       "Generalization used in the query is not allowed in untrusted access level"
 
