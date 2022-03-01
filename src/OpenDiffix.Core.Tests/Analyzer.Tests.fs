@@ -397,22 +397,6 @@ type Tests(db: DBFixture) =
       "Generalization used in the query is not allowed in untrusted access level"
 
     ensureQueryFailsUntrusted
-      "SELECT round_by(age, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
-
-    ensureQueryFailsUntrusted
-      "SELECT ceil_by(age, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
-
-    ensureQueryFailsUntrusted
-      "SELECT round(age) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
-
-    ensureQueryFailsUntrusted
-      "SELECT ceil(age) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
-
-    ensureQueryFailsUntrusted
       "SELECT width_bucket(age, 2, 200, 5) from customers"
       "Generalization used in the query is not allowed in untrusted access level"
 
@@ -425,6 +409,11 @@ type Tests(db: DBFixture) =
     analyzeQueryUntrusted "SELECT floor_by(age, 0.2) from customers" |> ignore
     analyzeQueryUntrusted "SELECT floor_by(age, 20.0) from customers" |> ignore
     analyzeQueryUntrusted "SELECT floor_by(age, 50.0) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT ceil_by(age, 50.0) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT round_by(age, 50.0) from customers" |> ignore
+    // No generalization, either implicitly or explicitly
+    analyzeQueryUntrusted "SELECT floor(age) from customers" |> ignore
+    analyzeQueryUntrusted "SELECT age from customers" |> ignore
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =
