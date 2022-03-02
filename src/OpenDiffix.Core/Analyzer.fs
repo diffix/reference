@@ -446,7 +446,7 @@ let private validateGeneralization accessLevel expression =
     | FunctionExpr (ScalarFunction _, primaryArg :: _) when not (isColumnReference primaryArg) ->
       failwith "Primary argument for a bucket function has to be a simple column reference."
     | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) when List.exists (isConstant >> not) secondaryArgs ->
-      failwith "Secondary arguments for a bucket function have to be a constants."
+      failwith "Secondary arguments for a bucket function have to be constants."
     | _ -> ()
 
   if accessLevel = PublishUntrusted then

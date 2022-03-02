@@ -423,7 +423,7 @@ type Tests(db: DBFixture) =
 
     ensureQueryFailsUntrusted
       "SELECT round(age, age) from customers"
-      "Secondary arguments for a bucket function have to be a constants."
+      "Secondary arguments for a bucket function have to be constants."
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =
