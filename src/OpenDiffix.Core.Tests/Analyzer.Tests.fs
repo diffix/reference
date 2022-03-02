@@ -417,11 +417,11 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Detect queries with disallowed bucket functions calls`` () =
-    ensureQueryFailsUntrusted
+    ensureQueryFails
       "SELECT round(2, age) from customers"
       "Primary argument for a bucket function has to be a simple column reference."
 
-    ensureQueryFailsUntrusted
+    ensureQueryFails
       "SELECT round(age, age) from customers"
       "Secondary arguments for a bucket function have to be constants."
 
