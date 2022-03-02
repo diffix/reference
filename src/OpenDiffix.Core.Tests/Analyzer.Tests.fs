@@ -382,23 +382,23 @@ type Tests(db: DBFixture) =
   let ``Detect queries with disallowed generalizations in untrusted access level`` () =
     ensureQueryFailsUntrusted
       "SELECT substring(city, 2, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3.0) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 5000000000.1) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT width_bucket(age, 2, 200, 5) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
   [<Fact>]
   let ``Analyze queries with allowed generalizations in untrusted access level`` () =

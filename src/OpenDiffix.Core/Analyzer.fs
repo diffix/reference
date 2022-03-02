@@ -440,7 +440,7 @@ let private validateGeneralization accessLevel expression =
       ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | ColumnReference _ -> ()
-    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level"
+    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
 
   expression
 
