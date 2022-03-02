@@ -382,23 +382,23 @@ type Tests(db: DBFixture) =
   let ``Detect queries with disallowed generalizations in untrusted access level`` () =
     ensureQueryFailsUntrusted
       "SELECT substring(city, 2, 2) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 3.0) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT floor_by(age, 5000000000.1) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
     ensureQueryFailsUntrusted
       "SELECT width_bucket(age, 2, 200, 5) from customers"
-      "Generalization used in the query is not allowed in untrusted access level"
+      "Generalization used in the query is not allowed in untrusted access level."
 
   [<Fact>]
   let ``Analyze queries with allowed generalizations in untrusted access level`` () =
@@ -414,6 +414,16 @@ type Tests(db: DBFixture) =
     // No generalization, either implicitly or explicitly
     analyzeQueryUntrusted "SELECT floor(age) from customers" |> ignore
     analyzeQueryUntrusted "SELECT age from customers" |> ignore
+
+  [<Fact>]
+  let ``Detect queries with disallowed bucket functions calls`` () =
+    ensureQueryFails
+      "SELECT round(2, age) from customers"
+      "Primary argument for a bucket function has to be a simple column reference."
+
+    ensureQueryFails
+      "SELECT round(age, age) from customers"
+      "Secondary arguments for a bucket function have to be constants."
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =

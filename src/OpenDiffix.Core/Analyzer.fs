@@ -430,7 +430,25 @@ let private isMoneyStyle arg =
   | Constant (Integer c) -> Regex.IsMatch($"%i{c}", "^[125]0*$")
   | _ -> false
 
+let private isColumnReference arg =
+  match arg with
+  | ColumnReference _ -> true
+  | _ -> false
+
+let private isConstant arg =
+  match arg with
+  | Constant _ -> true
+  | _ -> false
+
 let private validateGeneralization accessLevel expression =
+  if accessLevel <> Direct then
+    match expression with
+    | FunctionExpr (ScalarFunction _, primaryArg :: _) when not (isColumnReference primaryArg) ->
+      failwith "Primary argument for a bucket function has to be a simple column reference."
+    | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) when List.exists (isConstant >> not) secondaryArgs ->
+      failwith "Secondary arguments for a bucket function have to be constants."
+    | _ -> ()
+
   if accessLevel = PublishUntrusted then
     match expression with
     | FunctionExpr (ScalarFunction fn, [ _ ]) when List.contains fn [ Floor; Ceil; Round ] -> ()
@@ -440,7 +458,7 @@ let private validateGeneralization accessLevel expression =
       ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | ColumnReference _ -> ()
-    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level"
+    | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
 
   expression
 
