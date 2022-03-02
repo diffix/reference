@@ -416,6 +416,16 @@ type Tests(db: DBFixture) =
     analyzeQueryUntrusted "SELECT age from customers" |> ignore
 
   [<Fact>]
+  let ``Detect queries with disallowed bucket functions calls`` () =
+    ensureQueryFailsUntrusted
+      "SELECT round(2, age) from customers"
+      "Primary argument for a bucket function has to be a simple column reference."
+
+    ensureQueryFailsUntrusted
+      "SELECT round(age, age) from customers"
+      "Secondary arguments for a bucket function have to be a constants."
+
+  [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =
     assertDefaultSqlSeed "SELECT * FROM products"
     assertDefaultSqlSeed "SELECT count(*) FROM products"
