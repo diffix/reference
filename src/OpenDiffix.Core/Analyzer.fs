@@ -355,16 +355,17 @@ let private compileQuery anonParams (selectQuery: SelectQuery) =
   let rangeColumns = collectRangeColumns anonParams selectQuery.From
   let aidColumnsExpression = makeAidColumnsExpression rangeColumns
 
-  let isAnonymizing =
-    anonParams.AccessLevel <> Direct
-    && aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
+  let directAccess =
+    anonParams.AccessLevel = Direct
+    || aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty
 
-  QueryValidator.validateQuery isAnonymizing anonParams.AccessLevel selectQuery
+  QueryValidator.validateStandardQuery selectQuery
 
-  if isAnonymizing then
-    compileAnonymizingQuery aidColumnsExpression selectQuery
-  else
+  if directAccess then
     selectQuery
+  else
+    QueryValidator.validateAnonymizingQuery selectQuery
+    compileAnonymizingQuery aidColumnsExpression selectQuery
 
 // ----------------------------------------------------------------
 // Noise layers

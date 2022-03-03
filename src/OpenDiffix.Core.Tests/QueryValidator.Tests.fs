@@ -2,33 +2,50 @@ module OpenDiffix.Core.QueryValidatorTests
 
 open Xunit
 
-let testTable: Table =
-  {
-    Name = "table"
-    Columns =
-      [
-        { Name = "str_col"; Type = StringType }
-        { Name = "int_col"; Type = IntegerType } // AID column
-        { Name = "float_col"; Type = RealType }
-        { Name = "bool_col"; Type = BooleanType }
-      ]
+let testTables =
+  [
+    {
+      Name = "anon_table"
+      Columns =
+        [
+          { Name = "id"; Type = IntegerType }
+          { Name = "str_col"; Type = StringType }
+          { Name = "int_col"; Type = IntegerType }
+          { Name = "float_col"; Type = RealType }
+          { Name = "bool_col"; Type = BooleanType }
+        ]
+    }
+    {
+      Name = "direct_table"
+      Columns =
+        [
+          { Name = "str_col"; Type = StringType }
+          { Name = "int_col"; Type = IntegerType }
+          { Name = "float_col"; Type = RealType }
+          { Name = "bool_col"; Type = BooleanType }
+        ]
+    }
+  ]
+
+let anonParams =
+  { AnonymizationParams.Default with
+      TableSettings = Map [ "anon_table", { AidColumns = [ "id" ] } ]
   }
 
+let dataProvider = dummyDataProvider testTables
+let queryContext = QueryContext.make anonParams dataProvider
 
-let dataProvider = dummyDataProvider [ testTable ]
-let queryContext = QueryContext.make AnonymizationParams.Default dataProvider
-
-let aidColIndex = Table.findColumn testTable "int_col" |> fst
-
-let analyzeQuery isAnonymizing queryString =
+let analyzeQuery queryString =
   queryString
   |> Parser.parse
   |> Analyzer.analyze queryContext
-  |> QueryValidator.validateQuery isAnonymizing queryContext.AnonymizationParams
+  |> Normalizer.normalize
+  |> Analyzer.anonymize queryContext
+  |> ignore
 
-let ensureFailParsedQuery isAnonymizing queryString (errorFragment: string) =
+let assertAnalyzeError queryString (errorFragment: string) =
   try
-    analyzeQuery isAnonymizing queryString
+    analyzeQuery queryString
     failwith "Was expecting query analysis to fail"
   with
   | ex ->
@@ -39,61 +56,48 @@ let ensureFailParsedQuery isAnonymizing queryString (errorFragment: string) =
     else
       failwith $"Expecting error to contain '%s{errorFragment}'. Got '%s{str}' instead."
 
-let ANONYMIZING = true
-let NOT_ANONYMIZING = false
-
-let ensureAnalyzeValid queryString = analyzeQuery ANONYMIZING queryString
-
-let ensureAnalyzeNotAnonValid queryString =
-  analyzeQuery NOT_ANONYMIZING queryString
-
 let ensureAnalyzeFails queryString errorFragment =
-  ensureFailParsedQuery ANONYMIZING queryString errorFragment
-
-let ensureAnalyzeNotAnonFails queryString errorFragment =
-  ensureFailParsedQuery NOT_ANONYMIZING queryString errorFragment
+  assertAnalyzeError queryString errorFragment
 
 [<Fact>]
 let ``Fail on sum aggregate`` () =
-  ensureAnalyzeFails "SELECT sum(int_col) FROM table" "only count"
+  assertAnalyzeError "SELECT sum(int_col) FROM anon_table" "only count"
 
 [<Fact>]
-let ``Only allow count(*) and count(distinct column)`` () =
-  ensureAnalyzeValid "SELECT count(*) FROM table"
-  ensureAnalyzeValid "SELECT count(distinct int_col) FROM table"
+let ``Allow count(*) and count(distinct column)`` () =
+  analyzeQuery "SELECT count(*) FROM anon_table"
+  analyzeQuery "SELECT count(distinct int_col) FROM anon_table"
 
 [<Fact>]
 let ``Disallow multiple low count aggregators`` () =
-  let errorFragment = "single low count aggregator is allowed"
-
-  ensureAnalyzeNotAnonFails
-    "SELECT count(*), diffix_low_count(int_col), diffix_low_count(str_col) FROM table"
-    errorFragment
+  assertAnalyzeError
+    "SELECT count(*), diffix_low_count(int_col), diffix_low_count(str_col) FROM direct_table"
+    "single low count aggregator is allowed"
 
 [<Fact>]
 let ``Disallow anonymizing queries with JOINs`` () =
-  ensureAnalyzeFails
-    "SELECT count(*) FROM table JOIN table AS t ON true"
+  assertAnalyzeError
+    "SELECT count(*) FROM anon_table JOIN anon_table AS t ON true"
     "JOIN in anonymizing queries is not currently supported"
 
 [<Fact>]
 let ``Disallow anonymizing queries with subqueries`` () =
-  ensureAnalyzeFails
-    "SELECT count(*) FROM (SELECT 1 FROM table) x"
+  assertAnalyzeError
+    "SELECT count(*) FROM (SELECT 1 FROM anon_table) x"
     "Subqueries in anonymizing queries are not currently supported"
 
 [<Fact>]
 let ``Allow limiting top query`` () =
-  ensureAnalyzeValid "SELECT count(*) FROM table LIMIT 1"
+  analyzeQuery "SELECT count(*) FROM anon_table LIMIT 1"
 
 [<Fact>]
 let ``Disallow anonymizing queries with WHERE`` () =
-  ensureAnalyzeFails
-    "SELECT count(*) FROM table WHERE str_col=''"
+  assertAnalyzeError
+    "SELECT count(*) FROM anon_table WHERE str_col=''"
     "WHERE in anonymizing queries is not currently supported"
 
 [<Fact>]
 let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
   // Subqueries, JOINs, WHEREs, other aggregators etc.
-  ensureAnalyzeNotAnonValid
-    "SELECT sum(z.int_col) FROM (SELECT t.int_col FROM table JOIN table AS t ON true) z WHERE z.int_col=0"
+  analyzeQuery
+    "SELECT sum(z.int_col) FROM (SELECT t.int_col FROM direct_table JOIN direct_table AS t ON true) z WHERE z.int_col=0"
