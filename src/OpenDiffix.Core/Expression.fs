@@ -283,3 +283,13 @@ let unwrapListExpr expr =
   match expr with
   | ListExpr list -> list
   | _ -> failwith "Expected a list expression"
+
+let isColumnReference arg =
+  match arg with
+  | ColumnReference _ -> true
+  | _ -> false
+
+let isConstant arg =
+  match arg with
+  | Constant _ -> true
+  | _ -> false
