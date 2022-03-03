@@ -15,6 +15,7 @@
     <Compile Include="Parser.fs" />
     <Compile Include="AnalyzerTypes.fs" />
     <Compile Include="NodeUtils.fs" />
+    <Compile Include="SQLNoiseLayers.fs" />
     <Compile Include="QueryValidator.fs" />
     <Compile Include="Analyzer.fs" />
     <Compile Include="Normalizer.fs" />

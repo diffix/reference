@@ -35,6 +35,8 @@ type RangeTable = Table * string
 
 type RangeTables = RangeTable list
 
+type RangeColumn = { RangeName: string; ColumnName: string; Type: ExpressionType; IsAid: bool }
+
 // ----------------------------------------------------------------
 // Functions
 // ----------------------------------------------------------------

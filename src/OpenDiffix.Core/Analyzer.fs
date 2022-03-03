@@ -3,8 +3,6 @@ module rec OpenDiffix.Core.Analyzer
 open AnalyzerTypes
 open NodeUtils
 
-type private RangeColumn = { RangeName: string; ColumnName: string; Type: ExpressionType; IsAid: bool }
-
 /// Attempts to find a unique match for a given column name (and optional range name) in the query range.
 /// Returns a `RangeColumn` and its index in the range.
 let rec private resolveColumn rangeColumns tableName columnName =
@@ -283,6 +281,16 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     Limit = selectQuery.Limit
   }
 
+// NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
+let private hasAnonymizingAggregators query =
+  query
+  |> collectAggregates
+  |> Seq.exists (
+    function
+    | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
+    | _ -> false
+  )
+
 // ----------------------------------------------------------------
 // Rewriting
 // ----------------------------------------------------------------
@@ -365,37 +373,6 @@ let private compileQuery anonParams (selectQuery: SelectQuery) =
     QueryValidator.validateDirectQuery selectQuery
     selectQuery
 
-// ----------------------------------------------------------------
-// Noise layers
-// ----------------------------------------------------------------
-
-let private basicSeedMaterial rangeColumns expression =
-  match expression with
-  | ColumnReference (index, _type) ->
-    let rangeColumn = List.item index rangeColumns
-    $"%s{rangeColumn.RangeName}.%s{rangeColumn.ColumnName}"
-  | Constant (String value) -> value
-  | Constant (Integer value) -> value.ToString()
-  | Constant (Real value) -> value.ToString()
-  | Constant (Boolean value) -> value.ToString()
-  | _ -> failwith "Unsupported expression used for defining buckets."
-
-let private functionSeedMaterial =
-  function
-  | Substring -> "substring"
-  | CeilBy -> "ceil"
-  | FloorBy -> "floor"
-  | RoundBy -> "round"
-  | WidthBucket -> "width_bucket"
-  | _ -> failwith "Unsupported function used for defining buckets."
-
-let private collectSeedMaterials rangeColumns expression =
-  match expression with
-  | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
-  | Constant _ -> failwith "Constant expressions can not be used for defining buckets."
-  | _ -> [ basicSeedMaterial rangeColumns expression ]
-  |> String.join ","
-
 let rec private normalizeBucketLabelExpression expression =
   match expression with
   | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) ->
@@ -412,28 +389,6 @@ let rec private normalizeBucketLabelExpression expression =
     FunctionExpr(ScalarFunction fn, List.map normalizeBucketLabelExpression args @ extraArgs)
   | _ -> expression
 
-let private computeNoiseLayers anonParams query =
-  let rangeColumns = collectRangeColumns anonParams query.From
-  let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
-  QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
-
-  let sqlSeed =
-    normalizedBucketLabelExpressions
-    |> Seq.map (collectSeedMaterials rangeColumns)
-    |> Hash.strings 0UL
-
-  { BucketSeed = sqlSeed }
-
-// NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
-let private hasAnonymizingAggregators query =
-  query
-  |> collectAggregates
-  |> Seq.exists (
-    function
-    | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
-    | _ -> false
-  )
-
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -445,14 +400,19 @@ let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
   query
 
 let anonymize queryContext (query: Query) =
-  let query = compileQuery queryContext.AnonymizationParams query
+  let anonParams = queryContext.AnonymizationParams
+  let query = compileQuery anonParams query
 
   // Noise is needed only when we anonymize. If we don't, we also don't need to do the validations which are done deep
   // in `computeNoiseLayers`. This includes anonymization injected in `compileQuery` and explicit use of anonymizing
   // aggregates like `diffix_low_count`.
   let noiseLayers =
     if hasAnonymizingAggregators query then
-      computeNoiseLayers queryContext.AnonymizationParams query
+      let rangeColumns = collectRangeColumns anonParams query.From
+      let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
+
+      QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
+      SQLNoiseLayers.compute rangeColumns normalizedBucketLabelExpressions
     else
       NoiseLayers.Default
 
