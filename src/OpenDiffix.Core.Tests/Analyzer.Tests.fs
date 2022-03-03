@@ -281,49 +281,42 @@ type Tests(db: DBFixture) =
       LayerNoiseSD = 0.
     }
 
-  let queryContext = QueryContext.make anonParams db.DataProvider
-  let queryContextUntrusted = QueryContext.make { anonParams with AccessLevel = PublishUntrusted } db.DataProvider
+  let queryContext accessLevel =
+    QueryContext.make { anonParams with AccessLevel = accessLevel } db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
-  let analyzeQuery query =
+  let analyzeQueryOnLevel accessLevel query =
     query
     |> Parser.parse
-    |> Analyzer.analyze queryContext
+    |> Analyzer.analyze (queryContext accessLevel)
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.anonymize (queryContext accessLevel)
     |> fst
 
-  let analyzeQueryUntrusted query =
-    query
-    |> Parser.parse
-    |> Analyzer.analyze queryContextUntrusted
-    |> Normalizer.normalize
-    |> Analyzer.anonymize queryContextUntrusted
-    |> fst
+  let analyzeQuery = analyzeQueryOnLevel PublishTrusted
+  let analyzeQueryDirect = analyzeQueryOnLevel Direct
+  let analyzeQueryUntrusted = analyzeQueryOnLevel PublishUntrusted
 
-  let ensureQueryFails query error =
+  let ensureqQueryFailsOnLevel accessLevel query error =
     try
-      query |> analyzeQuery |> ignore
+      query |> (analyzeQueryOnLevel accessLevel) |> ignore
       failwith "Expected query to fail"
     with
     | ex -> ex.Message |> should equal error
 
-  let ensureQueryFailsUntrusted query error =
-    try
-      query |> analyzeQueryUntrusted |> ignore
-      failwith "Expected query to fail"
-    with
-    | ex -> ex.Message |> should equal error
+  let ensureQueryFails = ensureqQueryFailsOnLevel PublishTrusted
+  let ensureQueryFailsDirect = ensureqQueryFailsOnLevel Direct
+  let ensureQueryFailsUntrusted = ensureqQueryFailsOnLevel PublishUntrusted
 
   let sqlNoiseLayers query =
     query
     |> Parser.parse
-    |> Analyzer.analyze queryContext
+    |> Analyzer.analyze (queryContext PublishTrusted)
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.anonymize (queryContext PublishTrusted)
     |> snd
 
   let assertSqlSeed query (seedMaterials: string seq) =
@@ -360,19 +353,48 @@ type Tests(db: DBFixture) =
 
     result.Having |> should equal expected
 
-  // NOTE: We do QueryValidator testing in its respective test module. Here we just check, if it's invoked at all based
-  // on whether the query is anonymizing.
   [<Fact>]
-  let ``Detect subqueries touching tables with AID columns`` () =
+  let ``Fail on sum aggregate`` () =
+    ensureQueryFails "SELECT sum(age) FROM customers" "Only count aggregates are supported"
+
+  [<Fact>]
+  let ``Allow count(*) and count(distinct column)`` () =
+    analyzeQuery "SELECT count(*) FROM customers" |> ignore
+    analyzeQuery "SELECT count(distinct age) FROM customers" |> ignore
+
+  [<Fact>]
+  let ``Disallow multiple low count aggregators`` () =
+    ensureQueryFailsDirect
+      "SELECT count(*), diffix_low_count(age), diffix_low_count(first_name) FROM customers"
+      "A single low count aggregator is allowed in a query"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with JOINs`` () =
     ensureQueryFails
-      "SELECT count(*) FROM (SELECT 1 FROM customers_small) x"
+      "SELECT count(*) FROM customers JOIN customers AS t ON true"
+      "JOIN in anonymizing queries is not currently supported"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with subqueries`` () =
+    ensureQueryFails
+      "SELECT count(*) FROM (SELECT 1 FROM customers) x"
       "Subqueries in anonymizing queries are not currently supported"
 
   [<Fact>]
-  let ``Detect queries joining tables with AID columns`` () =
+  let ``Allow limiting top query`` () =
+    analyzeQuery "SELECT count(*) FROM customers LIMIT 1"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with WHERE`` () =
     ensureQueryFails
-      "SELECT price FROM products JOIN customers_small ON true"
-      "JOIN in anonymizing queries is not currently supported"
+      "SELECT count(*) FROM customers WHERE first_name=''"
+      "WHERE in anonymizing queries is not currently supported"
+
+  [<Fact>]
+  let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
+    // Subqueries, JOINs, WHEREs, other aggregators etc.
+    analyzeQueryDirect
+      "SELECT sum(z.age) FROM (SELECT t.age FROM customers JOIN customers AS t ON true) z WHERE z.age=0"
 
   [<Fact>]
   let ``Detect queries with disallowed generalizations in untrusted access level`` () =
