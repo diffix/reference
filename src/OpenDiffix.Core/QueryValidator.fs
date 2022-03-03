@@ -52,12 +52,10 @@ let private validateNoWhere (selectQuery: SelectQuery) =
 // Public API
 // ----------------------------------------------------------------
 
-/// Validates a top-level query.
-let validateQuery isAnonymizing accessLevel (selectQuery: SelectQuery) =
-  validateSingleLowCount selectQuery
+let validateStandardQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
 
-  if isAnonymizing then
-    validateOnlyCount selectQuery
-    allowedCountUsage selectQuery
-    validateNoWhere selectQuery
-    validateSelectTarget selectQuery
+let validateAnonymizingQuery (selectQuery: SelectQuery) =
+  validateOnlyCount selectQuery
+  allowedCountUsage selectQuery
+  validateNoWhere selectQuery
+  validateSelectTarget selectQuery
