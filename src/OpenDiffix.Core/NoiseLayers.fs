@@ -1,4 +1,4 @@
-module OpenDiffix.Core.SQLNoiseLayers
+module OpenDiffix.Core.NoiseLayers
 
 open AnalyzerTypes
 
@@ -33,7 +33,7 @@ let private collectSeedMaterials rangeColumns expression =
 // Public API
 // ----------------------------------------------------------------
 
-let compute rangeColumns normalizedBucketLabelExpressions =
+let computeSQLLayer rangeColumns normalizedBucketLabelExpressions =
   let sqlSeed =
     normalizedBucketLabelExpressions
     |> Seq.map (collectSeedMaterials rangeColumns)

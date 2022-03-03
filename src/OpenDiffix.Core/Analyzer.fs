@@ -412,7 +412,7 @@ let anonymize queryContext (query: Query) =
       let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
 
       QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
-      SQLNoiseLayers.compute rangeColumns normalizedBucketLabelExpressions
+      NoiseLayers.computeSQLLayer rangeColumns normalizedBucketLabelExpressions
     else
       NoiseLayers.Default
 
