@@ -52,7 +52,7 @@ let private validateNoWhere (selectQuery: SelectQuery) =
 // Public API
 // ----------------------------------------------------------------
 
-let validateStandardQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
+let validateDirectQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
 
 let validateAnonymizingQuery (selectQuery: SelectQuery) =
   validateOnlyCount selectQuery
