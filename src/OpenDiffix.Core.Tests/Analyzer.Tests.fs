@@ -289,24 +289,20 @@ type Tests(db: DBFixture) =
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
   let analyzeQuery query =
-    let query, _ =
-      query
-      |> Parser.parse
-      |> Analyzer.analyze queryContext
-      |> Normalizer.normalize
-      |> Analyzer.anonymize queryContext
-
     query
+    |> Parser.parse
+    |> Analyzer.analyze queryContext
+    |> Normalizer.normalize
+    |> Analyzer.anonymize queryContext
+    |> fst
 
   let analyzeQueryUntrusted query =
-    let query, _ =
-      query
-      |> Parser.parse
-      |> Analyzer.analyze queryContextUntrusted
-      |> Normalizer.normalize
-      |> Analyzer.anonymize queryContextUntrusted
-
     query
+    |> Parser.parse
+    |> Analyzer.analyze queryContextUntrusted
+    |> Normalizer.normalize
+    |> Analyzer.anonymize queryContextUntrusted
+    |> fst
 
   let ensureQueryFails query error =
     try
@@ -463,10 +459,12 @@ type Tests(db: DBFixture) =
     assertDefaultSqlSeed "SELECT cast(price AS integer) FROM products"
 
   [<Fact>]
-  let ``Constant bucket labels are rejected`` () =
-    ensureQueryFails
-      "SELECT age, round(1) FROM customers_small GROUP BY 2"
-      "Constant expressions can not be used for defining buckets."
+  let ``Constant bucket labels are ignored`` () =
+    (analyzeQuery "SELECT age, round(1) FROM customers_small GROUP BY 1, 2")
+    |> should equal (analyzeQuery "SELECT age, round(1) FROM customers_small GROUP BY 1")
+
+    (analyzeQuery "SELECT 1, COUNT(*) FROM customers_small GROUP BY 1")
+    |> should equal (analyzeQuery "SELECT 1, COUNT(*) FROM customers_small")
 
   [<Fact>]
   let ``Constants targets aren't used for implicit bucket grouping and don't impact the seed`` () =
