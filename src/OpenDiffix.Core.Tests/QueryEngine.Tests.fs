@@ -175,7 +175,7 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM (SELECT a.id, b.id FROM products as a LEFT JOIN products as b ON a.id = b.id) x"
 
   [<Fact>]
-  let ``standard query can use diffix functions`` () =
+  let ``Direct query can use diffix functions`` () =
     let expected =
       {
         Columns = [ { Name = "dc"; Type = IntegerType }; { Name = "lc"; Type = BooleanType } ]

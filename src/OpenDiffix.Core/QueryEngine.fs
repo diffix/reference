@@ -23,15 +23,15 @@ type QueryResult = { Columns: Column list; Rows: Row list }
 // modes of operation listed below.
 //
 // Supports two main modes of operation:
-// 1. (anonymizing query) Standard SQL statement, with `aidColumns` specified within the `queryContext`
+// 1. (anonymizing query) Standard SQL statement, `AnonymizationParams.AccessLevel = PublishTrusted / PublishUntrusted`
 //
 // Rewrites the statement, so that the query result is anonymized according to the `aidColumns` provided. For example,
 // it appends `AND NOT diffix_low_count(aidColumns)` to the `HAVING` SQL clause and rewrites regular SQL aggregators to
 // Diffix aggregators (e.g. `count` -> `diffix_count`, see below).
 //
-// 2. (standard query) SQL statement with Diffix aggregators, no `aidColumns` specified within the `queryContext`
+// 2. (direct query) SQL statement with Diffix aggregators, `AnonymizationParams.AccessLevel = Direct`
 //
-// (**NOTE**) some AID columns may (and should) be used within the Diffix aggregator functions.
+// (**NOTE**) AID columns may (and should) be used within the Diffix aggregator functions.
 //
 // Does not rewrite the statement. The caller is expected to use Diffix aggregator functions manually, in order to
 // anonymize the query result. **NOTE** that the Diffix aggregators are optional, if they're not used, the result is the

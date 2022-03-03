@@ -281,49 +281,42 @@ type Tests(db: DBFixture) =
       LayerNoiseSD = 0.
     }
 
-  let queryContext = QueryContext.make anonParams db.DataProvider
-  let queryContextUntrusted = QueryContext.make { anonParams with AccessLevel = PublishUntrusted } db.DataProvider
+  let queryContext accessLevel =
+    QueryContext.make { anonParams with AccessLevel = accessLevel } db.DataProvider
 
   let idColumn = ColumnReference(4, IntegerType)
   let companyColumn = ColumnReference(2, StringType)
   let aidColumns = [ companyColumn; idColumn ] |> ListExpr
 
-  let analyzeQuery query =
+  let analyzeQuery accessLevel query =
     query
     |> Parser.parse
-    |> Analyzer.analyze queryContext
+    |> Analyzer.analyze (queryContext accessLevel)
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.anonymize (queryContext accessLevel)
     |> fst
 
-  let analyzeQueryUntrusted query =
-    query
-    |> Parser.parse
-    |> Analyzer.analyze queryContextUntrusted
-    |> Normalizer.normalize
-    |> Analyzer.anonymize queryContextUntrusted
-    |> fst
+  let analyzeTrustedQuery = analyzeQuery PublishTrusted
+  let analyzeDirectQuery = analyzeQuery Direct
+  let analyzeUntrustedQuery = analyzeQuery PublishUntrusted
 
-  let ensureQueryFails query error =
+  let assertQueryFails accessLevel query error =
     try
-      query |> analyzeQuery |> ignore
+      query |> (analyzeQuery accessLevel) |> ignore
       failwith "Expected query to fail"
     with
     | ex -> ex.Message |> should equal error
 
-  let ensureQueryFailsUntrusted query error =
-    try
-      query |> analyzeQueryUntrusted |> ignore
-      failwith "Expected query to fail"
-    with
-    | ex -> ex.Message |> should equal error
+  let assertTrustedQueryFails = assertQueryFails PublishTrusted
+  let assertDirectQueryFails = assertQueryFails Direct
+  let assertUntrustedQueryFails = assertQueryFails PublishUntrusted
 
   let sqlNoiseLayers query =
     query
     |> Parser.parse
-    |> Analyzer.analyze queryContext
+    |> Analyzer.analyze (queryContext PublishTrusted)
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.anonymize (queryContext PublishTrusted)
     |> snd
 
   let assertSqlSeed query (seedMaterials: string seq) =
@@ -334,11 +327,11 @@ type Tests(db: DBFixture) =
     (sqlNoiseLayers query) |> should equal NoiseLayers.Default
 
   let assertNoLCF query =
-    (analyzeQuery query).Having |> should equal (Boolean true |> Constant)
+    (analyzeTrustedQuery query).Having |> should equal (Boolean true |> Constant)
 
   [<Fact>]
   let ``Analyze count transforms`` () =
-    let result = analyzeQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
+    let result = analyzeTrustedQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
 
     let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumns ])
 
@@ -360,64 +353,93 @@ type Tests(db: DBFixture) =
 
     result.Having |> should equal expected
 
-  // NOTE: We do QueryValidator testing in its respective test module. Here we just check, if it's invoked at all based
-  // on whether the query is anonymizing.
   [<Fact>]
-  let ``Detect subqueries touching tables with AID columns`` () =
-    ensureQueryFails
-      "SELECT count(*) FROM (SELECT 1 FROM customers_small) x"
-      "Subqueries in anonymizing queries are not currently supported"
+  let ``Fail on sum aggregate`` () =
+    assertTrustedQueryFails "SELECT sum(age) FROM customers" "Only count aggregates are supported"
 
   [<Fact>]
-  let ``Detect queries joining tables with AID columns`` () =
-    ensureQueryFails
-      "SELECT price FROM products JOIN customers_small ON true"
+  let ``Allow count(*) and count(distinct column)`` () =
+    analyzeTrustedQuery "SELECT count(*) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count(distinct age) FROM customers" |> ignore
+
+  [<Fact>]
+  let ``Disallow multiple low count aggregators`` () =
+    assertDirectQueryFails
+      "SELECT count(*), diffix_low_count(age), diffix_low_count(first_name) FROM customers"
+      "A single low count aggregator is allowed in a query"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with JOINs`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers JOIN customers AS t ON true"
       "JOIN in anonymizing queries is not currently supported"
 
   [<Fact>]
+  let ``Disallow anonymizing queries with subqueries`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM (SELECT 1 FROM customers) x"
+      "Subqueries in anonymizing queries are not currently supported"
+
+  [<Fact>]
+  let ``Allow limiting top query`` () =
+    analyzeTrustedQuery "SELECT count(*) FROM customers LIMIT 1"
+
+  [<Fact>]
+  let ``Disallow anonymizing queries with WHERE`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers WHERE first_name=''"
+      "WHERE in anonymizing queries is not currently supported"
+
+  [<Fact>]
+  let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
+    // Subqueries, JOINs, WHEREs, other aggregators etc.
+    analyzeDirectQuery
+      "SELECT sum(z.age) FROM (SELECT t.age FROM customers JOIN customers AS t ON true) z WHERE z.age=0"
+
+  [<Fact>]
   let ``Detect queries with disallowed generalizations in untrusted access level`` () =
-    ensureQueryFailsUntrusted
+    assertUntrustedQueryFails
       "SELECT substring(city, 2, 2) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
-    ensureQueryFailsUntrusted
+    assertUntrustedQueryFails
       "SELECT floor_by(age, 3) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
-    ensureQueryFailsUntrusted
+    assertUntrustedQueryFails
       "SELECT floor_by(age, 3.0) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
-    ensureQueryFailsUntrusted
+    assertUntrustedQueryFails
       "SELECT floor_by(age, 5000000000.1) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
-    ensureQueryFailsUntrusted
+    assertUntrustedQueryFails
       "SELECT width_bucket(age, 2, 200, 5) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
   [<Fact>]
   let ``Analyze queries with allowed generalizations in untrusted access level`` () =
-    analyzeQueryUntrusted "SELECT substring(city, 1, 2) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 2) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 20) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 2.0) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 0.2) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 20.0) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT floor_by(age, 50.0) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT ceil_by(age, 50.0) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT round_by(age, 50.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT substring(city, 1, 2) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 2) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 20) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 2.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 0.2) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 20.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor_by(age, 50.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT ceil_by(age, 50.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT round_by(age, 50.0) from customers" |> ignore
     // No generalization, either implicitly or explicitly
-    analyzeQueryUntrusted "SELECT floor(age) from customers" |> ignore
-    analyzeQueryUntrusted "SELECT age from customers" |> ignore
+    analyzeUntrustedQuery "SELECT floor(age) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT age from customers" |> ignore
 
   [<Fact>]
   let ``Detect queries with disallowed bucket functions calls`` () =
-    ensureQueryFails
+    assertTrustedQueryFails
       "SELECT round(2, age) from customers"
       "Primary argument for a bucket function has to be a simple column reference."
 
-    ensureQueryFails
+    assertTrustedQueryFails
       "SELECT round(age, age) from customers"
       "Secondary arguments for a bucket function have to be constants."
 
@@ -460,11 +482,11 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Constant bucket labels are ignored`` () =
-    (analyzeQuery "SELECT age, round(1) FROM customers_small GROUP BY 1, 2")
-    |> should equal (analyzeQuery "SELECT age, round(1) FROM customers_small GROUP BY 1")
+    (analyzeTrustedQuery "SELECT age, round(1) FROM customers_small GROUP BY 1, 2")
+    |> should equal (analyzeTrustedQuery "SELECT age, round(1) FROM customers_small GROUP BY 1")
 
-    (analyzeQuery "SELECT 1, COUNT(*) FROM customers_small GROUP BY 1")
-    |> should equal (analyzeQuery "SELECT 1, COUNT(*) FROM customers_small")
+    (analyzeTrustedQuery "SELECT 1, COUNT(*) FROM customers_small GROUP BY 1")
+    |> should equal (analyzeTrustedQuery "SELECT 1, COUNT(*) FROM customers_small")
 
   [<Fact>]
   let ``Constants targets aren't used for implicit bucket grouping and don't impact the seed`` () =
