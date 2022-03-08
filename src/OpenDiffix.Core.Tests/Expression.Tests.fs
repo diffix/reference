@@ -535,8 +535,15 @@ let colRef2 = ColumnReference(2, RealType)
 
 let evaluate expr = Expression.evaluate testRow expr
 
+let aggContext =
+  {
+    AnonymizationParams = AnonymizationParams.Default
+    GroupingLabels = [||]
+    Aggregators = [||]
+  }
+
 let evaluateAggregator aggSpec args =
-  evaluateAggregator (ExecutionContext.makeDefault ()) aggSpec args testRows
+  evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) aggSpec args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =

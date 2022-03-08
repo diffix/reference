@@ -26,6 +26,7 @@ let emptySelect =
     Having = constTrue
     OrderBy = []
     Limit = None
+    AnonymizationContext = Some { BucketSeed = 0UL }
   }
 
 let column index =
@@ -82,7 +83,7 @@ let ``plan aggregation`` () =
 
   let expected =
     Plan.Project(
-      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ]),
+      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ], emptySelect.AnonymizationContext),
       [ ColumnReference(0, StringType); ColumnReference(1, IntegerType) ]
     )
 
@@ -96,7 +97,10 @@ let ``plan aggregation without selection`` () =
   let select = { emptySelect with TargetList = selectedColumns; GroupBy = groupBy }
 
   let expected =
-    Plan.Project(Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ]), [ ColumnReference(1, IntegerType) ])
+    Plan.Project(
+      Plan.Aggregate(Plan.Scan(table, [ 1 ]), groupBy, [ countStar ], emptySelect.AnonymizationContext),
+      [ ColumnReference(1, IntegerType) ]
+    )
 
   select |> Planner.plan |> should equal expected
 
@@ -133,7 +137,8 @@ let ``plan all`` () =
               whereCondition
             ),
             groupBy,
-            [ countStar ]
+            [ countStar ],
+            emptySelect.AnonymizationContext
           ),
           FunctionExpr(ScalarFunction Equals, [ ColumnReference(1, IntegerType); Constant(Integer 0L) ])
         ),

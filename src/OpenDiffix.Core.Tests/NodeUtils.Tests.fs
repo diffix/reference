@@ -29,6 +29,7 @@ let selectQuery =
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
     Limit = None
+    AnonymizationContext = Some { BucketSeed = 0UL }
   }
 
 let selectQueryNegative =
@@ -40,6 +41,7 @@ let selectQueryNegative =
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
     Limit = None
+    AnonymizationContext = Some { BucketSeed = 0UL }
   }
 
 [<Fact>]

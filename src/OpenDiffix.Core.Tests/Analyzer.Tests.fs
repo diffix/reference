@@ -29,6 +29,7 @@ let defaultQuery =
     Having = Boolean true |> Constant
     OrderBy = []
     Limit = None
+    AnonymizationContext = None
   }
 
 let testParsedQuery queryString expected =
@@ -159,6 +160,7 @@ let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
         )
       OrderBy = []
       Limit = None
+      AnonymizationContext = None
     }
 
 [<Fact>]
@@ -294,7 +296,6 @@ type Tests(db: DBFixture) =
     |> Analyzer.analyze (queryContext accessLevel)
     |> Normalizer.normalize
     |> Analyzer.anonymize (queryContext accessLevel)
-    |> fst
 
   let analyzeTrustedQuery = analyzeQuery PublishTrusted
   let analyzeDirectQuery = analyzeQuery Direct
@@ -311,23 +312,19 @@ type Tests(db: DBFixture) =
   let assertDirectQueryFails = assertQueryFails Direct
   let assertUntrustedQueryFails = assertQueryFails PublishUntrusted
 
-  let sqlNoiseLayers query =
-    query
-    |> Parser.parse
-    |> Analyzer.analyze (queryContext PublishTrusted)
-    |> Normalizer.normalize
-    |> Analyzer.anonymize (queryContext PublishTrusted)
-    |> snd
-
   let assertSqlSeed query (seedMaterials: string seq) =
     let expectedSeed = Hash.strings 0UL seedMaterials
-    (sqlNoiseLayers query).BucketSeed |> should equal expectedSeed
 
-  let assertDefaultSqlSeed query =
-    (sqlNoiseLayers query) |> should equal NoiseLayers.Default
+    (analyzeTrustedQuery query).AnonymizationContext
+    |> Option.contains { BucketSeed = expectedSeed }
+    |> should equal true
 
-  let assertNoLCF query =
-    (analyzeTrustedQuery query).Having |> should equal (Boolean true |> Constant)
+  let assertEqualAnonContexts query1 query2 =
+    (analyzeTrustedQuery query1).AnonymizationContext
+    |> should equal (analyzeTrustedQuery query2).AnonymizationContext
+
+  let assertNoAnonContext query =
+    (analyzeTrustedQuery query).AnonymizationContext |> should equal None
 
   [<Fact>]
   let ``Analyze count transforms`` () =
@@ -445,8 +442,8 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =
-    assertDefaultSqlSeed "SELECT * FROM products"
-    assertDefaultSqlSeed "SELECT count(*) FROM products"
+    assertNoAnonContext "SELECT * FROM products"
+    assertNoAnonContext "SELECT count(*) FROM products"
 
   [<Fact>]
   let ``SQL seed from non-anonymizing queries using anonymizing aggregates`` () =
@@ -463,14 +460,16 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``SQL seeds from numeric ranges are consistent`` () =
     // TODO: temporarily broken, because `floor(age)` seeds as `age` and `floor_by(cast(...), 1.0)` seeds as `floor,age,1.0`
-    // (sqlNoiseLayers "SELECT floor(age) FROM customers_small GROUP BY 1")
-    // |> should equal (sqlNoiseLayers "SELECT floor_by(cast(age AS real), 1.0) FROM customers_small GROUP BY 1")
+    // assertEqualAnonContexts
+    //  "SELECT floor(age) FROM customers_small GROUP BY 1"
+    //  "SELECT floor_by(cast(age AS real), 1.0) FROM customers_small GROUP BY 1"
+    // assertEqualAnonContexts
+    //  "SELECT round(cast(age AS real)) FROM customers_small GROUP BY 1"
+    //  "SELECT round_by(age, 1.0) FROM customers_small GROUP BY 1"
 
-    // (sqlNoiseLayers "SELECT round(cast(age AS real)) FROM customers_small GROUP BY 1")
-    // |> should equal (sqlNoiseLayers "SELECT round_by(age, 1.0) FROM customers_small GROUP BY 1")
-
-    (sqlNoiseLayers "SELECT ceil_by(age, 1.0) FROM customers_small GROUP BY 1")
-    |> should equal (sqlNoiseLayers "SELECT ceil_by(age, 1) FROM customers_small GROUP BY 1")
+    assertEqualAnonContexts
+      "SELECT ceil_by(age, 1.0) FROM customers_small GROUP BY 1"
+      "SELECT ceil_by(age, 1) FROM customers_small GROUP BY 1"
 
   [<Fact>]
   let ``SQL seed from rounding cast`` () =
@@ -478,26 +477,26 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing rounding cast`` () =
-    assertDefaultSqlSeed "SELECT cast(price AS integer) FROM products"
+    assertNoAnonContext "SELECT cast(price AS integer) FROM products"
 
   [<Fact>]
   let ``Constant bucket labels are ignored`` () =
-    (analyzeTrustedQuery "SELECT age, round(1) FROM customers_small GROUP BY 1, 2")
-    |> should equal (analyzeTrustedQuery "SELECT age, round(1) FROM customers_small GROUP BY 1")
+    assertEqualAnonContexts
+      "SELECT age, round(1) FROM customers_small GROUP BY 1, 2"
+      "SELECT age, round(1) FROM customers_small GROUP BY 1"
 
-    (analyzeTrustedQuery "SELECT 1, COUNT(*) FROM customers_small GROUP BY 1")
-    |> should equal (analyzeTrustedQuery "SELECT 1, COUNT(*) FROM customers_small")
+    assertEqualAnonContexts
+      "SELECT 1, COUNT(*) FROM customers_small GROUP BY 1"
+      "SELECT 1, COUNT(*) FROM customers_small"
 
   [<Fact>]
   let ``Constants targets aren't used for implicit bucket grouping and don't impact the seed`` () =
-    (sqlNoiseLayers "SELECT round(1) FROM customers_small")
-    |> should equal (sqlNoiseLayers "SELECT round(2) FROM customers_small")
-
-    (sqlNoiseLayers "SELECT age, round(1) FROM customers_small")
-    |> should equal (sqlNoiseLayers "SELECT age, round(2) FROM customers_small")
+    assertEqualAnonContexts "SELECT round(1) FROM customers_small" "SELECT round(2) FROM customers_small"
+    assertEqualAnonContexts "SELECT age, round(1) FROM customers_small" "SELECT age, round(2) FROM customers_small"
 
   [<Fact>]
   let ``No low-count filtering for non-grouping, non-aggregate queries with only constants`` () =
-    assertNoLCF "SELECT round(1) FROM customers_small"
+    (analyzeTrustedQuery "SELECT round(1) FROM customers_small").Having
+    |> should equal (Boolean true |> Constant)
 
   interface IClassFixture<DBFixture>
