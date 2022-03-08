@@ -3,20 +3,14 @@ module OpenDiffix.Core.Bucket
 let private addValuesToSeed seed (values: Value seq) =
   values |> Seq.map Value.toString |> Hash.strings seed
 
-let make group aggregators executionContext =
-  let bucketExecutionContext =
-    { executionContext with
-        NoiseLayers =
-          { executionContext.NoiseLayers with
-              BucketSeed = addValuesToSeed executionContext.NoiseLayers.BucketSeed group
-          }
-    }
+let make group aggregators anonymizationContext =
+  let anonContextUpdater = fun context -> { context with BucketSeed = addValuesToSeed context.BucketSeed group }
 
   {
     Group = group
     RowCount = 0
     Aggregators = aggregators
-    ExecutionContext = bucketExecutionContext
+    AnonymizationContext = Option.map anonContextUpdater anonymizationContext
     Attributes = Dictionary<string, Value>()
   }
 
@@ -25,6 +19,6 @@ let getAttribute attr bucket =
 
 let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
 
-let isLowCount lowCountIndex bucket =
-  bucket.Aggregators.[lowCountIndex].Final(bucket.ExecutionContext)
+let isLowCount lowCountIndex bucket aggregationContext =
+  bucket.Aggregators.[lowCountIndex].Final(aggregationContext, bucket.AnonymizationContext)
   |> Value.unwrapBoolean

@@ -30,6 +30,11 @@ let private missingAid (aidValue: Value) =
 let private emptySets length =
   Array.init length (fun _ -> HashSet<AidHash>())
 
+let private unwrapAnonContext anonymizationContext =
+  match anonymizationContext with
+  | Some anonymizationContext -> anonymizationContext
+  | None -> failwith "Anonymizing aggregator called with empty anonymization context."
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
@@ -48,7 +53,7 @@ type private Count() =
     member this.Merge aggregator =
       state <- state + (castAggregator<Count> aggregator).State
 
-    member this.Final _ctx = Integer state
+    member this.Final(_aggContext, _anonContext) = Integer state
 
 type private CountDistinct() =
   let state = HashSet<Value>()
@@ -65,7 +70,7 @@ type private CountDistinct() =
     member this.Merge aggregator =
       state.UnionWith((castAggregator<CountDistinct> aggregator).State)
 
-    member this.Final _ctx = state.Count |> int64 |> Integer
+    member this.Final(_aggContext, _anonContext) = state.Count |> int64 |> Integer
 
 type private Sum() =
   let mutable state = Null
@@ -85,9 +90,9 @@ type private Sum() =
     member this.Merge aggregator =
       (this :> IAggregator).Transition [ (castAggregator<Sum> aggregator).State ]
 
-    member this.Final _ctx = state
+    member this.Final(_aggContext, _anonContext) = state
 
-type private DiffixCount(minCount) =
+type private DiffixCount() =
   let mutable state: Anonymizer.AidCountState array = null
 
   let initialState length : Anonymizer.AidCountState array =
@@ -162,15 +167,23 @@ type private DiffixCount(minCount) =
           )
         )
 
-    member this.Final executionContext =
+    member this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
+      let minCount =
+        if Array.isEmpty aggContext.GroupingLabels then
+          0L
+        else
+          int64 aggContext.AnonymizationParams.Suppression.LowThreshold
+
       if isNull state then
         Integer minCount
       else
-        match Anonymizer.count executionContext state with
+        match Anonymizer.count aggContext.AnonymizationParams anonContext state with
         | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
         | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
 
-type private DiffixCountDistinct(minCount) =
+type private DiffixCountDistinct() =
   let mutable aidsCount = Option<int>.None
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
 
@@ -215,11 +228,19 @@ type private DiffixCountDistinct(minCount) =
         | false, _ -> aidsPerValue.[pair.Key] <- pair.Value |> Array.map cloneHashSet
       )
 
-    member this.Final executionContext =
+    member this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
+      let minCount =
+        if Array.isEmpty aggContext.GroupingLabels then
+          0L
+        else
+          int64 aggContext.AnonymizationParams.Suppression.LowThreshold
+
       if Option.isNone aidsCount then
         Integer minCount
       else
-        match Anonymizer.countDistinct executionContext aidsCount.Value aidsPerValue with
+        match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount.Value aidsPerValue with
         | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
         | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
 
@@ -255,11 +276,13 @@ type private DiffixLowCount() =
         else
           otherState |> mergeHashSetsInto state
 
-    member this.Final executionContext =
+    member this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
       if isNull state then
         Boolean true
       else
-        Anonymizer.isLowCount executionContext state |> Boolean
+        Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
 
 type private MergeAids() =
   let state = HashSet<Value>()
@@ -277,7 +300,7 @@ type private MergeAids() =
     member this.Merge aggregator =
       state.UnionWith((castAggregator<MergeAids> aggregator).State)
 
-    member this.Final _ctx = state |> Seq.toList |> Value.List
+    member this.Final(_anonParams, _anonContext) = state |> Seq.toList |> Value.List
 
 // ----------------------------------------------------------------
 // Public API
@@ -291,19 +314,13 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixLowCount -> true
   | _ -> false
 
-let create (executionContext: ExecutionContext) globalBucket (aggSpec: AggregatorSpec) : T =
-  let minDiffixCount =
-    if globalBucket then
-      0L
-    else
-      int64 executionContext.AnonymizationParams.Suppression.LowThreshold
-
+let create (aggSpec: AggregatorSpec) : T =
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
   | Sum, { Distinct = false } -> Sum() :> T
-  | DiffixCount, { Distinct = false } -> DiffixCount(minDiffixCount) :> T
-  | DiffixCount, { Distinct = true } -> DiffixCountDistinct(minDiffixCount) :> T
+  | DiffixCount, { Distinct = false } -> DiffixCount() :> T
+  | DiffixCount, { Distinct = true } -> DiffixCountDistinct() :> T
   | DiffixLowCount, _ -> DiffixLowCount() :> T
   | MergeAids, _ -> MergeAids() :> T
   | _ -> failwith "Invalid aggregator"

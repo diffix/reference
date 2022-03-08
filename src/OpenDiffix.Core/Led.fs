@@ -140,7 +140,7 @@ let private prepareBuckets (aggregationContext: AggregationContext) (buckets: Bu
   let victimBuckets =
     buckets
     |> Array.Parallel.choose (fun bucket ->
-      let lowCount = Bucket.isLowCount lowCountIndex bucket
+      let lowCount = Bucket.isLowCount lowCountIndex bucket aggregationContext
       let bucketTuple = bucket, lowCount
       let columnValues = bucket.Group
       let siblingsPerColumn = Array.zeroCreate<SiblingsPerColumn> groupingLabelsLength
@@ -227,7 +227,7 @@ let private led (aggregationContext: AggregationContext) (buckets: Bucket array)
 // Public API
 // ----------------------------------------------------------------
 
-let hook (aggregationContext: AggregationContext) (buckets: Bucket seq) =
+let hook (aggregationContext: AggregationContext) (_anonymizationContext: AnonymizationContext) (buckets: Bucket seq) =
   let stopwatch = startStopwatch ()
 
   try

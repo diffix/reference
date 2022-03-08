@@ -48,7 +48,9 @@ let private planJoin join columnIndices =
   let leftColumnCount = QueryRange.columnsCount join.Left
   let leftIndices, rightIndices = List.partition (fun x -> x < leftColumnCount) columnIndices
   let rightIndices = List.map (fun i -> i - leftColumnCount) rightIndices
-  Plan.Join(planFrom join.Left leftIndices, planFrom join.Right rightIndices, join.Type, join.On)
+  let leftPlan = planFrom join.Left leftIndices
+  let rightPlan = planFrom join.Right rightIndices
+  Plan.Join(leftPlan, rightPlan, join.Type, join.On)
 
 let private planProject expressions plan =
   match expressions |> List.collect collectSetFunctions |> List.distinct with
@@ -69,11 +71,11 @@ let private planSort sortExpressions plan =
   | [] -> plan
   | _ -> Plan.Sort(plan, sortExpressions)
 
-let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) plan =
+let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) anonymizationContext plan =
   if groupingLabels.IsEmpty && aggregators.IsEmpty then
     plan
   else
-    Plan.Aggregate(plan, groupingLabels, aggregators)
+    Plan.Aggregate(plan, groupingLabels, aggregators, anonymizationContext)
 
 let private planFrom queryRange columnIndices =
   match queryRange with
@@ -113,7 +115,7 @@ let private planQuery query =
 
   planFrom query.From columnIndices
   |> planFilter query.Where
-  |> planAggregate groupingLabels aggregators
+  |> planAggregate groupingLabels aggregators query.AnonymizationContext
   |> planFilter havingExpression
   |> planSort orderByExpressions
   |> planProject selectedExpressions

@@ -19,19 +19,19 @@ module Utils =
 // Node execution
 // ----------------------------------------------------------------
 
-let private executeScan (executionContext: ExecutionContext) table columnIndices =
-  executionContext.DataProvider.OpenTable(table, columnIndices)
+let private executeScan (queryContext: QueryContext) table columnIndices =
+  queryContext.DataProvider.OpenTable(table, columnIndices)
 
-let private executeProject executionContext (childPlan, expressions) : seq<Row> =
+let private executeProject queryContext (childPlan, expressions) : seq<Row> =
   let expressions = Array.ofList expressions
 
   childPlan
-  |> execute executionContext
+  |> execute queryContext
   |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate row))
 
-let private executeProjectSet executionContext (childPlan, fn, args) : seq<Row> =
+let private executeProjectSet queryContext (childPlan, fn, args) : seq<Row> =
   childPlan
-  |> execute executionContext
+  |> execute queryContext
   |> Seq.collect (fun row ->
     let args = args |> List.map (Expression.evaluate row)
 
@@ -39,34 +39,39 @@ let private executeProjectSet executionContext (childPlan, fn, args) : seq<Row> 
     |> Seq.map (fun value -> Array.append row [| value |])
   )
 
-let private executeFilter executionContext (childPlan, condition) : seq<Row> =
-  childPlan |> execute executionContext |> Utils.filter condition
+let private executeFilter queryContext (childPlan, condition) : seq<Row> =
+  childPlan |> execute queryContext |> Utils.filter condition
 
-let private executeSort executionContext (childPlan, orderings) : seq<Row> =
-  childPlan |> execute executionContext |> Expression.sortRows orderings
+let private executeSort queryContext (childPlan, orderings) : seq<Row> =
+  childPlan |> execute queryContext |> Expression.sortRows orderings
 
-let private executeLimit executionContext (childPlan, amount) : seq<Row> =
+let private executeLimit queryContext (childPlan, amount) : seq<Row> =
   if amount > uint Int32.MaxValue then
     failwith "`LIMIT` amount is greater than supported range"
 
-  childPlan |> execute executionContext |> Seq.truncate (int amount)
+  childPlan |> execute queryContext |> Seq.truncate (int amount)
 
-let private executeAggregate executionContext (childPlan, groupingLabels, aggregators) : seq<Row> =
+let private invokeHooks aggregationContext anonymizationContext hooks buckets =
+  match anonymizationContext with
+  | None -> buckets
+  | Some anonymizationContext ->
+    List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
+
+let private executeAggregate queryContext (childPlan, groupingLabels, aggregators, anonymizationContext) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
-  let isGlobal = Array.isEmpty groupingLabels
   let aggregators = Utils.unpackAggregators aggregators
   let aggSpecs, aggArgs = Array.unzip aggregators
 
-  let makeBucket group executionContext =
-    Bucket.make group (aggSpecs |> Array.map (Aggregator.create executionContext isGlobal)) executionContext
+  let makeBucket group anonymizationContext =
+    Bucket.make group (aggSpecs |> Array.map Aggregator.create) anonymizationContext
 
   let state = Dictionary<Row, Bucket>(Row.equalityComparer)
 
-  if isGlobal then
-    let emptyGroup = [||]
-    state.Add(emptyGroup, makeBucket emptyGroup executionContext)
+  if Array.isEmpty groupingLabels then
+    let globalGroup = [||]
+    state.Add(globalGroup, makeBucket globalGroup anonymizationContext)
 
-  for row in execute executionContext childPlan do
+  for row in execute queryContext childPlan do
     let argEvaluator = Expression.evaluate row
     let group = groupingLabels |> Array.map argEvaluator
 
@@ -74,7 +79,7 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
       match state.TryGetValue(group) with
       | true, aggregators -> aggregators
       | false, _ ->
-        let bucket = makeBucket group executionContext
+        let bucket = makeBucket group anonymizationContext
         state.[group] <- bucket
         bucket
 
@@ -85,17 +90,19 @@ let private executeAggregate executionContext (childPlan, groupingLabels, aggreg
 
   let aggregationContext =
     {
-      ExecutionContext = executionContext
+      AnonymizationParams = queryContext.AnonymizationParams
       GroupingLabels = groupingLabels
       Aggregators = aggregators
     }
 
-  let buckets = state |> Seq.map (fun pair -> pair.Value)
-
-  executionContext.QueryContext.PostAggregationHooks
-  |> List.fold (fun buckets hook -> hook aggregationContext buckets) buckets
+  state
+  |> Seq.map (fun pair -> pair.Value)
+  |> invokeHooks aggregationContext anonymizationContext queryContext.PostAggregationHooks
   |> Seq.map (fun bucket ->
-    Array.append bucket.Group (bucket.Aggregators |> Array.map (fun agg -> agg.Final bucket.ExecutionContext))
+    Array.append
+      bucket.Group
+      (bucket.Aggregators
+       |> Array.map (fun agg -> agg.Final(aggregationContext, bucket.AnonymizationContext)))
   )
 
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
@@ -125,14 +132,15 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
 // Public API
 // ----------------------------------------------------------------
 
-let execute executionContext plan : seq<Row> =
+let execute (queryContext: QueryContext) plan : seq<Row> =
   match plan with
-  | Plan.Scan (table, columnIndices) -> executeScan executionContext table columnIndices
-  | Plan.Project (plan, expressions) -> executeProject executionContext (plan, expressions)
-  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet executionContext (plan, fn, args)
-  | Plan.Filter (plan, condition) -> executeFilter executionContext (plan, condition)
-  | Plan.Sort (plan, orderings) -> executeSort executionContext (plan, orderings)
-  | Plan.Aggregate (plan, labels, aggregators) -> executeAggregate executionContext (plan, labels, aggregators)
-  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin executionContext (leftPlan, rightPlan, joinType, on)
-  | Plan.Limit (plan, amount) -> executeLimit executionContext (plan, amount)
+  | Plan.Scan (table, columnIndices) -> executeScan queryContext table columnIndices
+  | Plan.Project (plan, expressions) -> executeProject queryContext (plan, expressions)
+  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet queryContext (plan, fn, args)
+  | Plan.Filter (plan, condition) -> executeFilter queryContext (plan, condition)
+  | Plan.Sort (plan, orderings) -> executeSort queryContext (plan, orderings)
+  | Plan.Aggregate (plan, labels, aggregators, anonymizationContext) ->
+    executeAggregate queryContext (plan, labels, aggregators, anonymizationContext)
+  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
+  | Plan.Limit (plan, amount) -> executeLimit queryContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"

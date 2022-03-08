@@ -279,6 +279,7 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     Having = havingClause
     OrderBy = simpleOrderBy
     Limit = selectQuery.Limit
+    AnonymizationContext = None
   }
 
 // NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
@@ -399,21 +400,19 @@ let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
   let query = mapQuery schema anonParams false parseTree
   query
 
-let anonymize queryContext (query: Query) =
+let anonymize (queryContext: QueryContext) (query: Query) =
   let anonParams = queryContext.AnonymizationParams
   let query = compileQuery anonParams query
 
   // Noise is needed only when we anonymize. If we don't, we also don't need to do the validations which are done deep
   // in `computeNoiseLayers`. This includes anonymization injected in `compileQuery` and explicit use of anonymizing
   // aggregates like `diffix_low_count`.
-  let noiseLayers =
-    if hasAnonymizingAggregators query then
-      let rangeColumns = collectRangeColumns anonParams query.From
-      let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
+  if hasAnonymizingAggregators query then
+    let rangeColumns = collectRangeColumns anonParams query.From
+    let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
 
-      QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
-      NoiseLayers.computeSQLLayer rangeColumns normalizedBucketLabelExpressions
-    else
-      NoiseLayers.Default
-
-  query, noiseLayers
+    QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
+    let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketLabelExpressions
+    { query with AnonymizationContext = Some { BucketSeed = sqlSeed } }
+  else
+    query
