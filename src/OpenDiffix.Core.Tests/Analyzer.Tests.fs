@@ -295,7 +295,7 @@ type Tests(db: DBFixture) =
     |> Parser.parse
     |> Analyzer.analyze (queryContext accessLevel)
     |> Normalizer.normalize
-    |> Analyzer.anonymize (queryContext accessLevel)
+    |> Analyzer.compile (queryContext accessLevel)
 
   let analyzeTrustedQuery = analyzeQuery PublishTrusted
   let analyzeDirectQuery = analyzeQuery Direct
@@ -352,7 +352,9 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Fail on sum aggregate`` () =
-    assertTrustedQueryFails "SELECT sum(age) FROM customers" "Only count aggregates are supported"
+    assertTrustedQueryFails
+      "SELECT sum(age) FROM customers"
+      "Only count aggregates are supported in anonymizing queries."
 
   [<Fact>]
   let ``Allow count(*) and count(distinct column)`` () =
@@ -363,19 +365,17 @@ type Tests(db: DBFixture) =
   let ``Disallow multiple low count aggregators`` () =
     assertDirectQueryFails
       "SELECT count(*), diffix_low_count(age), diffix_low_count(first_name) FROM customers"
-      "A single low count aggregator is allowed in a query"
+      "A single low count aggregator is allowed in a query."
 
   [<Fact>]
   let ``Disallow anonymizing queries with JOINs`` () =
     assertTrustedQueryFails
       "SELECT count(*) FROM customers JOIN customers AS t ON true"
-      "JOIN in anonymizing queries is not currently supported"
+      "JOIN in anonymizing queries is not currently supported."
 
   [<Fact>]
-  let ``Disallow anonymizing queries with subqueries`` () =
-    assertTrustedQueryFails
-      "SELECT count(*) FROM (SELECT 1 FROM customers) x"
-      "Subqueries in anonymizing queries are not currently supported"
+  let ``Allow anonymizing subquery`` () =
+    analyzeTrustedQuery "SELECT count(city) FROM (SELECT city FROM customers) x"
 
   [<Fact>]
   let ``Allow limiting top query`` () =
@@ -385,7 +385,7 @@ type Tests(db: DBFixture) =
   let ``Disallow anonymizing queries with WHERE`` () =
     assertTrustedQueryFails
       "SELECT count(*) FROM customers WHERE first_name=''"
-      "WHERE in anonymizing queries is not currently supported"
+      "WHERE in anonymizing queries is not currently supported."
 
   [<Fact>]
   let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =

@@ -48,7 +48,7 @@ let run queryContext statement : QueryResult =
     |> Parser.parse
     |> Analyzer.analyze queryContext
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.compile queryContext
 
   let rows = query |> Planner.plan |> Executor.execute queryContext |> Seq.toList
   let columns = extractColumns query

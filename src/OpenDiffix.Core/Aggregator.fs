@@ -284,24 +284,6 @@ type private DiffixLowCount() =
       else
         Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
 
-type private MergeAids() =
-  let state = HashSet<Value>()
-
-  member this.State = state
-
-  interface IAggregator with
-    member this.Transition args =
-      match args with
-      | [ Null ] -> ()
-      | [ Value.List aidValues ] -> state.UnionWith(aidValues)
-      | [ aidValue ] -> state.Add(aidValue) |> ignore
-      | _ -> invalidArgs args
-
-    member this.Merge aggregator =
-      state.UnionWith((castAggregator<MergeAids> aggregator).State)
-
-    member this.Final(_anonParams, _anonContext) = state |> Seq.toList |> Value.List
-
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -322,5 +304,4 @@ let create (aggSpec: AggregatorSpec) : T =
   | DiffixCount, { Distinct = false } -> DiffixCount() :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct() :> T
   | DiffixLowCount, _ -> DiffixLowCount() :> T
-  | MergeAids, _ -> MergeAids() :> T
   | _ -> failwith "Invalid aggregator"

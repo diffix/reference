@@ -27,7 +27,6 @@ type ExpressionType =
   | IntegerType
   | RealType
   | StringType
-  | ListType of ExpressionType
   | UnknownType of string
 
 type Expression =
@@ -81,7 +80,6 @@ type AggregateFunction =
   | DiffixCount
   | DiffixLowCount
   | Sum
-  | MergeAids
 
 type AggregateOptions =
   {
