@@ -316,8 +316,7 @@ type Tests(db: DBFixture) =
     let expectedSeed = Hash.strings 0UL seedMaterials
 
     (analyzeTrustedQuery query).AnonymizationContext
-    |> Option.contains { BucketSeed = expectedSeed }
-    |> should equal true
+    |> should equal (Some { BucketSeed = expectedSeed })
 
   let assertEqualAnonContexts query1 query2 =
     (analyzeTrustedQuery query1).AnonymizationContext
