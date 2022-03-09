@@ -21,7 +21,7 @@ module private rec Encoders =
     | String string -> Encode.string string
     | List values -> Encode.list (values |> List.map encodeValue)
 
-  let rec private typeName =
+  let private typeName =
     function
     | BooleanType -> "boolean"
     | IntegerType -> "integer"
