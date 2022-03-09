@@ -378,11 +378,15 @@ type Tests(db: DBFixture) =
     analyzeTrustedQuery "SELECT count(city) FROM (SELECT city FROM customers) x"
 
   [<Fact>]
-  let ``Allow limiting top query`` () =
+  let ``Allow LIMIT clause in anonymizing subqueries`` () =
     analyzeTrustedQuery "SELECT count(*) FROM customers LIMIT 1"
 
   [<Fact>]
-  let ``Disallow anonymizing queries with WHERE`` () =
+  let ``Allow HAVING clause in anonymizing subqueries`` () =
+    analyzeTrustedQuery "SELECT count(*) FROM customers GROUP BY city HAVING length(city) > 3"
+
+  [<Fact>]
+  let ``Reject WHERE clause in anonymizing subqueries`` () =
     assertTrustedQueryFails
       "SELECT count(*) FROM customers WHERE first_name=''"
       "WHERE in anonymizing queries is not currently supported."
