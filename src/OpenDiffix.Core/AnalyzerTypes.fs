@@ -15,6 +15,7 @@ type SelectQuery =
     OrderBy: OrderBy list
     Having: Expression
     Limit: uint option
+    AnonymizationContext: AnonymizationContext option
   }
 
 type TargetEntry = { Expression: Expression; Alias: string; Tag: TargetEntryTag }

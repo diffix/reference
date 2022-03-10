@@ -36,6 +36,7 @@ type NodeFunctions =
       OrderBy = NodeFunctions.Map(query.OrderBy, f)
       Having = f query.Having
       Limit = query.Limit
+      AnonymizationContext = query.AnonymizationContext
     }
 
   // TargetEntry

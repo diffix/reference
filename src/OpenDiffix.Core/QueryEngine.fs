@@ -43,15 +43,13 @@ type QueryResult = { Columns: Column list; Rows: Row list }
 //
 // `aid_columns_expression` should be a list of `aid_column` or `DISTINCT aid_column`.
 let run queryContext statement : QueryResult =
-  let query, noiseLayers =
+  let query =
     statement
     |> Parser.parse
     |> Analyzer.analyze queryContext
     |> Normalizer.normalize
-    |> Analyzer.anonymize queryContext
+    |> Analyzer.compile queryContext
 
-  let executionContext = { QueryContext = queryContext; NoiseLayers = noiseLayers }
-
-  let rows = query |> Planner.plan |> Executor.execute executionContext |> Seq.toList
+  let rows = query |> Planner.plan |> Executor.execute queryContext |> Seq.toList
   let columns = extractColumns query
   { Columns = columns; Rows = rows }

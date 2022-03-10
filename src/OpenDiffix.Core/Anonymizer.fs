@@ -92,11 +92,11 @@ let compactFlatteningIntervals outlierCount topCount totalCount =
 type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
 
 let inline private aidFlattening
-  (executionContext: ExecutionContext)
+  (anonParams: AnonymizationParams)
+  (anonContext: AnonymizationContext)
   (unaccountedFor: int64)
   (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
-  let anonParams = executionContext.AnonymizationParams
   let totalCount = aidContributions.Length
 
   match compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount totalCount with
@@ -135,7 +135,7 @@ let inline private aidFlattening
     let noiseSD = anonParams.LayerNoiseSD * noiseScale
 
     let noise =
-      [ executionContext.NoiseLayers.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
+      [ anonContext.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
       |> generateNoise anonParams.Salt "noise" noiseSD
 
     Some
@@ -199,7 +199,8 @@ let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<Ai
   result :> seq<AidHash * Value>
 
 let private countDistinctFlatteningByAid
-  (executionContext: ExecutionContext)
+  (anonParams: AnonymizationParams)
+  (anonContext: AnonymizationContext)
   (perAidContributions: Dictionary<AidHash, HashSet<Value>>)
   =
   perAidContributions
@@ -210,7 +211,7 @@ let private countDistinctFlatteningByAid
   |> Seq.countBy fst
   |> Seq.map (fun (aid, count) -> aid, int64 count)
   |> Seq.toArray
-  |> aidFlattening executionContext 0L
+  |> aidFlattening anonParams anonContext 0L
 
 // Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
@@ -238,16 +239,14 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 // ----------------------------------------------------------------
 
 /// Returns whether any of the AID value sets has a low count.
-let isLowCount (executionContext: ExecutionContext) (aidSets: HashSet<AidHash> seq) =
+let isLowCount (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (aidSets: HashSet<AidHash> seq) =
   aidSets
   |> Seq.map (fun aidSet ->
-    let anonParams = executionContext.AnonymizationParams
-
     if aidSet.Count < anonParams.Suppression.LowThreshold then
       true
     else
       let thresholdNoise =
-        [ executionContext.NoiseLayers.BucketSeed; seedFromAidSet aidSet ]
+        [ anonContext.BucketSeed; seedFromAidSet aidSet ]
         |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
 
       // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
@@ -267,7 +266,8 @@ type CountResult =
   | Ok of int64
 
 let countDistinct
-  (executionContext: ExecutionContext)
+  (anonParams: AnonymizationParams)
+  (anonContext: AnonymizationContext)
   aidsCount
   (aidsPerValue: Dictionary<Value, HashSet<AidHash> array>)
   =
@@ -276,7 +276,7 @@ let countDistinct
   let lowCountValues, highCountValues =
     aidsPerValue
     |> Seq.toArray
-    |> Array.partition (fun pair -> isLowCount executionContext pair.Value)
+    |> Array.partition (fun pair -> isLowCount anonParams anonContext pair.Value)
 
   let sortedLowCountValues = sortByValue lowCountValues
 
@@ -284,7 +284,7 @@ let countDistinct
     [ 0 .. aidsCount - 1 ]
     |> List.map (
       transposeToPerAid sortedLowCountValues
-      >> countDistinctFlatteningByAid executionContext
+      >> countDistinctFlatteningByAid anonParams anonContext
     )
 
   let safeCount = int64 highCountValues.Length
@@ -302,14 +302,18 @@ let countDistinct
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
 
-let count (executionContext: ExecutionContext) (perAidContributions: AidCountState array) =
+let count
+  (anonParams: AnonymizationParams)
+  (anonContext: AnonymizationContext)
+  (perAidContributions: AidCountState array)
+  =
   let byAid =
     perAidContributions
     |> Array.map (fun aidState ->
       aidState.AidContributions
       |> Seq.map (fun pair -> pair.Key, pair.Value)
       |> Seq.toArray
-      |> aidFlattening executionContext aidState.UnaccountedFor
+      |> aidFlattening anonParams anonContext aidState.UnaccountedFor
     )
 
   // If any of the AIDs had insufficient data to produce a sensible flattening

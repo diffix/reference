@@ -27,7 +27,6 @@ type ExpressionType =
   | IntegerType
   | RealType
   | StringType
-  | ListType of ExpressionType
   | UnknownType of string
 
 type Expression =
@@ -81,7 +80,6 @@ type AggregateFunction =
   | DiffixCount
   | DiffixLowCount
   | Sum
-  | MergeAids
 
 type AggregateOptions =
   {
@@ -172,7 +170,7 @@ type AnonymizationParams =
 // Query & Planner
 // ----------------------------------------------------------------
 
-type PostAggregationHook = AggregationContext -> seq<Bucket> -> seq<Bucket>
+type PostAggregationHook = AggregationContext -> AnonymizationContext -> seq<Bucket> -> seq<Bucket>
 
 type QueryContext =
   {
@@ -194,7 +192,7 @@ type Plan =
   | ProjectSet of Plan * setGenerator: SetFunction * args: Expression list
   | Filter of Plan * condition: Expression
   | Sort of Plan * OrderBy list
-  | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list
+  | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list * AnonymizationContext option
   | Unique of Plan
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Append of first: Plan * second: Plan
@@ -205,19 +203,14 @@ type Plan =
 // Executor
 // ----------------------------------------------------------------
 
-type NoiseLayers =
-  {
-    BucketSeed: Hash
-  }
-  static member Default = { BucketSeed = 0UL }
+type AnonymizationContext = { BucketSeed: Hash }
 
-type ExecutionContext =
+type AggregationContext =
   {
-    QueryContext: QueryContext
-    NoiseLayers: NoiseLayers
+    AnonymizationParams: AnonymizationParams
+    GroupingLabels: Expression array
+    Aggregators: (AggregatorSpec * AggregatorArgs) array
   }
-  member this.AnonymizationParams = this.QueryContext.AnonymizationParams
-  member this.DataProvider = this.QueryContext.DataProvider
 
 // Responsible for accumulating the state of the aggregation function while
 // scanning the rows, and delivering the final result as a query result `Value`
@@ -228,24 +221,17 @@ type IAggregator =
   // Merge state with that of a compatible aggregator
   abstract Merge : IAggregator -> unit
   // Extract the final value of the aggregation function from the state
-  abstract Final : ExecutionContext -> Value
+  abstract Final : AggregationContext * AnonymizationContext option -> Value
 
 type AggregatorSpec = AggregateFunction * AggregateOptions
 type AggregatorArgs = Expression list
-
-type AggregationContext =
-  {
-    ExecutionContext: ExecutionContext
-    GroupingLabels: Expression array
-    Aggregators: (AggregatorSpec * AggregatorArgs) array
-  }
 
 type Bucket =
   {
     Group: Row
     mutable RowCount: int
     Aggregators: IAggregator array
-    ExecutionContext: ExecutionContext
+    AnonymizationContext: AnonymizationContext option
     Attributes: Dictionary<string, Value>
   }
 
@@ -412,13 +398,6 @@ module QueryContext =
   let makeWithDataProvider dataProvider =
     make AnonymizationParams.Default dataProvider
 
-module ExecutionContext =
-  let fromQueryContext queryContext =
-    { QueryContext = queryContext; NoiseLayers = NoiseLayers.Default }
-
-  let makeDefault () =
-    fromQueryContext (QueryContext.makeDefault ())
-
 module Plan =
   let rec columnsCount (plan: Plan) =
     match plan with
@@ -427,7 +406,7 @@ module Plan =
     | Plan.ProjectSet (plan, _, _) -> (columnsCount plan) + 1
     | Plan.Filter (plan, _) -> columnsCount plan
     | Plan.Sort (plan, _) -> columnsCount plan
-    | Plan.Aggregate (_, groupingLabels, aggregators) -> groupingLabels.Length + aggregators.Length
+    | Plan.Aggregate (_, groupingLabels, aggregators, _) -> groupingLabels.Length + aggregators.Length
     | Plan.Unique plan -> columnsCount plan
     | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
     | Plan.Append (first, _) -> columnsCount first
@@ -456,10 +435,11 @@ module Plan =
         $"ProjectSet {fn}({String.joinWithComma args})" + childToString childPlan
       | Plan.Filter (childPlan, condition) -> $"Filter {condition})" + childToString childPlan
       | Plan.Sort (childPlan, orderings) -> $"Sort {String.joinWithComma orderings}" + childToString childPlan
-      | Plan.Aggregate (childPlan, groupingLabels, aggregators) ->
+      | Plan.Aggregate (childPlan, groupingLabels, aggregators, anonymizationContext) ->
         "Aggregate"
         + $"{propLine depth}Group Keys: {String.joinWithComma groupingLabels}"
         + $"{propLine depth}Aggregates: {String.joinWithComma aggregators}"
+        + $"{propLine depth}AnonymizationContext: {anonymizationContext}"
         + childToString childPlan
       | Plan.Unique childPlan -> "Unique" + childToString childPlan
       | Plan.Join (leftPlan, rightPlan, joinType, condition) ->

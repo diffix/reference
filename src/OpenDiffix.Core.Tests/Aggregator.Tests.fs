@@ -49,16 +49,16 @@ let makeStandardArgs hasValueArg random length =
 /// Verifies that merging 2 separately aggregated sequences is equivalent
 /// to a single aggregation of those 2 sequences concatenated.
 let ensureConsistentMerging ctx fn sourceArgs destinationArgs =
-  let sourceAggregator = Aggregator.create ctx true fn
+  let sourceAggregator = Aggregator.create fn
   sourceArgs |> List.iter sourceAggregator.Transition
 
-  let destinationAggregator = Aggregator.create ctx true fn
+  let destinationAggregator = Aggregator.create fn
   destinationArgs |> List.iter destinationAggregator.Transition
 
   destinationAggregator.Merge sourceAggregator
   let mergedFinal = destinationAggregator.Final ctx
 
-  let replayedAggregator = Aggregator.create ctx true fn
+  let replayedAggregator = Aggregator.create fn
   (destinationArgs @ sourceArgs) |> List.iter replayedAggregator.Transition
   let replayedFinal = replayedAggregator.Final ctx
 
@@ -78,9 +78,16 @@ let argLengthPairs =
     1, 0
   ]
 
+let aggContext =
+  {
+    AnonymizationParams = AnonymizationParams.Default
+    GroupingLabels = [||]
+    Aggregators = [||]
+  }
+
 let testAnonAggregatorMerging fn hasValueArg =
   let random = makeRandom fn hasValueArg
-  let ctx = ExecutionContext.makeDefault ()
+  let ctx = aggContext, Some { BucketSeed = 0UL }
 
   let testPair numAids (length1, length2) =
     let makeArgs = makeAnonArgs hasValueArg random numAids
@@ -97,7 +104,7 @@ let testAnonAggregatorMerging fn hasValueArg =
 
 let testStandardAggregatorMerging fn hasValueArg =
   let random = makeRandom fn hasValueArg
-  let ctx = ExecutionContext.makeDefault ()
+  let ctx = aggContext, None
 
   let testPair (length1, length2) =
     let makeArgs = makeStandardArgs hasValueArg random

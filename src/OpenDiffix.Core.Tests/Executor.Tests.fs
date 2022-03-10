@@ -25,12 +25,12 @@ type Tests(db: DBFixture) =
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
-  let executionContext =
-    QueryContext.makeWithDataProvider db.DataProvider
-    |> ExecutionContext.fromQueryContext
+  let anonContext = { BucketSeed = 0UL }
+
+  let queryContext = QueryContext.makeWithDataProvider db.DataProvider
 
   let execute plan =
-    plan |> Executor.execute executionContext |> Seq.toList
+    plan |> Executor.execute queryContext |> Seq.toList
 
   [<Fact>]
   let ``execute scan`` () =
@@ -61,7 +61,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute grouping aggregate`` () =
-    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [ nameLength ], [ countStar ])
+    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [ nameLength ], [ countStar ], None)
 
     let expected =
       [
@@ -76,7 +76,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``execute global aggregate`` () =
-    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [], [ countStar; countDistinct nameLength ])
+    let plan = Plan.Aggregate(Plan.Scan(products, [ 1 ]), [], [ countStar; countDistinct nameLength ], None)
 
     let expected = [ [| Integer 11L; Integer 4L |] ]
     plan |> execute |> should equal expected
@@ -84,7 +84,14 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute grouping aggregate over nothing`` () =
     let condition = Expression.makeFunction Equals [ column products 1; Constant(String "xxx") ]
-    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [ nameLength ], [ countStar ])
+
+    let plan =
+      Plan.Aggregate(
+        Plan.Filter(Plan.Scan(products, [ 1 ]), condition),
+        [ nameLength ],
+        [ countStar ],
+        Some anonContext
+      )
 
     let expected: Row list = []
     plan |> execute |> should equal expected
@@ -92,7 +99,9 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute global aggregate over nothing`` () =
     let condition = Expression.makeFunction Equals [ column products 1; Constant(String "xxx") ]
-    let plan = Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [], [ countStar ])
+
+    let plan =
+      Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [], [ countStar ], Some anonContext)
 
     let expected = [ [| Integer 0L |] ]
     plan |> execute |> should equal expected
@@ -146,7 +155,10 @@ type Tests(db: DBFixture) =
     let scanProducts = Plan.Scan(products, [ 0; 2 ])
 
     let makePlan groupBy =
-      Plan.Project(Plan.Aggregate(scanProducts, [ groupBy ], [ diffixCount ]), [ ColumnReference(1, IntegerType) ])
+      Plan.Project(
+        Plan.Aggregate(scanProducts, [ groupBy ], [ diffixCount ], Some anonContext),
+        [ ColumnReference(1, IntegerType) ]
+      )
 
     (priceInteger |> makePlan |> execute)
     |> should equal (priceReal |> makePlan |> execute)

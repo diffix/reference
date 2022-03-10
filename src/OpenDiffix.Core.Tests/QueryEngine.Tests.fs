@@ -197,4 +197,40 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers_small GROUP BY city, city ORDER BY 1"
       "SELECT count(*) FROM customers_small GROUP BY city ORDER BY 1"
 
+
+  [<Fact>]
+  let ``Anonymizing subquery`` () =
+    let queryResult =
+      runQuery
+        """
+          SELECT count(city), sum(count) FROM
+            (SELECT city, count(*) FROM customers_small GROUP BY 1) t
+          WHERE length(city) > 3
+        """
+
+    queryResult.Rows |> should equal [ [| Integer 2L; Integer 20L |] ]
+
+  [<Fact>]
+  let ``Joining anonymizing subqueries`` () =
+    let queryResult =
+      runQuery
+        """
+          SELECT t1.city, t1.count, t2.count FROM
+            (SELECT city, count(*) FROM customers GROUP BY 1) t1
+          LEFT JOIN
+            (SELECT city, count(*) FROM customers_small GROUP BY 1) t2
+          ON t1.city = t2.city
+        """
+
+    let expectedRows =
+      [
+        [| String "Paris"; Integer 26L; Value.Null |]
+        [| String "Berlin"; Integer 77L; Integer 10L |]
+        [| String "Rome"; Integer 50L; Integer 10L |]
+        [| String "Madrid"; Integer 25L; Value.Null |]
+        [| String "London"; Integer 25L; Value.Null |]
+      ]
+
+    queryResult.Rows |> should equal expectedRows
+
   interface IClassFixture<DBFixture>

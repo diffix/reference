@@ -66,11 +66,7 @@ let typeOfAggregate fn args =
   | Count
   | DiffixCount -> IntegerType
   | DiffixLowCount -> BooleanType
-  | Sum ->
-    match typeOfList args with
-    | ListType IntegerType -> IntegerType
-    | _ -> RealType
-  | MergeAids -> ListType MIXED_TYPE
+  | Sum -> RealType
 
 /// Resolves the type of an expression.
 let rec typeOf expression =

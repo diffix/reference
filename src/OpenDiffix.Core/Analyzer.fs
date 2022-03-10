@@ -246,39 +246,15 @@ let private mapQuery schema anonParams isSubQuery (selectQuery: ParserTypes.Sele
     |> mapOrderByIndices targetList
     |> List.map (fun (expression, direction, nullsBehavior) -> OrderBy(expression, direction, nullsBehavior))
 
-  let isAggregating = not (List.isEmpty groupBy && List.isEmpty (collectAggregates targetList))
-
-  let aidTargets =
-    if isSubQuery then
-      // Subqueries will export their AIDs to outer queries.
-      rangeColumns
-      |> List.indexed
-      |> List.filter (fun (_i, col) -> col.IsAid)
-      |> List.mapi (fun aidIndex (colIndex, col) ->
-        {
-          Expression =
-            if isAggregating then
-              FunctionExpr(
-                AggregateFunction(MergeAids, AggregateOptions.Default),
-                [ ColumnReference(colIndex, col.Type) ]
-              )
-            else
-              ColumnReference(colIndex, col.Type)
-          Alias = $"__aid_{aidIndex}"
-          Tag = AidTargetEntry
-        }
-      )
-    else
-      []
-
   {
-    TargetList = targetList @ aidTargets
+    TargetList = targetList
     Where = whereClause
     From = range
     GroupBy = groupBy
     Having = havingClause
     OrderBy = simpleOrderBy
     Limit = selectQuery.Limit
+    AnonymizationContext = None
   }
 
 // NOTE: We do not check subqueries, as they aren't supported in conjunction with anonymization.
@@ -358,20 +334,35 @@ let private compileAnonymizingQuery aidColumnsExpression selectQuery =
 
   { selectQuery with GroupBy = groupBy; Having = having }
 
-let private compileQuery anonParams (selectQuery: SelectQuery) =
-  let rangeColumns = collectRangeColumns anonParams selectQuery.From
+let private compileQuery anonParams (query: SelectQuery) =
+  let rangeColumns = collectRangeColumns anonParams query.From
   let aidColumnsExpression = makeAidColumnsExpression rangeColumns
 
   let isAnonymizing =
     anonParams.AccessLevel <> Direct
     && aidColumnsExpression |> Expression.unwrapListExpr |> List.isEmpty |> not
 
-  if isAnonymizing then
-    QueryValidator.validateAnonymizingQuery selectQuery
-    compileAnonymizingQuery aidColumnsExpression selectQuery
+  let query =
+    if isAnonymizing then
+      QueryValidator.validateAnonymizingQuery query
+      compileAnonymizingQuery aidColumnsExpression query
+    else
+      QueryValidator.validateDirectQuery query
+      query
+
+  // Noise seeding is needed only for anonymizing aggregators. This includes the aggregators injected
+  // in `compileAnonymizingQuery` and explicit use of noisy aggregators like `diffix_low_count`.
+  // If there aren't any, we also don't need to do the validations which are done deep in `computeSQLSeed`.
+  if hasAnonymizingAggregators query then
+    let rangeColumns = collectRangeColumns anonParams query.From
+    let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
+
+    QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
+    let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketLabelExpressions
+    { query with AnonymizationContext = Some { BucketSeed = sqlSeed } }
   else
-    QueryValidator.validateDirectQuery selectQuery
-    selectQuery
+    query
+
 
 let rec private normalizeBucketLabelExpression expression =
   match expression with
@@ -399,21 +390,7 @@ let analyze queryContext (parseTree: ParserTypes.SelectQuery) : Query =
   let query = mapQuery schema anonParams false parseTree
   query
 
-let anonymize queryContext (query: Query) =
-  let anonParams = queryContext.AnonymizationParams
-  let query = compileQuery anonParams query
-
-  // Noise is needed only when we anonymize. If we don't, we also don't need to do the validations which are done deep
-  // in `computeNoiseLayers`. This includes anonymization injected in `compileQuery` and explicit use of anonymizing
-  // aggregates like `diffix_low_count`.
-  let noiseLayers =
-    if hasAnonymizingAggregators query then
-      let rangeColumns = collectRangeColumns anonParams query.From
-      let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
-
-      QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
-      NoiseLayers.computeSQLLayer rangeColumns normalizedBucketLabelExpressions
-    else
-      NoiseLayers.Default
-
-  query, noiseLayers
+let rec compile (queryContext: QueryContext) (query: Query) =
+  query
+  |> map (compile queryContext)
+  |> compileQuery queryContext.AnonymizationParams

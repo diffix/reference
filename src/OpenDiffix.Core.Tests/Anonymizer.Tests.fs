@@ -25,58 +25,25 @@ let strColumn = ColumnReference(1, StringType)
 let companyColumn = ColumnReference(2, StringType)
 let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
-let executionContext =
-  (QueryContext.makeWithAnonParams
-    {
-      TableSettings = Map.empty
-      Salt = [||]
-      AccessLevel = Direct
-      Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
-      OutlierCount = { Lower = 1; Upper = 1 }
-      TopCount = { Lower = 1; Upper = 1 }
-      LayerNoiseSD = 0.
-    })
-  |> ExecutionContext.fromQueryContext
+let anonParams =
+  {
+    TableSettings = Map.empty
+    Salt = [||]
+    AccessLevel = Direct
+    Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
+    OutlierCount = { Lower = 1; Upper = 1 }
+    TopCount = { Lower = 1; Upper = 1 }
+    LayerNoiseSD = 0.
+  }
 
-let anonymizedAggregationContext =
-  let threshold = { Lower = 2; Upper = 2 }
-
-  let anonParams =
-    { executionContext.AnonymizationParams with
-        OutlierCount = threshold
-        TopCount = threshold
-    }
-
-  QueryContext.makeWithAnonParams anonParams |> ExecutionContext.fromQueryContext
+let aggContext = { AnonymizationParams = anonParams; GroupingLabels = [||]; Aggregators = [||] }
 
 let evaluateAggregator fn args =
-  evaluateAggregator executionContext fn args
+  evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) fn args
 
-let mergeAids = MergeAids, AggregateOptions.Default
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
 let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
 let diffixLowCount = DiffixLowCount, AggregateOptions.Default
-
-[<Fact>]
-let ``merge bucket aids`` () =
-  rows
-  |> evaluateAggregator mergeAids [ aidColumn ]
-  |> (function
-  | Value.List values -> Value.List(List.sort values)
-  | x -> x)
-  |> should
-       equal
-       (Value.List [
-         Integer 1L
-         Integer 2L
-         Integer 3L
-         Integer 4L
-         Integer 5L
-         Integer 6L
-         Integer 7L
-         Integer 8L
-         Integer 9L
-        ])
 
 [<Fact>]
 let ``anon count distinct column`` () =
@@ -192,7 +159,7 @@ let ``count distinct with flattening - worked example 1 from doc`` () =
   let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
-  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; fruit ]
   |> should equal (Integer 5L)
 
 [<Fact>]
@@ -223,7 +190,7 @@ let ``count distinct with flattening - re-worked example 2 from doc`` () =
   let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
-  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; fruit ]
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; fruit ]
   |> should equal (Integer 2L)
 
 [<Fact>]
@@ -244,11 +211,11 @@ let ``counts with insufficient values for one AID return 0`` () =
   let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
-  |> TestHelpers.evaluateAggregator anonymizedAggregationContext diffixCount [ allAidColumns; value ]
+  |> evaluateAggregator diffixCount [ allAidColumns; value ]
   |> should equal (Integer 0L)
 
   rows
-  |> TestHelpers.evaluateAggregator anonymizedAggregationContext distinctDiffixCount [ allAidColumns; value ]
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; value ]
   |> should equal (Integer 0L)
 
 [<Fact>]
@@ -269,22 +236,22 @@ let ``allows null-values for some of the AID rows`` () =
   let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
-  |> TestHelpers.evaluateAggregator executionContext diffixCount [ allAidColumns; value ]
+  |> evaluateAggregator diffixCount [ allAidColumns; value ]
   |> should equal (Integer 5L)
 
   rows
-  |> TestHelpers.evaluateAggregator executionContext distinctDiffixCount [ allAidColumns; value ]
+  |> evaluateAggregator distinctDiffixCount [ allAidColumns; value ]
   |> should equal (Integer 5L)
 
   // The aggregate result should not be affected by the order of the AIDs
   let allAidsFlipped = ListExpr [ aid2; aid1 ]
 
   rows
-  |> TestHelpers.evaluateAggregator executionContext diffixCount [ allAidsFlipped; value ]
+  |> evaluateAggregator diffixCount [ allAidsFlipped; value ]
   |> should equal (Integer 5L)
 
   rows
-  |> TestHelpers.evaluateAggregator executionContext distinctDiffixCount [ allAidsFlipped; value ]
+  |> evaluateAggregator distinctDiffixCount [ allAidsFlipped; value ]
   |> should equal (Integer 5L)
 
 [<Fact>]
@@ -309,80 +276,8 @@ let ``account for values where AID-value is null`` () =
   let allAidColumns = ListExpr [ aid1; aid2 ]
 
   rows
-  |> TestHelpers.evaluateAggregator executionContext diffixCount [ allAidColumns; value ]
+  |> evaluateAggregator diffixCount [ allAidColumns; value ]
   |> should equal (Integer 8L)
-
-[<Fact>]
-let ``low count accepts rows with shared contribution`` () =
-  let aidList names = names |> List.map String |> Value.List
-  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType) ]
-
-  let lowUserRows = [ [| aidList [ "Sebastian" ] |] ]
-  let highUserRows = [ [| aidList [ "Paul"; "Cristian"; "Felix"; "Edon" ] |] ]
-
-  lowUserRows
-  |> TestHelpers.evaluateAggregator executionContext diffixLowCount [ aidsExpression ]
-  |> should equal (Boolean true)
-
-  highUserRows
-  |> TestHelpers.evaluateAggregator executionContext diffixLowCount [ aidsExpression ]
-  |> should equal (Boolean false)
-
-[<Fact>]
-let ``count accepts rows with shared contribution`` () =
-  let aidList names = names |> List.map String |> Value.List
-  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType) ]
-
-  let rows =
-    [
-      // AIDs
-      [| aidList [ "Paul"; "Felix"; "Edon" ] |]
-      [| aidList [ "Paul"; "Felix"; "Edon" ] |]
-      [| aidList [ "Sebastian"; "Felix"; "Edon" ] |]
-      [| aidList [ "Paul"; "Cristian" ] |]
-      [| aidList [ "Cristian" ] |]
-      [| aidList [ "Cristian" ] |]
-      [| aidList [ "Cristian" ] |]
-    ]
-
-  // Cristian:  1/2 + 1 + 1 + 1 = 3.5  (outlier)
-  // Paul:      1/3 + 1/3 + 1/2 = 1.16 (top)
-  // Felix:     1/3 + 1/3 + 1/3 = 1.0
-  // Edon:      1/3 + 1/3 + 1/3 = 1.0
-  // Sebastian: 1/3             = 0.33
-  // Total:                     = 7.0
-
-  rows
-  |> TestHelpers.evaluateAggregator executionContext diffixCount [ aidsExpression ]
-  |> should equal (Integer 5L)
-
-[<Fact>]
-let ``count distinct accepts rows with shared contribution`` () =
-  let email values = values |> List.map String |> Value.List
-  let firstName = email
-
-  let aidsExpression = ListExpr [ ColumnReference(0, ListType StringType); ColumnReference(1, ListType StringType) ]
-  let dataColumn = ColumnReference(2, StringType)
-
-  // See `docs/distinct pre-processing.md` for explanation.
-  let rows =
-    [
-      [| email [ "Paul"; "Sebastian" ]; firstName [ "Sebastian" ]; String "Apple" |]
-      [| email [ "Paul"; "Edon" ]; firstName [ "Sebastian" ]; String "Apple" |]
-      [| email [ "Sebastian" ]; firstName [ "Sebastian" ]; String "Apple" |]
-      [| email [ "Cristian" ]; firstName [ "Paul" ]; String "Apple" |]
-      [| email [ "Edon" ]; firstName [ "Paul" ]; String "Apple" |]
-      [| email [ "Edon" ]; firstName [ "Paul" ]; String "Pear" |]
-      [| email [ "Paul" ]; firstName [ "Paul" ]; String "Pineapple" |]
-      [| email [ "Cristian" ]; firstName [ "Paul" ]; String "Lemon" |]
-      [| email [ "Cristian" ]; firstName [ "Felix" ]; String "Orange" |]
-      [| email [ "Felix" ]; firstName [ "Edon" ]; String "Banana" |]
-      [| email [ "Edon" ]; firstName [ "Cristian" ]; String "Grapefruit" |]
-    ]
-
-  rows
-  |> TestHelpers.evaluateAggregator executionContext distinctDiffixCount [ aidsExpression; dataColumn ]
-  |> should equal (Integer 5L)
 
 [<Fact>]
 let ``compacting top/outlier interval respects rules`` () =

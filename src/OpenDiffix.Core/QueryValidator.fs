@@ -23,14 +23,15 @@ let private validateSingleLowCount query =
     |> List.distinct
 
   if List.length lowCountAggregators > 1 then
-    failwith "A single low count aggregator is allowed in a query"
+    failwith "A single low count aggregator is allowed in a query."
 
 let private validateOnlyCount query =
   query
   |> visitAggregates (
     function
     | FunctionExpr (AggregateFunction (Count, _), _) -> ()
-    | FunctionExpr (AggregateFunction (_otherAggregate, _), _) -> failwith "Only count aggregates are supported"
+    | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
+      failwith "Only count aggregates are supported in anonymizing queries."
     | _ -> ()
   )
 
@@ -42,19 +43,19 @@ let private allowedCountUsage query =
       match args with
       | []
       | [ ColumnReference _ ] -> ()
-      | _ -> failwith "Only count(*), count(column) and count(distinct column) are supported"
+      | _ -> failwith "Only count(*), count(column) and count(distinct column) are supported in anonymizing queries."
     | _ -> ()
   )
 
 let private validateSelectTarget (selectQuery: SelectQuery) =
   match selectQuery.From with
-  | Join _ -> failwith "JOIN in anonymizing queries is not currently supported"
-  | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported"
+  | Join _ -> failwith "JOIN in anonymizing queries is not currently supported."
+  | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported."
   | _ -> ()
 
 let private validateNoWhere (selectQuery: SelectQuery) =
   if selectQuery.Where <> Constant(Boolean true) then
-    failwith "WHERE in anonymizing queries is not currently supported"
+    failwith "WHERE in anonymizing queries is not currently supported."
 
 let private validateGeneralization accessLevel expression =
   if accessLevel <> Direct then

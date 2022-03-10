@@ -152,38 +152,38 @@ module QueryParser =
           List.fold (fun left ((joinType, right), on) -> Join(joinType, left, right, on)) first_table joined_tables
 
   do
-    selectQueryRef
-    := word "SELECT"
-       >>= fun _ ->
-             distinct
-             >>= fun distinct ->
-                   commaSepExpressions
-                   >>= fun columns ->
-                         from
-                         >>= fun from ->
-                               opt whereClause
-                               >>= fun whereClause ->
-                                     opt groupBy
-                                     >>= fun groupBy ->
-                                           opt havingClause
-                                           >>= fun having ->
-                                                 opt orderBy
-                                                 >>= fun orderBy ->
-                                                       opt limitClause
-                                                       >>= fun limit ->
-                                                             let query =
-                                                               {
-                                                                 SelectDistinct = distinct
-                                                                 Expressions = columns
-                                                                 From = from
-                                                                 Where = whereClause
-                                                                 GroupBy = groupBy |> Option.defaultValue []
-                                                                 Having = having
-                                                                 Limit = limit
-                                                                 OrderBy = orderBy |> Option.defaultValue []
-                                                               }
+    selectQueryRef.Value <-
+      word "SELECT"
+      >>= fun _ ->
+            distinct
+            >>= fun distinct ->
+                  commaSepExpressions
+                  >>= fun columns ->
+                        from
+                        >>= fun from ->
+                              opt whereClause
+                              >>= fun whereClause ->
+                                    opt groupBy
+                                    >>= fun groupBy ->
+                                          opt havingClause
+                                          >>= fun having ->
+                                                opt orderBy
+                                                >>= fun orderBy ->
+                                                      opt limitClause
+                                                      >>= fun limit ->
+                                                            let query =
+                                                              {
+                                                                SelectDistinct = distinct
+                                                                Expressions = columns
+                                                                From = from
+                                                                Where = whereClause
+                                                                GroupBy = groupBy |> Option.defaultValue []
+                                                                Having = having
+                                                                Limit = limit
+                                                                OrderBy = orderBy |> Option.defaultValue []
+                                                              }
 
-                                                             preturn (Expression.SelectQuery query)
+                                                            preturn (Expression.SelectQuery query)
 
   // This is sort of silly... but the operator precedence parser is case sensitive. This means
   // if we add a parser for AND, then it will fail if you write a query as And... Therefore

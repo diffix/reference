@@ -6,27 +6,30 @@ let private mergeAllAggregatorsInto (targetBucket: Bucket) (sourceBucket: Bucket
 
   sourceBucket.Aggregators |> Array.iteri (fun i -> targetAggregators.[i].Merge)
 
-let private makeStarBucket (aggregationContext: AggregationContext) =
-  let isGlobal = aggregationContext.GroupingLabels.Length = 0
-
-  let executionContext = aggregationContext.ExecutionContext
-
+let private makeStarBucket aggregationContext anonymizationContext =
   // Group labels are all '*'s
   let group = Array.create aggregationContext.GroupingLabels.Length (String "*")
 
   let aggregators =
     aggregationContext.Aggregators
-    |> Seq.map fst
-    |> Seq.map (Aggregator.create executionContext isGlobal)
+    |> Seq.map (fst >> Aggregator.create)
     |> Seq.toArray
 
-  let starBucket = Bucket.make group aggregators executionContext
+  let starBucket = Bucket.make group aggregators (Some anonymizationContext)
   // Not currently used, but may be in the future.
   starBucket |> Bucket.putAttribute BucketAttributes.IS_STAR_BUCKET (Boolean true)
   starBucket
 
-let hook callback (aggregationContext: AggregationContext) (buckets: Bucket seq) =
-  let starBucket = makeStarBucket aggregationContext
+let private getBucketAggregate index aggregationContext bucket =
+  bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)
+
+let hook
+  callback
+  (aggregationContext: AggregationContext)
+  (anonymizationContext: AnonymizationContext)
+  (buckets: Bucket seq)
+  =
+  let starBucket = makeStarBucket aggregationContext anonymizationContext
   let lowCountIndex = AggregationContext.lowCountIndex aggregationContext
   let diffixCountIndex = AggregationContext.diffixCountIndex aggregationContext
 
@@ -36,7 +39,7 @@ let hook callback (aggregationContext: AggregationContext) (buckets: Bucket seq)
       |> Bucket.getAttribute BucketAttributes.IS_LED_MERGED
       |> Value.unwrapBoolean
 
-    not isAlreadyMerged && Bucket.isLowCount lowCountIndex bucket
+    not isAlreadyMerged && Bucket.isLowCount lowCountIndex bucket aggregationContext
 
   let bucketsInStarBucket =
     buckets
@@ -44,10 +47,9 @@ let hook callback (aggregationContext: AggregationContext) (buckets: Bucket seq)
     |> Seq.map (mergeAllAggregatorsInto starBucket)
     |> Seq.length
 
-  let executionContext = starBucket.ExecutionContext
-
   let isStarBucketLowCount =
-    starBucket.Aggregators.[lowCountIndex].Final(executionContext)
+    starBucket
+    |> getBucketAggregate lowCountIndex aggregationContext
     |> Value.unwrapBoolean
 
   let suppressedAnonCount =
@@ -57,7 +59,7 @@ let hook callback (aggregationContext: AggregationContext) (buckets: Bucket seq)
     if isStarBucketLowCount || bucketsInStarBucket < 2 then
       Null
     else
-      starBucket.Aggregators.[diffixCountIndex].Final(executionContext)
+      starBucket |> getBucketAggregate diffixCountIndex aggregationContext
 
   callback suppressedAnonCount
   buckets
