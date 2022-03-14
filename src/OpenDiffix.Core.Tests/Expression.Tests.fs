@@ -493,14 +493,19 @@ module DefaultFunctionsTests =
       [ //
         String "  1 ", String "integer", Integer 1L
         String "+0", String "integer", Integer 0L
+        String "+0.0", String "integer", Null
         String "-2", String "integer", Integer -2L
         String "0.5", String "real", Real 0.5
         String "-12.334", String "real", Real -12.334
+        String "-12.334.8", String "real", Null
         String "true", String "boolean", Boolean true
         String "TRUE", String "boolean", Boolean true
         String "1", String "boolean", Boolean true
         String "", String "boolean", Null
+        String "not a bool", String "boolean", Null
         String "False", String "boolean", Boolean false
+        String "  False", String "boolean", Boolean false
+        String "False  ", String "boolean", Boolean false
         Integer 100L, String "boolean", Boolean true
         Integer 0L, String "boolean", Boolean false
         Integer -1L, String "real", Real -1.

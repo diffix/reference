@@ -190,13 +190,12 @@ let rec evaluateScalarFunction fn args =
     | true, r -> Real r
     | false, _ -> Null
   | Cast, [ String s; String "boolean" ] ->
-    match s.ToLower() with
+    match s.Trim().ToLower() with
     | "true"
     | "1" -> Boolean true
     | "false"
     | "0" -> Boolean false
-    | "" -> Null
-    | _ -> failwith "Input value is not a valid boolean string."
+    | _ -> Null
   | Cast, [ Integer i; String "real" ] -> i |> float |> Real
   | Cast, [ Real r; String "integer" ] -> r |> roundAwayFromZero |> int64 |> Integer
   | Cast, [ Integer 0L; String "boolean" ] -> Boolean false
