@@ -12,7 +12,8 @@ let private stringSortFlag = CompareOptions.StringSort
 let rec toString value =
   match value with
   | Null -> "NULL"
-  | Boolean b -> b.ToString()
+  | Boolean true -> "t"
+  | Boolean false -> "f"
   | Integer i -> i.ToString()
   | Real r -> r.ToString()
   | String s -> s
@@ -66,14 +67,3 @@ let comparer direction nulls =
         // `StringSort` means symbols come last and we group letter cases together.
         directionValue * stringCompareInfo.Compare(x, y, stringSortFlag)
     | x, y -> directionValue * Operators.compare x y
-
-/// Computes a 64 bit hash of the given value.
-let rec hash value =
-  match value with
-  | Null -> 0UL
-  | Boolean false -> 0UL
-  | Boolean true -> 1UL
-  | Integer i -> i |> BitConverter.GetBytes |> Hash.bytes
-  | Real r -> r |> BitConverter.GetBytes |> Hash.bytes
-  | String s -> s |> Hash.string
-  | List l -> l |> List.map hash |> List.fold (^^^) 0UL
