@@ -18,7 +18,10 @@ let private invalidArgs (values: Value list) =
   failwith $"Invalid arguments for aggregator: {values}"
 
 let private hashAid (aidValue: Value) =
-  aidValue |> Value.toString |> Hash.string
+  match aidValue with
+  | Integer i -> i |> System.BitConverter.GetBytes |> Hash.bytes
+  | String s -> Hash.string s
+  | _ -> failwith "Unsupported AID type."
 
 let private hashAidList (aidValues: Value list) = List.map hashAid aidValues
 

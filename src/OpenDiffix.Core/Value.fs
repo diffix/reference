@@ -1,6 +1,5 @@
 module OpenDiffix.Core.Value
 
-open System
 open System.Globalization
 
 /// Sort-related constants
