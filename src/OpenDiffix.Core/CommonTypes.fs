@@ -471,7 +471,7 @@ module AggregationContext =
 
   let diffixCountIndex (aggregationContext: AggregationContext) =
     match findSingleIndex
-      // We're looking for `count(*)`, so we cannot confuse a we may find `count(value)` with it.
+      // We're looking for `count(*)`;`hasOnlyAidArgs` ensures we don't find a `count(value)`.
       (fun ((fn, _), args) -> fn = DiffixCount && hasOnlyAidArgs args)
       aggregationContext.Aggregators with
     | Some index -> index
