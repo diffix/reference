@@ -69,10 +69,7 @@ let private validateGeneralization accessLevel expression =
   if accessLevel = PublishUntrusted then
     match expression with
     | FunctionExpr (ScalarFunction fn, [ _ ]) when List.contains fn [ Floor; Ceil; Round ] -> ()
-    | FunctionExpr (ScalarFunction fn, [ _; arg ]) when
-      List.contains fn [ FloorBy; CeilBy; RoundBy ] && isMoneyStyle arg
-      ->
-      ()
+    | FunctionExpr (ScalarFunction fn, [ _; arg ]) when List.contains fn [ FloorBy; RoundBy ] && isMoneyStyle arg -> ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | ColumnReference _ -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."

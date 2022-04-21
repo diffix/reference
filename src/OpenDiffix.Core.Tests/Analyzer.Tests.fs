@@ -415,6 +415,10 @@ type Tests(db: DBFixture) =
       "Generalization used in the query is not allowed in untrusted access level."
 
     assertUntrustedQueryFails
+      "SELECT ceil_by(age, 2) from customers"
+      "Generalization used in the query is not allowed in untrusted access level."
+
+    assertUntrustedQueryFails
       "SELECT width_bucket(age, 2, 200, 5) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
@@ -427,7 +431,6 @@ type Tests(db: DBFixture) =
     analyzeUntrustedQuery "SELECT floor_by(age, 0.2) from customers" |> ignore
     analyzeUntrustedQuery "SELECT floor_by(age, 20.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT floor_by(age, 50.0) from customers" |> ignore
-    analyzeUntrustedQuery "SELECT ceil_by(age, 50.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT round_by(age, 50.0) from customers" |> ignore
     // No generalization, either implicitly or explicitly
     analyzeUntrustedQuery "SELECT floor(age) from customers" |> ignore
