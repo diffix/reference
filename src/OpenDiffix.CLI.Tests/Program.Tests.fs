@@ -46,6 +46,12 @@ let ``Rejects invalid intervals`` () =
     |> ignore
   )
 
+  shouldFail (fun () ->
+    [| "-f"; dataDirectory; "--top-count"; "0"; "1"; "-q"; "SELECT count(*) FROM customers" |]
+    |> mainCore
+    |> ignore
+  )
+
 [<Fact>]
 let ``Guards against unknown params`` () =
   shouldFail (fun () ->
@@ -73,9 +79,43 @@ let ``Accepts supported CLI parameters`` () =
     "--low-layer-sd"
     "1.2"
     "--low-mean-gap"
-    "1"
+    "2.0"
     "--layer-noise-sd"
     "2.4"
+    "--aid-columns"
+    "customers.id"
+    "-q"
+    "SELECT count(*) FROM customers"
+  |]
+  |> mainCore
+  |> should not' (be Empty)
+
+[<Fact>]
+let ``Rejects unsafe CLI parameters`` () =
+  shouldFail (fun () ->
+    [|
+      "-f"
+      dataDirectory
+      "--low-layer-sd"
+      "0.2"
+      "--aid-columns"
+      "customers.id"
+      "-q"
+      "SELECT count(*) FROM customers"
+    |]
+    |> mainCore
+    |> ignore
+  )
+
+[<Fact>]
+let ``Allows unsafe CLI parameters in unsafe mode`` () =
+  [|
+    "-f"
+    dataDirectory
+    "--low-layer-sd"
+    "0.2"
+    "--strict-check"
+    "false"
     "--aid-columns"
     "customers.id"
     "-q"

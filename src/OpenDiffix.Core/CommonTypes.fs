@@ -149,6 +149,7 @@ type AnonymizationParams =
     Salt: byte []
     Suppression: SuppressionParams
     AccessLevel: AccessLevel
+    StrictCheck: bool
 
     // Count params
     OutlierCount: Interval
@@ -161,6 +162,7 @@ type AnonymizationParams =
       Salt = [||]
       Suppression = SuppressionParams.Default
       AccessLevel = PublishTrusted
+      StrictCheck = true
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0
@@ -367,6 +369,10 @@ module Schema =
       | None -> failwith $"Could not find table `{tableName}`."
 
 module AnonymizationParams =
+  let private validateInterval interval =
+    if interval.Upper < interval.Lower then
+      failwith "Invalid interval bounds: (%i{interval.Lower}, %i{interval.Upper})"
+
   /// Returns whether the given column in the table is an AID column.
   let isAidColumn anonParams tableName columnName =
     anonParams.TableSettings
@@ -374,6 +380,55 @@ module AnonymizationParams =
     |> function
       | Some tableSettings -> tableSettings.AidColumns |> List.exists (String.equalsI columnName)
       | None -> false
+
+  /// Fails if any of the anon params does not meet the requirements. Set `strict` to `true` to enforce
+  /// checking if the parameters ensure safe minimum level of anonymization, `false` only for basic checks.
+  let validate anonParams =
+    if anonParams.StrictCheck then
+      if anonParams.Suppression.LowThreshold < 2 then
+        failwith "Suppression.LowThreshold must be greater than or equal to 2"
+
+      if anonParams.Suppression.LayerSD < 1.0 then
+        failwith "Suppression.LayerSD must be greater than or equal to 1.0"
+
+      if anonParams.Suppression.LowMeanGap < 2.0 then
+        failwith "Suppression.LowMeanGap must be greater than or equal to 2.0"
+
+      if anonParams.OutlierCount.Lower < 1 then
+        failwith "OutlierCount lower bound must be greater than or equal to 1"
+
+      if anonParams.OutlierCount.Upper < 2 then
+        failwith "OutlierCount upper bound must be greater than or equal to 2"
+
+      if anonParams.TopCount.Lower < 2 then
+        failwith "TopCount lower bound must be greater than or equal to 2"
+
+      if anonParams.TopCount.Upper < 3 then
+        failwith "TopCount upper bound must be greater than or equal to 3"
+
+      if anonParams.LayerNoiseSD < 1.0 then
+        failwith "LayerNoiseSD must be greater than or equal to 1.0"
+    else
+      if anonParams.Suppression.LowThreshold < 1 then
+        failwith "Suppression.LowThreshold must be greater than or equal to 1"
+
+      if anonParams.Suppression.LayerSD < 0.0 then
+        failwith "Suppression.LayerSD must be non-negative"
+
+      if anonParams.Suppression.LowMeanGap < 0.0 then
+        failwith "Suppression.LowMeanGap must be non-negative"
+
+      if anonParams.OutlierCount.Lower < 0 then
+        failwith "OutlierCount bounds must be non-negative"
+
+      if anonParams.TopCount.Lower <= 0 then
+        failwith "TopCount bounds must be positive"
+
+      if anonParams.LayerNoiseSD < 0.0 then
+        failwith "LayerNoiseSD must be non-negative"
+
+    validateInterval anonParams.OutlierCount
+    validateInterval anonParams.TopCount
 
 module QueryContext =
   let private defaultDataProvider =
@@ -384,6 +439,8 @@ module QueryContext =
     }
 
   let make anonParams dataProvider =
+    AnonymizationParams.validate anonParams
+
     {
       AnonymizationParams = anonParams
       DataProvider = dataProvider
