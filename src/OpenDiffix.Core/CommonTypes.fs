@@ -149,7 +149,7 @@ type AnonymizationParams =
     Salt: byte []
     Suppression: SuppressionParams
     AccessLevel: AccessLevel
-    StrictCheck: bool
+    Strict: bool
 
     // Count params
     OutlierCount: Interval
@@ -162,7 +162,7 @@ type AnonymizationParams =
       Salt = [||]
       Suppression = SuppressionParams.Default
       AccessLevel = PublishTrusted
-      StrictCheck = true
+      Strict = true
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0
@@ -384,7 +384,7 @@ module AnonymizationParams =
   /// Fails if any of the anon params does not meet the requirements. Set `strict` to `true` to enforce
   /// checking if the parameters ensure safe minimum level of anonymization, `false` only for basic checks.
   let validate anonParams =
-    if anonParams.StrictCheck then
+    if anonParams.Strict then
       if anonParams.Suppression.LowThreshold < 2 then
         failwith "Suppression.LowThreshold must be greater than or equal to 2"
 

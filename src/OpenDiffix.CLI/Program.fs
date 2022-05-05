@@ -16,7 +16,7 @@ type CliArguments =
   | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Salt of string
   | Access_Level of string
-  | Strict_Check of bool
+  | Strict of bool
   | Json
 
   // Threshold values
@@ -44,7 +44,7 @@ type CliArguments =
       | Access_Level _ ->
         "Controls the access level to the data: 'publish_trusted' - protects against accidental re-identification; "
         + "'publish_untrusted' - protects against intentional re-identification; 'direct' - no anonymization."
-      | Strict_Check _ ->
+      | Strict _ ->
         "Controls whether the anonymization parameters must be checked strictly, i.e. to ensure safe minimum level of "
         + "anonymization. Defaults to `true`."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
@@ -125,7 +125,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
     AccessLevel = parsedArgs.TryGetResult Access_Level |> toAccessLevel
-    StrictCheck = parsedArgs.TryGetResult Strict_Check |> Option.defaultValue true
+    Strict = parsedArgs.TryGetResult Strict |> Option.defaultValue true
     Suppression = suppression
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval

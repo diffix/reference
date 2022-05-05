@@ -114,7 +114,7 @@ let ``Allows unsafe CLI parameters in unsafe mode`` () =
     dataDirectory
     "--low-layer-sd"
     "0.2"
-    "--strict-check"
+    "--strict"
     "false"
     "--aid-columns"
     "customers.id"

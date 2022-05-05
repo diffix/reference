@@ -277,7 +277,7 @@ type Tests(db: DBFixture) =
         ]
       Salt = [||]
       AccessLevel = PublishTrusted
-      StrictCheck = false
+      Strict = false
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
