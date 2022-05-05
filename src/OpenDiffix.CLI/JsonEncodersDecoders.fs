@@ -48,6 +48,7 @@ module private rec Encoders =
            |> Map.toList
            |> List.map (fun (table, settings) -> {| Table = table; Settings = settings |}))
         AccessLevel = ap.AccessLevel
+        Strict = ap.Strict
         LowThreshold = ap.Suppression.LowThreshold
         LowMeanGap = ap.Suppression.LowMeanGap
         LowLayerSd = ap.Suppression.LayerSD

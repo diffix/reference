@@ -16,6 +16,7 @@ type CliArguments =
   | Query_Stdin
   | [<Unique; AltCommandLine("-s")>] Salt of string
   | Access_Level of string
+  | Strict of bool
   | Json
 
   // Threshold values
@@ -43,6 +44,9 @@ type CliArguments =
       | Access_Level _ ->
         "Controls the access level to the data: 'publish_trusted' - protects against accidental re-identification; "
         + "'publish_untrusted' - protects against intentional re-identification; 'direct' - no anonymization."
+      | Strict _ ->
+        "Controls whether the anonymization parameters must be checked strictly, i.e. to ensure safe minimum level of "
+        + "anonymization. Defaults to `true`."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Outlier_Count _ ->
         "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -70,8 +74,7 @@ let failWithUsageInfo errorMsg =
 
 let toInterval =
   function
-  | Some (lower, upper) when lower <= upper -> { Lower = lower; Upper = upper }
-  | Some (lower, upper) -> failwith $"Invalid request: interval lower bound exceeds upper bound: (%i{lower}, %i{upper})"
+  | Some (lower, upper) -> { Lower = lower; Upper = upper }
   | _ -> Interval.Default
 
 let toNoise =
@@ -122,6 +125,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
     AccessLevel = parsedArgs.TryGetResult Access_Level |> toAccessLevel
+    Strict = parsedArgs.TryGetResult Strict |> Option.defaultValue true
     Suppression = suppression
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
