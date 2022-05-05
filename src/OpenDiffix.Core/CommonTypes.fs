@@ -408,6 +408,12 @@ module AnonymizationParams =
 
       if anonParams.LayerNoiseSD < 1.0 then
         failwith "LayerNoiseSD must be greater than or equal to 1.0"
+
+      if anonParams.OutlierCount.Upper - anonParams.OutlierCount.Lower < 1 then
+        failwith "OutlierCount bounds must differ by at least 1"
+
+      if anonParams.TopCount.Upper - anonParams.TopCount.Lower < 1 then
+        failwith "TopCount bounds must differ by at least 1"
     else
       if anonParams.Suppression.LowThreshold < 1 then
         failwith "Suppression.LowThreshold must be greater than or equal to 1"
