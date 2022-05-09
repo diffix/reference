@@ -7,8 +7,11 @@ let private mergeAllAggregatorsInto (targetBucket: Bucket) (sourceBucket: Bucket
   sourceBucket.Aggregators |> Array.iteri (fun i -> targetAggregators.[i].Merge)
 
 let private makeStarBucket aggregationContext anonymizationContext =
-  // Group labels are all '*'s
-  let group = Array.create aggregationContext.GroupingLabels.Length (String "*")
+  // Group labels: '*'s for text and NULL for other, so that this can potentially be delivered
+  // as a properly typed row in a SQL query result.
+  let group =
+    aggregationContext.GroupingLabels
+    |> Array.map (fun expr -> if Expression.typeOf expr = StringType then String "*" else Null)
 
   let aggregators =
     aggregationContext.Aggregators
