@@ -229,7 +229,12 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 
   let noise =
     byAidSum
-    |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD)
+    |> Seq.sortByDescending (fun aggregate -> aggregate.NoiseSD)
+    |> Seq.groupBy (fun aggregate -> aggregate.NoiseSD)
+    |> Seq.head
+    // For determinism, resolve draws using maximum absolute noise value.
+    |> snd
+    |> Seq.maxBy (fun aggregate -> Math.Abs(aggregate.Noise))
     |> (fun aggregate -> aggregate.Noise)
 
   flattening.FlattenedSum + noise
