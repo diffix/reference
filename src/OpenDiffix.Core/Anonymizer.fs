@@ -102,7 +102,9 @@ let inline private aidFlattening
   match compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount totalCount with
   | None -> None // not enough AIDVs for a sensible flattening
   | Some (outlierInterval, topInterval) ->
-    let sortedAidContributions = aidContributions |> Array.sortByDescending snd
+    let sortedAidContributions =
+      aidContributions
+      |> Array.sortByDescending (fun (aid, contribution) -> contribution, aid)
 
     let flatSeed =
       sortedAidContributions
