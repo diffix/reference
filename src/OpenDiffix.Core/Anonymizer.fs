@@ -217,27 +217,18 @@ let private countDistinctFlatteningByAid
 let private anonymizedSum (byAidSum: AidCount seq) =
   let flattening =
     byAidSum
-    |> Seq.sortByDescending (fun aggregate -> aggregate.Flattening)
-    |> Seq.groupBy (fun aggregate -> aggregate.Flattening)
-    |> Seq.head
     // We might end up with multiple different flattened sums that have the same amount of flattening.
     // This could be the result of some AID values being null for one of the AIDs, while there were still
     // overall enough AIDs to produce a flattened sum.
     // In these case we want to use the largest flattened sum to minimize unnecessary flattening.
-    |> snd
-    |> Seq.maxBy (fun aggregate -> aggregate.FlattenedSum)
+    |> Seq.maxBy (fun aggregate -> aggregate.Flattening, aggregate.FlattenedSum)
 
   let noise =
     byAidSum
-    |> Seq.sortByDescending (fun aggregate -> aggregate.NoiseSD)
-    |> Seq.groupBy (fun aggregate -> aggregate.NoiseSD)
-    |> Seq.head
     // For determinism, resolve draws using maximum absolute noise value.
-    |> snd
-    |> Seq.maxBy (fun aggregate -> Math.Abs(aggregate.Noise))
-    |> (fun aggregate -> aggregate.Noise)
+    |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD, Math.Abs(aggregate.Noise))
 
-  flattening.FlattenedSum + noise
+  flattening.FlattenedSum + noise.Noise
 
 // ----------------------------------------------------------------
 // Public API
