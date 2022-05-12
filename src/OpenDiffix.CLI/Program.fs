@@ -2,6 +2,7 @@
 
 open System
 open System.IO
+open System.Globalization
 open Argu
 open OpenDiffix.CLI
 open OpenDiffix.Core
@@ -206,6 +207,9 @@ let batchExecuteQueries (queriesPath: string) =
   JsonEncodersDecoders.encodeBatchRunResult time AssemblyInfo.version results
 
 let mainCore argv =
+  // Default to invariant culture regardless of system default.
+  CultureInfo.DefaultThreadCurrentCulture <- CultureInfo.InvariantCulture
+
   let parsedArguments =
     parser.ParseCommandLine(inputs = argv, raiseOnUsage = true, ignoreMissing = false, ignoreUnrecognized = false)
 
