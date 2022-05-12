@@ -514,11 +514,6 @@ module Plan =
   let explain (plan: Plan) = toString 0 plan
 
 module AggregationContext =
-  let private hasOnlyAidArgs args =
-    match args with
-    | [ ListExpr _ ] -> true
-    | _ -> false
-
   let private findSingleIndex cond arr =
     arr
     |> Array.indexed
@@ -532,10 +527,6 @@ module AggregationContext =
     | Some index -> index
     | None -> failwith "Cannot find required DiffixLowCount aggregator"
 
-  let diffixCountIndex (aggregationContext: AggregationContext) =
-    match findSingleIndex
-      // We're looking for `count(*)`;`hasOnlyAidArgs` ensures we don't find a `count(value)`.
-      (fun ((fn, _), args) -> fn = DiffixCount && hasOnlyAidArgs args)
-      aggregationContext.Aggregators with
-    | Some index -> index
-    | None -> failwith "Cannot find required DiffixCount aggregator"
+module Bucket =
+  let getAggregate index aggregationContext bucket =
+    bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)

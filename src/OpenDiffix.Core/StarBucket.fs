@@ -23,9 +23,6 @@ let private makeStarBucket aggregationContext anonymizationContext =
   starBucket |> Bucket.putAttribute BucketAttributes.IS_STAR_BUCKET (Boolean true)
   starBucket
 
-let private getBucketAggregate index aggregationContext bucket =
-  bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)
-
 let hook
   callback
   (aggregationContext: AggregationContext)
@@ -34,7 +31,6 @@ let hook
   =
   let starBucket = makeStarBucket aggregationContext anonymizationContext
   let lowCountIndex = AggregationContext.lowCountIndex aggregationContext
-  let diffixCountIndex = AggregationContext.diffixCountIndex aggregationContext
 
   let isInStarBucket bucket =
     let isAlreadyMerged =
@@ -52,17 +48,13 @@ let hook
 
   let isStarBucketLowCount =
     starBucket
-    |> getBucketAggregate lowCountIndex aggregationContext
+    |> Bucket.getAggregate lowCountIndex aggregationContext
     |> Value.unwrapBoolean
 
-  let suppressedAnonCount =
-    // NOTE: we can have a star bucket consisting of a single suppressed bucket,
-    // which won't be suppressed by itself (different noise seed). In such case,
-    // we must enforce the suppression manually.
-    if isStarBucketLowCount || bucketsInStarBucket < 2 then
-      Null
-    else
-      starBucket |> getBucketAggregate diffixCountIndex aggregationContext
+  // NOTE: we can have a star bucket consisting of a single suppressed bucket,
+  // which won't be suppressed by itself (different noise seed). In such case,
+  // we must enforce the suppression manually.
+  if not isStarBucketLowCount && bucketsInStarBucket >= 2 then
+    callback aggregationContext starBucket
 
-  callback suppressedAnonCount
   buckets

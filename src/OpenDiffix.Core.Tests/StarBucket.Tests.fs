@@ -32,7 +32,9 @@ let query =
 [<Fact>]
 let ``Counts all suppressed buckets`` () =
   let mutable suppressedAnonCount = Null
-  let pullHookResultsCallback results = suppressedAnonCount <- results
+
+  let pullHookResultsCallback aggCtx bucket =
+    suppressedAnonCount <- Bucket.getAggregate 0 aggCtx bucket
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csv query
   |> ignore
@@ -42,26 +44,11 @@ let ``Counts all suppressed buckets`` () =
 [<Fact>]
 let ``Counts all suppressed buckets, but suppresses the star bucket`` () =
   let mutable suppressedAnonCount = Null
-  let pullHookResultsCallback results = suppressedAnonCount <- results
+
+  let pullHookResultsCallback aggCtx bucket =
+    suppressedAnonCount <- Bucket.getAggregate 0 aggCtx bucket
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csvSuppressedStarBucket query
   |> ignore
 
   suppressedAnonCount |> should equal Null
-
-[<Fact>]
-let ``Works together with count(value) aggregators`` () =
-  let query =
-    """
-    SELECT letter, diffix_count(*, RowIndex), diffix_low_count(RowIndex), diffix_count(letter, RowIndex)
-    FROM table
-    GROUP BY 1
-    """
-
-  let mutable suppressedAnonCount = Null
-  let pullHookResultsCallback results = suppressedAnonCount <- results
-
-  HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csv query
-  |> ignore
-
-  suppressedAnonCount |> should equal (Integer 3L)

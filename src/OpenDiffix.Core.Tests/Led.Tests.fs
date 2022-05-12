@@ -106,7 +106,10 @@ let ``Does not merge if the victim cannot be singled out`` () =
 let ``Merges taking precedence before star bucket hook`` () =
   // We get a hold of the star bucket results reference via side effects.
   let mutable suppressedAnonCount = Null
-  let pullHookResultsCallback results = suppressedAnonCount <- results
+
+  let pullHookResultsCallback aggCtx bucket =
+    suppressedAnonCount <- Bucket.getAggregate 0 aggCtx bucket
+
   let starBucketHook = StarBucket.hook pullHookResultsCallback
 
   let rows (result: QueryEngine.QueryResult) = result.Rows
