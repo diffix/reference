@@ -526,7 +526,3 @@ module AggregationContext =
     match findSingleIndex (fun ((fn, _), _) -> fn = DiffixLowCount) aggregationContext.Aggregators with
     | Some index -> index
     | None -> failwith "Cannot find required DiffixLowCount aggregator"
-
-module Bucket =
-  let finalizeAggregate index aggregationContext bucket =
-    bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)
