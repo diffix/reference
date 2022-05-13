@@ -22,3 +22,6 @@ let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
 let isLowCount lowCountIndex bucket aggregationContext =
   bucket.Aggregators.[lowCountIndex].Final(aggregationContext, bucket.AnonymizationContext)
   |> Value.unwrapBoolean
+
+let finalizeAggregate index aggregationContext bucket =
+  bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)
