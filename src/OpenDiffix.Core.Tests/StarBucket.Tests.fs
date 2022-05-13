@@ -34,7 +34,7 @@ let ``Counts all suppressed buckets`` () =
   let mutable suppressedAnonCount = Null
 
   let pullHookResultsCallback aggCtx bucket =
-    suppressedAnonCount <- Bucket.getAggregate 0 aggCtx bucket
+    suppressedAnonCount <- Bucket.finalizeAggregate 0 aggCtx bucket
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csv query
   |> ignore
@@ -46,7 +46,7 @@ let ``Counts all suppressed buckets, but suppresses the star bucket`` () =
   let mutable suppressedAnonCount = Null
 
   let pullHookResultsCallback aggCtx bucket =
-    suppressedAnonCount <- Bucket.getAggregate 0 aggCtx bucket
+    suppressedAnonCount <- Bucket.finalizeAggregate 0 aggCtx bucket
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csvSuppressedStarBucket query
   |> ignore

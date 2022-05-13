@@ -528,5 +528,5 @@ module AggregationContext =
     | None -> failwith "Cannot find required DiffixLowCount aggregator"
 
 module Bucket =
-  let getAggregate index aggregationContext bucket =
+  let finalizeAggregate index aggregationContext bucket =
     bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)

@@ -48,7 +48,7 @@ let hook
 
   let isStarBucketLowCount =
     starBucket
-    |> Bucket.getAggregate lowCountIndex aggregationContext
+    |> Bucket.finalizeAggregate lowCountIndex aggregationContext
     |> Value.unwrapBoolean
 
   // NOTE: we can have a star bucket consisting of a single suppressed bucket,
