@@ -483,6 +483,10 @@ type Tests(db: DBFixture) =
     assertSqlSeed "SELECT cast(amount AS integer) FROM purchases" [ "round,purchases.amount,1" ]
 
   [<Fact>]
+  let ``SQL seed from non-rounding cast`` () =
+    assertSqlSeed "SELECT cast(city AS integer) FROM customers" [ "customers.city" ]
+
+  [<Fact>]
   let ``Default SQL seed from non-anonymizing rounding cast`` () =
     assertNoAnonContext "SELECT cast(price AS integer) FROM products"
 
