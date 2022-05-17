@@ -70,11 +70,16 @@ type Tests(db: DBFixture) =
   let ``query 4`` () =
     let expected =
       {
-        Columns = [ { Name = "city"; Type = StringType }; { Name = "count"; Type = IntegerType } ]
-        Rows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+        Columns =
+          [
+            { Name = "city"; Type = StringType }
+            { Name = "count"; Type = IntegerType }
+            { Name = "sum"; Type = RealType }
+          ]
+        Rows = [ [| String "Berlin"; Integer 10L; Integer 320L |]; [| String "Rome"; Integer 10L; Integer 300L |] ]
       }
 
-    let queryResult = runQuery "SELECT city, count(distinct id) FROM customers_small GROUP BY city"
+    let queryResult = runQuery "SELECT city, count(distinct id), sum(age) FROM customers_small GROUP BY city"
     queryResult |> should equal expected
 
   [<Fact>]

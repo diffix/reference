@@ -94,7 +94,7 @@ type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float
 let inline private aidFlattening
   (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
-  (unaccountedFor: int64)
+  (unaccountedFor: float)
   (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
   let totalCount = aidContributions.Length
@@ -129,7 +129,7 @@ let inline private aidFlattening
 
     let summedContributions = aidContributions |> Array.sumBy snd
     let flattening = float outliersSummed - outlierReplacement
-    let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
+    let flattenedUnaccountedFor = unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
     let flattenedAvg = flattenedSum / float totalCount
 
@@ -213,7 +213,7 @@ let private countDistinctFlatteningByAid
   |> Seq.countBy fst
   |> Seq.map (fun (aid, count) -> aid, int64 count)
   |> Seq.toArray
-  |> aidFlattening anonParams anonContext 0L
+  |> aidFlattening anonParams anonContext 0.0
 
 // Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
@@ -259,9 +259,9 @@ let isLowCount (anonParams: AnonymizationParams) (anonContext: AnonymizationCont
   |> Seq.reduce (||)
 
 [<RequireQualifiedAccess>]
-type CountResult =
+type CountResult<'okType> =
   | NotEnoughAIDVs
-  | Ok of int64
+  | Ok of 'okType
 
 let countDistinct
   (anonParams: AnonymizationParams)
@@ -298,7 +298,17 @@ let countDistinct
     |> anonymizedSum
     |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> CountResult.Ok)
 
-type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
+type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
+
+type SumState =
+  {
+    Positive: AidCountState array
+    Negative: AidCountState array
+    mutable IsReal: bool
+  }
+
+let private arrayFromDict (d: Dictionary<'a, 'b>) =
+  d |> Seq.map (fun pair -> pair.Key, pair.Value) |> Seq.toArray
 
 let count
   (anonParams: AnonymizationParams)
@@ -309,8 +319,7 @@ let count
     perAidContributions
     |> Array.map (fun aidState ->
       aidState.AidContributions
-      |> Seq.map (fun pair -> pair.Key, pair.Value)
-      |> Seq.toArray
+      |> arrayFromDict
       |> aidFlattening anonParams anonContext aidState.UnaccountedFor
     )
 
@@ -323,3 +332,47 @@ let count
     |> Array.choose id
     |> anonymizedSum
     |> (Math.roundAwayFromZero >> int64 >> CountResult.Ok)
+
+let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) =
+  let byAidPositive =
+    perAidContributions.Positive
+    |> Array.map (fun aidState ->
+      aidState.AidContributions
+      |> arrayFromDict
+      |> aidFlattening anonParams anonContext aidState.UnaccountedFor
+    )
+
+  let byAidNegative =
+    perAidContributions.Negative
+    |> Array.map (fun aidState ->
+      aidState.AidContributions
+      |> arrayFromDict
+      |> aidFlattening anonParams anonContext aidState.UnaccountedFor
+    )
+
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // for both positive and negative values, we have to abort anonymization.
+  if (Array.zip byAidPositive byAidNegative) |> Array.exists ((=) (None, None)) then
+    CountResult.NotEnoughAIDVs
+  else
+    // Using `anonymizedSum` separately for positive and negative, we ensure that we pick the appropriate
+    // amount of flattening and noise for each leg, and only later combine the results.
+    let positive =
+      byAidPositive
+      |> Array.choose id
+      |> function
+        | [||] -> 0.0
+        | nonEmpty -> anonymizedSum nonEmpty
+
+    let negative =
+      byAidNegative
+      |> Array.choose id
+      |> function
+        | [||] -> 0.0
+        | nonEmpty -> anonymizedSum nonEmpty
+
+    if perAidContributions.IsReal then
+      (positive - negative) |> (Real >> CountResult.Ok)
+    else
+      (positive - negative)
+      |> (Math.roundAwayFromZero >> int64 >> Integer >> CountResult.Ok)

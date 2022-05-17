@@ -67,6 +67,7 @@ let typeOfAggregate fn args =
   | DiffixCount -> IntegerType
   | DiffixLowCount -> BooleanType
   | Sum -> RealType
+  | DiffixSum -> RealType
 
 /// Resolves the type of an expression.
 let rec typeOf expression =

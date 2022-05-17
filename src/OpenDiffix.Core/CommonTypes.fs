@@ -80,6 +80,7 @@ type AggregateFunction =
   | DiffixCount
   | DiffixLowCount
   | Sum
+  | DiffixSum
 
 type AggregateOptions =
   {
@@ -319,6 +320,7 @@ module Function =
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
     | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
+    | "diffix_sum" -> AggregateFunction(DiffixSum, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply

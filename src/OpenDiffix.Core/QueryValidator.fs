@@ -25,13 +25,14 @@ let private validateSingleLowCount query =
   if List.length lowCountAggregators > 1 then
     failwith "A single low count aggregator is allowed in a query."
 
-let private validateOnlyCount query =
+let private validateAllowedAggregates query =
   query
   |> visitAggregates (
     function
     | FunctionExpr (AggregateFunction (Count, _), _) -> ()
+    | FunctionExpr (AggregateFunction (Sum, _), _) -> ()
     | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
-      failwith "Only count aggregates are supported in anonymizing queries."
+      failwith "Only count and sum aggregates are supported in anonymizing queries."
     | _ -> ()
   )
 
@@ -44,6 +45,17 @@ let private allowedCountUsage query =
       | []
       | [ ColumnReference _ ] -> ()
       | _ -> failwith "Only count(*), count(column) and count(distinct column) are supported in anonymizing queries."
+    | _ -> ()
+  )
+
+let private allowedSumUsage query =
+  query
+  |> visitAggregates (
+    function
+    | FunctionExpr (AggregateFunction (Sum, { Distinct = distinct }), args) ->
+      match distinct, args with
+      | false, [ ColumnReference _ ] -> ()
+      | _ -> failwith "Only sum(column) is supported in anonymizing queries."
     | _ -> ()
   )
 
@@ -81,8 +93,9 @@ let private validateGeneralization accessLevel expression =
 let validateDirectQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
 
 let validateAnonymizingQuery (selectQuery: SelectQuery) =
-  validateOnlyCount selectQuery
+  validateAllowedAggregates selectQuery
   allowedCountUsage selectQuery
+  allowedSumUsage selectQuery
   validateNoWhere selectQuery
   validateSelectTarget selectQuery
 

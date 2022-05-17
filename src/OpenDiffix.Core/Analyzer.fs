@@ -55,6 +55,15 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
      let aids = parsedAids |> List.map (mapExpression rangeColumns) |> ListExpr
      AggregateFunction(DiffixCount, aggregateArgs), aids :: args
+   | AggregateFunction (DiffixSum, aggregateArgs), parsedArg :: parsedAids ->
+     let aggregateArgs, args =
+       match parsedArg with
+       | ParserTypes.Distinct parsedExpr ->
+         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+
+     let aids = parsedAids |> List.map (mapExpression rangeColumns) |> ListExpr
+     AggregateFunction(DiffixSum, aggregateArgs), aids :: args
    | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
      let arg = mapExpression rangeColumns expr
      AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
