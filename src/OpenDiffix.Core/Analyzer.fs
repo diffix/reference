@@ -366,7 +366,9 @@ let private compileQuery anonParams (query: SelectQuery) =
 
 let rec private normalizeBucketLabelExpression expression =
   match expression with
-  | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) ->
+  | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) when
+    Expression.typeOf expression = RealType
+    ->
     FunctionExpr(ScalarFunction RoundBy, [ normalizeBucketLabelExpression expression; 1.0 |> Real |> Constant ])
   | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketLabelExpression expression
   | FunctionExpr (ScalarFunction fn, args) ->
