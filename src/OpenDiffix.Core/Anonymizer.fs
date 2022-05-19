@@ -4,14 +4,15 @@ open System
 open System.Security.Cryptography
 
 [<RequireQualifiedAccess>]
-type AnonymizedResult<'okType> =
+type AnonymizedResult<'T> =
   | NotEnoughAIDVs
-  | Ok of 'okType
+  | Ok of 'T
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
 
 type SumState =
   {
+    // Both `Positive` and `Negative` include 0.0 contributions by design, but for simplicity we call it like this.
     Positive: AidCountState array
     Negative: AidCountState array
     mutable IsReal: bool

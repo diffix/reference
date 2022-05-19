@@ -303,23 +303,19 @@ type private DiffixSum() =
   let increaseUnaccountedFor valueIncrease i =
     let absValueIncrease = abs (valueIncrease)
 
-    if valueIncrease > 0.0 then
+    if valueIncrease >= 0.0 then
       state.Positive.[i].UnaccountedFor <- state.Positive.[i].UnaccountedFor + absValueIncrease
-    else if valueIncrease < 0.0 then
-      state.Negative.[i].UnaccountedFor <- state.Negative.[i].UnaccountedFor + absValueIncrease
-    else
-      state.Positive.[i].UnaccountedFor <- state.Positive.[i].UnaccountedFor + absValueIncrease
+
+    if valueIncrease <= 0.0 then
       state.Negative.[i].UnaccountedFor <- state.Negative.[i].UnaccountedFor + absValueIncrease
 
   let increaseSumContribution valueIncrease aidValue i =
     let absValueIncrease = abs (valueIncrease)
 
-    if valueIncrease > 0.0 then
+    if valueIncrease >= 0.0 then
       increaseContribution absValueIncrease aidValue state.Positive.[i].AidContributions
-    else if valueIncrease < 0.0 then
-      increaseContribution absValueIncrease aidValue state.Negative.[i].AidContributions
-    else
-      increaseContribution absValueIncrease aidValue state.Positive.[i].AidContributions
+
+    if valueIncrease <= 0.0 then
       increaseContribution absValueIncrease aidValue state.Negative.[i].AidContributions
 
 
@@ -356,8 +352,8 @@ type private DiffixSum() =
     member this.Transition args =
       match args with
       | Value.List [] :: _ -> invalidArgs args
-      // Note that we're completely ignoring `Null`, contrary to `count(col)` where it contributed 0.
-      | [ aidInstances; Null ] -> ()
+      // Note that we're completely ignoring `Null`, contrary to `count(col)` where it contributes 0.
+      | [ _; Null ] -> ()
       | [ aidInstances; Integer value ] -> updateAidMaps aidInstances (float value)
       | [ aidInstances; Real value ] ->
         updateAidMaps aidInstances value

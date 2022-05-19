@@ -68,27 +68,27 @@ let ``anon count distinct column`` () =
 
 [<Fact>]
 let ``anon count()`` () =
-  // - replacing outlier 6, with top 5 --> flattened by 1
-  // - noise proportional to top group average of 5
+  // replacing outlier 6, with top 5 --> flattened by 1
+  // noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList ]
   |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count(col)`` () =
-  // - 1 user with Null string is ignored
-  // - replacing outlier 6 with top 5
-  // - noise proportional to top group average of 5
+  // 1 user with Null string is ignored
+  // replacing outlier 6 with top 5
+  // noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
   |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon sum(real col)`` () =
-  // - 1 user with Null real is ignored
-  // - replacing positive outlier 10.0 with 4.0
-  // - replacing negative outlier 3x -0.01 with 2x -0.01
-  // - end up with 4.0 + 4.0 + 4.0 + 0.7 - 0.02 - 0.02
+  // 1 user with Null real is ignored
+  // replacing positive outlier 10.0 with 4.0
+  // replacing negative outlier 3x -0.01 with 2x -0.01
+  // end up with 4.0 + 4.0 + 4.0 + 0.7 - 0.02 - 0.02
   rows
   |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
   |> function
