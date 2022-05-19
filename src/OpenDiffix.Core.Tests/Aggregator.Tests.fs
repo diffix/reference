@@ -49,16 +49,18 @@ let makeStandardArgs hasValueArg random length =
 /// Verifies that merging 2 separately aggregated sequences is equivalent
 /// to a single aggregation of those 2 sequences concatenated.
 let ensureConsistentMerging ctx fn sourceArgs destinationArgs =
-  let sourceAggregator = Aggregator.create fn
+  let DUMMY_ARGS = []
+
+  let sourceAggregator = Aggregator.create (fn, DUMMY_ARGS)
   sourceArgs |> List.iter sourceAggregator.Transition
 
-  let destinationAggregator = Aggregator.create fn
+  let destinationAggregator = Aggregator.create (fn, DUMMY_ARGS)
   destinationArgs |> List.iter destinationAggregator.Transition
 
   destinationAggregator.Merge sourceAggregator
   let mergedFinal = destinationAggregator.Final ctx
 
-  let replayedAggregator = Aggregator.create fn
+  let replayedAggregator = Aggregator.create (fn, DUMMY_ARGS)
   (destinationArgs @ sourceArgs) |> List.iter replayedAggregator.Transition
   let replayedFinal = replayedAggregator.Final ctx
 

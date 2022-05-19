@@ -300,7 +300,7 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixLowCount -> true
   | _ -> false
 
-let create (aggSpec: AggregatorSpec) : T =
+let create ((aggSpec, args): AggregatorSpec * AggregatorArgs) : T =
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
