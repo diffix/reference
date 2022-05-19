@@ -26,7 +26,7 @@ let buildRealSequence (random: System.Random) =
 
 /// Builds a list of given length with aggregator transitions.
 /// Each transition contains AID instances as the first argument
-/// and an optional random integer as the second argument.
+/// and an optional random integer (as `Real`) as the second argument.
 let makeAnonArgs hasValueArg random numAids length =
   (if hasValueArg then
      // Generates a sequence of [ Value.List [aid1, aid2, ...]; Value.Integer int ]
@@ -53,16 +53,18 @@ let makeStandardArgs hasValueArg random length =
 /// Verifies that merging 2 separately aggregated sequences is equivalent
 /// to a single aggregation of those 2 sequences concatenated.
 let ensureConsistentMerging ctx fn sourceArgs destinationArgs =
-  let sourceAggregator = Aggregator.create fn
+  let DUMMY_ARGS = [ ListExpr [ ColumnReference(0, IntegerType) ]; ColumnReference(1, RealType) ]
+
+  let sourceAggregator = Aggregator.create (fn, DUMMY_ARGS)
   sourceArgs |> List.iter sourceAggregator.Transition
 
-  let destinationAggregator = Aggregator.create fn
+  let destinationAggregator = Aggregator.create (fn, DUMMY_ARGS)
   destinationArgs |> List.iter destinationAggregator.Transition
 
   destinationAggregator.Merge sourceAggregator
   let mergedFinal = destinationAggregator.Final ctx
 
-  let replayedAggregator = Aggregator.create fn
+  let replayedAggregator = Aggregator.create (fn, DUMMY_ARGS)
   (destinationArgs @ sourceArgs) |> List.iter replayedAggregator.Transition
   let replayedFinal = replayedAggregator.Final ctx
 

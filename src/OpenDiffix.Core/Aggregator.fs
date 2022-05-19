@@ -288,8 +288,8 @@ type private DiffixLowCount() =
       else
         Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
 
-type private DiffixSum() =
-  let nullState: Anonymizer.SumState = { Positive = null; Negative = null; IsReal = false }
+type private DiffixSum(summandType) =
+  let nullState: Anonymizer.SumState = { Positive = null; Negative = null }
   let mutable state = nullState
 
   let initialState length : Anonymizer.SumState =
@@ -355,9 +355,7 @@ type private DiffixSum() =
       // Note that we're completely ignoring `Null`, contrary to `count(col)` where it contributes 0.
       | [ _; Null ] -> ()
       | [ aidInstances; Integer value ] -> updateAidMaps aidInstances (float value)
-      | [ aidInstances; Real value ] ->
-        updateAidMaps aidInstances value
-        state.IsReal <- true
+      | [ aidInstances; Real value ] -> updateAidMaps aidInstances value
       | _ -> invalidArgs args
 
     member this.Merge aggregator =
@@ -381,7 +379,6 @@ type private DiffixSum() =
 
         mergeStateLeg state.Positive otherState.Positive
         mergeStateLeg state.Negative otherState.Negative
-        state.IsReal <- state.IsReal || otherState.IsReal
 
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
@@ -389,7 +386,9 @@ type private DiffixSum() =
       if state = nullState then
         Null
       else
-        match Anonymizer.sum aggContext.AnonymizationParams anonContext state with
+        let isReal = summandType = RealType
+
+        match Anonymizer.sum aggContext.AnonymizationParams anonContext state isReal with
         | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
         | Anonymizer.AnonymizedResult.Ok value -> value
 
@@ -406,7 +405,9 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixSum -> true
   | _ -> false
 
-let create (aggSpec: AggregatorSpec) : T =
+let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
+  let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
+
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
@@ -414,5 +415,5 @@ let create (aggSpec: AggregatorSpec) : T =
   | DiffixCount, { Distinct = false } -> DiffixCount() :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct() :> T
   | DiffixLowCount, _ -> DiffixLowCount() :> T
-  | DiffixSum, { Distinct = false } -> DiffixSum() :> T
+  | DiffixSum, { Distinct = false } -> DiffixSum(aggType) :> T
   | _ -> failwith "Invalid aggregator"

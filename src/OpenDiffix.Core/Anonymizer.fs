@@ -15,7 +15,6 @@ type SumState =
     // Both `Positive` and `Negative` include 0.0 contributions by design, but for simplicity we call it like this.
     Positive: AidCountState array
     Negative: AidCountState array
-    mutable IsReal: bool
   }
 
 // ----------------------------------------------------------------
@@ -339,7 +338,7 @@ let count
     |> anonymizedSum
     |> (Math.roundAwayFromZero >> int64 >> AnonymizedResult.Ok)
 
-let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) =
+let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) isReal =
   let byAidPositive = mapAidFlattening anonParams anonContext perAidContributions.Positive
   let byAidNegative = mapAidFlattening anonParams anonContext perAidContributions.Negative
 
@@ -359,7 +358,7 @@ let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (p
     let positive = anonymizedSumOnNonEmpty byAidPositive
     let negative = anonymizedSumOnNonEmpty byAidNegative
 
-    if perAidContributions.IsReal then
+    if isReal then
       (positive - negative) |> (Real >> AnonymizedResult.Ok)
     else
       (positive - negative)
