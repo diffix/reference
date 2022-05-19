@@ -184,8 +184,8 @@ type private DiffixCount() =
         Integer minCount
       else
         match Anonymizer.count aggContext.AnonymizationParams anonContext state with
-        | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
+        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
 
 type private DiffixCountDistinct() =
   let mutable aidsCount = Option<int>.None
@@ -245,8 +245,8 @@ type private DiffixCountDistinct() =
         Integer minCount
       else
         match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount.Value aidsPerValue with
-        | Anonymizer.CountResult.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.CountResult.Ok value -> Integer(max value minCount)
+        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
 
 type private DiffixLowCount() =
   let mutable state: HashSet<AidHash> [] = null
@@ -394,8 +394,8 @@ type private DiffixSum() =
         Null
       else
         match Anonymizer.sum aggContext.AnonymizationParams anonContext state with
-        | Anonymizer.CountResult.NotEnoughAIDVs -> Null
-        | Anonymizer.CountResult.Ok value -> value
+        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+        | Anonymizer.AnonymizedResult.Ok value -> value
 
 // ----------------------------------------------------------------
 // Public API
