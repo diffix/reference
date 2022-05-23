@@ -60,10 +60,10 @@ let private invokeHooks aggregationContext anonymizationContext hooks buckets =
 let private executeAggregate queryContext (childPlan, groupingLabels, aggregators, anonymizationContext) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
   let aggregators = Utils.unpackAggregators aggregators
-  let aggSpecs, aggArgs = Array.unzip aggregators
+  let _aggSpecs, aggArgs = Array.unzip aggregators
 
   let makeBucket group anonymizationContext =
-    Bucket.make group (aggSpecs |> Array.map Aggregator.create) anonymizationContext
+    Bucket.make group (aggregators |> Array.map Aggregator.create) anonymizationContext
 
   let state = Dictionary<Row, Bucket>(Row.equalityComparer)
 

@@ -7,22 +7,27 @@ open CommonTypes
 
 let companies i =
   let names = [ "Alpha"; "Beta"; "Gamma"; "Delta" ]
-  names |> List.item (i % names.Length)
+  names |> List.item (i % names.Length) |> String
+
+let reals i =
+  let reals = [ 0.1; 0.0; 1.0; -0.01 ]
+  reals |> List.item (i % reals.Length) |> Real
 
 let rows =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
-  |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id |> String |])
+  |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id; reals id |])
   |> List.append [
-       [| Null; String "value"; String "Alpha" |]
-       [| Integer 8L; Null; String "Alpha" |]
-       [| Integer 9L; String "value"; Null |]
+       [| Null; String "value"; String "Alpha"; Real -100.0 |]
+       [| Integer 8L; Null; String "Alpha"; Null |]
+       [| Integer 9L; String "value"; Null; Real 10.0 |]
      ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let aidColumnList = ListExpr [ aidColumn ]
 let strColumn = ColumnReference(1, StringType)
 let companyColumn = ColumnReference(2, StringType)
+let realColumn = ColumnReference(3, RealType)
 let allAidColumns = ListExpr [ aidColumn; companyColumn ]
 
 let anonParams =
@@ -45,6 +50,7 @@ let evaluateAggregator fn args =
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
 let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
 let diffixLowCount = DiffixLowCount, AggregateOptions.Default
+let diffixSum = DiffixSum, { AggregateOptions.Default with Distinct = false }
 
 [<Fact>]
 let ``anon count distinct column`` () =
@@ -62,20 +68,39 @@ let ``anon count distinct column`` () =
 
 [<Fact>]
 let ``anon count()`` () =
-  // - replacing outlier 6, with top 5 --> flattened by 1
-  // - noise proportional to top group average of 5
+  // replacing outlier 6, with top 5 --> flattened by 1
+  // noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList ]
   |> should equal (Integer 30L)
 
 [<Fact>]
 let ``anon count(col)`` () =
-  // - 1 user with Null string is ignored
-  // - replacing outlier 6 with top 5
-  // - noise proportional to top group average of 5
+  // 1 user with Null string is ignored
+  // replacing outlier 6 with top 5
+  // noise proportional to top group average of 5
   rows
   |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
   |> should equal (Integer 30L)
+
+[<Fact>]
+let ``anon sum(real col)`` () =
+  // 1 user with Null real is ignored
+  // replacing positive outlier 10.0 with 4.0
+  // replacing negative outlier 3x -0.01 with 2x -0.01
+  // end up with 4.0 + 4.0 + 4.0 + 0.7 - 0.02 - 0.02
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
+  |> function
+    | Real value -> value
+    | _ -> failwith "Unexpected aggregator result"
+  |> should (equalWithin 1e-10) 12.66
+
+[<Fact>]
+let ``anon sum(int col)`` () =
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; aidColumn ]
+  |> should equal (Integer 127L)
 
 [<Fact>]
 let ``anon count returns 0 if insufficient users`` () =
@@ -98,12 +123,50 @@ let ``anon count returns 0 for Null inputs`` () =
   |> should equal (Integer 0L)
 
 [<Fact>]
+let ``anon sum returns Null for Null inputs`` () =
+  let rows = [ 1L .. 10L ] |> List.map (fun i -> [| Integer i; Null; Null; Null |])
+
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
+  |> should equal Null
+
+[<Fact>]
 let ``anon count returns 0 when all AIDs null`` () =
   let rows = [ 1L .. 10L ] |> List.map (fun _ -> [| Null; String "value"; Null |])
 
   rows
   |> evaluateAggregator diffixCount [ allAidColumns; strColumn ]
   |> should equal (Integer 0L)
+
+[<Fact>]
+let ``anon sum returns null when all AIDs null`` () =
+  let rows = [ 1L .. 10L ] |> List.map (fun _ -> [| Null; Null; Null; Real 10.0 |])
+
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
+  |> should equal Null
+
+[<Fact>]
+let ``anon sum accepts 0.0 as contributions for both positive and negative`` () =
+  let rows =
+    [ 1L .. 10L ]
+    |> List.map (fun i -> [| Integer i; Null; Null; Real 0.0 |])
+    |> List.append ([ [| Integer 11L; Null; Null; Real -10.0 |]; [| Integer 12L; Null; Null; Real 10.0 |] ])
+
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
+  |> should equal (Real 0.0)
+
+[<Fact>]
+let ``anon sum ignores nulls completely, flattening included`` () =
+  let rows =
+    [ 1L .. 10L ]
+    |> List.map (fun i -> [| Integer i; Null; Null; Null |])
+    |> List.append ([ [| Integer 11L; Null; Null; Real -10.0 |]; [| Integer 12L; Null; Null; Real 10.0 |] ])
+
+  rows
+  |> evaluateAggregator diffixSum [ aidColumnList; realColumn ]
+  |> should equal Null
 
 [<Fact>]
 let ``multi-AID count`` () =

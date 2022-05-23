@@ -13,10 +13,7 @@ let private makeStarBucket aggregationContext anonymizationContext =
     aggregationContext.GroupingLabels
     |> Array.map (fun expr -> if Expression.typeOf expr = StringType then String "*" else Null)
 
-  let aggregators =
-    aggregationContext.Aggregators
-    |> Seq.map (fst >> Aggregator.create)
-    |> Seq.toArray
+  let aggregators = aggregationContext.Aggregators |> Seq.map Aggregator.create |> Seq.toArray
 
   let starBucket = Bucket.make group aggregators (Some anonymizationContext)
   // Not currently used, but may be in the future.
