@@ -124,14 +124,8 @@ type private DiffixCount() =
 
       match aidValue with
       // No AIDs, add to unaccounted value
-      | Null
-      | Value.List [] -> aidState.UnaccountedFor <- aidState.UnaccountedFor + valueIncrease
-      // List of AIDs, distribute contribution evenly
-      | Value.List aidValues ->
-        let partialIncrease = (float valueIncrease) / (aidValues |> List.length |> float)
-
-        aidValues
-        |> List.iter (fun aidValue -> increaseContribution partialIncrease aidValue aidContributions)
+      | Null -> aidState.UnaccountedFor <- aidState.UnaccountedFor + valueIncrease
+      | Value.List _ -> failwith "Lists of AIDs and distributing of contributions are not supported."
       // Single AID, add to its contribution
       | aidValue -> increaseContribution (float valueIncrease) aidValue aidContributions
     )
@@ -212,9 +206,8 @@ type private DiffixCountDistinct() =
         aidInstances
         |> List.iteri (fun i aidValue ->
           match aidValue with
-          | Null
-          | Value.List [] -> ()
-          | Value.List aidValues -> aidSets.[i].UnionWith(hashAidList aidValues)
+          | Null -> ()
+          | Value.List _ -> failwith "Lists of AIDs and distributing of contributions are not supported."
           | aidValue -> aidSets.[i].Add(hashAid aidValue) |> ignore
         )
       | _ -> invalidArgs args
@@ -263,9 +256,8 @@ type private DiffixLowCount() =
         aidInstances
         |> List.iteri (fun i aidValue ->
           match aidValue with
-          | Null
-          | Value.List [] -> ()
-          | Value.List aidValues -> state.[i].UnionWith(hashAidList aidValues)
+          | Null -> ()
+          | Value.List _ -> failwith "Lists of AIDs and distributing of contributions are not supported."
           | aidValue -> state.[i].Add(hashAid aidValue) |> ignore
         )
 
@@ -325,14 +317,8 @@ type private DiffixSum(summandType) =
     |> List.iteri (fun i aidValue ->
       match aidValue with
       // No AIDs, add to unaccounted value
-      | Null
-      | Value.List [] -> increaseUnaccountedFor valueIncrease i
-      // List of AIDs, distribute contribution evenly
-      | Value.List aidValues ->
-        let partialIncrease = valueIncrease / (aidValues |> List.length |> float)
-
-        aidValues
-        |> List.iter (fun aidValue -> increaseSumContribution partialIncrease aidValue i)
+      | Null -> increaseUnaccountedFor valueIncrease i
+      | Value.List _ -> failwith "Lists of AIDs and distributing of contributions are not supported."
       // Single AID, add to its contribution
       | aidValue -> increaseSumContribution valueIncrease aidValue i
     )
