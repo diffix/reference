@@ -281,12 +281,10 @@ type private DiffixLowCount() =
           otherState |> mergeHashSetsInto state
 
     member this.Final(aggContext, anonContext) =
-      let anonContext = unwrapAnonContext anonContext
-
       if isNull state then
         Boolean true
       else
-        Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
+        Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams state)
 
 // ----------------------------------------------------------------
 // Public API
