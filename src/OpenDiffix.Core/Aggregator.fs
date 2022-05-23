@@ -303,10 +303,10 @@ type private DiffixSum(summandType) =
   let increaseUnaccountedFor valueIncrease i =
     let absValueIncrease = abs (valueIncrease)
 
-    if valueIncrease >= 0.0 then
+    if valueIncrease > 0.0 then
       state.Positive.[i].UnaccountedFor <- state.Positive.[i].UnaccountedFor + absValueIncrease
 
-    if valueIncrease <= 0.0 then
+    if valueIncrease < 0.0 then
       state.Negative.[i].UnaccountedFor <- state.Negative.[i].UnaccountedFor + absValueIncrease
 
   let increaseSumContribution valueIncrease aidValue i =
@@ -347,6 +347,7 @@ type private DiffixSum(summandType) =
     | _ -> failwith "Expecting a list as input"
 
   member this.State = state
+  member this.SummandType = summandType
 
   interface IAggregator with
     member this.Transition args =
@@ -360,6 +361,9 @@ type private DiffixSum(summandType) =
 
     member this.Merge aggregator =
       let otherState = (castAggregator<DiffixSum> aggregator).State
+
+      if summandType <> (castAggregator<DiffixSum> aggregator).SummandType then
+        failwith "Cannot merge incompatible aggregators."
 
       if otherState <> nullState then
         if state = nullState then state <- initialState otherState.Positive.Length
@@ -406,8 +410,6 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | _ -> false
 
 let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
-  let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
-
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
@@ -415,5 +417,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | DiffixCount, { Distinct = false } -> DiffixCount() :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct() :> T
   | DiffixLowCount, _ -> DiffixLowCount() :> T
-  | DiffixSum, { Distinct = false } -> DiffixSum(aggType) :> T
+  | DiffixSum, { Distinct = false } ->
+    let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
+    DiffixSum(aggType) :> T
   | _ -> failwith "Invalid aggregator"
