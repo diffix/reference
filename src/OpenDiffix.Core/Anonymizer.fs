@@ -262,14 +262,14 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 // ----------------------------------------------------------------
 
 /// Returns whether any of the AID value sets has a low count.
-let isLowCount (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (aidSets: HashSet<AidHash> seq) =
+let isLowCount (anonParams: AnonymizationParams) (aidSets: HashSet<AidHash> seq) =
   aidSets
   |> Seq.map (fun aidSet ->
     if aidSet.Count < anonParams.Suppression.LowThreshold then
       true
     else
       let thresholdNoise =
-        [ anonContext.BucketSeed; seedFromAidSet aidSet ]
+        [ seedFromAidSet aidSet ]
         |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
 
       // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
@@ -294,7 +294,7 @@ let countDistinct
   let lowCountValues, highCountValues =
     aidsPerValue
     |> Seq.toArray
-    |> Array.partition (fun pair -> isLowCount anonParams anonContext pair.Value)
+    |> Array.partition (fun pair -> isLowCount anonParams pair.Value)
 
   let sortedLowCountValues = sortByValue lowCountValues
 
