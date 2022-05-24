@@ -107,16 +107,12 @@ type private Sum() =
 
     member this.Final(_aggContext, _anonContext) = state
 
-type private DiffixCount() =
-  let mutable state: Anonymizer.AidCountState array = null
-
-  let initialState length : Anonymizer.AidCountState array =
-    Array.init length (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
+type private DiffixCount(aidsCount) =
+  let mutable state: Anonymizer.AidCountState array =
+    Array.init aidsCount (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
 
   /// Increases contribution of all AID instances.
   let increaseContributions valueIncrease (aidInstances: Value list) =
-    if isNull state then state <- initialState aidInstances.Length
-
     aidInstances
     |> List.iteri (fun i aidValue ->
       let aidState = state.[i]
@@ -150,20 +146,17 @@ type private DiffixCount() =
     member this.Merge aggregator =
       let otherState = (castAggregator<DiffixCount> aggregator).State
 
-      if otherState <> null then
-        if isNull state then state <- initialState otherState.Length
+      otherState
+      |> Array.iteri (fun i otherAidCountState ->
+        let aidCountState = state.[i]
+        let aidContributions = aidCountState.AidContributions
+        aidCountState.UnaccountedFor <- aidCountState.UnaccountedFor + otherAidCountState.UnaccountedFor
 
-        otherState
-        |> Array.iteri (fun i otherAidCountState ->
-          let aidCountState = state.[i]
-          let aidContributions = aidCountState.AidContributions
-          aidCountState.UnaccountedFor <- aidCountState.UnaccountedFor + otherAidCountState.UnaccountedFor
-
-          otherAidCountState.AidContributions
-          |> Seq.iter (fun pair ->
-            aidContributions.[pair.Key] <- (aidContributions |> Dictionary.getOrDefault pair.Key 0.0) + pair.Value
-          )
+        otherAidCountState.AidContributions
+        |> Seq.iter (fun pair ->
+          aidContributions.[pair.Key] <- (aidContributions |> Dictionary.getOrDefault pair.Key 0.0) + pair.Value
         )
+      )
 
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
@@ -174,19 +167,14 @@ type private DiffixCount() =
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
 
-      if isNull state then
-        Integer minCount
-      else
-        match Anonymizer.count aggContext.AnonymizationParams anonContext state with
-        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
+      match Anonymizer.count aggContext.AnonymizationParams anonContext state with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
+      | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
 
-type private DiffixCountDistinct() =
-  let mutable aidsCount = Option<int>.None
+type private DiffixCountDistinct(aidsCount) =
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
 
   member this.AidsCount = aidsCount
-
   member this.State = aidsPerValue
 
   interface IAggregator with
@@ -198,8 +186,7 @@ type private DiffixCountDistinct() =
           match aidsPerValue.TryGetValue(value) with
           | true, aidSets -> aidSets
           | false, _ ->
-            if Option.isNone aidsCount then aidsCount <- Some aidInstances.Length
-            let aidSets = emptySets aidsCount.Value
+            let aidSets = emptySets aidsCount
             aidsPerValue.[value] <- aidSets
             aidSets
 
@@ -215,8 +202,6 @@ type private DiffixCountDistinct() =
     member this.Merge aggregator =
       let other = (castAggregator<DiffixCountDistinct> aggregator)
       let otherAidsPerValue = other.State
-
-      if Option.isNone aidsCount then aidsCount <- other.AidsCount
 
       otherAidsPerValue
       |> Seq.iter (fun pair ->
@@ -234,15 +219,12 @@ type private DiffixCountDistinct() =
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
 
-      if Option.isNone aidsCount then
-        Integer minCount
-      else
-        match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount.Value aidsPerValue with
-        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-        | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
+      match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount aidsPerValue with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
+      | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
 
-type private DiffixLowCount() =
-  let mutable state: HashSet<AidHash> [] = null
+type private DiffixLowCount(aidsCount) =
+  let mutable state: HashSet<AidHash> [] = emptySets aidsCount
 
   member this.State = state
 
@@ -251,8 +233,6 @@ type private DiffixLowCount() =
       match args with
       | [ Null ] -> ()
       | [ Value.List aidInstances ] when not aidInstances.IsEmpty ->
-        if isNull state then state <- emptySets aidInstances.Length
-
         aidInstances
         |> List.iteri (fun i aidValue ->
           match aidValue with
@@ -265,31 +245,19 @@ type private DiffixLowCount() =
 
     member this.Merge aggregator =
       let otherState = (castAggregator<DiffixLowCount> aggregator).State
-
-      if otherState <> null then
-        if state = null then
-          state <- otherState |> Array.map cloneHashSet
-        else
-          otherState |> mergeHashSetsInto state
+      otherState |> mergeHashSetsInto state
 
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
+      Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
 
-      if isNull state then
-        Boolean true
-      else
-        Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
-
-type private DiffixSum(summandType) =
-  let nullState: Anonymizer.SumState = { Positive = null; Negative = null }
-  let mutable state = nullState
-
-  let initialState length : Anonymizer.SumState =
-    { nullState with
-        Positive =
-          Array.init length (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
-        Negative =
-          Array.init length (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
+type private DiffixSum(summandType, aidsCount) =
+  let state: Anonymizer.SumState =
+    {
+      Positive =
+        Array.init aidsCount (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
+      Negative =
+        Array.init aidsCount (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
     }
 
   let increaseUnaccountedFor valueIncrease i =
@@ -326,8 +294,6 @@ type private DiffixSum(summandType) =
   let updateAidMaps aidInstances valueIncrease =
     match aidInstances with
     | Value.List aidInstances ->
-      if state = nullState then state <- initialState aidInstances.Length
-
       if not <| List.forall missingAid aidInstances then
         increaseContributions valueIncrease aidInstances
     | _ -> failwith "Expecting a list as input"
@@ -351,36 +317,30 @@ type private DiffixSum(summandType) =
       if summandType <> (castAggregator<DiffixSum> aggregator).SummandType then
         failwith "Cannot merge incompatible aggregators."
 
-      if otherState <> nullState then
-        if state = nullState then state <- initialState otherState.Positive.Length
+      let mergeStateLeg (leg: Anonymizer.AidCountState array) (otherLeg: Anonymizer.AidCountState array) =
+        otherLeg
+        |> Array.iteri (fun i otherAidCountState ->
+          let aidCountState = leg.[i]
+          let aidContributions = aidCountState.AidContributions
+          aidCountState.UnaccountedFor <- aidCountState.UnaccountedFor + otherAidCountState.UnaccountedFor
 
-        let mergeStateLeg (leg: Anonymizer.AidCountState array) (otherLeg: Anonymizer.AidCountState array) =
-          otherLeg
-          |> Array.iteri (fun i otherAidCountState ->
-            let aidCountState = leg.[i]
-            let aidContributions = aidCountState.AidContributions
-            aidCountState.UnaccountedFor <- aidCountState.UnaccountedFor + otherAidCountState.UnaccountedFor
-
-            otherAidCountState.AidContributions
-            |> Seq.iter (fun pair ->
-              aidContributions.[pair.Key] <- (aidContributions |> Dictionary.getOrDefault pair.Key 0.0) + pair.Value
-            )
+          otherAidCountState.AidContributions
+          |> Seq.iter (fun pair ->
+            aidContributions.[pair.Key] <- (aidContributions |> Dictionary.getOrDefault pair.Key 0.0) + pair.Value
           )
+        )
 
-        mergeStateLeg state.Positive otherState.Positive
-        mergeStateLeg state.Negative otherState.Negative
+      mergeStateLeg state.Positive otherState.Positive
+      mergeStateLeg state.Negative otherState.Negative
 
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
 
-      if state = nullState then
-        Null
-      else
-        let isReal = summandType = RealType
+      let isReal = summandType = RealType
 
-        match Anonymizer.sum aggContext.AnonymizationParams anonContext state isReal with
-        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-        | Anonymizer.AnonymizedResult.Ok value -> value
+      match Anonymizer.sum aggContext.AnonymizationParams anonContext state isReal with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+      | Anonymizer.AnonymizedResult.Ok value -> value
 
 // ----------------------------------------------------------------
 // Public API
@@ -396,14 +356,24 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | _ -> false
 
 let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
+  let aidsCount =
+    if isAnonymizing aggSpec then
+      aggArgs
+      |> List.head
+      |> function
+        | ListExpr v -> v.Length
+        | _ -> failwith "Expected the AID argument to be a ListExpr."
+    else
+      0
+
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
   | Sum, { Distinct = false } -> Sum() :> T
-  | DiffixCount, { Distinct = false } -> DiffixCount() :> T
-  | DiffixCount, { Distinct = true } -> DiffixCountDistinct() :> T
-  | DiffixLowCount, _ -> DiffixLowCount() :> T
+  | DiffixCount, { Distinct = false } -> DiffixCount(aidsCount) :> T
+  | DiffixCount, { Distinct = true } -> DiffixCountDistinct(aidsCount) :> T
+  | DiffixLowCount, _ -> DiffixLowCount(aidsCount) :> T
   | DiffixSum, { Distinct = false } ->
     let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
-    DiffixSum(aggType) :> T
+    DiffixSum(aggType, aidsCount) :> T
   | _ -> failwith "Invalid aggregator"
