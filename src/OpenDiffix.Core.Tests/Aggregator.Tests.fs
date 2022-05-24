@@ -52,19 +52,17 @@ let makeStandardArgs hasValueArg random length =
 
 /// Verifies that merging 2 separately aggregated sequences is equivalent
 /// to a single aggregation of those 2 sequences concatenated.
-let ensureConsistentMerging ctx fn sourceArgs destinationArgs =
-  let DUMMY_ARGS = [ ListExpr [ ColumnReference(0, IntegerType) ]; ColumnReference(1, RealType) ]
-
-  let sourceAggregator = Aggregator.create (fn, DUMMY_ARGS)
+let ensureConsistentMerging ctx fn sourceArgs destinationArgs aggArgs =
+  let sourceAggregator = Aggregator.create (fn, aggArgs)
   sourceArgs |> List.iter sourceAggregator.Transition
 
-  let destinationAggregator = Aggregator.create (fn, DUMMY_ARGS)
+  let destinationAggregator = Aggregator.create (fn, aggArgs)
   destinationArgs |> List.iter destinationAggregator.Transition
 
   destinationAggregator.Merge sourceAggregator
   let mergedFinal = destinationAggregator.Final ctx
 
-  let replayedAggregator = Aggregator.create (fn, DUMMY_ARGS)
+  let replayedAggregator = Aggregator.create (fn, aggArgs)
   (destinationArgs @ sourceArgs) |> List.iter replayedAggregator.Transition
   let replayedFinal = replayedAggregator.Final ctx
 
@@ -99,8 +97,15 @@ let testAnonAggregatorMerging fn hasValueArg =
     let makeArgs = makeAnonArgs hasValueArg random numAids
     let args1 = makeArgs length1
     let args2 = makeArgs length2
-    ensureConsistentMerging ctx fn args1 args2
-    ensureConsistentMerging ctx fn args2 args1
+
+    let DUMMY_ARGS_EXPRS =
+      [
+        (List.replicate numAids (ColumnReference(0, IntegerType))) |> ListExpr
+        ColumnReference(1, RealType)
+      ]
+
+    ensureConsistentMerging ctx fn args1 args2 DUMMY_ARGS_EXPRS
+    ensureConsistentMerging ctx fn args2 args1 DUMMY_ARGS_EXPRS
 
   // Empty args can't indicate number of AID instances
   testPair 1 (0, 0)
@@ -116,8 +121,9 @@ let testStandardAggregatorMerging fn hasValueArg =
     let makeArgs = makeStandardArgs hasValueArg random
     let args1 = makeArgs length1
     let args2 = makeArgs length2
-    ensureConsistentMerging ctx fn args1 args2
-    ensureConsistentMerging ctx fn args2 args1
+    let DUMMY_ARGS_EXPRS = [ ListExpr []; ColumnReference(1, RealType) ]
+    ensureConsistentMerging ctx fn args1 args2 DUMMY_ARGS_EXPRS
+    ensureConsistentMerging ctx fn args2 args1 DUMMY_ARGS_EXPRS
 
   argLengthPairs |> List.iter testPair
 
