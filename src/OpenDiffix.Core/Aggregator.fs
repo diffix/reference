@@ -249,7 +249,7 @@ type private DiffixLowCount(aidsCount) =
 
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
-      Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams anonContext state)
+      Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams state)
 
 type private DiffixSum(summandType, aidsCount) =
   let state: Anonymizer.SumState =
