@@ -75,11 +75,18 @@ type Tests(db: DBFixture) =
             { Name = "city"; Type = StringType }
             { Name = "count"; Type = IntegerType }
             { Name = "sum"; Type = RealType }
+            { Name = "count_noise"; Type = RealType }
           ]
-        Rows = [ [| String "Berlin"; Integer 10L; Integer 320L |]; [| String "Rome"; Integer 10L; Integer 300L |] ]
+        Rows =
+          [
+            [| String "Berlin"; Integer 10L; Integer 320L; Real 0.0 |]
+            [| String "Rome"; Integer 10L; Integer 300L; Real 0.0 |]
+          ]
       }
 
-    let queryResult = runQuery "SELECT city, count(distinct id), sum(age) FROM customers_small GROUP BY city"
+    let queryResult =
+      runQuery "SELECT city, count(distinct id), sum(age), count_noise(*) FROM customers_small GROUP BY city"
+
     queryResult |> should equal expected
 
   [<Fact>]

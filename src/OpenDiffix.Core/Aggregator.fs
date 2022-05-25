@@ -50,6 +50,10 @@ let private increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidH
 
   aidMap.[aidHash] <- updatedContribution
 
+type private RequestedOutput =
+  | Value
+  | Noise
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
@@ -107,7 +111,7 @@ type private Sum() =
 
     member this.Final(_aggContext, _anonContext) = state
 
-type private DiffixCount(aidsCount) =
+type private DiffixCount(aidsCount, requestedOutput) =
   let mutable state: Anonymizer.AidCountState array =
     Array.init aidsCount (fun _ -> { AidContributions = Dictionary<AidHash, float>(); UnaccountedFor = 0.0 })
 
@@ -167,9 +171,17 @@ type private DiffixCount(aidsCount) =
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
 
-      match Anonymizer.count aggContext.AnonymizationParams anonContext state with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
+      let countResult = Anonymizer.count aggContext.AnonymizationParams anonContext state
+
+      match requestedOutput with
+      | Noise ->
+        match countResult with
+        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+        | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
+      | Value ->
+        match countResult with
+        | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
+        | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> Integer(max value minCount)
 
 type private DiffixCountDistinct(aidsCount) =
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
@@ -351,6 +363,7 @@ type T = IAggregator
 let isAnonymizing ((fn, _args): AggregatorSpec) =
   match fn with
   | DiffixCount
+  | DiffixCountNoise
   | DiffixLowCount
   | DiffixSum -> true
   | _ -> false
@@ -370,7 +383,8 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | Count, { Distinct = false } -> Count() :> T
   | Count, { Distinct = true } -> CountDistinct() :> T
   | Sum, { Distinct = false } -> Sum() :> T
-  | DiffixCount, { Distinct = false } -> DiffixCount(aidsCount) :> T
+  | DiffixCount, { Distinct = false } -> DiffixCount(aidsCount, Value) :> T
+  | DiffixCountNoise, { Distinct = false } -> DiffixCount(aidsCount, Noise) :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct(aidsCount) :> T
   | DiffixLowCount, _ -> DiffixLowCount(aidsCount) :> T
   | DiffixSum, { Distinct = false } ->

@@ -10,6 +10,8 @@ type AnonymizedResult<'T> =
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
 
+type CountResult = { AnonymizedSum: int64; NoiseSD: float }
+
 type SumState =
   {
     // Both `Positive` and `Negative` include 0.0 contributions by design, but for simplicity we call it like this.
@@ -255,7 +257,7 @@ let private anonymizedSum (byAidSum: AidCount seq) =
     // For determinism, resolve draws using maximum absolute noise value.
     |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD, Math.Abs(aggregate.Noise))
 
-  flattening.FlattenedSum + noise.Noise
+  (flattening.FlattenedSum + noise.Noise, noise.NoiseSD)
 
 // ----------------------------------------------------------------
 // Public API
@@ -319,6 +321,7 @@ let countDistinct
     byAid
     |> List.choose id
     |> anonymizedSum
+    |> fst
     |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> AnonymizedResult.Ok)
 
 let count
@@ -333,10 +336,13 @@ let count
   if byAid |> Array.exists ((=) None) then
     AnonymizedResult.NotEnoughAIDVs
   else
-    byAid
-    |> Array.choose id
-    |> anonymizedSum
-    |> (Math.roundAwayFromZero >> int64 >> AnonymizedResult.Ok)
+    let (value, noiseSD) = byAid |> Array.choose id |> anonymizedSum
+
+    {
+      AnonymizedSum = value |> (Math.roundAwayFromZero >> int64)
+      NoiseSD = noiseSD
+    }
+    |> AnonymizedResult.Ok
 
 let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) isReal =
   let byAidPositive = mapAidFlattening anonParams anonContext perAidContributions.Positive
@@ -351,7 +357,7 @@ let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (p
       Array.choose id
       >> function
         | [||] -> 0.0
-        | nonEmpty -> anonymizedSum nonEmpty
+        | nonEmpty -> anonymizedSum nonEmpty |> fst
 
     // Using `anonymizedSum` separately for positive and negative, we ensure that we pick the appropriate
     // amount of flattening and noise for each leg, and only later combine the results.

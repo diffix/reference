@@ -45,6 +45,8 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   (match fn, parsedArgs with
    | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
      AggregateFunction(Count, aggregateArgs), []
+   | AggregateFunction (CountNoise, aggregateArgs), [ ParserTypes.Star ] -> //
+     AggregateFunction(CountNoise, aggregateArgs), []
    | AggregateFunction (DiffixLowCount, aggregateArgs), parsedAids ->
      AggregateFunction(DiffixLowCount, aggregateArgs), [ mapAids parsedAids ]
    | AggregateFunction (DiffixCount, aggregateArgs), parsedArg :: parsedAids ->
@@ -56,6 +58,13 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
        | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
 
      AggregateFunction(DiffixCount, aggregateArgs), mapAids parsedAids :: args
+   | AggregateFunction (DiffixCountNoise, aggregateArgs), parsedArg :: parsedAids ->
+     let aggregateArgs, args =
+       match parsedArg with
+       | ParserTypes.Star -> aggregateArgs, []
+       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixCountNoise, aggregateArgs), mapAids parsedAids :: args
    | AggregateFunction (DiffixSum, aggregateArgs), parsedArg :: parsedAids ->
      let aggregateArgs, args =
        match parsedArg with
@@ -293,6 +302,8 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
     match expr with
     | FunctionExpr (AggregateFunction (Count, opts), args) ->
       FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
+    | FunctionExpr (AggregateFunction (CountNoise, opts), args) ->
+      FunctionExpr(AggregateFunction(DiffixCountNoise, opts), aidColumnsExpression :: args)
     | other -> other |> map exprMapper
 
   query |> map exprMapper

@@ -353,13 +353,19 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``Fail on unsupported aggregate in non-direct access level`` () =
     assertTrustedQueryFails
-      "SELECT diffix_count(age) FROM customers"
-      "Only count and sum aggregates are supported in anonymizing queries."
+      "SELECT diffix_count(*, age) FROM customers"
+      "Only count, count_noise and sum aggregates are supported in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT diffix_count_noise(*, age) FROM customers"
+      "Only count, count_noise and sum aggregates are supported in anonymizing queries."
 
   [<Fact>]
-  let ``Allow count(*), count(column) and count(distinct column)`` () =
+  let ``Allow count(*), count(column) (with noise versions) and count(distinct column)`` () =
     analyzeTrustedQuery "SELECT count(*) FROM customers" |> ignore
     analyzeTrustedQuery "SELECT count(age) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count_noise(*) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count_noise(age) FROM customers" |> ignore
     analyzeTrustedQuery "SELECT count(distinct age) FROM customers" |> ignore
 
   [<Fact>]
@@ -370,7 +376,13 @@ type Tests(db: DBFixture) =
   let ``Fail on disallowed count`` () =
     assertTrustedQueryFails
       "SELECT count(age + id) FROM customers"
-      "Only count(*), count(column) and count(distinct column) are supported in anonymizing queries."
+      "Only count(*), count(column), count_noise(*), count_noise(column) and count(distinct column) are supported in anonymizing queries."
+
+  [<Fact>]
+  let ``Fail on disallowed count_noise`` () =
+    assertTrustedQueryFails
+      "SELECT count_noise(distinct age) FROM customers"
+      "Only count(*), count(column), count_noise(*), count_noise(column) and count(distinct column) are supported in anonymizing queries."
 
   [<Fact>]
   let ``Fail on disallowed sum`` () =

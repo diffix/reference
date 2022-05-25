@@ -144,6 +144,11 @@ let ``Merging DiffixCount`` () =
   DiffixCount |> testAnon NON_DISTINCT WITHOUT_VALUE_ARG
 
 [<Fact>]
+let ``Merging DiffixCountNoise`` () =
+  DiffixCountNoise |> testAnon NON_DISTINCT WITH_VALUE_ARG
+  DiffixCountNoise |> testAnon NON_DISTINCT WITHOUT_VALUE_ARG
+
+[<Fact>]
 let ``Merging DiffixSum`` () =
   DiffixSum |> testAnon NON_DISTINCT WITH_VALUE_ARG
 
