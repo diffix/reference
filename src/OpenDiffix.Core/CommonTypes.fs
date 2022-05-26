@@ -83,6 +83,8 @@ type AggregateFunction =
   | DiffixLowCount
   | Sum
   | DiffixSum
+  | Avg
+  | DiffixAvg
 
 type AggregateOptions =
   {
@@ -321,10 +323,12 @@ module Function =
     | "count" -> AggregateFunction(Count, AggregateOptions.Default)
     | "count_noise" -> AggregateFunction(CountNoise, AggregateOptions.Default)
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
+    | "avg" -> AggregateFunction(Avg, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
     | "diffix_count_noise" -> AggregateFunction(DiffixCountNoise, AggregateOptions.Default)
     | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
     | "diffix_sum" -> AggregateFunction(DiffixSum, AggregateOptions.Default)
+    | "diffix_avg" -> AggregateFunction(DiffixAvg, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply

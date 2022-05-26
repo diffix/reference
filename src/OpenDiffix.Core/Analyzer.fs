@@ -42,11 +42,19 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   let mapAids parsedAids =
     parsedAids |> List.map (mapExpression rangeColumns) |> ListExpr
 
+  let mapAvg aggregateArgs parsedArgs sumFunction countFunction =
+    let sum = mapFunctionExpression rangeColumns (AggregateFunction(sumFunction, aggregateArgs)) parsedArgs
+    let count = mapFunctionExpression rangeColumns (AggregateFunction(countFunction, aggregateArgs)) parsedArgs
+    let castSum = FunctionExpr(ScalarFunction ScalarFunction.Cast, [ sum; Constant(String "real") ])
+    ScalarFunction ScalarFunction.Divide, [ castSum; count ]
+
   (match fn, parsedArgs with
    | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
      AggregateFunction(Count, aggregateArgs), []
    | AggregateFunction (CountNoise, aggregateArgs), [ ParserTypes.Star ] -> //
      AggregateFunction(CountNoise, aggregateArgs), []
+   | AggregateFunction (Avg, aggregateArgs), parsedArgs -> //
+     mapAvg aggregateArgs parsedArgs Sum Count
    | AggregateFunction (DiffixLowCount, aggregateArgs), parsedAids ->
      AggregateFunction(DiffixLowCount, aggregateArgs), [ mapAids parsedAids ]
    | AggregateFunction (DiffixCount, aggregateArgs), parsedArg :: parsedAids ->
@@ -73,6 +81,8 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
        | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
 
      AggregateFunction(DiffixSum, aggregateArgs), mapAids parsedAids :: args
+   | AggregateFunction (DiffixAvg, aggregateArgs), parsedArgs -> //
+     mapAvg aggregateArgs parsedArgs DiffixSum DiffixCount
    | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
      let arg = mapExpression rangeColumns expr
      AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
@@ -298,12 +308,18 @@ let private makeAidColumnsExpression rangeColumns =
   |> ListExpr
 
 let private compileAnonymizingAggregators aidColumnsExpression query =
+  let anonymizing =
+    function
+    | Count -> DiffixCount
+    | CountNoise -> DiffixCountNoise
+    | Sum -> DiffixSum
+    | Avg -> DiffixAvg
+    | other -> other
+
   let rec exprMapper expr =
     match expr with
-    | FunctionExpr (AggregateFunction (Count, opts), args) ->
-      FunctionExpr(AggregateFunction(DiffixCount, opts), aidColumnsExpression :: args)
-    | FunctionExpr (AggregateFunction (CountNoise, opts), args) ->
-      FunctionExpr(AggregateFunction(DiffixCountNoise, opts), aidColumnsExpression :: args)
+    | FunctionExpr (AggregateFunction (agg, opts), args) when List.contains agg [ Count; CountNoise; Sum; Avg ] ->
+      FunctionExpr(AggregateFunction(anonymizing agg, opts), aidColumnsExpression :: args)
     | other -> other |> map exprMapper
 
   query |> map exprMapper

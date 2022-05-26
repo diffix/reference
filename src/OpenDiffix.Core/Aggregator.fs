@@ -368,7 +368,8 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixCount
   | DiffixCountNoise
   | DiffixLowCount
-  | DiffixSum -> true
+  | DiffixSum
+  | DiffixAvg -> true
   | _ -> false
 
 let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
