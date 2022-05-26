@@ -376,13 +376,13 @@ type Tests(db: DBFixture) =
   let ``Fail on disallowed count`` () =
     assertTrustedQueryFails
       "SELECT count(age + id) FROM customers"
-      "Only count(*), count(column), count_noise(*), count_noise(column) and count(distinct column) are supported in anonymizing queries."
+      "Only count(column) is supported in anonymizing queries."
 
   [<Fact>]
   let ``Fail on disallowed count_noise`` () =
     assertTrustedQueryFails
       "SELECT count_noise(distinct age) FROM customers"
-      "Only count(*), count(column), count_noise(*), count_noise(column) and count(distinct column) are supported in anonymizing queries."
+      "count_noise(distinct column) is not currently supported."
 
   [<Fact>]
   let ``Fail on disallowed sum`` () =

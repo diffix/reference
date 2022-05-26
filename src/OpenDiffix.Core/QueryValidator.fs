@@ -38,26 +38,17 @@ let private validateAllowedAggregates query =
   )
 
 let private allowedCountUsage query =
-  let message =
-    "Only count(*), count(column), count_noise(*), count_noise(column)"
-    + " and count(distinct column) are supported in anonymizing queries."
-
-  let checkArgs =
-    function
-    | []
-    | [ ColumnReference _ ] -> ()
-    | _ -> failwith message
-
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Count, opts), args) -> checkArgs args
-    | FunctionExpr (AggregateFunction (CountNoise, opts), args) ->
-      checkArgs args
-
-      match opts with
-      | { Distinct = true } -> failwith message
-      | _ -> ()
+    | FunctionExpr (AggregateFunction (Count, _), args)
+    | FunctionExpr (AggregateFunction (CountNoise, { Distinct = false }), args) ->
+      match args with
+      | []
+      | [ ColumnReference _ ] -> ()
+      | _ -> failwith "Only count(column) is supported in anonymizing queries."
+    | FunctionExpr (AggregateFunction (CountNoise, { Distinct = true }), _) ->
+      failwith "count_noise(distinct column) is not currently supported."
     | _ -> ()
   )
 
