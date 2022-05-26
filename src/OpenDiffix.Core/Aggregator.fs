@@ -50,6 +50,10 @@ let private increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidH
 
   aidMap.[aidHash] <- updatedContribution
 
+type private RequestedOutput =
+  | Value
+  | Noise
+
 // ----------------------------------------------------------------
 // Aggregators
 // ----------------------------------------------------------------
@@ -169,7 +173,18 @@ type private DiffixCount(aidsCount) =
 
       match Anonymizer.count aggContext.AnonymizationParams anonContext state with
       | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
+      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> Integer(max value minCount)
+
+type private DiffixCountNoise(aidsCount) =
+  inherit DiffixCount(aidsCount)
+
+  interface IAggregator with
+    override this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
+      match Anonymizer.count aggContext.AnonymizationParams anonContext this.State with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixCountDistinct(aidsCount) =
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
@@ -351,6 +366,7 @@ type T = IAggregator
 let isAnonymizing ((fn, _args): AggregatorSpec) =
   match fn with
   | DiffixCount
+  | DiffixCountNoise
   | DiffixLowCount
   | DiffixSum -> true
   | _ -> false
@@ -371,6 +387,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | Count, { Distinct = true } -> CountDistinct() :> T
   | Sum, { Distinct = false } -> Sum() :> T
   | DiffixCount, { Distinct = false } -> DiffixCount(aidsCount) :> T
+  | DiffixCountNoise, { Distinct = false } -> DiffixCountNoise(aidsCount) :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct(aidsCount) :> T
   | DiffixLowCount, _ -> DiffixLowCount(aidsCount) :> T
   | DiffixSum, { Distinct = false } ->

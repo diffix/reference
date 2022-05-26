@@ -45,10 +45,15 @@ let anonParams =
 let aggContext = { AnonymizationParams = anonParams; GroupingLabels = [||]; Aggregators = [||] }
 
 let evaluateAggregator fn args =
-  evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) fn args
+  TestHelpers.evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) fn args
+
+let evaluateAggregatorNoisy fn args =
+  let aggContextNoisy = { aggContext with AnonymizationParams = { anonParams with LayerNoiseSD = 1. } }
+  TestHelpers.evaluateAggregator (aggContextNoisy, Some { BucketSeed = 0UL }) fn args
 
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
 let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
+let diffixCountNoise = DiffixCountNoise, { AggregateOptions.Default with Distinct = false }
 let diffixLowCount = DiffixLowCount, AggregateOptions.Default
 let diffixSum = DiffixSum, { AggregateOptions.Default with Distinct = false }
 
@@ -68,20 +73,37 @@ let ``anon count distinct column`` () =
 
 [<Fact>]
 let ``anon count()`` () =
-  // replacing outlier 6, with top 5 --> flattened by 1
-  // noise proportional to top group average of 5
+  // replacing outlier 8, with top 5 --> flattened by 2
   rows
   |> evaluateAggregator diffixCount [ aidColumnList ]
   |> should equal (Integer 30L)
 
 [<Fact>]
+let ``anon count_noise()`` () =
+  // noise proportional to flattened avg of 30/9 = 3.333...
+  rows
+  |> evaluateAggregatorNoisy diffixCountNoise [ aidColumnList ]
+  |> function
+    | Real value -> value
+    | _ -> failwith "Unexpected aggregator result"
+  |> should (equalWithin 1e-3) 3.333
+
+[<Fact>]
 let ``anon count(col)`` () =
-  // 1 user with Null string is ignored
-  // replacing outlier 6 with top 5
-  // noise proportional to top group average of 5
+  // replacing outlier 8, with top 5 --> flattened by 2
   rows
   |> evaluateAggregator diffixCount [ aidColumnList; strColumn ]
   |> should equal (Integer 30L)
+
+[<Fact>]
+let ``anon count_noise(col)`` () =
+  // noise proportional to flattened avg of 30/9 = 3.333...
+  rows
+  |> evaluateAggregatorNoisy diffixCountNoise [ aidColumnList; strColumn ]
+  |> function
+    | Real value -> value
+    | _ -> failwith "Unexpected aggregator result"
+  |> should (equalWithin 1e-3) 3.333
 
 [<Fact>]
 let ``anon sum(real col)`` () =
