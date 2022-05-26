@@ -26,7 +26,7 @@ let emptySelect =
     Having = constTrue
     OrderBy = []
     Limit = None
-    AnonymizationContext = Some { BucketSeed = 0UL }
+    AnonymizationContext = Some { BucketSeed = 0UL; BaseLabels = [] }
   }
 
 let column index =

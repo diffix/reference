@@ -548,7 +548,7 @@ let aggContext =
   }
 
 let evaluateAggregator aggSpec args =
-  evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) aggSpec args testRows
+  evaluateAggregator (aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }) aggSpec args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =

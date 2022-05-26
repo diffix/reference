@@ -205,7 +205,7 @@ type Plan =
 // Executor
 // ----------------------------------------------------------------
 
-type AnonymizationContext = { BucketSeed: Hash }
+type AnonymizationContext = { BucketSeed: Hash; BaseLabels: Value list }
 
 type AggregationContext =
   {
