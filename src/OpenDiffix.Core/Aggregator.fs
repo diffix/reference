@@ -175,7 +175,7 @@ type private DiffixCount() =
       let anonContext = unwrapAnonContext anonContext
 
       let minCount =
-        if Array.isEmpty aggContext.GroupingLabels then
+        if Array.isEmpty aggContext.GroupingLabels && List.isEmpty anonContext.BaseLabels then
           0L
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
@@ -236,7 +236,7 @@ type private DiffixCountDistinct() =
       let anonContext = unwrapAnonContext anonContext
 
       let minCount =
-        if Array.isEmpty aggContext.GroupingLabels then
+        if Array.isEmpty aggContext.GroupingLabels && List.isEmpty anonContext.BaseLabels then
           0L
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold

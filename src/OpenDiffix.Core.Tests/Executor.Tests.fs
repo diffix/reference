@@ -25,7 +25,7 @@ type Tests(db: DBFixture) =
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
-  let anonContext = { BucketSeed = 0UL }
+  let anonContext = { BucketSeed = 0UL; BaseLabels = [] }
 
   let queryContext = QueryContext.makeWithDataProvider db.DataProvider
 

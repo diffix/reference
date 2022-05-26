@@ -87,7 +87,7 @@ let aggContext =
 
 let testAnonAggregatorMerging fn hasValueArg =
   let random = makeRandom fn hasValueArg
-  let ctx = aggContext, Some { BucketSeed = 0UL }
+  let ctx = aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }
 
   let testPair numAids (length1, length2) =
     let makeArgs = makeAnonArgs hasValueArg random numAids

@@ -313,11 +313,14 @@ type Tests(db: DBFixture) =
   let assertDirectQueryFails = assertQueryFails Direct
   let assertUntrustedQueryFails = assertQueryFails PublishUntrusted
 
-  let assertSqlSeed query (seedMaterials: string seq) =
+  let assertSqlSeedWithFilter query (seedMaterials: string seq) baseLabels =
     let expectedSeed = Hash.strings 0UL seedMaterials
 
     (analyzeTrustedQuery query).AnonymizationContext
-    |> should equal (Some { BucketSeed = expectedSeed })
+    |> should equal (Some { BucketSeed = expectedSeed; BaseLabels = baseLabels })
+
+  let assertSqlSeed query (seedMaterials: string seq) =
+    assertSqlSeedWithFilter query seedMaterials []
 
   let assertEqualAnonContexts query1 query2 =
     (analyzeTrustedQuery query1).AnonymizationContext
@@ -386,10 +389,18 @@ type Tests(db: DBFixture) =
     analyzeTrustedQuery "SELECT count(*) FROM customers GROUP BY city HAVING length(city) > 3"
 
   [<Fact>]
-  let ``Reject WHERE clause in anonymizing subqueries`` () =
+  let ``Reject unsupported WHERE clause in anonymizing subqueries`` () =
     assertTrustedQueryFails
-      "SELECT count(*) FROM customers WHERE first_name=''"
-      "WHERE in anonymizing queries is not currently supported."
+      "SELECT count(*) FROM customers WHERE first_name <> ''"
+      "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers WHERE age = 20 OR city = 'London'"
+      "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
+
+  [<Fact>]
+  let ``Allow supported WHERE clause in anonymizing subqueries`` () =
+    analyzeTrustedQuery "SELECT count(*) FROM customers WHERE floor_by(age, 10) = 20 AND city = 'London'"
 
   [<Fact>]
   let ``Don't validate not anonymizing queries for unsupported anonymization features`` () =
@@ -441,11 +452,11 @@ type Tests(db: DBFixture) =
   let ``Detect queries with disallowed bucket functions calls`` () =
     assertTrustedQueryFails
       "SELECT round(2, age) from customers"
-      "Primary argument for a bucket function has to be a simple column reference."
+      "Primary argument for a generalization expression has to be a simple column reference."
 
     assertTrustedQueryFails
       "SELECT round(age, age) from customers"
-      "Secondary arguments for a bucket function have to be constants."
+      "Secondary arguments for a generalization expression have to be constants."
 
   [<Fact>]
   let ``Default SQL seed from non-anonymizing queries`` () =
@@ -489,6 +500,19 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``Default SQL seed from non-anonymizing rounding cast`` () =
     assertNoAnonContext "SELECT cast(price AS integer) FROM products"
+
+  [<Fact>]
+  let ``SQL seed from single filter`` () =
+    assertSqlSeedWithFilter
+      "SELECT COUNT(*) FROM customers WHERE substring(city, 1, 2) = 'Lo'"
+      [ "substring,customers.city,1,2" ]
+      [ String "Lo" ]
+
+  let ``SQL seed from multiple filters`` () =
+    assertSqlSeedWithFilter
+      "SELECT COUNT(*) FROM customers WHERE age = 20 AND city = 'London'"
+      [ "customers.age"; "customers.city" ]
+      [ Integer 20L; String "London" ]
 
   [<Fact>]
   let ``Constant bucket labels are ignored`` () =

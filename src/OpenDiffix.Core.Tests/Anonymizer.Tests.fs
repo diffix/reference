@@ -40,7 +40,7 @@ let anonParams =
 let aggContext = { AnonymizationParams = anonParams; GroupingLabels = [||]; Aggregators = [||] }
 
 let evaluateAggregator fn args =
-  evaluateAggregator (aggContext, Some { BucketSeed = 0UL }) fn args
+  evaluateAggregator (aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }) fn args
 
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
 let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
