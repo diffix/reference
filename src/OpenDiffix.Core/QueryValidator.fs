@@ -69,17 +69,13 @@ let private validateSelectTarget (selectQuery: SelectQuery) =
   | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported."
   | _ -> ()
 
-let private validateNoWhere (selectQuery: SelectQuery) =
-  if selectQuery.Where <> Constant(Boolean true) then
-    failwith "WHERE in anonymizing queries is not currently supported."
-
 let private validateGeneralization accessLevel expression =
   if accessLevel <> Direct then
     match expression with
     | FunctionExpr (ScalarFunction _, primaryArg :: _) when not (Expression.isColumnReference primaryArg) ->
-      failwith "Primary argument for a bucket function has to be a simple column reference."
+      failwith "Primary argument for a generalization expression has to be a simple column reference."
     | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) when List.exists (Expression.isConstant >> not) secondaryArgs ->
-      failwith "Secondary arguments for a bucket function have to be constants."
+      failwith "Secondary arguments for a generalization expression have to be constants."
     | _ -> ()
 
   if accessLevel = PublishUntrusted then
@@ -100,7 +96,6 @@ let validateAnonymizingQuery (selectQuery: SelectQuery) =
   validateAllowedAggregates selectQuery
   allowedCountUsage selectQuery
   allowedSumUsage selectQuery
-  validateNoWhere selectQuery
   validateSelectTarget selectQuery
 
 let validateGeneralizations accessLevel expressions =

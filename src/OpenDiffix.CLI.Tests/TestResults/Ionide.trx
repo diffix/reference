@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="1796fef4-71c7-495e-bb7f-6411f18173af" name="@legion 2022-05-16 15:07:52" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2022-05-16T15:07:52.4446530+03:00" queuing="2022-05-16T15:07:52.4446542+03:00" start="2022-05-16T15:07:50.1797862+03:00" finish="2022-05-16T15:07:52.4949996+03:00" />
+  <TestSettings name="default" id="de6a0029-9d74-4b12-9acd-a116f38ecb12">
+    <Deployment runDeploymentRoot="_legion_2022-05-16_15_07_52" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="2c523908-9a8b-47fc-9eec-081cfd47eb3a" testId="a718d9ed-97d3-bc95-3f47-54e6f1c750cb" testName="OpenDiffix.CLI.ProgramTests.Counts all rows" computerName="legion" duration="00:00:00.0052891" startTime="2022-05-16T15:07:52.3855949+03:00" endTime="2022-05-16T15:07:52.3855959+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2c523908-9a8b-47fc-9eec-081cfd47eb3a" />
+    <UnitTestResult executionId="72f9fdf9-8ab8-415d-898b-9c1e44f6246b" testId="0fac6165-55ff-f79d-8436-8f1c10f9d6b1" testName="OpenDiffix.CLI.ProgramTests.Guards against unknown params" computerName="legion" duration="00:00:00.0263465" startTime="2022-05-16T15:07:52.3802694+03:00" endTime="2022-05-16T15:07:52.3802706+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="72f9fdf9-8ab8-415d-898b-9c1e44f6246b" />
+    <UnitTestResult executionId="ae6e796f-a1e9-400c-8560-5e511fbc5f7f" testId="52ceb0ae-ea20-a029-da45-3c7baa117776" testName="OpenDiffix.CLI.ProgramTests.Rejects invalid intervals" computerName="legion" duration="00:00:00.0097008" startTime="2022-05-16T15:07:52.3500360+03:00" endTime="2022-05-16T15:07:52.3500371+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ae6e796f-a1e9-400c-8560-5e511fbc5f7f" />
+    <UnitTestResult executionId="2b81995e-d18f-4e54-b787-5949ad6bfdbc" testId="5fa25436-cbfd-01d1-ff36-5784dedac41a" testName="OpenDiffix.CLI.ProgramTests.Rejects unsafe CLI parameters" computerName="legion" duration="00:00:00.0037312" startTime="2022-05-16T15:07:52.3538156+03:00" endTime="2022-05-16T15:07:52.3538166+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2b81995e-d18f-4e54-b787-5949ad6bfdbc" />
+    <UnitTestResult executionId="bf2c0c5b-12a2-4f6f-88c4-7b64ff54cfc0" testId="51289ea1-0994-a6dd-9aba-5b4fcaf2e056" testName="OpenDiffix.CLI.ProgramTests.Executes example batch query" computerName="legion" duration="00:00:00.1243116" startTime="2022-05-16T15:07:52.3332257+03:00" endTime="2022-05-16T15:07:52.3332268+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bf2c0c5b-12a2-4f6f-88c4-7b64ff54cfc0" />
+    <UnitTestResult executionId="9875df5f-436e-4c9e-8c8d-7103c3f812d4" testId="5eaa2b01-a859-3a94-5c83-06e92214f1ac" testName="OpenDiffix.CLI.ProgramTests.Accepts supported CLI parameters" computerName="legion" duration="00:00:00.4009970" startTime="2022-05-16T15:07:52.1931925+03:00" endTime="2022-05-16T15:07:52.1932196+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9875df5f-436e-4c9e-8c8d-7103c3f812d4" />
+    <UnitTestResult executionId="7fd3860b-9e68-4ab7-ac02-bcc7361d28be" testId="60449274-ce7a-c496-99d3-e237405bb819" testName="OpenDiffix.CLI.ProgramTests.Counts in non-anonymized tables" computerName="legion" duration="00:00:00.0069712" startTime="2022-05-16T15:07:52.3402543+03:00" endTime="2022-05-16T15:07:52.3402554+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7fd3860b-9e68-4ab7-ac02-bcc7361d28be" />
+    <UnitTestResult executionId="5d4ede1f-2cfa-49d5-bdee-7a4d7d96cc25" testId="db7aa720-875f-1a2d-0a56-2d6404a7dbf9" testName="OpenDiffix.CLI.ProgramTests.Prints version" computerName="legion" duration="00:00:00.0087413" startTime="2022-05-16T15:07:52.2014088+03:00" endTime="2022-05-16T15:07:52.2014102+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5d4ede1f-2cfa-49d5-bdee-7a4d7d96cc25" />
+    <UnitTestResult executionId="e3b11e1d-e913-46d3-9623-c33d95853b02" testId="519f9af2-5000-a371-e51c-1c62a23e0cb1" testName="OpenDiffix.CLI.ProgramTests.Allows unsafe CLI parameters in unsafe mode" computerName="legion" duration="00:00:00.0073449" startTime="2022-05-16T15:07:52.2088431+03:00" endTime="2022-05-16T15:07:52.2088441+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e3b11e1d-e913-46d3-9623-c33d95853b02" />
+    <UnitTestResult executionId="3b69e49f-df2c-48d7-bf61-186260e0c8f4" testId="2adc3cfd-9309-1407-f20a-c9771313220f" testName="OpenDiffix.CLI.ProgramTests.Rejects invalid SQL" computerName="legion" duration="00:00:00.0067925" startTime="2022-05-16T15:07:52.4127918+03:00" endTime="2022-05-16T15:07:52.4127927+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3b69e49f-df2c-48d7-bf61-186260e0c8f4" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Allows unsafe CLI parameters in unsafe mode" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="519f9af2-5000-a371-e51c-1c62a23e0cb1">
+      <Execution id="e3b11e1d-e913-46d3-9623-c33d95853b02" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Allows unsafe CLI parameters in unsafe mode" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Accepts supported CLI parameters" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="5eaa2b01-a859-3a94-5c83-06e92214f1ac">
+      <Execution id="9875df5f-436e-4c9e-8c8d-7103c3f812d4" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Accepts supported CLI parameters" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Prints version" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="db7aa720-875f-1a2d-0a56-2d6404a7dbf9">
+      <Execution id="5d4ede1f-2cfa-49d5-bdee-7a4d7d96cc25" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Prints version" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Rejects invalid intervals" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="52ceb0ae-ea20-a029-da45-3c7baa117776">
+      <Execution id="ae6e796f-a1e9-400c-8560-5e511fbc5f7f" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Rejects invalid intervals" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Counts all rows" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="a718d9ed-97d3-bc95-3f47-54e6f1c750cb">
+      <Execution id="2c523908-9a8b-47fc-9eec-081cfd47eb3a" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Counts all rows" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Counts in non-anonymized tables" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="60449274-ce7a-c496-99d3-e237405bb819">
+      <Execution id="7fd3860b-9e68-4ab7-ac02-bcc7361d28be" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Counts in non-anonymized tables" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Executes example batch query" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="51289ea1-0994-a6dd-9aba-5b4fcaf2e056">
+      <Execution id="bf2c0c5b-12a2-4f6f-88c4-7b64ff54cfc0" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Executes example batch query" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Rejects unsafe CLI parameters" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="5fa25436-cbfd-01d1-ff36-5784dedac41a">
+      <Execution id="2b81995e-d18f-4e54-b787-5949ad6bfdbc" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Rejects unsafe CLI parameters" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Guards against unknown params" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="0fac6165-55ff-f79d-8436-8f1c10f9d6b1">
+      <Execution id="72f9fdf9-8ab8-415d-898b-9c1e44f6246b" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Guards against unknown params" />
+    </UnitTest>
+    <UnitTest name="OpenDiffix.CLI.ProgramTests.Rejects invalid SQL" storage="/home/cristian/work/reference/src/opendiffix.cli.tests/bin/debug/net6.0/opendiffix.cli.tests.dll" id="2adc3cfd-9309-1407-f20a-c9771313220f">
+      <Execution id="3b69e49f-df2c-48d7-bf61-186260e0c8f4" />
+      <TestMethod codeBase="/home/cristian/work/reference/src/OpenDiffix.CLI.Tests/bin/Debug/net6.0/OpenDiffix.CLI.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="OpenDiffix.CLI.ProgramTests" name="Rejects invalid SQL" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a718d9ed-97d3-bc95-3f47-54e6f1c750cb" executionId="2c523908-9a8b-47fc-9eec-081cfd47eb3a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0fac6165-55ff-f79d-8436-8f1c10f9d6b1" executionId="72f9fdf9-8ab8-415d-898b-9c1e44f6246b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="52ceb0ae-ea20-a029-da45-3c7baa117776" executionId="ae6e796f-a1e9-400c-8560-5e511fbc5f7f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5fa25436-cbfd-01d1-ff36-5784dedac41a" executionId="2b81995e-d18f-4e54-b787-5949ad6bfdbc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="51289ea1-0994-a6dd-9aba-5b4fcaf2e056" executionId="bf2c0c5b-12a2-4f6f-88c4-7b64ff54cfc0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5eaa2b01-a859-3a94-5c83-06e92214f1ac" executionId="9875df5f-436e-4c9e-8c8d-7103c3f812d4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="60449274-ce7a-c496-99d3-e237405bb819" executionId="7fd3860b-9e68-4ab7-ac02-bcc7361d28be" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="db7aa720-875f-1a2d-0a56-2d6404a7dbf9" executionId="5d4ede1f-2cfa-49d5-bdee-7a4d7d96cc25" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="519f9af2-5000-a371-e51c-1c62a23e0cb1" executionId="e3b11e1d-e913-46d3-9623-c33d95853b02" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2adc3cfd-9309-1407-f20a-c9771313220f" executionId="3b69e49f-df2c-48d7-bf61-186260e0c8f4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="10" executed="10" passed="10" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.4.3+1b45f5407b (64-bit .NET 6.0.5)
+[xUnit.net 00:00:00.59]   Discovering: OpenDiffix.CLI.Tests
+[xUnit.net 00:00:00.63]   Discovered:  OpenDiffix.CLI.Tests
+[xUnit.net 00:00:00.63]   Starting:    OpenDiffix.CLI.Tests
+[xUnit.net 00:00:01.31]   Finished:    OpenDiffix.CLI.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
