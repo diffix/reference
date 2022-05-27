@@ -326,6 +326,24 @@ let countDistinct
     |> fst
     |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> AnonymizedResult.Ok)
 
+/// Returns the noisy count of a single AID set.
+let countDistinctAid
+  (anonParams: AnonymizationParams)
+  (anonContext: AnonymizationContext)
+  (numAids: int)
+  (aidSeed: Hash)
+  =
+  let noise =
+    [ anonContext.BucketSeed; aidSeed ]
+    |> generateNoise anonParams.Salt "noise" anonParams.LayerNoiseSD
+
+  let noisyCount = (float numAids + noise) |> Math.roundAwayFromZero |> int64
+
+  if noisyCount < anonParams.Suppression.LowThreshold then
+    AnonymizedResult.NotEnoughAIDVs
+  else
+    AnonymizedResult.Ok noisyCount
+
 let count
   (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
