@@ -3,6 +3,22 @@ module OpenDiffix.Core.Anonymizer
 open System
 open System.Security.Cryptography
 
+[<RequireQualifiedAccess>]
+type AnonymizedResult<'T> =
+  | NotEnoughAIDVs
+  | Ok of 'T
+
+type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
+
+type CountResult = { AnonymizedSum: int64; NoiseSD: float }
+
+type SumState =
+  {
+    // Both `Positive` and `Negative` include 0.0 contributions by design, but for simplicity we call it like this.
+    Positive: AidCountState array
+    Negative: AidCountState array
+  }
+
 // ----------------------------------------------------------------
 // Random & noise
 // ----------------------------------------------------------------
@@ -94,7 +110,7 @@ type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float
 let inline private aidFlattening
   (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
-  (unaccountedFor: int64)
+  (unaccountedFor: float)
   (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
   let totalCount = aidContributions.Length
@@ -129,7 +145,7 @@ let inline private aidFlattening
 
     let summedContributions = aidContributions |> Array.sumBy snd
     let flattening = float outliersSummed - outlierReplacement
-    let flattenedUnaccountedFor = float unaccountedFor - flattening |> max 0.
+    let flattenedUnaccountedFor = unaccountedFor - flattening |> max 0.
     let flattenedSum = float summedContributions - flattening
     let flattenedAvg = flattenedSum / float totalCount
 
@@ -147,6 +163,17 @@ let inline private aidFlattening
         NoiseSD = noiseSD
         Noise = noise
       }
+
+let private arrayFromDict (d: Dictionary<'a, 'b>) =
+  d |> Seq.map (fun pair -> pair.Key, pair.Value) |> Seq.toArray
+
+let private mapAidFlattening (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) perAidContributions =
+  perAidContributions
+  |> Array.map (fun aidState ->
+    aidState.AidContributions
+    |> arrayFromDict
+    |> aidFlattening anonParams anonContext aidState.UnaccountedFor
+  )
 
 let private sortByValue (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) =
   let comparer = Value.comparer Ascending NullsFirst
@@ -213,7 +240,7 @@ let private countDistinctFlatteningByAid
   |> Seq.countBy fst
   |> Seq.map (fun (aid, count) -> aid, int64 count)
   |> Seq.toArray
-  |> aidFlattening anonParams anonContext 0L
+  |> aidFlattening anonParams anonContext 0.0
 
 // Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
@@ -230,7 +257,7 @@ let private anonymizedSum (byAidSum: AidCount seq) =
     // For determinism, resolve draws using maximum absolute noise value.
     |> Seq.maxBy (fun aggregate -> aggregate.NoiseSD, Math.Abs(aggregate.Noise))
 
-  flattening.FlattenedSum + noise.Noise
+  (flattening.FlattenedSum + noise.Noise, noise.NoiseSD)
 
 // ----------------------------------------------------------------
 // Public API
@@ -257,11 +284,6 @@ let isLowCount (anonParams: AnonymizationParams) (aidSets: HashSet<AidHash> seq)
       float aidSet.Count < threshold
   )
   |> Seq.reduce (||)
-
-[<RequireQualifiedAccess>]
-type CountResult =
-  | NotEnoughAIDVs
-  | Ok of int64
 
 let countDistinct
   (anonParams: AnonymizationParams)
@@ -291,35 +313,59 @@ let countDistinct
   // we can only report the count of values we already know to be safe as they
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
-    if safeCount > 0L then CountResult.Ok safeCount else CountResult.NotEnoughAIDVs
+    if safeCount > 0L then
+      AnonymizedResult.Ok safeCount
+    else
+      AnonymizedResult.NotEnoughAIDVs
   else
     byAid
     |> List.choose id
     |> anonymizedSum
-    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> CountResult.Ok)
-
-type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: int64 }
+    |> fst
+    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> AnonymizedResult.Ok)
 
 let count
   (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
   (perAidContributions: AidCountState array)
   =
-  let byAid =
-    perAidContributions
-    |> Array.map (fun aidState ->
-      aidState.AidContributions
-      |> Seq.map (fun pair -> pair.Key, pair.Value)
-      |> Seq.toArray
-      |> aidFlattening anonParams anonContext aidState.UnaccountedFor
-    )
+  let byAid = mapAidFlattening anonParams anonContext perAidContributions
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we have to abort anonymization.
   if byAid |> Array.exists ((=) None) then
-    CountResult.NotEnoughAIDVs
+    AnonymizedResult.NotEnoughAIDVs
   else
-    byAid
-    |> Array.choose id
-    |> anonymizedSum
-    |> (Math.roundAwayFromZero >> int64 >> CountResult.Ok)
+    let (value, noiseSD) = byAid |> Array.choose id |> anonymizedSum
+
+    {
+      AnonymizedSum = value |> (Math.roundAwayFromZero >> int64)
+      NoiseSD = noiseSD
+    }
+    |> AnonymizedResult.Ok
+
+let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) isReal =
+  let byAidPositive = mapAidFlattening anonParams anonContext perAidContributions.Positive
+  let byAidNegative = mapAidFlattening anonParams anonContext perAidContributions.Negative
+
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // for both positive and negative values, we have to abort anonymization.
+  if (Array.zip byAidPositive byAidNegative) |> Array.exists ((=) (None, None)) then
+    AnonymizedResult.NotEnoughAIDVs
+  else
+    let anonymizedSumOnNonEmpty =
+      Array.choose id
+      >> function
+        | [||] -> 0.0
+        | nonEmpty -> anonymizedSum nonEmpty |> fst
+
+    // Using `anonymizedSum` separately for positive and negative, we ensure that we pick the appropriate
+    // amount of flattening and noise for each leg, and only later combine the results.
+    let positive = anonymizedSumOnNonEmpty byAidPositive
+    let negative = anonymizedSumOnNonEmpty byAidNegative
+
+    if isReal then
+      (positive - negative) |> (Real >> AnonymizedResult.Ok)
+    else
+      (positive - negative)
+      |> (Math.roundAwayFromZero >> int64 >> Integer >> AnonymizedResult.Ok)

@@ -77,9 +77,12 @@ type SetFunction = | GenerateSeries
 
 type AggregateFunction =
   | Count
+  | CountNoise
   | DiffixCount
+  | DiffixCountNoise
   | DiffixLowCount
   | Sum
+  | DiffixSum
 
 type AggregateOptions =
   {
@@ -316,9 +319,12 @@ module Function =
   let fromString name =
     match name with
     | "count" -> AggregateFunction(Count, AggregateOptions.Default)
+    | "count_noise" -> AggregateFunction(CountNoise, AggregateOptions.Default)
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
+    | "diffix_count_noise" -> AggregateFunction(DiffixCountNoise, AggregateOptions.Default)
     | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
+    | "diffix_sum" -> AggregateFunction(DiffixSum, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply

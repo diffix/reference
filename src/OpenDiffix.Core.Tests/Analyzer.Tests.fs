@@ -354,15 +354,48 @@ type Tests(db: DBFixture) =
     result.Having |> should equal expected
 
   [<Fact>]
-  let ``Fail on sum aggregate`` () =
+  let ``Fail on unsupported aggregate in non-direct access level`` () =
     assertTrustedQueryFails
-      "SELECT sum(age) FROM customers"
-      "Only count aggregates are supported in anonymizing queries."
+      "SELECT diffix_count(*, age) FROM customers"
+      "Only count, count_noise and sum aggregates are supported in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT diffix_count_noise(*, age) FROM customers"
+      "Only count, count_noise and sum aggregates are supported in anonymizing queries."
 
   [<Fact>]
-  let ``Allow count(*) and count(distinct column)`` () =
+  let ``Allow count(*), count(column) (with noise versions) and count(distinct column)`` () =
     analyzeTrustedQuery "SELECT count(*) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count(age) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count_noise(*) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count_noise(age) FROM customers" |> ignore
     analyzeTrustedQuery "SELECT count(distinct age) FROM customers" |> ignore
+
+  [<Fact>]
+  let ``Allow sum(column)`` () =
+    analyzeTrustedQuery "SELECT sum(age) FROM customers" |> ignore
+
+  [<Fact>]
+  let ``Fail on disallowed count`` () =
+    assertTrustedQueryFails
+      "SELECT count(age + id) FROM customers"
+      "Only count(column) is supported in anonymizing queries."
+
+  [<Fact>]
+  let ``Fail on disallowed count_noise`` () =
+    assertTrustedQueryFails
+      "SELECT count_noise(distinct age) FROM customers"
+      "count_noise(distinct column) is not currently supported."
+
+  [<Fact>]
+  let ``Fail on disallowed sum`` () =
+    assertTrustedQueryFails
+      "SELECT sum(distinct age) FROM customers"
+      "Only sum(column) is supported in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT sum(age + id) FROM customers"
+      "Only sum(column) is supported in anonymizing queries."
 
   [<Fact>]
   let ``Disallow multiple low count aggregators`` () =

@@ -63,10 +63,13 @@ let typeOfSetFunction fn _args =
 /// Resolves the type of an aggregate function expression.
 let typeOfAggregate fn args =
   match fn with
-  | Count
+  | Count -> IntegerType
+  | CountNoise -> RealType
   | DiffixCount -> IntegerType
+  | DiffixCountNoise -> RealType
   | DiffixLowCount -> BooleanType
   | Sum -> RealType
+  | DiffixSum -> args |> List.last |> typeOf
 
 /// Resolves the type of an expression.
 let rec typeOf expression =
