@@ -76,16 +76,20 @@ type Tests(db: DBFixture) =
             { Name = "count"; Type = IntegerType }
             { Name = "sum"; Type = IntegerType }
             { Name = "count_noise"; Type = RealType }
+            { Name = "count_noise"; Type = RealType }
+            { Name = "count_noise"; Type = RealType }
+            { Name = "sum_noise"; Type = RealType }
           ]
         Rows =
           [
-            [| String "Berlin"; Integer 10L; Integer 295L; Real 0.0 |]
-            [| String "Rome"; Integer 10L; Integer 300L; Real 0.0 |]
+            [| String "Berlin"; Integer 10L; Integer 295L; Real 0.0; Real 0.0; Real 0.0; Real 0.0 |]
+            [| String "Rome"; Integer 10L; Integer 300L; Real 0.0; Real 0.0; Real 0.0; Real 0.0 |]
           ]
       }
 
     let queryResult =
-      runQuery "SELECT city, count(distinct id), sum(age), count_noise(*) FROM customers_small GROUP BY city"
+      runQuery
+        "SELECT city, count(distinct id), sum(age), count_noise(*), count_noise(id), count_noise(distinct id), sum_noise(age) FROM customers_small GROUP BY city"
 
     queryResult |> should equal expected
 

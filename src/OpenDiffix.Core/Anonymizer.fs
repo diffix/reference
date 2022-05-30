@@ -10,7 +10,7 @@ type AnonymizedResult<'T> =
 
 type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
 
-type CountResult = { AnonymizedSum: int64; NoiseSD: float }
+type CountResult<'T> = { AnonymizedSum: 'T; NoiseSD: float }
 
 type SumState =
   {
@@ -314,15 +314,17 @@ let countDistinct
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
     if safeCount > 0L then
-      AnonymizedResult.Ok safeCount
+      { AnonymizedSum = safeCount; NoiseSD = 0.0 } |> AnonymizedResult.Ok
     else
       AnonymizedResult.NotEnoughAIDVs
   else
-    byAid
-    |> List.choose id
-    |> anonymizedSum
-    |> fst
-    |> (Math.roundAwayFromZero >> int64 >> (+) safeCount >> AnonymizedResult.Ok)
+    let (value, noiseSD) = byAid |> List.choose id |> anonymizedSum
+
+    {
+      AnonymizedSum = value |> (Math.roundAwayFromZero >> int64 >> (+) safeCount)
+      NoiseSD = noiseSD
+    }
+    |> AnonymizedResult.Ok
 
 let count
   (anonParams: AnonymizationParams)
@@ -356,16 +358,21 @@ let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (p
     let anonymizedSumOnNonEmpty =
       Array.choose id
       >> function
-        | [||] -> 0.0
-        | nonEmpty -> anonymizedSum nonEmpty |> fst
+        | [||] -> (0.0, 0.0)
+        | nonEmpty -> anonymizedSum nonEmpty
 
     // Using `anonymizedSum` separately for positive and negative, we ensure that we pick the appropriate
     // amount of flattening and noise for each leg, and only later combine the results.
-    let positive = anonymizedSumOnNonEmpty byAidPositive
-    let negative = anonymizedSumOnNonEmpty byAidNegative
+    let (positive, positiveNoiseSD) = anonymizedSumOnNonEmpty byAidPositive
+    let (negative, negativeNoiseSD) = anonymizedSumOnNonEmpty byAidNegative
+    let noiseSD = Math.Sqrt(positiveNoiseSD ** 2.0 + negativeNoiseSD ** 2.0)
 
     if isReal then
-      (positive - negative) |> (Real >> AnonymizedResult.Ok)
+      { AnonymizedSum = Real(positive - negative); NoiseSD = noiseSD }
+      |> AnonymizedResult.Ok
     else
-      (positive - negative)
-      |> (Math.roundAwayFromZero >> int64 >> Integer >> AnonymizedResult.Ok)
+      {
+        AnonymizedSum = (positive - negative) |> (Math.roundAwayFromZero >> int64 >> Integer)
+        NoiseSD = noiseSD
+      }
+      |> AnonymizedResult.Ok

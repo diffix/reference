@@ -70,6 +70,8 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
      let aggregateArgs, args =
        match parsedArg with
        | ParserTypes.Star -> aggregateArgs, []
+       | ParserTypes.Distinct parsedExpr ->
+         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
        | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
 
      AggregateFunction(DiffixCountNoise, aggregateArgs), mapAids parsedAids :: args
@@ -81,6 +83,14 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
        | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
 
      AggregateFunction(DiffixSum, aggregateArgs), mapAids parsedAids :: args
+   | AggregateFunction (DiffixSumNoise, aggregateArgs), parsedArg :: parsedAids ->
+     let aggregateArgs, args =
+       match parsedArg with
+       | ParserTypes.Distinct parsedExpr ->
+         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixSumNoise, aggregateArgs), mapAids parsedAids :: args
    | AggregateFunction (DiffixAvg, aggregateArgs), parsedArgs -> //
      mapAvg aggregateArgs parsedArgs DiffixSum DiffixCount
    | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
@@ -313,12 +323,15 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
     | Count -> DiffixCount
     | CountNoise -> DiffixCountNoise
     | Sum -> DiffixSum
+    | SumNoise -> DiffixSumNoise
     | Avg -> DiffixAvg
     | other -> other
 
   let rec exprMapper expr =
     match expr with
-    | FunctionExpr (AggregateFunction (agg, opts), args) when List.contains agg [ Count; CountNoise; Sum; Avg ] ->
+    | FunctionExpr (AggregateFunction (agg, opts), args) when
+      List.contains agg [ Count; CountNoise; Sum; SumNoise; Avg ]
+      ->
       FunctionExpr(AggregateFunction(anonymizing agg, opts), aidColumnsExpression :: args)
     | other -> other |> map exprMapper
 
