@@ -337,12 +337,10 @@ let countDistinctAid
     [ anonContext.BucketSeed; aidSeed ]
     |> generateNoise anonParams.Salt "noise" anonParams.LayerNoiseSD
 
-  let noisyCount = (float numAids + noise) |> Math.roundAwayFromZero |> int64
-
-  if noisyCount < anonParams.Suppression.LowThreshold then
-    AnonymizedResult.NotEnoughAIDVs
-  else
-    AnonymizedResult.Ok noisyCount
+  (float numAids + noise)
+  |> Math.roundAwayFromZero
+  |> int64
+  |> max anonParams.Suppression.LowThreshold
 
 let count
   (anonParams: AnonymizationParams)
