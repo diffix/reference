@@ -74,12 +74,12 @@ type Tests(db: DBFixture) =
           [
             { Name = "city"; Type = StringType }
             { Name = "count"; Type = IntegerType }
-            { Name = "sum"; Type = RealType }
+            { Name = "sum"; Type = IntegerType }
             { Name = "count_noise"; Type = RealType }
           ]
         Rows =
           [
-            [| String "Berlin"; Integer 10L; Integer 320L; Real 0.0 |]
+            [| String "Berlin"; Integer 10L; Integer 295L; Real 0.0 |]
             [| String "Rome"; Integer 10L; Integer 300L; Real 0.0 |]
           ]
       }
@@ -172,6 +172,14 @@ type Tests(db: DBFixture) =
       }
 
     queryResult |> should equal expected
+
+  [<Fact>]
+  let ``query 14 - avg parity`` () =
+    let expected = runQuery "SELECT sum(age) / cast(count(age), 'real') as avg FROM customers_small GROUP BY city"
+    let queryResult = runQuery "SELECT avg(age) FROM customers_small GROUP BY city"
+
+    queryResult |> should equal expected
+
 
   [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
