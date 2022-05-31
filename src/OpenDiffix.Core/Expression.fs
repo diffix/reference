@@ -204,6 +204,10 @@ let rec evaluateScalarFunction fn args =
   | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
 
+  | Cast, [ Integer i; String "integer" ] -> Integer i
+  | Cast, [ Real r; String "real" ] -> Real r
+  | Cast, [ Boolean b; String "boolean" ] -> Boolean b
+  | Cast, [ String s; String "string" ] -> String s
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 
 /// Evaluates the result sequence of a set function invocation.

@@ -108,6 +108,12 @@ let ``normalize casts (2)`` () =
     "SELECT cast(age as real) as c FROM table"
 
 [<Fact>]
+let ``normalize casts (3)`` () =
+  equivalentQueries //
+    "SELECT cast(1.01 as real) AS c FROM table"
+    "SELECT 1.01 as c FROM table"
+
+[<Fact>]
 let ``normalize ranges (1)`` () =
   equivalentQueries //
     "SELECT round(age) AS x FROM table"
