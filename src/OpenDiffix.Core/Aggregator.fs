@@ -236,7 +236,18 @@ type private DiffixCountDistinct(aidsCount) =
 
       match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount aidsPerValue with
       | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.AnonymizedResult.Ok value -> Integer(max value minCount)
+      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> Integer(max value minCount)
+
+type private DiffixCountDistinctNoise(aidsCount) =
+  inherit DiffixCountDistinct(aidsCount)
+
+  interface IAggregator with
+    override this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
+      match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext this.AidsCount this.State with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixLowCount(aidsCount) =
   let mutable state: HashSet<AidHash> [] = emptySets aidsCount
@@ -355,7 +366,21 @@ type private DiffixSum(summandType, aidsCount) =
 
       match Anonymizer.sum aggContext.AnonymizationParams anonContext state isReal with
       | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-      | Anonymizer.AnonymizedResult.Ok value -> value
+      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> value
+
+
+type private DiffixSumNoise(summandType, aidsCount) =
+  inherit DiffixSum(summandType, aidsCount)
+
+  interface IAggregator with
+    override this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
+
+      let isReal = this.SummandType = RealType
+
+      match Anonymizer.sum aggContext.AnonymizationParams anonContext this.State isReal with
+      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
+      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
 
 // ----------------------------------------------------------------
 // Public API
@@ -369,6 +394,7 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixCountNoise
   | DiffixLowCount
   | DiffixSum
+  | DiffixSumNoise
   | DiffixAvg -> true
   | _ -> false
 
@@ -390,8 +416,12 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | DiffixCount, { Distinct = false } -> DiffixCount(aidsCount) :> T
   | DiffixCountNoise, { Distinct = false } -> DiffixCountNoise(aidsCount) :> T
   | DiffixCount, { Distinct = true } -> DiffixCountDistinct(aidsCount) :> T
+  | DiffixCountNoise, { Distinct = true } -> DiffixCountDistinctNoise(aidsCount) :> T
   | DiffixLowCount, _ -> DiffixLowCount(aidsCount) :> T
   | DiffixSum, { Distinct = false } ->
     let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
     DiffixSum(aggType, aidsCount) :> T
+  | DiffixSumNoise, { Distinct = false } ->
+    let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
+    DiffixSumNoise(aggType, aidsCount) :> T
   | _ -> failwith "Invalid aggregator"

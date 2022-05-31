@@ -32,8 +32,9 @@ let private validateAllowedAggregates query =
     | FunctionExpr (AggregateFunction (Count, _), _) -> ()
     | FunctionExpr (AggregateFunction (CountNoise, _), _) -> ()
     | FunctionExpr (AggregateFunction (Sum, _), _) -> ()
+    | FunctionExpr (AggregateFunction (SumNoise, _), _) -> ()
     | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
-      failwith "Only count, count_noise and sum aggregates are supported in anonymizing queries."
+      failwith "Aggregate not supported in anonymizing queries."
     | _ -> ()
   )
 
@@ -42,13 +43,11 @@ let private allowedCountUsage query =
   |> visitAggregates (
     function
     | FunctionExpr (AggregateFunction (Count, _), args)
-    | FunctionExpr (AggregateFunction (CountNoise, { Distinct = false }), args) ->
+    | FunctionExpr (AggregateFunction (CountNoise, _), args) ->
       match args with
       | []
       | [ ColumnReference _ ] -> ()
       | _ -> failwith "Only count(column) is supported in anonymizing queries."
-    | FunctionExpr (AggregateFunction (CountNoise, { Distinct = true }), _) ->
-      failwith "count_noise(distinct column) is not currently supported."
     | _ -> ()
   )
 
@@ -56,7 +55,8 @@ let private allowedSumUsage query =
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Sum, { Distinct = distinct }), args) ->
+    | FunctionExpr (AggregateFunction (Sum, { Distinct = distinct }), args)
+    | FunctionExpr (AggregateFunction (SumNoise, { Distinct = distinct }), args) ->
       match distinct, args with
       | false, [ ColumnReference _ ] -> ()
       | _ -> failwith "Only sum(column) is supported in anonymizing queries."
