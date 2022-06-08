@@ -71,9 +71,11 @@ let typeOfAggregate fn args =
   | Sum -> args |> List.last |> typeOf
   | SumNoise -> RealType
   | Avg -> RealType
+  | AvgNoise -> RealType
   | DiffixSum -> args |> List.last |> typeOf
   | DiffixSumNoise -> RealType
   | DiffixAvg -> RealType
+  | DiffixAvgNoise -> RealType
 
 /// Resolves the type of an expression.
 let rec typeOf expression =
