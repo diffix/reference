@@ -62,3 +62,25 @@ module ComparerTests =
     [ String "+a"; String "a"; String " a"; String "b" ]
     |> sort Ascending NullsLast
     |> should equal [ String " a"; String "+a"; String "a"; String "b" ]
+
+  [<Fact>]
+  let ``Money rounding`` () =
+    Value.moneyRound 5.0 |> should (equalWithin 1e-10) 5.0
+    Value.moneyRound 5.1 |> should (equalWithin 1e-10) 5.0
+    Value.moneyRound 4.9 |> should (equalWithin 1e-10) 5.0
+    Value.moneyRound 2.9 |> should (equalWithin 1e-10) 2.0
+    Value.moneyRound 0.00009 |> should (equalWithin 1e-10) 0.0001
+    Value.moneyRound 0.02009 |> should (equalWithin 1e-10) 0.02
+    Value.moneyRound 0.00509 |> should (equalWithin 1e-10) 0.005
+    Value.moneyRound 0.00019 |> should (equalWithin 1e-10) 0.0002
+    Value.moneyRound 0.000000000000009 |> should (equalWithin 1e-10) 0.
+    Value.moneyRound 100000.0000000009 |> should (equalWithin 1e-10) 100000.
+
+  [<Fact>]
+  let ``Money rounded checking`` () =
+    Value.isMoneyRounded (Real 5.0) |> should equal true
+    Value.isMoneyRounded (Real 5.1) |> should equal false
+    Value.isMoneyRounded (Real 0.00009) |> should equal false
+    Value.isMoneyRounded (Real 0.000000000000009) |> should equal true
+    Value.isMoneyRounded (Real 100000.0000000009) |> should equal false
+    Value.isMoneyRounded (Real 100000.000000000000009) |> should equal true

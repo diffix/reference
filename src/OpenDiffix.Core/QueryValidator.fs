@@ -4,13 +4,6 @@ open System.Text.RegularExpressions
 open AnalyzerTypes
 open NodeUtils
 
-let private isMoneyStyle arg =
-  match arg with
-  // "money-style" numbers, i.e. 1, 2, or 5 preceeded by or followed by zeros: ⟨... 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, ...⟩
-  | Constant (Real c) -> Regex.IsMatch($"%.15e{c}", "^[125]\.0+e[-+]\d+$")
-  | Constant (Integer c) -> Regex.IsMatch($"%i{c}", "^[125]0*$")
-  | _ -> false
-
 let private validateSingleLowCount query =
   let lowCountAggregators =
     query
@@ -81,7 +74,10 @@ let private validateGeneralization accessLevel expression =
   if accessLevel = PublishUntrusted then
     match expression with
     | FunctionExpr (ScalarFunction fn, [ _ ]) when List.contains fn [ Floor; Ceil; Round ] -> ()
-    | FunctionExpr (ScalarFunction fn, [ _; arg ]) when List.contains fn [ FloorBy; RoundBy ] && isMoneyStyle arg -> ()
+    | FunctionExpr (ScalarFunction fn, [ _; Constant c ]) when
+      List.contains fn [ FloorBy; RoundBy ] && Value.isMoneyRounded c
+      ->
+      ()
     | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | ColumnReference _ -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
