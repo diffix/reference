@@ -1,5 +1,6 @@
 module OpenDiffix.Core.Value
 
+open System
 open System.Globalization
 
 /// Sort-related constants
@@ -70,21 +71,19 @@ let comparer direction nulls =
 let MONEY_ROUND_MIN = 1e-10
 let MONEY_ROUND_DELTA = MONEY_ROUND_MIN / 100.0
 
-let rec moneyRound (value: float) : float =
+// Works with `value` between 1.0 and 10.0.
+let private moneyRoundInternal value =
+  if value >= 1.0 && value < 1.5 then 1.0
+  else if value >= 1.5 && value < 3.5 then 2.0
+  else if value >= 3.5 && value < 7.5 then 5.0
+  else 10.0
+
+let moneyRound value =
   if value >= 0.0 && value < MONEY_ROUND_MIN then
     0.0
-  else if value >= MONEY_ROUND_MIN && value < 1.0 then
-    0.1 * (moneyRound (10.0 * value))
-  else if value >= 1.0 && value < 1.5 then
-    1.0
-  else if value >= 1.5 && value < 3.5 then
-    2.0
-  else if value >= 3.5 && value < 7.5 then
-    5.0
-  else if value >= 7.5 && value < 10.0 then
-    10.0
   else
-    10.0 * (moneyRound (0.1 * value))
+    let tens = Math.Pow(10.0, floor (Math.Log10(value)))
+    tens * (moneyRoundInternal (value / tens))
 
 let isMoneyRounded arg =
   match arg with
