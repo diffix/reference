@@ -184,6 +184,13 @@ type Tests(db: DBFixture) =
 
     queryResult |> should equal expected
 
+  [<Fact>]
+  let ``query 14 - avg_noise parity`` () =
+    let expected = runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
+
+    let queryResult = runQuery "SELECT avg_noise(age) FROM customers_small GROUP BY city"
+
+    queryResult |> should equal expected
 
   [<Fact>]
   let ``Subquery wrappers produce consistent results`` () =
