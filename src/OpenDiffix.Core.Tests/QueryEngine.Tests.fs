@@ -186,8 +186,7 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 14 - avg_noise parity`` () =
-    let expected =
-      runQuery "SELECT sum_noise(age) / cast(count(age), 'real') as avg_noise FROM customers_small GROUP BY city"
+    let expected = runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
 
     let queryResult = runQuery "SELECT avg_noise(age) FROM customers_small GROUP BY city"
 
