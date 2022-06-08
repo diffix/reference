@@ -66,3 +66,29 @@ let comparer direction nulls =
         // `StringSort` means symbols come last and we group letter cases together.
         directionValue * stringCompareInfo.Compare(x, y, stringSortFlag)
     | x, y -> directionValue * Operators.compare x y
+
+let MONEY_ROUND_MIN = 1e-10
+let MONEY_ROUND_DELTA = MONEY_ROUND_MIN / 100.0
+
+let rec moneyRound (value: float) : float =
+  if value >= 0.0 && value < MONEY_ROUND_MIN then
+    0.0
+  else if value >= MONEY_ROUND_MIN && value < 1.0 then
+    0.1 * (moneyRound (10.0 * value))
+  else if value >= 1.0 && value < 1.5 then
+    1.0
+  else if value >= 1.5 && value < 3.5 then
+    2.0
+  else if value >= 3.5 && value < 7.5 then
+    5.0
+  else if value >= 7.5 && value < 10.0 then
+    10.0
+  else
+    10.0 * (moneyRound (0.1 * value))
+
+let isMoneyRounded arg =
+  match arg with
+  // "money-style" numbers, i.e. 1, 2, or 5 preceeded by or followed by zeros: ⟨... 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, ...⟩
+  | Real c -> abs (moneyRound (c) - c) < MONEY_ROUND_DELTA
+  | Integer c -> abs (moneyRound (float c) - float c) < MONEY_ROUND_DELTA
+  | _ -> false
