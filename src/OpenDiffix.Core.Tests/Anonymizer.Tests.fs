@@ -80,13 +80,13 @@ let ``anon count()`` () =
 
 [<Fact>]
 let ``anon count_noise()`` () =
-  // noise proportional to flattened avg of 30/9 = 3.333...
+  // noise proportional to flattened avg of 30/9 = 3.333..., money rounded to 3.4
   rows
   |> evaluateAggregatorNoisy diffixCountNoise [ aidColumnList ]
   |> function
     | Real value -> value
     | _ -> failwith "Unexpected aggregator result"
-  |> should (equalWithin 1e-3) 3.333
+  |> should (equalWithin 1e-3) 3.4
 
 [<Fact>]
 let ``anon count(col)`` () =
@@ -97,13 +97,13 @@ let ``anon count(col)`` () =
 
 [<Fact>]
 let ``anon count_noise(col)`` () =
-  // noise proportional to flattened avg of 30/9 = 3.333...
+  // noise proportional to flattened avg of 30/9 = 3.333..., money rounded to 3.4
   rows
   |> evaluateAggregatorNoisy diffixCountNoise [ aidColumnList; strColumn ]
   |> function
     | Real value -> value
     | _ -> failwith "Unexpected aggregator result"
-  |> should (equalWithin 1e-3) 3.333
+  |> should (equalWithin 1e-3) 3.4
 
 [<Fact>]
 let ``anon sum(real col)`` () =

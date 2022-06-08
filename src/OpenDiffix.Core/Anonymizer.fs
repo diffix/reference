@@ -259,6 +259,14 @@ let private anonymizedSum (byAidSum: AidCount seq) =
 
   (flattening.FlattenedSum + noise.Noise, noise.NoiseSD)
 
+let private moneyRoundNoise noiseSD =
+  if noiseSD = 0.0 then
+    0.0
+  else
+    let roundingResolution = Value.moneyRound (0.05 * noiseSD)
+
+    (noiseSD / roundingResolution) |> ceil |> (*) roundingResolution
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -322,7 +330,7 @@ let countDistinct
 
     {
       AnonymizedSum = value |> (Math.roundAwayFromZero >> int64 >> (+) safeCount)
-      NoiseSD = noiseSD
+      NoiseSD = moneyRoundNoise noiseSD
     }
     |> AnonymizedResult.Ok
 
@@ -342,7 +350,7 @@ let count
 
     {
       AnonymizedSum = value |> (Math.roundAwayFromZero >> int64)
-      NoiseSD = noiseSD
+      NoiseSD = moneyRoundNoise noiseSD
     }
     |> AnonymizedResult.Ok
 
@@ -368,11 +376,11 @@ let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (p
     let noiseSD = Math.Sqrt(positiveNoiseSD ** 2.0 + negativeNoiseSD ** 2.0)
 
     if isReal then
-      { AnonymizedSum = Real(positive - negative); NoiseSD = noiseSD }
+      { AnonymizedSum = Real(positive - negative); NoiseSD = moneyRoundNoise noiseSD }
       |> AnonymizedResult.Ok
     else
       {
         AnonymizedSum = (positive - negative) |> (Math.roundAwayFromZero >> int64 >> Integer)
-        NoiseSD = noiseSD
+        NoiseSD = moneyRoundNoise noiseSD
       }
       |> AnonymizedResult.Ok
