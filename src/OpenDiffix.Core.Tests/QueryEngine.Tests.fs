@@ -198,19 +198,6 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers_small GROUP BY city, city ORDER BY 1"
       "SELECT count(*) FROM customers_small GROUP BY city ORDER BY 1"
 
-  [<Fact>]
-  let ``Filtering and grouping doesn't change results`` () =
-    equivalentQueries
-      "SELECT count(*) FROM customers GROUP BY city HAVING city = 'Berlin'"
-      "SELECT count(*) FROM customers WHERE city = 'Berlin'"
-
-    equivalentQueries
-      "SELECT count(*) FROM customers GROUP BY city, round_by(age, 10) HAVING city = 'Berlin' AND round_by(age, 10) = 20"
-      "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20"
-
-    equivalentQueries
-      "SELECT count(*) FROM customers WHERE round_by(age, 10) = 20 GROUP BY city HAVING city = 'Berlin'"
-      "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20"
 
   [<Fact>]
   let ``Anonymizing subquery`` () =

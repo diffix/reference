@@ -354,42 +354,23 @@ let private compileQuery anonParams (query: SelectQuery) =
   // in `compileAnonymizingQuery` and explicit use of noisy aggregators like `diffix_low_count`.
   // If there aren't any, we also don't need to do the validations which are done deep in `computeSQLSeed`.
   if hasAnonymizingAggregators query then
-    let normalizedBucketExpressions =
-      (query.GroupBy @ gatherBucketExpressionsFromFilter query.Where)
-      |> Seq.map normalizeBucketExpression
+    let rangeColumns = collectRangeColumns anonParams query.From
+    let normalizedBucketLabelExpressions = query.GroupBy |> Seq.map (normalizeBucketLabelExpression)
 
-    QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketExpressions
-
-    let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketExpressions
-    let baseLabels = gatherBucketLabelsFromFilter query.Where
-    let anonContext = Some { BucketSeed = sqlSeed; BaseLabels = baseLabels }
-    { query with AnonymizationContext = anonContext }
+    QueryValidator.validateGeneralizations anonParams.AccessLevel normalizedBucketLabelExpressions
+    let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketLabelExpressions
+    { query with AnonymizationContext = Some { BucketSeed = sqlSeed } }
   else
     query
 
-let rec private gatherBucketExpressionsFromFilter filter =
-  match filter with
-  | Constant (Boolean true) -> []
-  | FunctionExpr (ScalarFunction And, args) -> args |> List.collect gatherBucketExpressionsFromFilter
-  | FunctionExpr (ScalarFunction Eq, [ bucketExpression; Constant _ ]) -> [ bucketExpression ]
-  | _ ->
-    failwith "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
 
-let rec private gatherBucketLabelsFromFilter filter =
-  match filter with
-  | Constant (Boolean true) -> []
-  | FunctionExpr (ScalarFunction And, args) -> args |> List.collect gatherBucketLabelsFromFilter
-  | FunctionExpr (ScalarFunction Eq, [ _; Constant bucketLabel ]) -> [ bucketLabel ]
-  | _ ->
-    failwith "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
-
-let rec private normalizeBucketExpression expression =
+let rec private normalizeBucketLabelExpression expression =
   match expression with
   | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) when
     Expression.typeOf expression = RealType
     ->
-    FunctionExpr(ScalarFunction RoundBy, [ normalizeBucketExpression expression; 1.0 |> Real |> Constant ])
-  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketExpression expression
+    FunctionExpr(ScalarFunction RoundBy, [ normalizeBucketLabelExpression expression; 1.0 |> Real |> Constant ])
+  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketLabelExpression expression
   | FunctionExpr (ScalarFunction fn, args) ->
     let fn, extraArgs =
       match fn with
@@ -398,7 +379,7 @@ let rec private normalizeBucketExpression expression =
       | Round -> RoundBy, [ 1.0 |> Real |> Constant ]
       | _ -> fn, []
 
-    FunctionExpr(ScalarFunction fn, List.map normalizeBucketExpression args @ extraArgs)
+    FunctionExpr(ScalarFunction fn, List.map normalizeBucketLabelExpression args @ extraArgs)
   | _ -> expression
 
 // ----------------------------------------------------------------

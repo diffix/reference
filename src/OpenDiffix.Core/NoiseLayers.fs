@@ -33,7 +33,7 @@ let private collectSeedMaterials rangeColumns expression =
 // Public API
 // ----------------------------------------------------------------
 
-let computeSQLSeed rangeColumns normalizedBucketExpressions =
-  normalizedBucketExpressions
+let computeSQLSeed rangeColumns normalizedBucketLabelExpressions =
+  normalizedBucketLabelExpressions
   |> Seq.map (collectSeedMaterials rangeColumns)
   |> Hash.strings 0UL
