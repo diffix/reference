@@ -27,6 +27,7 @@ type ExpressionType =
   | IntegerType
   | RealType
   | StringType
+  | ListType of ExpressionType
   | UnknownType of string
 
 type Expression =
@@ -297,7 +298,7 @@ module Expression =
     | Boolean b -> b.ToString()
     | Integer i -> i.ToString()
     | Real r -> r.ToString()
-    | String s -> "'" + s.Replace("'", "''") + "'"
+    | String s -> String.quoteSingle s
     | List values -> "[" + (values |> List.map valueToString |> String.joinWithComma) + "]"
 
   let toString expr =

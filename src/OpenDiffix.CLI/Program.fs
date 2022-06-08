@@ -153,18 +153,16 @@ let runQuery query filePath anonParams =
   let queryContext = QueryContext.make anonParams dataProvider
   QueryEngine.run queryContext query
 
-let quoteString (string: string) =
-  "\"" + string.Replace("\"", "\"\"") + "\""
-
 let csvFormat value =
   match value with
-  | String string -> quoteString string
+  | String s -> String.quote s
+  | List _ -> value |> Value.toString |> String.quote
   | _ -> Value.toString value
 
 let csvFormatter result =
   let header =
     result.Columns
-    |> List.map (fun column -> quoteString column.Name)
+    |> List.map (fun column -> String.quote column.Name)
     |> String.join ","
 
   let rows =

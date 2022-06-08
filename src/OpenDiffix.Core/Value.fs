@@ -16,8 +16,8 @@ let rec toString value =
   | Boolean false -> "f"
   | Integer i -> i.ToString()
   | Real r -> r.ToString()
-  | String s -> s
-  | List values -> values |> List.map toString |> String.join ","
+  | String s -> String.quoteSingle s
+  | List values -> "[" + (values |> List.map toString |> String.joinWithComma) + "]"
 
 /// Resolves the type of a value.
 let rec typeOf value =
@@ -27,7 +27,7 @@ let rec typeOf value =
   | Integer _ -> IntegerType
   | Real _ -> RealType
   | String _ -> StringType
-  | List values -> values |> List.map typeOf |> ExpressionType.commonType
+  | List values -> values |> List.map typeOf |> ExpressionType.commonType |> ListType
 
 /// Attempts to convert a value to a boolean.
 let unwrapBoolean value =

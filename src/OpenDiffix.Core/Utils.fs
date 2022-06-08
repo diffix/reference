@@ -15,6 +15,11 @@ module String =
 
   let joinWithComma (values: seq<'T>) = join ", " values
 
+  let quote (string: string) =
+    "\"" + string.Replace("\"", "\"\"") + "\""
+
+  let quoteSingle (string: string) = "'" + string.Replace("'", "''") + "'"
+
   let equalsI s1 s2 =
     String.Equals(s1, s2, StringComparison.InvariantCultureIgnoreCase)
 

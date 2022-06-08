@@ -85,7 +85,7 @@ let rec typeOf expression =
   | FunctionExpr (AggregateFunction (fn, _options), args) -> typeOfAggregate fn args
   | ColumnReference (_, exprType) -> exprType
   | Constant c -> Value.typeOf c
-  | ListExpr expressions -> typeOfList expressions
+  | ListExpr expressions -> ListType(typeOfList expressions)
 
 // ----------------------------------------------------------------
 // Evaluation
