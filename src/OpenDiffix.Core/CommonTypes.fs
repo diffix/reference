@@ -90,6 +90,8 @@ type AggregateFunction =
   | AvgNoise
   | DiffixAvg
   | DiffixAvgNoise
+  | CountHistogram
+  | DiffixCountHistogram
 
 type AggregateOptions =
   {
@@ -331,6 +333,7 @@ module Function =
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
     | "avg" -> AggregateFunction(Avg, AggregateOptions.Default)
     | "avg_noise" -> AggregateFunction(AvgNoise, AggregateOptions.Default)
+    | "count_histogram" -> AggregateFunction(CountHistogram, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
     | "diffix_count_noise" -> AggregateFunction(DiffixCountNoise, AggregateOptions.Default)
     | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
@@ -338,6 +341,7 @@ module Function =
     | "diffix_sum_noise" -> AggregateFunction(DiffixSumNoise, AggregateOptions.Default)
     | "diffix_avg" -> AggregateFunction(DiffixAvg, AggregateOptions.Default)
     | "diffix_avg_noise" -> AggregateFunction(DiffixAvgNoise, AggregateOptions.Default)
+    | "diffix_count_histogram" -> AggregateFunction(DiffixCountHistogram, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply

@@ -382,6 +382,125 @@ type private DiffixSumNoise(summandType, aidsCount) =
       | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
       | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
 
+
+type private CountHistogram(binSize: int64 option) =
+  let state = Dictionary<Value, int64>()
+
+  let generalize count =
+    match binSize with
+    | None
+    | Some 1L -> count
+    | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
+
+  interface IAggregator with
+    member this.Transition args =
+      match args with
+      | Null :: _ -> () // Ignore NULLs
+      | aid :: _ -> state |> Dictionary.increment aid
+      | _ -> invalidArgs args
+
+    member this.Merge aggregator =
+      let otherState = (castAggregator<CountHistogram> aggregator).State
+
+      for other in otherState do
+        let current = state |> Dictionary.getOrDefault other.Key 0L
+        state.[other.Key] <- current + other.Value
+
+    member this.Final(aggContext, anonContext) =
+      let bins = Dictionary<int64, int64>()
+
+      for pair in state do
+        let binLabel = generalize pair.Value
+        bins |> Dictionary.increment binLabel
+
+      bins
+      |> Seq.map (fun pair -> (pair.Key, pair.Value))
+      |> Seq.sortBy fst
+      |> Seq.map (fun (binLabel, aidCount) -> Value.List [ Integer binLabel; Integer aidCount ])
+      |> Seq.toList
+      |> Value.List
+
+  member this.State = state
+
+
+type private CountHistogramAidTracker = { mutable RowCount: int64; LowCount: DiffixLowCount }
+
+type private CountHistogramBin = { mutable AidCount: int64; LowCount: DiffixLowCount }
+
+type private DiffixCountHistogram(aidsCount, binSize: int64 option) =
+  let state = Dictionary<AidHash, CountHistogramAidTracker>()
+
+  let makeAidTracker () =
+    { RowCount = 0; LowCount = DiffixLowCount(aidsCount) }
+
+  let generalize count =
+    match binSize with
+    | None
+    | Some 1L -> count
+    | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
+
+  interface IAggregator with
+    member this.Transition args =
+      match args with
+      | Value.List [] :: _ -> invalidArgs args
+      | _aidInstances :: Null :: _ -> () // Ignore NULLs
+      | aidInstances :: aid :: _ ->
+        let aidState = state |> Dictionary.getOrInit (hashAid aid) makeAidTracker
+        aidState.RowCount <- aidState.RowCount + 1L
+        (aidState.LowCount :> IAggregator).Transition([ aidInstances ])
+      | _ -> invalidArgs args
+
+    member this.Merge aggregator =
+      let otherState = (castAggregator<DiffixCountHistogram> aggregator).State
+
+      for other in otherState do
+        let currentState = state |> Dictionary.getOrInit other.Key makeAidTracker
+        currentState.RowCount <- currentState.RowCount + other.Value.RowCount
+        (currentState.LowCount :> IAggregator).Merge(other.Value.LowCount)
+
+    member this.Final(aggContext, anonContext) =
+      let bins = Dictionary<int64, CountHistogramBin>()
+
+      for pair in state do
+        let aidEntry = pair.Value
+        let binLabel = generalize aidEntry.RowCount
+
+        match bins.TryGetValue(binLabel) with
+        | true, bin ->
+          // Bin already exists, merge to it.
+          (bin.LowCount :> IAggregator).Merge(aidEntry.LowCount)
+          bin.AidCount <- bin.AidCount + 1L
+        | false, _ ->
+          // New bin, move ownership from current tracker because we don't need it any further.
+          bins.[binLabel] <- { AidCount = 1L; LowCount = aidEntry.LowCount }
+
+      let suppressBin = { AidCount = 0L; LowCount = DiffixLowCount(aidsCount) }
+
+      let highCountBins =
+        bins
+        |> Seq.choose (fun pair ->
+          let binLabel = pair.Key
+          let bin = pair.Value
+
+          if Anonymizer.isLowCount aggContext.AnonymizationParams bin.LowCount.State then
+            // Merge low count bin to suppress bin.
+            suppressBin.AidCount <- suppressBin.AidCount + bin.AidCount
+            (suppressBin.LowCount :> IAggregator).Merge(bin.LowCount)
+            None
+          else
+            Some(binLabel, bin.AidCount)
+        )
+        |> Seq.sortBy fst
+        |> Seq.map (fun (binLabel, aidCount) -> Value.List [ Integer binLabel; Integer aidCount ])
+        |> Seq.toList
+
+      if Anonymizer.isLowCount aggContext.AnonymizationParams suppressBin.LowCount.State then
+        Value.List highCountBins
+      else
+        Value.List((Value.List [ Null; Integer suppressBin.AidCount ]) :: highCountBins)
+
+  member this.State = state
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -396,7 +515,8 @@ let isAnonymizing ((fn, _args): AggregatorSpec) =
   | DiffixSum
   | DiffixSumNoise
   | DiffixAvg
-  | DiffixAvgNoise -> true
+  | DiffixAvgNoise
+  | DiffixCountHistogram -> true
   | _ -> false
 
 let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
@@ -409,6 +529,15 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
         | _ -> failwith "Expected the AID argument to be a ListExpr."
     else
       0
+
+  let unpackConstInt index =
+    aggArgs
+    |> List.tryItem index
+    |> Option.map (
+      function
+      | Constant (Integer x) when x >= 1L -> x
+      | _ -> failwith $"Expected positive integer argument in index {index} of aggregate {fst aggSpec}."
+    )
 
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
@@ -425,4 +554,6 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | DiffixSumNoise, { Distinct = false } ->
     let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
     DiffixSumNoise(aggType, aidsCount) :> T
+  | CountHistogram, { Distinct = false } -> CountHistogram(unpackConstInt (1)) :> T
+  | DiffixCountHistogram, { Distinct = false } -> DiffixCountHistogram(aidsCount, unpackConstInt (2)) :> T
   | _ -> failwith "Invalid aggregator"

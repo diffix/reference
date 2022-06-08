@@ -49,11 +49,11 @@ module Dictionary =
       dict.[key] <- value
       value
 
-  let increment key (dict: Dictionary<'K, int>) =
+  let inline increment key (dict: Dictionary<'K, ^V>) =
     dict.[key] <-
       match dict.TryGetValue(key) with
-      | true, count -> count + 1
-      | false, _ -> 1
+      | true, count -> count + LanguagePrimitives.GenericOne
+      | false, _ -> LanguagePrimitives.GenericOne
 
 type Hash = uint64
 

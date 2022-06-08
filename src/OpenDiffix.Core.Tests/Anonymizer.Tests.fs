@@ -52,10 +52,12 @@ let evaluateAggregatorNoisy fn args =
   TestHelpers.evaluateAggregator (aggContextNoisy, Some { BucketSeed = 0UL; BaseLabels = [] }) fn args
 
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
-let diffixCount = DiffixCount, { AggregateOptions.Default with Distinct = false }
-let diffixCountNoise = DiffixCountNoise, { AggregateOptions.Default with Distinct = false }
+let diffixCount = DiffixCount, AggregateOptions.Default
+let diffixCountNoise = DiffixCountNoise, AggregateOptions.Default
 let diffixLowCount = DiffixLowCount, AggregateOptions.Default
-let diffixSum = DiffixSum, { AggregateOptions.Default with Distinct = false }
+let diffixSum = DiffixSum, AggregateOptions.Default
+let countHistogram = CountHistogram, AggregateOptions.Default
+let diffixCountHistogram = DiffixCountHistogram, AggregateOptions.Default
 
 [<Fact>]
 let ``anon count distinct column`` () =
@@ -123,6 +125,70 @@ let ``anon sum(int col)`` () =
   rows
   |> evaluateAggregator diffixSum [ aidColumnList; aidColumn ]
   |> should equal (Integer 127L)
+
+let countHistogramRows =
+  [
+    List.replicate 1 [| Integer 1L; String "value" |]
+    List.replicate 1 [| Integer 2L; String "value" |]
+    List.replicate 1 [| Integer 3L; String "value" |]
+    List.replicate 1 [| Integer 4L; String "value" |] // 4 users contribute 1 row
+    List.replicate 2 [| Integer 5L; String "value" |]
+    List.replicate 2 [| Integer 6L; String "value" |]
+    List.replicate 2 [| Integer 7L; String "value" |] // 3 users contribute 2 rows
+    List.replicate 6 [| Integer 8L; String "value" |] // 1 user contributes 6 rows
+    List.replicate 7 [| Integer 9L; String "value" |] // 1 user contributes 7 rows
+    List.replicate 13 [| Integer 10L; String "value" |] // 1 user contributes 13 rows
+  ]
+  |> List.concat
+
+[<Fact>]
+let ``direct count_histogram`` () =
+  countHistogramRows
+  |> evaluateAggregator countHistogram [ aidColumn ]
+  |> should
+       equal
+       (List [
+         List [ Integer 1L; Integer 4L ]
+         List [ Integer 2L; Integer 3L ]
+         List [ Integer 6L; Integer 1L ]
+         List [ Integer 7L; Integer 1L ]
+         List [ Integer 13L; Integer 1L ]
+        ])
+
+[<Fact>]
+let ``direct count_histogram with generalization`` () =
+  countHistogramRows
+  |> evaluateAggregator countHistogram [ aidColumn; Constant(Integer 5L) ]
+  |> should
+       equal
+       (List [ //
+         List [ Integer 0L; Integer 7L ]
+         List [ Integer 5L; Integer 2L ]
+         List [ Integer 10L; Integer 1L ]
+        ])
+
+[<Fact>]
+let ``anon count_histogram`` () =
+  countHistogramRows
+  |> evaluateAggregator diffixCountHistogram [ aidColumnList; aidColumn ]
+  |> should
+       equal
+       (List [ //
+         List [ Null; Integer 3L ]
+         List [ Integer 1L; Integer 4L ]
+         List [ Integer 2L; Integer 3L ]
+        ])
+
+[<Fact>]
+let ``anon count_histogram with generalization`` () =
+  countHistogramRows
+  |> evaluateAggregator diffixCountHistogram [ aidColumnList; aidColumn; Constant(Integer 5L) ]
+  |> should
+       equal
+       (List [ //
+         List [ Integer 0L; Integer 7L ]
+         List [ Integer 5L; Integer 2L ]
+        ])
 
 [<Fact>]
 let ``anon count returns 0 if insufficient users`` () =

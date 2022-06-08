@@ -26,6 +26,7 @@ let private validateAllowedAggregates query =
     | FunctionExpr (AggregateFunction (CountNoise, _), _) -> ()
     | FunctionExpr (AggregateFunction (Sum, _), _) -> ()
     | FunctionExpr (AggregateFunction (SumNoise, _), _) -> ()
+    | FunctionExpr (AggregateFunction (CountHistogram, _), _) -> ()
     | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
       failwith "Aggregate not supported in anonymizing queries."
     | _ -> ()

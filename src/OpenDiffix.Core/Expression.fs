@@ -76,6 +76,8 @@ let typeOfAggregate fn args =
   | DiffixSumNoise -> RealType
   | DiffixAvg -> RealType
   | DiffixAvgNoise -> RealType
+  | CountHistogram
+  | DiffixCountHistogram -> ListType(ListType(IntegerType))
 
 /// Resolves the type of an expression.
 let rec typeOf expression =
