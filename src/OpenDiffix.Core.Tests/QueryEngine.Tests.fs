@@ -185,13 +185,13 @@ type Tests(db: DBFixture) =
     queryResult |> should equal expected
 
   [<Fact>]
-  let ``query 14 - avg_noise parity`` () =
+  let ``query 15 - avg_noise parity`` () =
     let expected = runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
     let queryResult = runQuery "SELECT avg_noise(age) FROM customers_small GROUP BY city"
 
     queryResult |> should equal expected
 
-  let ``query 15 - count histogram`` () =
+  let ``query 16 - count histogram`` () =
     let queryResult =
       runQuery
         """

@@ -383,20 +383,20 @@ type private DiffixSumNoise(summandType, aidsCount) =
       | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
 
 
+let private floorBy binSize count =
+  match binSize with
+  | None
+  | Some 1L -> count
+  | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
+
 type private CountHistogram(binSize: int64 option) =
   let state = Dictionary<Value, int64>()
-
-  let generalize count =
-    match binSize with
-    | None
-    | Some 1L -> count
-    | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
 
   interface IAggregator with
     member this.Transition args =
       match args with
       | Null :: _ -> () // Ignore NULLs
-      | aid :: _ -> state |> Dictionary.increment aid
+      | countedAid :: _ -> state |> Dictionary.increment countedAid
       | _ -> invalidArgs args
 
     member this.Merge aggregator =
@@ -410,7 +410,7 @@ type private CountHistogram(binSize: int64 option) =
       let bins = Dictionary<int64, int64>()
 
       for pair in state do
-        let binLabel = generalize pair.Value
+        let binLabel = floorBy binSize pair.Value
         bins |> Dictionary.increment binLabel
 
       bins
@@ -433,19 +433,13 @@ type private DiffixCountHistogram(aidsCount, binSize: int64 option) =
   let makeAidTracker () =
     { RowCount = 0; LowCount = DiffixLowCount(aidsCount) }
 
-  let generalize count =
-    match binSize with
-    | None
-    | Some 1L -> count
-    | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
-
   interface IAggregator with
     member this.Transition args =
       match args with
       | Value.List [] :: _ -> invalidArgs args
       | _aidInstances :: Null :: _ -> () // Ignore NULLs
-      | aidInstances :: aid :: _ ->
-        let aidState = state |> Dictionary.getOrInit (hashAid aid) makeAidTracker
+      | aidInstances :: countedAid :: _ ->
+        let aidState = state |> Dictionary.getOrInit (hashAid countedAid) makeAidTracker
         aidState.RowCount <- aidState.RowCount + 1L
         (aidState.LowCount :> IAggregator).Transition([ aidInstances ])
       | _ -> invalidArgs args
@@ -463,7 +457,7 @@ type private DiffixCountHistogram(aidsCount, binSize: int64 option) =
 
       for pair in state do
         let aidEntry = pair.Value
-        let binLabel = generalize aidEntry.RowCount
+        let binLabel = floorBy binSize aidEntry.RowCount
 
         match bins.TryGetValue(binLabel) with
         | true, bin ->
@@ -530,14 +524,13 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     else
       0
 
-  let unpackConstInt index =
+  let unpackFloorWidthArgAt index =
     aggArgs
     |> List.tryItem index
-    |> Option.map (
-      function
-      | Constant (Integer x) when x >= 1L -> x
+    |> function
+      | None -> None
+      | Some (Constant (Integer x)) when x >= 1L -> Some x
       | _ -> failwith $"Expected positive integer argument in index {index} of aggregate {fst aggSpec}."
-    )
 
   match aggSpec with
   | Count, { Distinct = false } -> Count() :> T
@@ -554,6 +547,6 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
   | DiffixSumNoise, { Distinct = false } ->
     let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
     DiffixSumNoise(aggType, aidsCount) :> T
-  | CountHistogram, { Distinct = false } -> CountHistogram(unpackConstInt (1)) :> T
-  | DiffixCountHistogram, { Distinct = false } -> DiffixCountHistogram(aidsCount, unpackConstInt (2)) :> T
+  | CountHistogram, { Distinct = false } -> CountHistogram(unpackFloorWidthArgAt 1) :> T
+  | DiffixCountHistogram, { Distinct = false } -> DiffixCountHistogram(aidsCount, unpackFloorWidthArgAt 2) :> T
   | _ -> failwith "Invalid aggregator"
