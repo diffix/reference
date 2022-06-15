@@ -44,6 +44,22 @@ let private validateCountUsage query =
     | _ -> ()
   )
 
+let private validateCountHistogramUsage accessLevel query =
+  // Verifying that the first argument is an AID is done in the analyzer.
+  query
+  |> visitAggregates (
+    function
+    | CountHistogram, { Distinct = true }, _ ->
+      failwith "count_histogram(distinct) is not supported in anonymizing queries."
+    | CountHistogram, _, [ _aidExpr; Constant (Integer binSize) ] when binSize >= 1L ->
+      if accessLevel = PublishUntrusted && not (Value.isMoneyRounded (Integer binSize)) then
+        failwith "count_histogram bin size must be a money-aligned value (1, 2, 5, 10, ...)."
+    | CountHistogram, _, [ _aidExpr; _invalidBinSize ] ->
+      failwith "count_histogram bin size must be a constant positive integer."
+    | CountHistogram, _, [] -> failwith "count_histogram must specify an AID argument."
+    | _ -> ()
+  )
+
 let private validateSumUsage query =
   query
   |> visitAggregates (
@@ -92,6 +108,7 @@ let validateAnonymizingQuery accessLevel (selectQuery: SelectQuery) =
   validateAllowedAggregates selectQuery
   validateCountUsage selectQuery
   validateSumUsage selectQuery
+  validateCountHistogramUsage accessLevel selectQuery
   validateSelectTarget selectQuery
 
 let validateGeneralizations accessLevel expressions =

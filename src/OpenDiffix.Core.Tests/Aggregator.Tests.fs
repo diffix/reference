@@ -9,12 +9,14 @@ type ArgType =
   | WithoutArg
   | WithIntegerArg
   | WithRealArg
+  | WithConstArg of Value
 
 let mapArgType =
   function
   | WithoutArg -> MISSING_TYPE
   | WithIntegerArg -> IntegerType
   | WithRealArg -> RealType
+  | WithConstArg value -> Value.typeOf value
 
 let makeAgg distinct fn =
   fn, { AggregateOptions.Default with Distinct = distinct }
@@ -52,7 +54,10 @@ let makeAnonArgs argType random numAids length =
      ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ])
    | WithRealArg ->
      (buildAidInstancesSequence numAids random, buildRealSequence random)
-     ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ]))
+     ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ])
+   | WithConstArg arg ->
+     buildAidInstancesSequence numAids random
+     |> Seq.map (fun aidInstances -> [ aidInstances; arg ]))
   |> Seq.truncate length
   |> Seq.toList
 
@@ -61,7 +66,8 @@ let makeStandardArgs argType random length =
   (match argType with
    | WithoutArg -> Seq.initInfinite (fun _ -> [])
    | WithIntegerArg -> buildIntegerSequence random |> Seq.map (fun argValue -> [ argValue ])
-   | WithRealArg -> buildRealSequence random |> Seq.map (fun argValue -> [ argValue ]))
+   | WithRealArg -> buildRealSequence random |> Seq.map (fun argValue -> [ argValue ])
+   | WithConstArg arg -> Seq.initInfinite (fun _ -> [ arg ]))
   |> Seq.truncate length
   |> Seq.toList
 
@@ -116,7 +122,9 @@ let testAnonAggregatorMerging fn argType =
     let DUMMY_ARGS_EXPRS =
       [
         (List.replicate numAids (ColumnReference(0, IntegerType))) |> ListExpr
-        ColumnReference(1, mapArgType argType)
+        match argType with
+        | WithConstArg arg -> Constant arg
+        | _ -> ColumnReference(1, mapArgType argType)
       ]
 
     ensureConsistentMerging ctx fn args1 args2 DUMMY_ARGS_EXPRS
@@ -180,7 +188,7 @@ let ``Merging CountHistogram`` () =
 
 [<Fact>]
 let ``Merging DiffixCountHistogram`` () =
-  DiffixCountHistogram |> testAnon NON_DISTINCT WithIntegerArg
+  DiffixCountHistogram |> testAnon NON_DISTINCT (WithConstArg(Integer 0L))
 
 [<Fact>]
 let ``Merging default aggregators`` () =

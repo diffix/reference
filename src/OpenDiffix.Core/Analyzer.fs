@@ -104,11 +104,11 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
    | AggregateFunction (DiffixAvgNoise, options), parsedArgs -> //
      mapAvg options parsedArgs DiffixSumNoise DiffixCount
 
-   | AggregateFunction (DiffixCountHistogram, options), parsedAid :: parsedBinSize :: parsedAids ->
+   | AggregateFunction (DiffixCountHistogram, options), parsedAidIndex :: parsedBinSize :: parsedAids ->
      AggregateFunction(DiffixCountHistogram, options),
      [
        mapAids parsedAids
-       mapExpression rangeColumns parsedAid
+       mapExpression rangeColumns parsedAidIndex
        mapExpression rangeColumns parsedBinSize
      ]
 
@@ -346,13 +346,27 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
     | SumNoise -> DiffixSumNoise
     | Avg -> DiffixAvg
     | AvgNoise -> DiffixAvgNoise
-    | CountHistogram -> DiffixCountHistogram
     | other -> other
 
   let rec exprMapper expr =
     match expr with
+    | FunctionExpr (AggregateFunction (CountHistogram, opts), args) ->
+      let countedAidExpr = List.head args
+
+      let countedAidIndex =
+        aidColumnsExpression
+        |> Expression.unwrapListExpr
+        |> List.tryFindIndex ((=) countedAidExpr)
+        |> function
+          | Some index -> Constant(Integer(int64 index))
+          | None -> failwith "count_histogram requires an AID argument."
+
+      FunctionExpr(
+        AggregateFunction(anonymizing DiffixCountHistogram, opts),
+        aidColumnsExpression :: countedAidIndex :: (List.tail args)
+      )
     | FunctionExpr (AggregateFunction (agg, opts), args) when
-      List.contains agg [ Count; CountNoise; Sum; SumNoise; Avg; AvgNoise; CountHistogram ]
+      List.contains agg [ Count; CountNoise; Sum; SumNoise; Avg; AvgNoise ]
       ->
       FunctionExpr(AggregateFunction(anonymizing agg, opts), aidColumnsExpression :: args)
     | other -> other |> map exprMapper

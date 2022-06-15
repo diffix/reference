@@ -427,7 +427,7 @@ type private CountHistogramAidTracker = { mutable RowCount: int64; LowCount: Dif
 
 type private CountHistogramBin = { mutable AidCount: int64; LowCount: DiffixLowCount }
 
-type private DiffixCountHistogram(aidsCount, binSize: int64 option) =
+type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 option) =
   let state = Dictionary<AidHash, CountHistogramAidTracker>()
 
   let makeAidTracker () =
@@ -437,11 +437,13 @@ type private DiffixCountHistogram(aidsCount, binSize: int64 option) =
     member this.Transition args =
       match args with
       | Value.List [] :: _ -> invalidArgs args
-      | _aidInstances :: Null :: _ -> () // Ignore NULLs
-      | aidInstances :: countedAid :: _ ->
-        let aidState = state |> Dictionary.getOrInit (hashAid countedAid) makeAidTracker
-        aidState.RowCount <- aidState.RowCount + 1L
-        (aidState.LowCount :> IAggregator).Transition([ aidInstances ])
+      | Value.List aidInstances :: _ ->
+        let countedAid = aidInstances |> List.item countedAidIndex
+
+        if countedAid <> Null then
+          let aidState = state |> Dictionary.getOrInit (hashAid countedAid) makeAidTracker
+          aidState.RowCount <- aidState.RowCount + 1L
+          (aidState.LowCount :> IAggregator).Transition([ Value.List aidInstances ])
       | _ -> invalidArgs args
 
     member this.Merge aggregator =
@@ -524,6 +526,13 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     else
       0
 
+  let unpackAidIndexArgAt index =
+    aggArgs
+    |> List.tryItem index
+    |> function
+      | Some (Constant (Integer x)) when x >= 0L && x < aidsCount -> int32 x
+      | _ -> failwith "Expected a valid AID index"
+
   let unpackFloorWidthArgAt index =
     aggArgs
     |> List.tryItem index
@@ -548,5 +557,6 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     let aggType = Expression.typeOfAggregate (fst aggSpec) aggArgs
     DiffixSumNoise(aggType, aidsCount) :> T
   | CountHistogram, { Distinct = false } -> CountHistogram(unpackFloorWidthArgAt 1) :> T
-  | DiffixCountHistogram, { Distinct = false } -> DiffixCountHistogram(aidsCount, unpackFloorWidthArgAt 2) :> T
+  | DiffixCountHistogram, { Distinct = false } ->
+    DiffixCountHistogram(aidsCount, unpackAidIndexArgAt 1, unpackFloorWidthArgAt 2) :> T
   | _ -> failwith "Invalid aggregator"

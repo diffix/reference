@@ -446,6 +446,19 @@ type Tests(db: DBFixture) =
       "SELECT sum(z.age) FROM (SELECT t.age FROM customers JOIN customers AS t ON true) z WHERE z.age=0"
 
   [<Fact>]
+  let ``Require AID argument for count_distinct`` () =
+    analyzeTrustedQuery "SELECT count_histogram(id) FROM customers" |> ignore
+    analyzeTrustedQuery "SELECT count_histogram(id, 3) FROM customers" |> ignore
+    assertTrustedQueryFails "SELECT count_histogram(age, 3) from customers" "count_histogram requires an AID argument."
+
+  [<Fact>]
+  let ``Require constant integer for count_distinct bin size`` () =
+    let errorMsg = "count_histogram bin size must be a constant positive integer."
+    assertTrustedQueryFails "SELECT count_histogram(age, -3) from customers" errorMsg
+    assertTrustedQueryFails "SELECT count_histogram(age, age) from customers" errorMsg
+    assertTrustedQueryFails "SELECT count_histogram(age, 'text') from customers" errorMsg
+
+  [<Fact>]
   let ``Detect queries with disallowed generalizations in untrusted access level`` () =
     assertUntrustedQueryFails
       "SELECT substring(city, 2, 2) from customers"
@@ -471,6 +484,14 @@ type Tests(db: DBFixture) =
       "SELECT width_bucket(age, 2, 200, 5) from customers"
       "Generalization used in the query is not allowed in untrusted access level."
 
+    assertUntrustedQueryFails
+      "SELECT width_bucket(age, 2, 200, 5) from customers"
+      "Generalization used in the query is not allowed in untrusted access level."
+
+    assertUntrustedQueryFails
+      "SELECT count_histogram(id, 3) from customers"
+      "count_histogram bin size must be a money-aligned value (1, 2, 5, 10, ...)."
+
   [<Fact>]
   let ``Analyze queries with allowed generalizations in untrusted access level`` () =
     analyzeUntrustedQuery "SELECT substring(city, 1, 2) from customers" |> ignore
@@ -481,6 +502,7 @@ type Tests(db: DBFixture) =
     analyzeUntrustedQuery "SELECT floor_by(age, 20.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT floor_by(age, 50.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT round_by(age, 50.0) from customers" |> ignore
+    analyzeUntrustedQuery "SELECT count_histogram(id, 5) from customers" |> ignore
     // No generalization, either implicitly or explicitly
     analyzeUntrustedQuery "SELECT floor(age) from customers" |> ignore
     analyzeUntrustedQuery "SELECT age from customers" |> ignore

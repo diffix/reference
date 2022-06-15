@@ -170,7 +170,7 @@ let ``direct count_histogram with generalization`` () =
 [<Fact>]
 let ``anon count_histogram`` () =
   countHistogramRows
-  |> evaluateAggregator diffixCountHistogram [ aidColumnList; aidColumn ]
+  |> evaluateAggregator diffixCountHistogram [ aidColumnList; Constant(Integer 0L) ]
   |> should
        equal
        (List [ //
@@ -182,7 +182,7 @@ let ``anon count_histogram`` () =
 [<Fact>]
 let ``anon count_histogram with generalization`` () =
   countHistogramRows
-  |> evaluateAggregator diffixCountHistogram [ aidColumnList; aidColumn; Constant(Integer 5L) ]
+  |> evaluateAggregator diffixCountHistogram [ aidColumnList; Constant(Integer 0L); Constant(Integer 5L) ]
   |> should
        equal
        (List [ //
