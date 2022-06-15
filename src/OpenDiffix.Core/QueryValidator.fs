@@ -21,23 +21,22 @@ let private validateSingleLowCount query =
 let private validateAllowedAggregates query =
   query
   |> visitAggregates (
-    function
-    | FunctionExpr (AggregateFunction (Count, _), _) -> ()
-    | FunctionExpr (AggregateFunction (CountNoise, _), _) -> ()
-    | FunctionExpr (AggregateFunction (Sum, _), _) -> ()
-    | FunctionExpr (AggregateFunction (SumNoise, _), _) -> ()
-    | FunctionExpr (AggregateFunction (CountHistogram, _), _) -> ()
-    | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
-      failwith "Aggregate not supported in anonymizing queries."
-    | _ -> ()
+    fst3
+    >> function
+      | Count
+      | CountNoise
+      | Sum
+      | SumNoise
+      | CountHistogram -> ()
+      | _ -> failwith "Aggregate not supported in anonymizing queries."
   )
 
-let private allowedCountUsage query =
+let private validateCountUsage query =
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Count, _), args)
-    | FunctionExpr (AggregateFunction (CountNoise, _), args) ->
+    | Count, _, args
+    | CountNoise, _, args ->
       match args with
       | []
       | [ ColumnReference _ ] -> ()
@@ -45,12 +44,12 @@ let private allowedCountUsage query =
     | _ -> ()
   )
 
-let private allowedSumUsage query =
+let private validateSumUsage query =
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Sum, { Distinct = distinct }), args)
-    | FunctionExpr (AggregateFunction (SumNoise, { Distinct = distinct }), args) ->
+    | Sum, { Distinct = distinct }, args
+    | SumNoise, { Distinct = distinct }, args ->
       match distinct, args with
       | false, [ ColumnReference _ ] -> ()
       | _ -> failwith "Only sum(column) is supported in anonymizing queries."
@@ -89,10 +88,10 @@ let private validateGeneralization accessLevel expression =
 
 let validateDirectQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
 
-let validateAnonymizingQuery (selectQuery: SelectQuery) =
+let validateAnonymizingQuery accessLevel (selectQuery: SelectQuery) =
   validateAllowedAggregates selectQuery
-  allowedCountUsage selectQuery
-  allowedSumUsage selectQuery
+  validateCountUsage selectQuery
+  validateSumUsage selectQuery
   validateSelectTarget selectQuery
 
 let validateGeneralizations accessLevel expressions =

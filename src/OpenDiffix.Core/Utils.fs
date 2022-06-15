@@ -10,6 +10,11 @@ type KeyValuePair<'K, 'V> = Collections.Generic.KeyValuePair<'K, 'V>
 type HashSet<'T> = Collections.Generic.HashSet<'T>
 type Stack<'T> = Collections.Generic.Stack<'T>
 
+// 3-tuple deconstruction.
+let inline fst3 (a, _, _) = a
+let inline snd3 (_, b, _) = b
+let inline thd3 (_, _, c) = c
+
 module String =
   let join (sep: string) (values: seq<'T>) = String.Join<'T>(sep, values)
 

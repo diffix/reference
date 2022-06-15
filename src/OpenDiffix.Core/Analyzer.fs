@@ -415,7 +415,7 @@ let private compileQuery anonParams (query: SelectQuery) =
 
   let query =
     if isAnonymizing then
-      QueryValidator.validateAnonymizingQuery query
+      QueryValidator.validateAnonymizingQuery anonParams.AccessLevel query
       compileAnonymizingQuery aidColumnsExpression query
     else
       QueryValidator.validateDirectQuery query
