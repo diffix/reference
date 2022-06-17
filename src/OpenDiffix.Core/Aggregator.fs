@@ -425,7 +425,7 @@ type private CountHistogram(binSize: int64 option) =
 
 type private CountHistogramAidTracker = { mutable RowCount: int64; LowCount: DiffixLowCount }
 
-type private CountHistogramBin = { mutable AidCount: int64; LowCount: DiffixLowCount }
+type private CountHistogramBin = { LowCount: DiffixLowCount }
 
 type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 option) =
   let state = Dictionary<AidHash, CountHistogramAidTracker>()
@@ -455,7 +455,11 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
         (currentState.LowCount :> IAggregator).Merge(other.Value.LowCount)
 
     member this.Final(aggContext, anonContext) =
+      let anonContext = unwrapAnonContext anonContext
       let bins = Dictionary<int64, CountHistogramBin>()
+
+      let anonBinCount (bin: CountHistogramBin) =
+        Anonymizer.histogramBinCount aggContext.AnonymizationParams anonContext bin.LowCount.State.[countedAidIndex]
 
       for pair in state do
         let aidEntry = pair.Value
@@ -465,12 +469,11 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
         | true, bin ->
           // Bin already exists, merge to it.
           (bin.LowCount :> IAggregator).Merge(aidEntry.LowCount)
-          bin.AidCount <- bin.AidCount + 1L
         | false, _ ->
           // New bin, move ownership from current tracker because we don't need it any further.
-          bins.[binLabel] <- { AidCount = 1L; LowCount = aidEntry.LowCount }
+          bins.[binLabel] <- { LowCount = aidEntry.LowCount }
 
-      let suppressBin = { AidCount = 0L; LowCount = DiffixLowCount(aidsCount) }
+      let suppressBin = { LowCount = DiffixLowCount(aidsCount) }
 
       let highCountBins =
         bins
@@ -480,20 +483,19 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
 
           if Anonymizer.isLowCount aggContext.AnonymizationParams bin.LowCount.State then
             // Merge low count bin to suppress bin.
-            suppressBin.AidCount <- suppressBin.AidCount + bin.AidCount
             (suppressBin.LowCount :> IAggregator).Merge(bin.LowCount)
             None
           else
-            Some(binLabel, bin.AidCount)
+            Some(binLabel, bin)
         )
         |> Seq.sortBy fst
-        |> Seq.map (fun (binLabel, aidCount) -> Value.List [ Integer binLabel; Integer aidCount ])
+        |> Seq.map (fun (binLabel, bin) -> Value.List [ Integer binLabel; anonBinCount bin ])
         |> Seq.toList
 
       if Anonymizer.isLowCount aggContext.AnonymizationParams suppressBin.LowCount.State then
         Value.List highCountBins
       else
-        Value.List((Value.List [ Null; Integer suppressBin.AidCount ]) :: highCountBins)
+        Value.List((Value.List [ Null; anonBinCount suppressBin ]) :: highCountBins)
 
   member this.State = state
 
