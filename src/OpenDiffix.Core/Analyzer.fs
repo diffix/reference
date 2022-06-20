@@ -42,64 +42,80 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   let mapAids parsedAids =
     parsedAids |> List.map (mapExpression rangeColumns) |> ListExpr
 
-  let mapAvg aggregateArgs parsedArgs sumFunction countFunction =
-    let sum = mapFunctionExpression rangeColumns (AggregateFunction(sumFunction, aggregateArgs)) parsedArgs
-    let count = mapFunctionExpression rangeColumns (AggregateFunction(countFunction, aggregateArgs)) parsedArgs
+  let mapAvg options parsedArgs sumFunction countFunction =
+    let sum = mapFunctionExpression rangeColumns (AggregateFunction(sumFunction, options)) parsedArgs
+    let count = mapFunctionExpression rangeColumns (AggregateFunction(countFunction, options)) parsedArgs
     let castSum = FunctionExpr(ScalarFunction ScalarFunction.Cast, [ sum; Constant(String "real") ])
     ScalarFunction ScalarFunction.Divide, [ castSum; count ]
 
   (match fn, parsedArgs with
-   | AggregateFunction (Count, aggregateArgs), [ ParserTypes.Star ] -> //
-     AggregateFunction(Count, aggregateArgs), []
-   | AggregateFunction (CountNoise, aggregateArgs), [ ParserTypes.Star ] -> //
-     AggregateFunction(CountNoise, aggregateArgs), []
-   | AggregateFunction (Avg, aggregateArgs), parsedArgs -> //
-     mapAvg aggregateArgs parsedArgs Sum Count
-   | AggregateFunction (AvgNoise, aggregateArgs), parsedArgs -> //
-     mapAvg aggregateArgs parsedArgs SumNoise Count
-   | AggregateFunction (DiffixLowCount, aggregateArgs), parsedAids ->
-     AggregateFunction(DiffixLowCount, aggregateArgs), [ mapAids parsedAids ]
-   | AggregateFunction (DiffixCount, aggregateArgs), parsedArg :: parsedAids ->
-     let aggregateArgs, args =
-       match parsedArg with
-       | ParserTypes.Star -> aggregateArgs, []
-       | ParserTypes.Distinct parsedExpr ->
-         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
-       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+   | AggregateFunction (Count, options), [ ParserTypes.Star ] -> //
+     AggregateFunction(Count, options), []
 
-     AggregateFunction(DiffixCount, aggregateArgs), mapAids parsedAids :: args
-   | AggregateFunction (DiffixCountNoise, aggregateArgs), parsedArg :: parsedAids ->
-     let aggregateArgs, args =
-       match parsedArg with
-       | ParserTypes.Star -> aggregateArgs, []
-       | ParserTypes.Distinct parsedExpr ->
-         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
-       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+   | AggregateFunction (CountNoise, options), [ ParserTypes.Star ] -> //
+     AggregateFunction(CountNoise, options), []
 
-     AggregateFunction(DiffixCountNoise, aggregateArgs), mapAids parsedAids :: args
-   | AggregateFunction (DiffixSum, aggregateArgs), parsedArg :: parsedAids ->
-     let aggregateArgs, args =
-       match parsedArg with
-       | ParserTypes.Distinct parsedExpr ->
-         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
-       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+   | AggregateFunction (Avg, options), parsedArgs -> //
+     mapAvg options parsedArgs Sum Count
 
-     AggregateFunction(DiffixSum, aggregateArgs), mapAids parsedAids :: args
-   | AggregateFunction (DiffixSumNoise, aggregateArgs), parsedArg :: parsedAids ->
-     let aggregateArgs, args =
-       match parsedArg with
-       | ParserTypes.Distinct parsedExpr ->
-         { aggregateArgs with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
-       | parsedExpr -> aggregateArgs, [ mapExpression rangeColumns parsedExpr ]
+   | AggregateFunction (AvgNoise, options), parsedArgs -> //
+     mapAvg options parsedArgs SumNoise Count
 
-     AggregateFunction(DiffixSumNoise, aggregateArgs), mapAids parsedAids :: args
-   | AggregateFunction (DiffixAvg, aggregateArgs), parsedArgs -> //
-     mapAvg aggregateArgs parsedArgs DiffixSum DiffixCount
-   | AggregateFunction (DiffixAvgNoise, aggregateArgs), parsedArgs -> //
-     mapAvg aggregateArgs parsedArgs DiffixSumNoise DiffixCount
-   | AggregateFunction (aggregate, aggregateArgs), [ ParserTypes.Distinct expr ] ->
+   | AggregateFunction (DiffixLowCount, options), parsedAids ->
+     AggregateFunction(DiffixLowCount, options), [ mapAids parsedAids ]
+
+   | AggregateFunction (DiffixCount, options), parsedArg :: parsedAids ->
+     let options, args =
+       match parsedArg with
+       | ParserTypes.Star -> options, []
+       | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> options, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixCount, options), mapAids parsedAids :: args
+
+   | AggregateFunction (DiffixCountNoise, options), parsedArg :: parsedAids ->
+     let options, args =
+       match parsedArg with
+       | ParserTypes.Star -> options, []
+       | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> options, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixCountNoise, options), mapAids parsedAids :: args
+
+   | AggregateFunction (DiffixSum, options), parsedArg :: parsedAids ->
+     let options, args =
+       match parsedArg with
+       | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> options, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixSum, options), mapAids parsedAids :: args
+
+   | AggregateFunction (DiffixSumNoise, options), parsedArg :: parsedAids ->
+     let options, args =
+       match parsedArg with
+       | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
+       | parsedExpr -> options, [ mapExpression rangeColumns parsedExpr ]
+
+     AggregateFunction(DiffixSumNoise, options), mapAids parsedAids :: args
+
+   | AggregateFunction (DiffixAvg, options), parsedArgs -> //
+     mapAvg options parsedArgs DiffixSum DiffixCount
+
+   | AggregateFunction (DiffixAvgNoise, options), parsedArgs -> //
+     mapAvg options parsedArgs DiffixSumNoise DiffixCount
+
+   | AggregateFunction (DiffixCountHistogram, options), parsedAidIndex :: parsedBinSize :: parsedAids ->
+     AggregateFunction(DiffixCountHistogram, options),
+     [
+       mapAids parsedAids
+       mapExpression rangeColumns parsedAidIndex
+       mapExpression rangeColumns parsedBinSize
+     ]
+
+   | AggregateFunction (aggregate, options), [ ParserTypes.Distinct expr ] ->
      let arg = mapExpression rangeColumns expr
-     AggregateFunction(aggregate, { aggregateArgs with Distinct = true }), [ arg ]
+     AggregateFunction(aggregate, { options with Distinct = true }), [ arg ]
+
    | _ ->
      let args = parsedArgs |> List.map (mapExpression rangeColumns)
      fn, args)
@@ -334,6 +350,21 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
 
   let rec exprMapper expr =
     match expr with
+    | FunctionExpr (AggregateFunction (CountHistogram, opts), args) ->
+      let countedAidExpr = List.head args
+
+      let countedAidIndex =
+        aidColumnsExpression
+        |> Expression.unwrapListExpr
+        |> List.tryFindIndex ((=) countedAidExpr)
+        |> function
+          | Some index -> Constant(Integer(int64 index))
+          | None -> failwith "count_histogram requires an AID argument."
+
+      FunctionExpr(
+        AggregateFunction(anonymizing DiffixCountHistogram, opts),
+        aidColumnsExpression :: countedAidIndex :: (List.tail args)
+      )
     | FunctionExpr (AggregateFunction (agg, opts), args) when
       List.contains agg [ Count; CountNoise; Sum; SumNoise; Avg; AvgNoise ]
       ->

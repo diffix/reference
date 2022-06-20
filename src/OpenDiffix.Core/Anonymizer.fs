@@ -354,6 +354,18 @@ let count
     }
     |> AnonymizedResult.Ok
 
+let histogramBinCount (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (aidSet: HashSet<AidHash>) =
+  let numAids = aidSet.Count
+
+  let noise =
+    [ anonContext.BucketSeed; seedFromAidSet aidSet ]
+    |> generateNoise anonParams.Salt "count_histogram" anonParams.Suppression.LayerSD
+
+  (float numAids + noise)
+  |> int64
+  |> max anonParams.Suppression.LowThreshold
+  |> Integer
+
 let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (perAidContributions: SumState) isReal =
   let byAidPositive = mapAidFlattening anonParams anonContext perAidContributions.Positive
   let byAidNegative = mapAidFlattening anonParams anonContext perAidContributions.Negative

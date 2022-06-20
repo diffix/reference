@@ -118,7 +118,7 @@ let inline collectAggregates node =
 let inline visitAggregates f node =
   let rec exprVisitor f expr =
     match expr with
-    | FunctionExpr (AggregateFunction (_fn, _opts), _args) as aggregateExpression -> f aggregateExpression
+    | FunctionExpr (AggregateFunction (fn, opts), args) -> f (fn, opts, args)
     | other -> other |> visit (exprVisitor f)
 
   node |> visit (exprVisitor f)

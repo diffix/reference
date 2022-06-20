@@ -10,10 +10,20 @@ type KeyValuePair<'K, 'V> = Collections.Generic.KeyValuePair<'K, 'V>
 type HashSet<'T> = Collections.Generic.HashSet<'T>
 type Stack<'T> = Collections.Generic.Stack<'T>
 
+// 3-tuple deconstruction.
+let inline fst3 (a, _, _) = a
+let inline snd3 (_, b, _) = b
+let inline thd3 (_, _, c) = c
+
 module String =
   let join (sep: string) (values: seq<'T>) = String.Join<'T>(sep, values)
 
   let joinWithComma (values: seq<'T>) = join ", " values
+
+  let quote (string: string) =
+    "\"" + string.Replace("\"", "\"\"") + "\""
+
+  let quoteSingle (string: string) = "'" + string.Replace("'", "''") + "'"
 
   let equalsI s1 s2 =
     String.Equals(s1, s2, StringComparison.InvariantCultureIgnoreCase)
@@ -44,11 +54,11 @@ module Dictionary =
       dict.[key] <- value
       value
 
-  let increment key (dict: Dictionary<'K, int>) =
+  let inline increment key (dict: Dictionary<'K, ^V>) =
     dict.[key] <-
       match dict.TryGetValue(key) with
-      | true, count -> count + 1
-      | false, _ -> 1
+      | true, count -> count + LanguagePrimitives.GenericOne
+      | false, _ -> LanguagePrimitives.GenericOne
 
 type Hash = uint64
 

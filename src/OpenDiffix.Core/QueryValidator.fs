@@ -21,22 +21,22 @@ let private validateSingleLowCount query =
 let private validateAllowedAggregates query =
   query
   |> visitAggregates (
-    function
-    | FunctionExpr (AggregateFunction (Count, _), _) -> ()
-    | FunctionExpr (AggregateFunction (CountNoise, _), _) -> ()
-    | FunctionExpr (AggregateFunction (Sum, _), _) -> ()
-    | FunctionExpr (AggregateFunction (SumNoise, _), _) -> ()
-    | FunctionExpr (AggregateFunction (_otherAggregate, _), _) ->
-      failwith "Aggregate not supported in anonymizing queries."
-    | _ -> ()
+    fst3
+    >> function
+      | Count
+      | CountNoise
+      | Sum
+      | SumNoise
+      | CountHistogram -> ()
+      | _ -> failwith "Aggregate not supported in anonymizing queries."
   )
 
-let private allowedCountUsage query =
+let private validateCountUsage query =
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Count, _), args)
-    | FunctionExpr (AggregateFunction (CountNoise, _), args) ->
+    | Count, _, args
+    | CountNoise, _, args ->
       match args with
       | []
       | [ ColumnReference _ ] -> ()
@@ -44,12 +44,28 @@ let private allowedCountUsage query =
     | _ -> ()
   )
 
-let private allowedSumUsage query =
+let private validateCountHistogramUsage accessLevel query =
+  // Verifying that the first argument is an AID is done in the analyzer.
   query
   |> visitAggregates (
     function
-    | FunctionExpr (AggregateFunction (Sum, { Distinct = distinct }), args)
-    | FunctionExpr (AggregateFunction (SumNoise, { Distinct = distinct }), args) ->
+    | CountHistogram, { Distinct = true }, _ ->
+      failwith "count_histogram(distinct) is not supported in anonymizing queries."
+    | CountHistogram, _, [ _aidExpr; Constant (Integer binSize) ] when binSize >= 1L ->
+      if accessLevel = PublishUntrusted && not (Value.isMoneyRounded (Integer binSize)) then
+        failwith "count_histogram bin size must be a money-aligned value (1, 2, 5, 10, ...)."
+    | CountHistogram, _, [ _aidExpr; _invalidBinSize ] ->
+      failwith "count_histogram bin size must be a constant positive integer."
+    | CountHistogram, _, [] -> failwith "count_histogram must specify an AID argument."
+    | _ -> ()
+  )
+
+let private validateSumUsage query =
+  query
+  |> visitAggregates (
+    function
+    | Sum, { Distinct = distinct }, args
+    | SumNoise, { Distinct = distinct }, args ->
       match distinct, args with
       | false, [ ColumnReference _ ] -> ()
       | _ -> failwith "Only sum(column) is supported in anonymizing queries."
@@ -94,8 +110,9 @@ let validateDirectQuery (selectQuery: SelectQuery) = validateSingleLowCount sele
 
 let validateAnonymizingQuery accessLevel (selectQuery: SelectQuery) =
   validateAllowedAggregates selectQuery
-  allowedCountUsage selectQuery
-  allowedSumUsage selectQuery
+  validateCountUsage selectQuery
+  validateSumUsage selectQuery
+  validateCountHistogramUsage accessLevel selectQuery
   validateSelectTarget selectQuery
   validateWhere accessLevel selectQuery
 

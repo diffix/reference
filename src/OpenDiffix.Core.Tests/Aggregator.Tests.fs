@@ -5,6 +5,19 @@ open FsUnit.Xunit
 
 open CommonTypes
 
+type ArgType =
+  | WithoutArg
+  | WithIntegerArg
+  | WithRealArg
+  | WithConstArg of Value
+
+let mapArgType =
+  function
+  | WithoutArg -> MISSING_TYPE
+  | WithIntegerArg -> IntegerType
+  | WithRealArg -> RealType
+  | WithConstArg value -> Value.typeOf value
+
 let makeAgg distinct fn =
   fn, { AggregateOptions.Default with Distinct = distinct }
 
@@ -20,33 +33,41 @@ let buildAidInstancesSequence numAids (random: System.Random) =
   // Infinite sequence of (Value.List [aid1, aid2, ...])
   Seq.initInfinite (fun _ -> List.init numAids (fun _ -> randomNullableInteger random) |> Value.List)
 
+let buildIntegerSequence (random: System.Random) =
+  // Infinite sequence of (Value.Integer x | Null)
+  Seq.initInfinite (fun _ -> randomNullableInteger random)
+
 let buildRealSequence (random: System.Random) =
-  // Infinite sequence of (Value.Integer int | Null)
+  // Infinite sequence of (Value.Real x | Null)
   Seq.initInfinite (fun _ -> randomNullableReal random)
 
 /// Builds a list of given length with aggregator transitions.
 /// Each transition contains AID instances as the first argument
 /// and an optional random integer (as `Real`) as the second argument.
-let makeAnonArgs hasValueArg random numAids length =
-  (if hasValueArg then
-     // Generates a sequence of [ Value.List [aid1, aid2, ...]; Value.Integer int ]
+let makeAnonArgs argType random numAids length =
+  (match argType with
+   | WithoutArg ->
+     buildAidInstancesSequence numAids random
+     |> Seq.map (fun aidInstances -> [ aidInstances ])
+   | WithIntegerArg ->
+     (buildAidInstancesSequence numAids random, buildIntegerSequence random)
+     ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ])
+   | WithRealArg ->
      (buildAidInstancesSequence numAids random, buildRealSequence random)
      ||> Seq.map2 (fun aidInstances argValue -> [ aidInstances; argValue ])
-   else
-     // Generates a sequence of [ Value.List [aid1, aid2, ...] ]
+   | WithConstArg arg ->
      buildAidInstancesSequence numAids random
-     |> Seq.map (fun aidInstances -> [ aidInstances ]))
+     |> Seq.map (fun aidInstances -> [ aidInstances; arg ]))
   |> Seq.truncate length
   |> Seq.toList
 
 /// Like `makeAnonArgs` but without the AID instances.
-let makeStandardArgs hasValueArg random length =
-  (if hasValueArg then
-     // Generates a sequence of [ Value.Integer int ]
-     buildRealSequence random |> Seq.map (fun argValue -> [ argValue ])
-   else
-     // Generates a sequence of [ ]
-     Seq.initInfinite (fun _ -> []))
+let makeStandardArgs argType random length =
+  (match argType with
+   | WithoutArg -> Seq.initInfinite (fun _ -> [])
+   | WithIntegerArg -> buildIntegerSequence random |> Seq.map (fun argValue -> [ argValue ])
+   | WithRealArg -> buildRealSequence random |> Seq.map (fun argValue -> [ argValue ])
+   | WithConstArg arg -> Seq.initInfinite (fun _ -> [ arg ]))
   |> Seq.truncate length
   |> Seq.toList
 
@@ -69,8 +90,8 @@ let ensureConsistentMerging ctx fn sourceArgs destinationArgs aggArgs =
   // agg2(args2) -> merge_to -> agg1(args1) == agg(args1 ++ args2)
   mergedFinal |> should equal replayedFinal
 
-let makeRandom fn hasValueArg =
-  System.Random(Hash.string $"{fn}:{hasValueArg}" |> int32)
+let makeRandom fn argType =
+  System.Random(Hash.string $"{fn}:{argType}" |> int32)
 
 let argLengthPairs =
   [ //
@@ -89,19 +110,21 @@ let aggContext =
     Aggregators = [||]
   }
 
-let testAnonAggregatorMerging fn hasValueArg =
-  let random = makeRandom fn hasValueArg
+let testAnonAggregatorMerging fn argType =
+  let random = makeRandom fn argType
   let ctx = aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }
 
   let testPair numAids (length1, length2) =
-    let makeArgs = makeAnonArgs hasValueArg random numAids
+    let makeArgs = makeAnonArgs argType random numAids
     let args1 = makeArgs length1
     let args2 = makeArgs length2
 
     let DUMMY_ARGS_EXPRS =
       [
         (List.replicate numAids (ColumnReference(0, IntegerType))) |> ListExpr
-        ColumnReference(1, RealType)
+        match argType with
+        | WithConstArg arg -> Constant arg
+        | _ -> ColumnReference(1, mapArgType argType)
       ]
 
     ensureConsistentMerging ctx fn args1 args2 DUMMY_ARGS_EXPRS
@@ -113,56 +136,63 @@ let testAnonAggregatorMerging fn hasValueArg =
   for numAids in 1 .. 5 do
     argLengthPairs |> List.iter (testPair numAids)
 
-let testStandardAggregatorMerging fn hasValueArg =
-  let random = makeRandom fn hasValueArg
+let testStandardAggregatorMerging fn argType =
+  let random = makeRandom fn argType
   let ctx = aggContext, None
 
   let testPair (length1, length2) =
-    let makeArgs = makeStandardArgs hasValueArg random
+    let makeArgs = makeStandardArgs argType random
     let args1 = makeArgs length1
     let args2 = makeArgs length2
-    let DUMMY_ARGS_EXPRS = [ ListExpr []; ColumnReference(1, RealType) ]
+    let DUMMY_ARGS_EXPRS = [ ColumnReference(1, mapArgType argType) ]
     ensureConsistentMerging ctx fn args1 args2 DUMMY_ARGS_EXPRS
     ensureConsistentMerging ctx fn args2 args1 DUMMY_ARGS_EXPRS
 
   argLengthPairs |> List.iter testPair
 
-let WITH_VALUE_ARG, WITHOUT_VALUE_ARG = true, false
 let DISTINCT, NON_DISTINCT = true, false
 
 /// Verifies correct merging of an anonymizing aggregator (where first argument is the aid instances).
-let testAnon distinct hasArg fn =
-  testAnonAggregatorMerging (makeAgg distinct fn) hasArg
+let testAnon distinct argType fn =
+  testAnonAggregatorMerging (makeAgg distinct fn) argType
 
 /// Verifies correct merging of a standard aggregator.
-let testStandard distinct hasArg fn =
-  testStandardAggregatorMerging (makeAgg distinct fn) hasArg
+let testStandard distinct argType fn =
+  testStandardAggregatorMerging (makeAgg distinct fn) argType
 
 [<Fact>]
 let ``Merging DiffixCount`` () =
-  DiffixCount |> testAnon NON_DISTINCT WITH_VALUE_ARG
-  DiffixCount |> testAnon NON_DISTINCT WITHOUT_VALUE_ARG
+  DiffixCount |> testAnon NON_DISTINCT WithIntegerArg
+  DiffixCount |> testAnon NON_DISTINCT WithoutArg
 
 [<Fact>]
 let ``Merging DiffixCountNoise`` () =
-  DiffixCountNoise |> testAnon NON_DISTINCT WITH_VALUE_ARG
-  DiffixCountNoise |> testAnon NON_DISTINCT WITHOUT_VALUE_ARG
+  DiffixCountNoise |> testAnon NON_DISTINCT WithIntegerArg
+  DiffixCountNoise |> testAnon NON_DISTINCT WithoutArg
 
 [<Fact>]
 let ``Merging DiffixSum`` () =
-  DiffixSum |> testAnon NON_DISTINCT WITH_VALUE_ARG
+  DiffixSum |> testAnon NON_DISTINCT WithRealArg
 
 [<Fact>]
 let ``Merging distinct DiffixCount`` () =
-  DiffixCount |> testAnon DISTINCT WITH_VALUE_ARG
+  DiffixCount |> testAnon DISTINCT WithIntegerArg
 
 [<Fact>]
 let ``Merging DiffixLowCount`` () =
-  DiffixLowCount |> testAnon NON_DISTINCT WITHOUT_VALUE_ARG
+  DiffixLowCount |> testAnon NON_DISTINCT WithoutArg
+
+[<Fact>]
+let ``Merging CountHistogram`` () =
+  CountHistogram |> testStandard NON_DISTINCT WithIntegerArg
+
+[<Fact>]
+let ``Merging DiffixCountHistogram`` () =
+  DiffixCountHistogram |> testAnon NON_DISTINCT (WithConstArg(Integer 0L))
 
 [<Fact>]
 let ``Merging default aggregators`` () =
-  Count |> testStandard NON_DISTINCT WITHOUT_VALUE_ARG
-  Count |> testStandard NON_DISTINCT WITH_VALUE_ARG
-  Count |> testStandard DISTINCT WITH_VALUE_ARG
-  Sum |> testStandard NON_DISTINCT WITH_VALUE_ARG
+  Count |> testStandard NON_DISTINCT WithoutArg
+  Count |> testStandard NON_DISTINCT WithIntegerArg
+  Count |> testStandard DISTINCT WithIntegerArg
+  Sum |> testStandard NON_DISTINCT WithRealArg

@@ -185,10 +185,69 @@ type Tests(db: DBFixture) =
     queryResult |> should equal expected
 
   [<Fact>]
-  let ``query 14 - avg_noise parity`` () =
+  let ``query 15 - avg_noise parity`` () =
     let expected = runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
-
     let queryResult = runQuery "SELECT avg_noise(age) FROM customers_small GROUP BY city"
+
+    queryResult |> should equal expected
+
+  let ``query 16 - count histogram`` () =
+    let queryResult =
+      runQuery
+        """
+          SELECT floor_by(amount, 1.5) as amount, count(*), count_histogram(cid)
+          FROM purchases
+          GROUP BY 1
+          ORDER BY 1
+        """
+
+    let expected =
+      {
+        Columns =
+          [
+            { Name = "amount"; Type = RealType }
+            { Name = "count"; Type = IntegerType }
+            { Name = "count_histogram"; Type = ListType(ListType IntegerType) }
+          ]
+        Rows =
+          [
+            [|
+              Real 0.0
+              Integer 337L
+              List [
+                List [ Value.Null; Integer 3L ]
+                List [ Integer 1L; Integer 61L ]
+                List [ Integer 2L; Integer 52L ]
+                List [ Integer 3L; Integer 36L ]
+                List [ Integer 4L; Integer 11L ]
+              ]
+            |]
+            [|
+              Real 1.5
+              Integer 132L
+              List [
+                List [ Integer 1L; Integer 76L ]
+                List [ Integer 2L; Integer 25L ]
+                List [ Integer 3L; Integer 2L ]
+              ]
+            |]
+            [|
+              Real 3.0
+              Integer 34L
+              List [ //
+                List [ Integer 1L; Integer 26L ]
+                List [ Integer 2L; Integer 4L ]
+              ]
+            |]
+            [|
+              Real 4.5
+              Integer 2L
+              List [ //
+                List [ Integer 1L; Integer 2L ]
+              ]
+            |]
+          ]
+      }
 
     queryResult |> should equal expected
 

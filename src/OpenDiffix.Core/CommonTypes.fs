@@ -27,6 +27,7 @@ type ExpressionType =
   | IntegerType
   | RealType
   | StringType
+  | ListType of ExpressionType
   | UnknownType of string
 
 type Expression =
@@ -89,6 +90,8 @@ type AggregateFunction =
   | AvgNoise
   | DiffixAvg
   | DiffixAvgNoise
+  | CountHistogram
+  | DiffixCountHistogram
 
 type AggregateOptions =
   {
@@ -297,7 +300,7 @@ module Expression =
     | Boolean b -> b.ToString()
     | Integer i -> i.ToString()
     | Real r -> r.ToString()
-    | String s -> "'" + s.Replace("'", "''") + "'"
+    | String s -> String.quoteSingle s
     | List values -> "[" + (values |> List.map valueToString |> String.joinWithComma) + "]"
 
   let toString expr =
@@ -330,6 +333,7 @@ module Function =
     | "sum" -> AggregateFunction(Sum, AggregateOptions.Default)
     | "avg" -> AggregateFunction(Avg, AggregateOptions.Default)
     | "avg_noise" -> AggregateFunction(AvgNoise, AggregateOptions.Default)
+    | "count_histogram" -> AggregateFunction(CountHistogram, AggregateOptions.Default)
     | "diffix_count" -> AggregateFunction(DiffixCount, AggregateOptions.Default)
     | "diffix_count_noise" -> AggregateFunction(DiffixCountNoise, AggregateOptions.Default)
     | "diffix_low_count" -> AggregateFunction(DiffixLowCount, AggregateOptions.Default)
@@ -337,6 +341,7 @@ module Function =
     | "diffix_sum_noise" -> AggregateFunction(DiffixSumNoise, AggregateOptions.Default)
     | "diffix_avg" -> AggregateFunction(DiffixAvg, AggregateOptions.Default)
     | "diffix_avg_noise" -> AggregateFunction(DiffixAvgNoise, AggregateOptions.Default)
+    | "diffix_count_histogram" -> AggregateFunction(DiffixCountHistogram, AggregateOptions.Default)
     | "+" -> ScalarFunction Add
     | "-" -> ScalarFunction Subtract
     | "*" -> ScalarFunction Multiply
