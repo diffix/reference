@@ -446,13 +446,13 @@ type Tests(db: DBFixture) =
       "SELECT sum(z.age) FROM (SELECT t.age FROM customers JOIN customers AS t ON true) z WHERE z.age=0"
 
   [<Fact>]
-  let ``Require AID argument for count_distinct`` () =
+  let ``Require AID argument for count_histogram`` () =
     analyzeTrustedQuery "SELECT count_histogram(id) FROM customers" |> ignore
     analyzeTrustedQuery "SELECT count_histogram(id, 3) FROM customers" |> ignore
     assertTrustedQueryFails "SELECT count_histogram(age, 3) from customers" "count_histogram requires an AID argument."
 
   [<Fact>]
-  let ``Require constant integer for count_distinct bin size`` () =
+  let ``Require constant integer for count_histogram bin size`` () =
     let errorMsg = "count_histogram bin size must be a constant positive integer."
     assertTrustedQueryFails "SELECT count_histogram(age, -3) from customers" errorMsg
     assertTrustedQueryFails "SELECT count_histogram(age, age) from customers" errorMsg
