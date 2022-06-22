@@ -98,10 +98,6 @@ let private validateGeneralization accessLevel expression =
     | ColumnReference _ -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
 
-let private validateWhere accessLevel (selectQuery: SelectQuery) =
-  if accessLevel = PublishUntrusted && selectQuery.Where <> Constant(Boolean true) then
-    failwith "Pre-anonymization filters are not allowed in untrusted access level."
-
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -114,7 +110,6 @@ let validateAnonymizingQuery accessLevel (selectQuery: SelectQuery) =
   validateSumUsage selectQuery
   validateCountHistogramUsage accessLevel selectQuery
   validateSelectTarget selectQuery
-  validateWhere accessLevel selectQuery
 
 let validateGeneralizations accessLevel expressions =
   Seq.iter (validateGeneralization accessLevel) expressions
