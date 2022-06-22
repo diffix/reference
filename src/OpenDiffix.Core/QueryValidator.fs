@@ -98,18 +98,31 @@ let private validateGeneralization accessLevel expression =
     | ColumnReference _ -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
 
+let private validateWhere rangeColumns selectQuery =
+  let rec filterVisitor =
+    function
+    | ColumnReference (index, _) ->
+      let rangeColumn = List.item index rangeColumns
+
+      if rangeColumn.IsAid then
+        failwith "AID columns can't be referenced by pre-anonymization filters."
+    | other -> visit filterVisitor other
+
+  visit filterVisitor selectQuery.Where
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
 let validateDirectQuery (selectQuery: SelectQuery) = validateSingleLowCount selectQuery
 
-let validateAnonymizingQuery accessLevel (selectQuery: SelectQuery) =
+let validateAnonymizingQuery accessLevel rangeColumns (selectQuery: SelectQuery) =
   validateAllowedAggregates selectQuery
   validateCountUsage selectQuery
   validateSumUsage selectQuery
   validateCountHistogramUsage accessLevel selectQuery
   validateSelectTarget selectQuery
+  validateWhere rangeColumns selectQuery
 
 let validateGeneralizations accessLevel expressions =
   Seq.iter (validateGeneralization accessLevel) expressions

@@ -412,6 +412,12 @@ type Tests(db: DBFixture) =
     analyzeUntrustedQuery "SELECT count(*) FROM customers WHERE city = ''"
 
   [<Fact>]
+  let ``Reject WHERE clause over AID column`` () =
+    assertUntrustedQueryFails
+      "SELECT count(*) FROM customers WHERE round(id, 10) = 0"
+      "AID columns can't be referenced by pre-anonymization filters."
+
+  [<Fact>]
   let ``Disallow anonymizing queries with JOINs`` () =
     assertTrustedQueryFails
       "SELECT count(*) FROM customers JOIN customers AS t ON true"
