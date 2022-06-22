@@ -387,7 +387,7 @@ let private floorBy binSize count =
   match binSize with
   | None
   | Some 1L -> count
-  | Some binSize -> (float count / float binSize) |> floor |> int64 |> (*) binSize
+  | Some binSize -> (count / binSize) * binSize
 
 type private CountHistogram(binSize: int64 option) =
   let state = Dictionary<Value, int64>()
