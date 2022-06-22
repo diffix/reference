@@ -408,10 +408,14 @@ type Tests(db: DBFixture) =
       "A single low count aggregator is allowed in a query."
 
   [<Fact>]
-  let ``Reject WHERE clause in untrusted mode`` () =
+  let ``Allow WHERE clause in untrusted mode`` () =
+    analyzeUntrustedQuery "SELECT count(*) FROM customers WHERE city = ''"
+
+  [<Fact>]
+  let ``Reject WHERE clause over AID column`` () =
     assertUntrustedQueryFails
-      "SELECT count(*) FROM customers WHERE city = ''"
-      "Pre-anonymization filters are not allowed in untrusted access level."
+      "SELECT count(*) FROM customers WHERE round(id, 10) = 0"
+      "AID columns can't be referenced by pre-anonymization filters."
 
   [<Fact>]
   let ``Disallow anonymizing queries with JOINs`` () =
