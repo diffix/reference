@@ -2,7 +2,6 @@
 
 - [Purpose](#purpose)
 - [Development process](#development-process)
-  - [Anonymization design](#anonymization-design)
   - [Design considerations](#design-considerations)
   - [Organization](#organization)
   - [Branches](#branches)
@@ -25,20 +24,6 @@ Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
 
 The tests rely on the presence of a test database existing.
 For more information on how to create it, please read the [data/README](data/README.md).
-
-### Anonymization design
-
-We keep design nodes in the docs folder.
-Currently we describe:
-
-- anonymization specific terms in [glossary.md](docs/glossary.md)
-- noise computation in [computing noise.md](docs/computing%20noise.md)
-- low count filtering in [lcf.md](docs/lcf.md)
-- low effect detection in [led.md](docs/led.md)
-- handling of multiple AIDs in [multiple-aid.md](docs/multiple-aid.md)
-- how to deal with multiple levels of aggregation in [multi-level-aggregation.md](docs/multi-level-aggregation.md)
-- high level attacks and related gotchas in [attacks.md](docs/attacks.md)
-
 
 ### Design considerations
 
