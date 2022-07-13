@@ -470,8 +470,10 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
           // Bin already exists, merge to it.
           (bin.LowCount :> IAggregator).Merge(aidEntry.LowCount)
         | false, _ ->
-          // New bin, move ownership from current tracker because we don't need it any further.
-          bins.[binLabel] <- { LowCount = aidEntry.LowCount }
+          // New bin, create and merge.
+          let bin = { LowCount = DiffixLowCount(aidsCount) }
+          (bin.LowCount :> IAggregator).Merge(aidEntry.LowCount)
+          bins.[binLabel] <- bin
 
       let suppressBin = { LowCount = DiffixLowCount(aidsCount) }
 

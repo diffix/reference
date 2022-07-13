@@ -359,9 +359,10 @@ let histogramBinCount (anonParams: AnonymizationParams) (anonContext: Anonymizat
 
   let noise =
     [ anonContext.BucketSeed; seedFromAidSet aidSet ]
-    |> generateNoise anonParams.Salt "count_histogram" anonParams.Suppression.LayerSD
+    |> generateNoise anonParams.Salt "count_histogram" anonParams.LayerNoiseSD
 
   (float numAids + noise)
+  |> Math.roundAwayFromZero
   |> int64
   |> max anonParams.Suppression.LowThreshold
   |> Integer
