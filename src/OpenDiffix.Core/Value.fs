@@ -16,8 +16,8 @@ let rec toString value =
   | Boolean false -> "f"
   | Integer i -> i.ToString()
   | Real r -> r.ToString()
-  | String s -> String.quoteSingle s
-  | List values -> "[" + (values |> List.map toString |> String.joinWithComma) + "]"
+  | String s -> s
+  | List values -> "[" + (values |> List.map (toString >> String.quoteSingle) |> String.joinWithComma) + "]"
 
 /// Resolves the type of a value.
 let rec typeOf value =
