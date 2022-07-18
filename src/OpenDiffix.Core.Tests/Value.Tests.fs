@@ -84,3 +84,19 @@ module ComparerTests =
     Value.isMoneyRounded (Real 0.000000000000009) |> should equal true
     Value.isMoneyRounded (Real 100000.0000000009) |> should equal false
     Value.isMoneyRounded (Real 100000.000000000000009) |> should equal true
+
+  [<Fact>]
+  let ``Stringify works as expected with different types and nesting`` () =
+    Value.toString (Value.List [ Value.List [ String "a"; String "b" ]; Value.List [ String "c"; String "d" ] ])
+    |> should equal "[['a', 'b'], ['c', 'd']]"
+
+    Value.toString (Value.List [ String "a,b"; String "c" ])
+    |> should not' (equal (Value.toString (Value.List [ String "a"; String "b"; String "c" ])))
+
+    Value.toString (Integer 25) |> should equal (Value.toString (String "25"))
+    Value.toString (Real 2.5) |> should equal (Value.toString (String "2.5"))
+    Value.toString (Boolean true) |> should equal (Value.toString (String "t"))
+    Value.toString Null |> should equal "NULL"
+
+    Value.toString (String "'a'") |> should equal "'a'"
+    Value.toString (Value.List [ String "'a'" ]) |> should equal "['''a''']"
