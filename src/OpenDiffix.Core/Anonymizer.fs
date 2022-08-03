@@ -132,21 +132,21 @@ let inline private aidFlattening
     let outlierCount = flatSeed |> mixSeed "outlier" |> randomUniform outlierInterval
     let topCount = flatSeed |> mixSeed "top" |> randomUniform topInterval
 
-    let outliersSummed = sortedAidContributions |> Seq.take outlierCount |> Seq.sumBy snd
+    let outliersSum = sortedAidContributions |> Seq.take outlierCount |> Seq.sumBy snd
 
-    let topGroupValuesSummed =
+    let topGroupSum =
       sortedAidContributions
       |> Seq.skip outlierCount
       |> Seq.take topCount
       |> Seq.sumBy snd
 
-    let topGroupAverage = (float topGroupValuesSummed) / (float topCount)
+    let topGroupAverage = (float topGroupSum) / (float topCount)
     let outlierReplacement = topGroupAverage * (float outlierCount)
 
-    let summedContributions = aidContributions |> Array.sumBy snd
-    let flattening = float outliersSummed - outlierReplacement
+    let realSum = aidContributions |> Array.sumBy snd
+    let flattening = float outliersSum - outlierReplacement
     let flattenedUnaccountedFor = unaccountedFor - flattening |> max 0.
-    let flattenedSum = float summedContributions - flattening
+    let flattenedSum = float realSum - flattening
     let flattenedAvg = flattenedSum / float totalCount
 
     let noiseScale = max flattenedAvg (0.5 * topGroupAverage)
