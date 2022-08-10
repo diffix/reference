@@ -171,9 +171,9 @@ type private DiffixCount(aidsCount) =
         else
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
 
-      match Anonymizer.count aggContext.AnonymizationParams anonContext state with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> Integer(max value minCount)
+      match Anonymizer.sum aggContext.AnonymizationParams anonContext state with
+      | None -> Integer minCount
+      | Some { AnonymizedSum = value } -> value |> Math.roundAwayFromZero |> int64 |> max minCount |> Integer
 
 type private DiffixCountNoise(aidsCount) =
   inherit DiffixCount(aidsCount)
@@ -182,9 +182,9 @@ type private DiffixCountNoise(aidsCount) =
     override this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
 
-      match Anonymizer.count aggContext.AnonymizationParams anonContext this.State with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
+      match Anonymizer.sum aggContext.AnonymizationParams anonContext this.State with
+      | None -> Null
+      | Some { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixCountDistinct(aidsCount) =
   let aidsPerValue = Dictionary<Value, HashSet<AidHash> array>()
@@ -235,8 +235,8 @@ type private DiffixCountDistinct(aidsCount) =
           int64 aggContext.AnonymizationParams.Suppression.LowThreshold
 
       match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount aidsPerValue with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Integer minCount
-      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> Integer(max value minCount)
+      | None -> Integer minCount
+      | Some { AnonymizedSum = value } -> value |> Math.roundAwayFromZero |> int64 |> max minCount |> Integer
 
 type private DiffixCountDistinctNoise(aidsCount) =
   inherit DiffixCountDistinct(aidsCount)
@@ -246,8 +246,8 @@ type private DiffixCountDistinctNoise(aidsCount) =
       let anonContext = unwrapAnonContext anonContext
 
       match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext this.AidsCount this.State with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
+      | None -> Null
+      | Some { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixLowCount(aidsCount) =
   let mutable state: HashSet<AidHash> [] = emptySets aidsCount
@@ -362,11 +362,21 @@ type private DiffixSum(summandType, aidsCount) =
     member this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
 
-      let isReal = summandType = RealType
+      let makeValue =
+        if summandType = RealType then
+          Real
+        else
+          Math.roundAwayFromZero >> int64 >> Integer
 
-      match Anonymizer.sum aggContext.AnonymizationParams anonContext state isReal with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-      | Anonymizer.AnonymizedResult.Ok { AnonymizedSum = value } -> value
+      let positiveResult = Anonymizer.sum aggContext.AnonymizationParams anonContext state.Positive
+      let negativeResult = Anonymizer.sum aggContext.AnonymizationParams anonContext state.Negative
+
+      match positiveResult, negativeResult with
+      | None, None -> Null
+      | None, Some { AnonymizedSum = negativeSum } -> makeValue -negativeSum
+      | Some { AnonymizedSum = positiveSum }, None -> makeValue positiveSum
+      | Some { AnonymizedSum = positiveSum }, Some { AnonymizedSum = negativeSum } ->
+        makeValue (positiveSum - negativeSum)
 
 
 type private DiffixSumNoise(summandType, aidsCount) =
@@ -376,12 +386,15 @@ type private DiffixSumNoise(summandType, aidsCount) =
     override this.Final(aggContext, anonContext) =
       let anonContext = unwrapAnonContext anonContext
 
-      let isReal = this.SummandType = RealType
+      let positiveResult = Anonymizer.sum aggContext.AnonymizationParams anonContext this.State.Positive
+      let negativeResult = Anonymizer.sum aggContext.AnonymizationParams anonContext this.State.Negative
 
-      match Anonymizer.sum aggContext.AnonymizationParams anonContext this.State isReal with
-      | Anonymizer.AnonymizedResult.NotEnoughAIDVs -> Null
-      | Anonymizer.AnonymizedResult.Ok { NoiseSD = noiseSD } -> Real noiseSD
-
+      match positiveResult, negativeResult with
+      | None, None -> Null
+      | None, Some { NoiseSD = negativeNoiseSD } -> Real negativeNoiseSD
+      | Some { NoiseSD = positiveNoiseSD }, None -> Real positiveNoiseSD
+      | Some { NoiseSD = positiveNoiseSD }, Some { NoiseSD = negativeNoiseSD } ->
+        (positiveNoiseSD ** 2.0 + negativeNoiseSD ** 2.0) |> System.Math.Sqrt |> Real
 
 let private floorBy binSize count =
   match binSize with
