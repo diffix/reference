@@ -3,15 +3,15 @@ module OpenDiffix.Core.Anonymizer
 open System
 open System.Security.Cryptography
 
-type AidCountState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
+type ContributionsState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
 
 type SumResult = { AnonymizedSum: float; NoiseSD: float }
 
 type SumState =
   {
     // Both `Positive` and `Negative` include 0.0 contributions by design, but for simplicity we call it like this.
-    Positive: AidCountState array
-    Negative: AidCountState array
+    Positive: ContributionsState array
+    Negative: ContributionsState array
   }
 
 // ----------------------------------------------------------------
@@ -325,12 +325,12 @@ let countDistinct
 
     Some { AnonymizedSum = float value + safeCount; NoiseSD = moneyRoundNoise noiseSD }
 
-let sum
+let count
   (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
-  (perAidContributions: AidCountState array)
+  (contributions: ContributionsState array)
   =
-  let byAid = mapAidFlattening anonParams anonContext perAidContributions
+  let byAid = mapAidFlattening anonParams anonContext contributions
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we have to abort anonymization.
@@ -353,3 +353,26 @@ let histogramBinCount (anonParams: AnonymizationParams) (anonContext: Anonymizat
   |> int64
   |> max anonParams.Suppression.LowThreshold
   |> Integer
+
+let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (contributions: SumState) =
+  let byAidPositive = mapAidFlattening anonParams anonContext contributions.Positive
+  let byAidNegative = mapAidFlattening anonParams anonContext contributions.Negative
+
+  // If any of the AIDs had insufficient data to produce a sensible flattening
+  // for both positive and negative values, we have to abort anonymization.
+  if (Array.zip byAidPositive byAidNegative) |> Array.exists ((=) (None, None)) then
+    None
+  else
+    let anonymizedSumOnNonEmpty =
+      Array.choose id
+      >> function
+        | [||] -> (0.0, 0.0)
+        | nonEmpty -> anonymizedSum nonEmpty
+
+    // Using `anonymizedSum` separately for positive and negative, we ensure that we pick the appropriate
+    // amount of flattening and noise for each leg, and only later combine the results.
+    let (positive, positiveNoiseSD) = anonymizedSumOnNonEmpty byAidPositive
+    let (negative, negativeNoiseSD) = anonymizedSumOnNonEmpty byAidNegative
+    let noiseSD = Math.Sqrt(positiveNoiseSD ** 2.0 + negativeNoiseSD ** 2.0)
+
+    Some { AnonymizedSum = positive - negative; NoiseSD = moneyRoundNoise noiseSD }
