@@ -149,8 +149,17 @@ let getFilePath (parsedArgs: ParseResults<CliArguments>) =
   | None -> failWithUsageInfo "Please specify the file path."
 
 let runQuery query filePath anonParams =
-  use dataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
-  let queryContext = QueryContext.make anonParams dataProvider
+  AnonymizationParams.validate anonParams
+
+  let starBucketCallback _aggCtx starBucket buckets = Seq.append buckets [ starBucket ]
+
+  let queryContext =
+    {
+      AnonymizationParams = anonParams
+      DataProvider = new SQLite.DataProvider(filePath) :> IDataProvider
+      PostAggregationHooks = [ StarBucket.hook starBucketCallback; Led.hook ]
+    }
+
   QueryEngine.run queryContext query
 
 let csvFormat value =

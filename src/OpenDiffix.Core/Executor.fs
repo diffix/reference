@@ -55,7 +55,10 @@ let private invokeHooks aggregationContext anonymizationContext hooks buckets =
   match anonymizationContext with
   | None -> buckets
   | Some anonymizationContext ->
-    List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
+    if aggregationContext.GroupingLabels.Length > 0 then
+      List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
+    else
+      buckets // don't run hooks for global bucket
 
 let private executeAggregate queryContext (childPlan, groupingLabels, aggregators, anonymizationContext) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
