@@ -107,8 +107,9 @@ let ``Merges taking precedence before star bucket hook`` () =
   // We get a hold of the star bucket results reference via side effects.
   let mutable suppressedAnonCount = Null
 
-  let pullHookResultsCallback aggCtx bucket =
-    suppressedAnonCount <- Bucket.finalizeAggregate 0 aggCtx bucket
+  let pullHookResultsCallback aggCtx starBucket buckets =
+    suppressedAnonCount <- Bucket.finalizeAggregate 0 aggCtx starBucket
+    buckets
 
   let starBucketHook = StarBucket.hook pullHookResultsCallback
 

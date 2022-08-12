@@ -52,6 +52,6 @@ let hook
   // which won't be suppressed by itself (different noise seed). In such case,
   // we must enforce the suppression manually.
   if not isStarBucketLowCount && bucketsInStarBucket >= 2 then
-    callback aggregationContext starBucket
-
-  buckets
+    callback aggregationContext starBucket buckets
+  else
+    buckets
