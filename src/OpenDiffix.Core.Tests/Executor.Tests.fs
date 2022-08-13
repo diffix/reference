@@ -86,12 +86,7 @@ type Tests(db: DBFixture) =
     let condition = Expression.makeFunction Equals [ column products 1; Constant(String "xxx") ]
 
     let plan =
-      Plan.Aggregate(
-        Plan.Filter(Plan.Scan(products, [ 1 ]), condition),
-        [ nameLength ],
-        [ countStar ],
-        Some anonContext
-      )
+      Plan.Aggregate(Plan.Filter(Plan.Scan(products, [ 1 ]), condition), [ nameLength ], [ countStar ], None)
 
     let expected: Row list = []
     plan |> execute |> should equal expected
@@ -152,11 +147,12 @@ type Tests(db: DBFixture) =
     let priceReal = Expression.makeFunction CeilBy [ price; Constant(Real 1000.0) ]
     let idColumn = column products 0
     let diffixCount = Expression.makeAggregate DiffixCount [ ListExpr [ idColumn ] ]
+    let diffixLowCount = Expression.makeAggregate DiffixLowCount [ ListExpr [ idColumn ] ]
     let scanProducts = Plan.Scan(products, [ 0; 2 ])
 
     let makePlan groupBy =
       Plan.Project(
-        Plan.Aggregate(scanProducts, [ groupBy ], [ diffixCount ], Some anonContext),
+        Plan.Aggregate(scanProducts, [ groupBy ], [ diffixCount; diffixLowCount ], Some anonContext),
         [ ColumnReference(1, IntegerType) ]
       )
 

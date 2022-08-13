@@ -28,8 +28,8 @@ let getAttribute attr bucket =
 let putAttribute attr value bucket = bucket.Attributes.[attr] <- value
 
 let isLowCount lowCountIndex bucket aggregationContext =
-  bucket.Aggregators.[lowCountIndex].Final(aggregationContext, bucket.AnonymizationContext)
+  bucket.Aggregators.[lowCountIndex].Final(aggregationContext, bucket.AnonymizationContext, None)
   |> Value.unwrapBoolean
 
 let finalizeAggregate index aggregationContext bucket =
-  bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext)
+  bucket.Aggregators.[index].Final(aggregationContext, bucket.AnonymizationContext, None)

@@ -51,14 +51,103 @@ let private executeLimit queryContext (childPlan, amount) : seq<Row> =
 
   childPlan |> execute queryContext |> Seq.truncate (int amount)
 
-let private invokeHooks aggregationContext anonymizationContext hooks buckets =
-  match anonymizationContext with
-  | None -> buckets
-  | Some anonymizationContext ->
-    if aggregationContext.GroupingLabels.Length > 0 then
-      List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
-    else
-      buckets // don't run hooks for global bucket
+let private accumulateAbs accumulator value =
+  match value with
+  | Integer value -> accumulator + abs (float value)
+  | Real value -> accumulator + abs value
+  | _ -> accumulator
+
+// Returns a function that proportionally redistributes the aggregrated outliers data over the individual values in a column.
+let private makeColumnTweaker total outliersAggregate =
+  match total > 0.0, outliersAggregate with
+  | true, Integer outliersAggregate ->
+    function
+    | Integer i ->
+      let tweakFactor = 1.0 + float outliersAggregate / total
+      Integer(int64 (Math.roundAwayFromZero (float i * tweakFactor)))
+    | Null -> Null
+    | _ -> failwith "Unexpected value type in `integer` column."
+  | true, Real outliersAggregate ->
+    function
+    | Real r ->
+      let tweakFactor = 1.0 + float outliersAggregate / total
+      Real(r * tweakFactor)
+    | Null -> Null
+    | _ -> failwith "Unexpected value type in `real` column."
+  | _ -> id
+
+// Recovers dropped outliers data while finalizing aggregated values and proportionally redistributes it over the
+// non-suppressed anonymized values, in order to minimize the total distortion per column.
+let private finalizeAggregratesAndRedistributeOutliers
+  (aggregationContext: AggregationContext)
+  anonymizationContext
+  buckets
+  : Row seq =
+  let outliersAggregators = aggregationContext.Aggregators |> Array.map Aggregator.create
+  let totals = Array.create aggregationContext.Aggregators.Length 0.0
+  let lowCountIndex = AggregationContext.lowCountIndex aggregationContext
+
+  // Finalize aggregrated values, gather dropped outliers data and compute column totals.
+  let rows =
+    buckets
+    |> Seq.map (fun bucket ->
+      let isLowCount =
+        bucket
+        |> Bucket.finalizeAggregate lowCountIndex aggregationContext
+        |> Value.unwrapBoolean
+
+      let finalizer =
+        if isLowCount then
+          fun _i (agg: IAggregator) -> agg.Final(aggregationContext, bucket.AnonymizationContext, None)
+        else
+          fun i (agg: IAggregator) ->
+            let value = agg.Final(aggregationContext, bucket.AnonymizationContext, Some outliersAggregators.[i])
+            totals.[i] <- accumulateAbs totals.[i] value
+            value
+
+      Array.append bucket.Group (Array.mapi finalizer bucket.Aggregators)
+    )
+    |> Seq.toArray
+
+  // Force global aggregration and anonymization contexts for aggregrating outliers.
+  let outliersAggregationContext = { aggregationContext with GroupingLabels = [||] }
+  let outliersAnonymizationContext = { anonymizationContext with BaseLabels = [] }
+
+  // Create a value tweaker for each column that minimizes the total distortion of that column.
+  let columnTweakers =
+    outliersAggregators
+    |> Array.mapi (fun i agg ->
+      makeColumnTweaker totals.[i] (agg.Final(outliersAggregationContext, Some outliersAnonymizationContext, None))
+    )
+
+  // Apply column tweakers to non-suppressed rows.
+  rows
+  |> Seq.filter (fun row -> not (Value.unwrapBoolean row.[lowCountIndex + aggregationContext.GroupingLabels.Length]))
+  |> Seq.iter (fun row ->
+    columnTweakers
+    |> Array.iteri (fun columnIndex tweaker ->
+      let valueIndex = columnIndex + aggregationContext.GroupingLabels.Length
+      row.[valueIndex] <- tweaker row.[valueIndex]
+    )
+  )
+
+  rows
+
+let private finalizeBuckets aggregationContext anonymizationContext hooks buckets =
+  // Invoking hooks and redistributing outliers require that a `DiffixLowCount` aggregrator is present,
+  // which only happens during non-global anonymized aggregration.
+  match aggregationContext, anonymizationContext with
+  | { GroupingLabels = groupingLabels }, Some anonymizationContext when groupingLabels.Length > 0 ->
+    List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
+    |> finalizeAggregratesAndRedistributeOutliers aggregationContext anonymizationContext
+  | _ -> // finalize aggregrates without invoking hooks or redistributing outliers
+    buckets
+    |> Seq.map (fun bucket ->
+      Array.append
+        bucket.Group
+        (bucket.Aggregators
+         |> Array.map (fun agg -> agg.Final(aggregationContext, bucket.AnonymizationContext, None)))
+    )
 
 let private executeAggregate queryContext (childPlan, groupingLabels, aggregators, anonymizationContext) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
@@ -100,13 +189,7 @@ let private executeAggregate queryContext (childPlan, groupingLabels, aggregator
 
   state
   |> Seq.map (fun pair -> pair.Value)
-  |> invokeHooks aggregationContext anonymizationContext queryContext.PostAggregationHooks
-  |> Seq.map (fun bucket ->
-    Array.append
-      bucket.Group
-      (bucket.Aggregators
-       |> Array.map (fun agg -> agg.Final(aggregationContext, bucket.AnonymizationContext)))
-  )
+  |> finalizeBuckets aggregationContext anonymizationContext queryContext.PostAggregationHooks
 
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =

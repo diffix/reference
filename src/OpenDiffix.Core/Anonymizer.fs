@@ -5,7 +5,20 @@ open System.Security.Cryptography
 
 type ContributionsState = { AidContributions: Dictionary<AidHash, float>; mutable UnaccountedFor: float }
 
-type SumResult = { AnonymizedSum: float; NoiseSD: float }
+type CountResult =
+  {
+    AnonymizedCount: int64
+    NoiseSD: float
+    Outliers: (AidHash * float) array array
+  }
+
+type SumResult =
+  {
+    AnonymizedSum: float
+    NoiseSD: float
+    PositiveOutliers: (AidHash * float) array array
+    NegativeOutliers: (AidHash * float) array array
+  }
 
 type SumState =
   {
@@ -100,7 +113,14 @@ let compactFlatteningIntervals outlierCount topCount totalCount =
 
     Some compactIntervals
 
-type private AidCount = { FlattenedSum: float; Flattening: float; NoiseSD: float; Noise: float }
+type private AidCount =
+  {
+    FlattenedSum: float
+    Flattening: float
+    NoiseSD: float
+    Noise: float
+    Outliers: (AidHash * float) array
+  }
 
 let inline private aidFlattening
   (anonParams: AnonymizationParams)
@@ -151,12 +171,20 @@ let inline private aidFlattening
       [ anonContext.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
       |> generateNoise anonParams.Salt "noise" noiseSD
 
+    let outliers =
+      sortedAidContributions
+      |> Seq.take outlierCount
+      |> Seq.map (fun (aid, contribution) -> aid, (float contribution) - topGroupAverage)
+      |> Seq.filter (fun (_aid, contribution) -> contribution > 0)
+      |> Seq.toArray
+
     Some
       {
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         NoiseSD = noiseSD
         Noise = noise
+        Outliers = outliers
       }
 
 let private arrayFromDict (d: Dictionary<'a, 'b>) =
@@ -310,20 +338,33 @@ let countDistinct
       >> countDistinctFlatteningByAid anonParams anonContext
     )
 
-  let safeCount = float highCountValues.Length
+  let safeCount = int64 highCountValues.Length
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we can only report the count of values we already know to be safe as they
   // individually passed low count filtering.
   if byAid |> List.exists ((=) None) then
     if safeCount > 0 then
-      Some { AnonymizedSum = safeCount; NoiseSD = 0.0 }
+      Some { AnonymizedCount = safeCount; NoiseSD = 0.0; Outliers = [||] }
     else
       None
   else
     let (value, noiseSD) = byAid |> List.choose id |> anonymizedSum
 
-    Some { AnonymizedSum = float value + safeCount; NoiseSD = moneyRoundNoise noiseSD }
+    Some
+      {
+        AnonymizedCount = value |> Math.roundAwayFromZero |> int64 |> (+) safeCount
+        NoiseSD = moneyRoundNoise noiseSD
+        Outliers = [||]
+      }
+
+let private gatherOutliers (byAid: option<AidCount> array) =
+  byAid
+  |> Array.map (
+    function
+    | None -> [||]
+    | Some state -> state.Outliers
+  )
 
 let count
   (anonParams: AnonymizationParams)
@@ -339,7 +380,12 @@ let count
   else
     let (value, noiseSD) = byAid |> Array.choose id |> anonymizedSum
 
-    Some { AnonymizedSum = value; NoiseSD = moneyRoundNoise noiseSD }
+    Some
+      {
+        AnonymizedCount = value |> Math.roundAwayFromZero |> int64
+        NoiseSD = moneyRoundNoise noiseSD
+        Outliers = byAid |> gatherOutliers
+      }
 
 let histogramBinCount (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (aidSet: HashSet<AidHash>) =
   let numAids = aidSet.Count
@@ -373,6 +419,13 @@ let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (c
     // amount of flattening and noise for each leg, and only later combine the results.
     let (positive, positiveNoiseSD) = anonymizedSumOnNonEmpty byAidPositive
     let (negative, negativeNoiseSD) = anonymizedSumOnNonEmpty byAidNegative
+
     let noiseSD = Math.Sqrt(positiveNoiseSD ** 2.0 + negativeNoiseSD ** 2.0)
 
-    Some { AnonymizedSum = positive - negative; NoiseSD = moneyRoundNoise noiseSD }
+    Some
+      {
+        AnonymizedSum = positive - negative
+        NoiseSD = moneyRoundNoise noiseSD
+        PositiveOutliers = gatherOutliers byAidPositive
+        NegativeOutliers = gatherOutliers byAidNegative
+      }
