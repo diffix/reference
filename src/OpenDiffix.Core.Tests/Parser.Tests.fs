@@ -52,9 +52,14 @@ let ``Parses simple identifiers`` () =
 let ``Parses expressions`` () =
   [
     "1", Integer 1L
+    "-1", Integer -1L
     "1.1", Float 1.1
     "1.01", Float 1.01
     "1.001", Float 1.001
+    "1.101", Float 1.101
+    "-1.101", Float -1.101
+    "1.123456789012345678", Float 1.123456789012345678
+    "1.123456789012345678e18", Float 1.123456789012345678e18
     "1.0", Float 1.0
     "'hello'", String "hello"
     "true", Boolean true
