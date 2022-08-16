@@ -51,19 +51,18 @@ module QueryParser =
 
   let alias = word "AS" >>. identifier
 
-  // This custom numbers parser is needed as both pint64 and pfloat are eager
-  // to the point of not being possible to combine. pint64 would parse 1.2 as 1,
-  // and pfloat would parse 1 as 1.0.
+  let numberFormat =
+    NumberLiteralOptions.AllowMinusSign
+    ||| NumberLiteralOptions.AllowFraction
+    ||| NumberLiteralOptions.AllowExponent
+
   let number =
-    pint64 .>>. opt (pchar '.' >>. many (pchar '0') .>>. opt pint32) .>> spaces
-    |>> fun (wholeValue, decimalPartOption) ->
-          match decimalPartOption with
-          | None -> Expression.Integer wholeValue
-          | Some (leadingZeros, Some decimalValue) ->
-            let divisor = List.length leadingZeros + 1
-            let decimalPart = (float decimalValue) / (float <| pown 10 divisor)
-            Expression.Float(float wholeValue + decimalPart)
-          | Some (_leadingZeros, None) -> Expression.Float(float wholeValue)
+    numberLiteral numberFormat "number" .>> spaces
+    |>> fun nl ->
+          if nl.IsInteger then
+            Expression.Integer(int64 nl.String)
+          else
+            Expression.Float(float nl.String)
 
   let boolean =
     (word "true" |>> fun _ -> Expression.Boolean true)
