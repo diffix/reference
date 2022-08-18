@@ -525,17 +525,20 @@ module DefaultFunctionsTests =
         Integer 1, Integer 2, Integer 1
         Real 1.1, Real 1.2, Real 1.1
         Boolean false, Boolean true, Boolean false
+        List [], List [ Integer 1 ], List []
         String "a", String "a", Null
         Integer 1, Integer 1, Null
         Real 1.1, Real 1.1, Null
         Boolean false, Boolean false, Null
-      ]
-
-    fails
-      NullIf
-      [ //
-        [ Boolean false; String "b" ]
-        [ List []; List [] ]
+        List [], List [], Null
+        Null, Null, Null
+        // cases leveraging the mixed integer/real binary coercion
+        Integer 1, Real 1.0, Null
+        Real 1.0, Integer 1, Null
+        Integer 1, Real 2.0, Real 1.0
+        Real 1.0, Integer 2, Real 1.0
+        // special cases, differing from PostgreSQL
+        String "a", Integer 1, String "a"
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
