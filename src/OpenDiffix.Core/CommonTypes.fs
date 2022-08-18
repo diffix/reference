@@ -71,6 +71,7 @@ type ScalarFunction =
   | Concat
   | WidthBucket
   | Cast
+  | NullIf
 
 type ScalarArgs = Value list
 
@@ -361,6 +362,7 @@ module Function =
     | "||" -> ScalarFunction Concat
     | "width_bucket" -> ScalarFunction WidthBucket
     | "cast" -> ScalarFunction Cast
+    | "nullif" -> ScalarFunction NullIf
     | other -> failwith $"Unknown function `{other}`"
 
 module Table =

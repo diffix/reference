@@ -516,6 +516,28 @@ module DefaultFunctionsTests =
         Null, String "integer", Null
       ]
 
+  [<Fact>]
+  let NullIf () =
+    runsBinary
+      NullIf
+      [ //
+        String "a", String "b", String "a"
+        Integer 1, Integer 2, Integer 1
+        Real 1.1, Real 1.2, Real 1.1
+        Boolean false, Boolean true, Boolean false
+        String "a", String "a", Null
+        Integer 1, Integer 1, Null
+        Real 1.1, Real 1.1, Null
+        Boolean false, Boolean false, Null
+      ]
+
+    fails
+      NullIf
+      [ //
+        [ Boolean false; String "b" ]
+        [ List []; List [] ]
+      ]
+
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 
