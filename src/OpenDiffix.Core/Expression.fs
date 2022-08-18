@@ -54,6 +54,13 @@ let typeOfScalarFunction fn args =
       | Constant (String "real") -> RealType
       | Constant (String "boolean") -> BooleanType
       | _ -> failwith "Unsupported cast destination type name."
+  | NullIf ->
+    args
+    |> List.map typeOf
+    |> function
+      | [ IntegerType; RealType ] -> RealType
+      | [ RealType; IntegerType ] -> RealType
+      | argsTypes -> List.head argsTypes
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -214,6 +221,9 @@ let rec evaluateScalarFunction fn args =
   | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
   | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
+
+  | NullIf, [ x; y ] when x = y -> Null
+  | NullIf, [ x; y ] -> x
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 
