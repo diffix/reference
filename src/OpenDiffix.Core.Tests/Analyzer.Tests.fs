@@ -78,6 +78,46 @@ let ``Analyze count(distinct col)`` () =
     }
 
 [<Fact>]
+let ``Analyze avg(int_col) produces save division with nullif`` () =
+  testParsedQuery
+    "SELECT avg(int_col) from table"
+    { defaultQuery with
+        TargetList =
+          [
+            {
+              Expression =
+                FunctionExpr(
+                  ScalarFunction Divide,
+                  [
+                    FunctionExpr(
+                      ScalarFunction Cast,
+                      [
+                        FunctionExpr(
+                          AggregateFunction(Sum, { Distinct = false; OrderBy = [] }),
+                          [ ColumnReference(1, IntegerType) ]
+                        )
+                        Constant(String "real")
+                      ]
+                    )
+                    FunctionExpr(
+                      ScalarFunction NullIf,
+                      [
+                        FunctionExpr(
+                          AggregateFunction(Count, { Distinct = false; OrderBy = [] }),
+                          [ ColumnReference(1, IntegerType) ]
+                        )
+                        Constant(Integer 0L)
+                      ]
+                    )
+                  ]
+                )
+              Alias = "avg"
+              Tag = RegularTargetEntry
+            }
+          ]
+    }
+
+[<Fact>]
 let ``Selecting columns from a table`` () =
   testParsedQuery
     "SELECT str_col, bool_col FROM table"

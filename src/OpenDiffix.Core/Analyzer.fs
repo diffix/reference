@@ -45,8 +45,11 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
   let mapAvg options parsedArgs sumFunction countFunction =
     let sum = mapFunctionExpression rangeColumns (AggregateFunction(sumFunction, options)) parsedArgs
     let count = mapFunctionExpression rangeColumns (AggregateFunction(countFunction, options)) parsedArgs
+    // `nullif` is necessary to handle cases where large negative noise brings `count`
+    // down to 0 during global aggregation.
+    let countDenominator = FunctionExpr(ScalarFunction ScalarFunction.NullIf, [ count; Constant(Integer 0L) ])
     let castSum = FunctionExpr(ScalarFunction ScalarFunction.Cast, [ sum; Constant(String "real") ])
-    ScalarFunction ScalarFunction.Divide, [ castSum; count ]
+    ScalarFunction ScalarFunction.Divide, [ castSum; countDenominator ]
 
   (match fn, parsedArgs with
    | AggregateFunction (Count, options), [ ParserTypes.Star ] -> //
