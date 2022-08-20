@@ -59,6 +59,26 @@ git diff --cached --name-only --diff-filter=ACM -z | xargs -0 dotnet fantomas
 git diff --cached --name-only --diff-filter=ACM -z | xargs -0 git add -p
 ```
 
+Getting "Format on Save" to work correctly in VS Code is not a straightforward task.
+Existing formatting extensions either don't work at all, use an incompatible version of `fantomas`, or ignore the workspace settings.
+Here is a solution that produces results consistent with our CI checks:
+
+1. Install the right version of `fantomas` globally.
+2. Add the `Custom Local Formatters` extension to VS Code.
+3. Configure the extension by adding this entry to the `customLocalFormatters.formatters` array:
+```json
+  {
+      "command": "fantomas --stdout ${file}",
+      "languages": [
+          "fsharp"
+      ]
+  }
+```
+4. Open the file `.vscode/extensions/jkillian.custom-local-formatters-0.0.6/out/extension.js` from your home folder and comment out this line:
+```js
+(_a = process.stdin) === null || _a === void 0 ? void 0 : _a.write(originalDocumentText);
+```
+
 ## Creating a release
 
 To generate an executable of the command line interface, run:
