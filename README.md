@@ -1,6 +1,7 @@
 # Open Diffix reference implementation
 
 - [Purpose](#purpose)
+- [Documentation](#documentation)
 - [Development process](#development-process)
   - [Design considerations](#design-considerations)
   - [Organization](#organization)
@@ -11,16 +12,22 @@
 
 ## Purpose
 
-This is a reference implementation of Open Diffix.
-As such, this serves as a sandbox in which we can quickly try, and validate, new ideas for anonymization.
-The reference implementation is meant to offer anonymization quality matching that of a final product - however
-not necessarily SQL parity. It will not receive the type of polish and usability work a commercial product would.
+This is the reference implementation of Open Diffix.
+It serves as a sandbox in which we can quickly try, and validate, new mechanisms for anonymization.
+The reference implementation is meant to offer anonymization quality matching that of production-ready code, however
+without the same amount of polish, usability, documentation, and performance work a commercial product would require.
 It can safely be used to anonymize data, but there will be rough edges.
+
+## Documentation
+
+Once a mechanism is considered stable, it will be added to the [pg_diffix](https://github.com/diffix/pg_diffix) project, using the
+reference code as a guideline.
+As such, all Diffix-related documentation present there should also apply to this project. Under-development features will not be documented.
 
 ## Development process
 
-The concepts implemented will at times be complex. We therefore do not skimp on code quality or legibility.
-Code going into the `master`-branch is peer-reviewed. Tests should pass, etc.
+The concepts implemented will be, much of the time, complex. Therefore, we do not skimp on code quality or legibility.
+Code going into the `master` and `release` branches is peer-reviewed, tests should pass, etc.
 
 The tests rely on the presence of a test database existing.
 For more information on how to create it, please read the [data/README](data/README.md).
@@ -44,6 +51,9 @@ The codebase is currently organized in a number of projects:
 
 To avoid merge conflicts we work on feature branches. Once automated tests pass it can either be reviewed
 or merged into `master`.
+
+Each finished version of Diffix will have its own `release` branch. Code in `master` should be considered unstable and
+representing the next, under-development, version of Diffix.
 
 ### Formatting
 
