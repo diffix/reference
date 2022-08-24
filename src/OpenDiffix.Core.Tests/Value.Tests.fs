@@ -64,6 +64,12 @@ module ComparerTests =
     |> should equal [ String " a"; String "+a"; String "a"; String "b" ]
 
   [<Fact>]
+  let ``String sort uses the natural order of symbols`` () =
+    [ String "*"; String "."; String " "; String "b" ]
+    |> sort Ascending NullsLast
+    |> should equal [ String " "; String "*"; String "."; String "b" ]
+
+  [<Fact>]
   let ``Money rounding`` () =
     Value.moneyRound 5.0 |> should (equalWithin 1e-10) 5.0
     Value.moneyRound 5.1 |> should (equalWithin 1e-10) 5.0
