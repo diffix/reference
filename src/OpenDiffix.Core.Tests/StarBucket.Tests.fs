@@ -19,9 +19,6 @@ let csv =
   D
   """
 
-// now only C is below the default lowThresh, and so is the *-bucket
-let csvSuppressedStarBucket = csv.Replace("D\n", "")
-
 let query =
   """
   SELECT letter, diffix_count(*, RowIndex), diffix_low_count(RowIndex)
@@ -49,6 +46,9 @@ let ``Counts all suppressed buckets, but suppresses the star bucket`` () =
   let pullHookResultsCallback aggCtx bucket buckets =
     suppressedAnonCount <- Bucket.finalizeAggregate 0 aggCtx bucket
     buckets
+
+  // now only C is below the default lowThresh, and so is the *-bucket
+  let csvSuppressedStarBucket = csv.Replace("D" + System.Environment.NewLine, "")
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csvSuppressedStarBucket query
   |> ignore
