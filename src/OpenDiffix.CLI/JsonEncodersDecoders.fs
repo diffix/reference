@@ -19,6 +19,7 @@ module private rec Encoders =
     | Integer int64 -> Encode.float (float int64)
     | Real float -> Encode.float float
     | String string -> Encode.string string
+    | Timestamp timestamp -> Encode.datetime timestamp
     | List values -> Encode.list (values |> List.map encodeValue)
 
   let rec private typeName =
@@ -27,6 +28,7 @@ module private rec Encoders =
     | IntegerType -> "integer"
     | RealType -> "real"
     | StringType -> "text"
+    | TimestampType -> "timestamp"
     | ListType itemType -> $"list({typeName itemType})"
     | UnknownType _ -> "unknown"
 

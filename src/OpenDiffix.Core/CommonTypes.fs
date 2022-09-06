@@ -14,6 +14,7 @@ type Value =
   | Integer of int64
   | Real of float
   | String of string
+  | Timestamp of DateTime
   | List of Value list
 
 type Row = Value array
@@ -27,6 +28,7 @@ type ExpressionType =
   | IntegerType
   | RealType
   | StringType
+  | TimestampType
   | ListType of ExpressionType
   | UnknownType of string
 
@@ -72,6 +74,7 @@ type ScalarFunction =
   | WidthBucket
   | Cast
   | NullIf
+  | DateTrunc
 
 type ScalarArgs = Value list
 
@@ -302,6 +305,7 @@ module Expression =
     | Integer i -> i.ToString()
     | Real r -> r.ToString()
     | String s -> String.quoteSingle s
+    | Timestamp ts -> ts.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
     | List values -> "[" + (values |> List.map valueToString |> String.joinWithComma) + "]"
 
   let toString expr =
@@ -363,6 +367,7 @@ module Function =
     | "width_bucket" -> ScalarFunction WidthBucket
     | "cast" -> ScalarFunction Cast
     | "nullif" -> ScalarFunction NullIf
+    | "date_trunc" -> ScalarFunction DateTrunc
     | other -> failwith $"Unknown function `{other}`"
 
 module Table =

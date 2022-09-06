@@ -14,6 +14,10 @@ type Field =
   | Text of string
   | Integer of int64
   | Real of float
+  | Timestamp of DateTime
+
+let quoteString (string: string) =
+  "\"" + string.Replace("\"", "\"\"") + "\""
 
 let fieldToString field =
   match field with
@@ -21,16 +25,17 @@ let fieldToString field =
   | Text value -> $"'{value}'"
   | Integer value -> string value
   | Real value -> string value
+  | Timestamp value ->
+    $"""'{value.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}'"""
 
 let fieldToCSVString field =
   match field with
   | Null -> ""
-  | Text value -> $"\"{value}\""
+  | Text value -> quoteString value
   | Integer value -> string value
   | Real value -> string value
-
-let quoteString (string: string) =
-  "\"" + string.Replace("\"", "\"\"") + "\""
+  | Timestamp value ->
+    quoteString $"""{value.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}"""
 
 type Column = { Name: string; Type: Type }
 
@@ -67,6 +72,16 @@ let randomGenerator min max =
       yield Field.Integer(int64 (gRNG.Next(min, max)))
   }
 
+let randomTimestampGenerator =
+  let scale = 1234123412L
+  let min = DateTime(1917, 6, 7, 4, 5, 6).Ticks / scale |> int
+  let max = DateTime(2017, 6, 7, 4, 5, 6).Ticks / scale |> int
+
+  seq {
+    while true do
+      yield Field.Timestamp(DateTime(scale * int64 (gRNG.Next(min, max))))
+  }
+
 let statefulGenerator (generator: seq<Field>) =
   let enumerator = generator.GetEnumerator()
 
@@ -81,20 +96,7 @@ let cities =
 let city = List.head cities
 
 let firstNames =
-  [
-    "James"
-    "James"
-    "James"
-    "Mary"
-    "Mary"
-    "Robert"
-    "Jennifer"
-    "David"
-    "William"
-    "Elizabeth"
-    "David"
-    "Susan"
-  ]
+  [ "James"; "James"; "James"; "Mary"; "Mary"; "Robert"; "Jennifer"; "David"; "William"; "Elizabeth"; "David"; "Susan" ]
   |> List.map Field.Text
 
 let firstName = List.head firstNames
@@ -140,6 +142,11 @@ let companyNames =
 
 let companyName = List.head companyNames
 
+let timestamps =
+  [ Timestamp(DateTime(2017, 6, 7, 4, 5, 6)); Timestamp(DateTime(2013, 3, 4)); Timestamp(DateTime(2015, 5, 6)) ]
+
+let timestamp = List.head timestamps
+
 let customersSmall =
   {
     Name = "customers_small"
@@ -151,6 +158,7 @@ let customersSmall =
         { Name = "age"; Type = Type.Integer }
         { Name = "city"; Type = Type.Text }
         { Name = "company_name"; Type = Type.Text }
+        { Name = "last_seen"; Type = Type.Text }
       ]
 
     GeneratedRowsCount = 20
@@ -162,24 +170,25 @@ let customersSmall =
         listGenerator [ Integer 25L; Integer 30L; Integer 35L ]
         listGenerator [ Text "Berlin"; Text "Rome" ]
         listGenerator companyNames
+        listGenerator timestamps
       ]
 
     StaticRows =
       [
-        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
-        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc" ]
-        [ Null; Text "Bob"; Text "Regular"; Integer 25L; city; companyName ]
+        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc"; timestamp ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1001L; Text "Alice"; Text "Outlier"; Integer 18L; Text "Bucharest"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Integer 1002L; Text "Bob"; Text "Outlier"; Integer 100L; Text "Pristina"; Text "Outlier Inc"; timestamp ]
+        [ Null; Text "Bob"; Text "Regular"; Integer 25L; city; companyName; timestamp ]
       ]
   }
 
@@ -194,6 +203,7 @@ let customers =
         { Name = "age"; Type = Type.Integer }
         { Name = "city"; Type = Type.Text }
         { Name = "company_name"; Type = Type.Text }
+        { Name = "last_seen"; Type = Type.Text }
       ]
 
     GeneratedRowsCount = 200
@@ -205,16 +215,17 @@ let customers =
         randomGenerator 18 80
         listGenerator cities
         listGenerator companyNames
+        randomTimestampGenerator
       ]
 
     StaticRows =
       [
-        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc." ]
-        [ Integer 1001L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo"; Text "Outlier Inc." ]
-        [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris"; Text "Outlier Inc." ]
-        [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin"; Text "Outlier Inc." ]
-        [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin"; Text "Outlier Inc." ]
-        [ Null; firstName; lastName; Integer 25L; city; companyName ]
+        [ Integer 1000L; Null; Null; Null; Null; Text "Outlier Inc."; timestamp ]
+        [ Integer 1001L; Text "1"; Text "outlier"; Integer 17L; Text "Oslo"; Text "Outlier Inc."; timestamp ]
+        [ Integer 1002L; Text "2"; Text "outlier"; Integer 90L; Text "Paris"; Text "Outlier Inc."; timestamp ]
+        [ Integer 1003L; Text "3"; Text "outlier"; Null; Text "Berlin"; Text "Outlier Inc."; timestamp ]
+        [ Integer 1004L; Text "4"; Text "outlier"; Integer 10L; Text "Berlin"; Text "Outlier Inc."; timestamp ]
+        [ Null; firstName; lastName; Integer 25L; city; companyName; timestamp ]
       ]
   }
 

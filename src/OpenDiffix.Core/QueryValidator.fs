@@ -81,15 +81,24 @@ let private validateSelectTarget (selectQuery: SelectQuery) =
 let private validateGeneralization accessLevel expression =
   if accessLevel <> Direct then
     match expression with
-    | FunctionExpr (ScalarFunction _, primaryArg :: _) when not (Expression.isColumnReference primaryArg) ->
-      failwith "Primary argument for a generalization expression has to be a simple column reference."
-    | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) when List.exists (Expression.isConstant >> not) secondaryArgs ->
-      failwith "Secondary arguments for a generalization expression have to be constants."
+    | FunctionExpr (ScalarFunction DateTrunc, [ _; primaryArg ])
+    | FunctionExpr (ScalarFunction _, primaryArg :: _) ->
+      if not (Expression.isColumnReference primaryArg) then
+        failwith "Primary argument for a generalization expression has to be a simple column reference."
+    | _ -> ()
+
+    match expression with
+    | FunctionExpr (ScalarFunction DateTrunc, [ secondaryArg; _ ]) ->
+      if secondaryArg |> Expression.isConstant |> not then
+        failwith "Secondary arguments for a generalization expression have to be constants."
+    | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) ->
+      if (List.exists (Expression.isConstant >> not) secondaryArgs) then
+        failwith "Secondary arguments for a generalization expression have to be constants."
     | _ -> ()
 
   if accessLevel = PublishUntrusted then
     match expression with
-    | FunctionExpr (ScalarFunction fn, [ _ ]) when List.contains fn [ Floor; Ceil; Round ] -> ()
+    | FunctionExpr (ScalarFunction fn, _) when List.contains fn [ Floor; Ceil; Round; DateTrunc ] -> ()
     | FunctionExpr (ScalarFunction fn, [ _; Constant c ]) when
       List.contains fn [ FloorBy; RoundBy ] && Value.isMoneyRounded c
       ->

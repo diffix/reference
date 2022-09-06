@@ -553,6 +553,10 @@ type Tests(db: DBFixture) =
     analyzeUntrustedQuery "SELECT floor_by(age, 50.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT round_by(age, 50.0) from customers" |> ignore
     analyzeUntrustedQuery "SELECT count_histogram(id, 5) from customers" |> ignore
+
+    analyzeUntrustedQuery "SELECT date_trunc('month', last_seen) from customers"
+    |> ignore
+
     // No generalization, either implicitly or explicitly
     analyzeUntrustedQuery "SELECT floor(age) from customers" |> ignore
     analyzeUntrustedQuery "SELECT age from customers" |> ignore

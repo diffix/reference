@@ -513,6 +513,7 @@ module DefaultFunctionsTests =
         Real 0.7, String "text", String "0.7"
         Integer -2L, String "text", String "-2"
         Boolean false, String "text", String "false"
+        String "2013-01-08 13:56:41", String "timestamp", Timestamp(System.DateTime(2013, 1, 8, 13, 56, 41))
         Null, String "integer", Null
       ]
 
@@ -539,6 +540,40 @@ module DefaultFunctionsTests =
         Real 1.0, Integer 2, Real 1.0
         // special cases, differing from PostgreSQL
         String "a", Integer 1, String "a"
+      ]
+
+  [<Fact>]
+  let DateTrunc () =
+    runsBinary
+      DateTrunc
+      [ //
+        String "second",
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41, 123)),
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41))
+        String "minute",
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)),
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 0))
+        String "hour",
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)),
+        Timestamp(System.DateTime(2113, 2, 8, 13, 0, 0))
+        String "day",
+        Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)),
+        Timestamp(System.DateTime(2113, 2, 8, 0, 0, 0))
+        String "week", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2113, 2, 6))
+        String "month", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2113, 2, 1))
+        String "quarter", Timestamp(System.DateTime(2113, 5, 8)), Timestamp(System.DateTime(2113, 4, 1))
+        String "year", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2113, 1, 1))
+        String "decade", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2110, 1, 1))
+        String "century", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2101, 1, 1))
+        String "millennium", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(2001, 1, 1))
+        String "century", Timestamp(System.DateTime(2000, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(1901, 1, 1))
+        String "millennium", Timestamp(System.DateTime(2000, 2, 8, 13, 56, 41)), Timestamp(System.DateTime(1001, 1, 1))
+      ]
+
+    fails
+      DateTrunc
+      [ //
+        [ String "secondz"; Timestamp(System.DateTime(2113, 2, 6)) ]
       ]
 
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =

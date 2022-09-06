@@ -53,6 +53,7 @@ let typeOfScalarFunction fn args =
       | Constant (String "integer") -> IntegerType
       | Constant (String "real") -> RealType
       | Constant (String "boolean") -> BooleanType
+      | Constant (String "timestamp") -> TimestampType
       | _ -> failwith "Unsupported cast destination type name."
   | NullIf ->
     args
@@ -61,6 +62,7 @@ let typeOfScalarFunction fn args =
       | [ IntegerType; RealType ] -> RealType
       | [ RealType; IntegerType ] -> RealType
       | argsTypes -> List.head argsTypes
+  | DateTrunc -> TimestampType
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -221,9 +223,50 @@ let rec evaluateScalarFunction fn args =
   | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
   | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
+  | Cast, [ Timestamp ts; String "text" ] ->
+    ts.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
+    |> String
+  | Cast, [ String s; String "timestamp" ] ->
+    System.DateTime.Parse(s, System.Globalization.CultureInfo.InvariantCulture)
+    |> Timestamp
 
   | NullIf, [ x; y ] when x = y -> Null
   | NullIf, [ x; y ] -> x
+
+  | DateTrunc, [ String "second"; Timestamp ts ]
+  | DateTrunc, [ String "seconds"; Timestamp ts ] ->
+    System.DateTime(ts.Year, ts.Month, ts.Day, ts.Hour, ts.Minute, ts.Second, ts.Kind)
+    |> Timestamp
+  | DateTrunc, [ String "minute"; Timestamp ts ]
+  | DateTrunc, [ String "minutes"; Timestamp ts ] ->
+    System.DateTime(ts.Year, ts.Month, ts.Day, ts.Hour, ts.Minute, 0, ts.Kind)
+    |> Timestamp
+  | DateTrunc, [ String "hour"; Timestamp ts ]
+  | DateTrunc, [ String "hours"; Timestamp ts ] ->
+    System.DateTime(ts.Year, ts.Month, ts.Day, ts.Hour, 0, 0, ts.Kind) |> Timestamp
+  | DateTrunc, [ String "day"; Timestamp ts ]
+  | DateTrunc, [ String "days"; Timestamp ts ] -> System.DateTime(ts.Year, ts.Month, ts.Day) |> Timestamp
+  | DateTrunc, [ String "week"; Timestamp ts ]
+  | DateTrunc, [ String "weeks"; Timestamp ts ] ->
+    match ts.DayOfWeek with
+    // .NET has Sunday as day 0, while PostgreSQL as day 7.
+    | System.DayOfWeek.Sunday -> System.DateTime(ts.Year, ts.Month, ts.Day).AddDays(-6.0)
+    | _ -> System.DateTime(ts.Year, ts.Month, ts.Day).AddDays(-(float ts.DayOfWeek) + 1.0)
+    |> Timestamp
+  | DateTrunc, [ String "month"; Timestamp ts ]
+  | DateTrunc, [ String "months"; Timestamp ts ] -> System.DateTime(ts.Year, ts.Month, 1) |> Timestamp
+  | DateTrunc, [ String "quarter"; Timestamp ts ] ->
+    System.DateTime(ts.Year, ts.Month - (ts.Month - 1) % 3, 1) |> Timestamp
+  | DateTrunc, [ String "year"; Timestamp ts ]
+  | DateTrunc, [ String "years"; Timestamp ts ] -> System.DateTime(ts.Year, 1, 1) |> Timestamp
+  | DateTrunc, [ String "decade"; Timestamp ts ]
+  | DateTrunc, [ String "decades"; Timestamp ts ] -> System.DateTime(ts.Year - ts.Year % 10, 1, 1) |> Timestamp
+  | DateTrunc, [ String "century"; Timestamp ts ]
+  | DateTrunc, [ String "centuries"; Timestamp ts ] -> System.DateTime(ts.Year - (ts.Year - 1) % 100, 1, 1) |> Timestamp
+  | DateTrunc, [ String "millennium"; Timestamp ts ]
+  | DateTrunc, [ String "millenniums"; Timestamp ts ]
+  | DateTrunc, [ String "millennia"; Timestamp ts ] ->
+    System.DateTime(ts.Year - (ts.Year - 1) % 1000, 1, 1) |> Timestamp
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 

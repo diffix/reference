@@ -74,7 +74,8 @@ let private normalizeCasts expr =
     | "boolean", BooleanType
     | "integer", IntegerType
     | "real", RealType
-    | "string", StringType -> arg
+    | "string", StringType
+    | "timestamp", TimestampType -> arg
     | _ -> expr
   | _ -> expr
 

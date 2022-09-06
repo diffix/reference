@@ -88,3 +88,7 @@ resharper_fsharp_multi_line_lambda_closing_newline = true
 fsharp_multi_line_lambda_closing_newline = true
 resharper_fsharp_strict_mode = false
 fsharp_strict_mode = false
+
+[data/generate.fsx]
+resharper_fsharp_max_array_or_list_width = 120
+fsharp_max_array_or_list_width = 120
