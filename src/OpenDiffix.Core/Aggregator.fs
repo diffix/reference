@@ -87,7 +87,7 @@ type private Count() =
     member this.Merge aggregator =
       state <- state + (castAggregator<Count> aggregator).State
 
-    member this.Final(_aggContext, _anonContext, _outliersAggregrator) = Integer state
+    member this.Final(_aggContext, _anonContext, _outliersAggregator) = Integer state
 
 type private CountDistinct() =
   let state = HashSet<Value>()
@@ -104,7 +104,7 @@ type private CountDistinct() =
     member this.Merge aggregator =
       state.UnionWith((castAggregator<CountDistinct> aggregator).State)
 
-    member this.Final(_aggContext, _anonContext, _outliersAggregrator) = state.Count |> int64 |> Integer
+    member this.Final(_aggContext, _anonContext, _outliersAggregator) = state.Count |> int64 |> Integer
 
 type private Sum() =
   let mutable state = Null
@@ -124,7 +124,7 @@ type private Sum() =
     member this.Merge aggregator =
       (this :> IAggregator).Transition [ (castAggregator<Sum> aggregator).State ]
 
-    member this.Final(_aggContext, _anonContext, _outliersAggregrator) = state
+    member this.Final(_aggContext, _anonContext, _outliersAggregator) = state
 
 type private DiffixCount(aidsCount) =
   let mutable state: Anonymizer.ContributionsState array =
@@ -177,9 +177,9 @@ type private DiffixCount(aidsCount) =
         )
       )
 
-    member this.Final(aggContext, anonContext, outliersAggregrator) =
+    member this.Final(aggContext, anonContext, outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
-      let getState = fun aggregrator -> (castAggregator<DiffixCount> aggregrator).State
+      let getState = fun aggregator -> (castAggregator<DiffixCount> aggregator).State
 
       let minCount =
         if Array.isEmpty aggContext.GroupingLabels && List.isEmpty anonContext.BaseLabels then
@@ -189,18 +189,18 @@ type private DiffixCount(aidsCount) =
 
       match Anonymizer.count aggContext.AnonymizationParams anonContext state with
       | None ->
-        Option.iter (getState >> mergeOutliers (contributionsToArray state)) outliersAggregrator
+        Option.iter (getState >> mergeOutliers (contributionsToArray state)) outliersAggregator
         Integer minCount
 
       | Some result ->
-        Option.iter (getState >> mergeOutliers result.Outliers) outliersAggregrator
+        Option.iter (getState >> mergeOutliers result.Outliers) outliersAggregator
         result.AnonymizedCount |> max minCount |> Integer
 
 type private DiffixCountNoise(aidsCount) =
   inherit DiffixCount(aidsCount)
 
   interface IAggregator with
-    override this.Final(aggContext, anonContext, _outliersAggregrator) =
+    override this.Final(aggContext, anonContext, _outliersAggregator) =
       match Anonymizer.count aggContext.AnonymizationParams (unwrapAnonContext anonContext) this.State with
       | None -> Null
       | Some result -> Real result.NoiseSD
@@ -244,7 +244,7 @@ type private DiffixCountDistinct(aidsCount) =
         | false, _ -> aidsPerValue.[pair.Key] <- pair.Value |> Array.map cloneHashSet
       )
 
-    member this.Final(aggContext, anonContext, _outliersAggregrator) =
+    member this.Final(aggContext, anonContext, _outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
 
       let minCount =
@@ -261,7 +261,7 @@ type private DiffixCountDistinctNoise(aidsCount) =
   inherit DiffixCountDistinct(aidsCount)
 
   interface IAggregator with
-    override this.Final(aggContext, anonContext, _outliersAggregrator) =
+    override this.Final(aggContext, anonContext, _outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
 
       match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext this.AidsCount this.State with
@@ -292,7 +292,7 @@ type private DiffixLowCount(aidsCount) =
       let otherState = (castAggregator<DiffixLowCount> aggregator).State
       otherState |> mergeHashSetsInto state
 
-    member this.Final(aggContext, anonContext, _outliersAggregrator) =
+    member this.Final(aggContext, anonContext, _outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
       Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams state)
 
@@ -381,10 +381,10 @@ type private DiffixSum(summandType, aidsCount) =
       mergeContributions state.Positive srcState.Positive
       mergeContributions state.Negative srcState.Negative
 
-    member this.Final(aggContext, anonContext, outliersAggregrator) =
+    member this.Final(aggContext, anonContext, outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
-      let getPositiveState = fun aggregrator -> (castAggregator<DiffixSum> aggregrator).State.Positive
-      let getNegativeState = fun aggregrator -> (castAggregator<DiffixSum> aggregrator).State.Negative
+      let getPositiveState = fun aggregator -> (castAggregator<DiffixSum> aggregator).State.Positive
+      let getNegativeState = fun aggregator -> (castAggregator<DiffixSum> aggregator).State.Negative
 
       let makeValue =
         if summandType = RealType then
@@ -394,20 +394,20 @@ type private DiffixSum(summandType, aidsCount) =
 
       match Anonymizer.sum aggContext.AnonymizationParams anonContext state with
       | None ->
-        Option.iter (getPositiveState >> mergeOutliers (contributionsToArray state.Positive)) outliersAggregrator
-        Option.iter (getNegativeState >> mergeOutliers (contributionsToArray state.Negative)) outliersAggregrator
+        Option.iter (getPositiveState >> mergeOutliers (contributionsToArray state.Positive)) outliersAggregator
+        Option.iter (getNegativeState >> mergeOutliers (contributionsToArray state.Negative)) outliersAggregator
         Null
 
       | Some result ->
-        Option.iter (getPositiveState >> mergeOutliers result.PositiveOutliers) outliersAggregrator
-        Option.iter (getNegativeState >> mergeOutliers result.NegativeOutliers) outliersAggregrator
+        Option.iter (getPositiveState >> mergeOutliers result.PositiveOutliers) outliersAggregator
+        Option.iter (getNegativeState >> mergeOutliers result.NegativeOutliers) outliersAggregator
         makeValue result.AnonymizedSum
 
 type private DiffixSumNoise(summandType, aidsCount) =
   inherit DiffixSum(summandType, aidsCount)
 
   interface IAggregator with
-    override this.Final(aggContext, anonContext, _outliersAggregrator) =
+    override this.Final(aggContext, anonContext, _outliersAggregator) =
       match Anonymizer.sum aggContext.AnonymizationParams (unwrapAnonContext anonContext) this.State with
       | None -> Null
       | Some result -> Real result.NoiseSD
@@ -435,7 +435,7 @@ type private CountHistogram(binSize: int64 option) =
         let current = state |> Dictionary.getOrDefault other.Key 0L
         state.[other.Key] <- current + other.Value
 
-    member this.Final(aggContext, anonContext, _outliersAggregrator) =
+    member this.Final(aggContext, anonContext, _outliersAggregator) =
       let bins = Dictionary<int64, int64>()
 
       for pair in state do
@@ -483,7 +483,7 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
         currentState.RowCount <- currentState.RowCount + other.Value.RowCount
         (currentState.LowCount :> IAggregator).Merge(other.Value.LowCount)
 
-    member this.Final(aggContext, anonContext, _outliersAggregrator) =
+    member this.Final(aggContext, anonContext, _outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
       let bins = Dictionary<int64, CountHistogramBin>()
 

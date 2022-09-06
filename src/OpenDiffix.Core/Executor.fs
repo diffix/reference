@@ -57,7 +57,7 @@ let private accumulateAbs accumulator value =
   | Real value -> accumulator + abs value
   | _ -> accumulator
 
-// Returns a function that proportionally redistributes the aggregrated outliers data over the individual values in a column.
+// Returns a function that proportionally redistributes the aggregated outliers data over the individual values in a column.
 let private makeColumnTweaker total outliersAggregate =
   match total > 0.0, outliersAggregate with
   | true, Integer outliersAggregate ->
@@ -78,7 +78,7 @@ let private makeColumnTweaker total outliersAggregate =
 
 // Recovers dropped outliers data while finalizing aggregated values and proportionally redistributes it over the
 // non-suppressed anonymized values, in order to minimize the total distortion per column.
-let private finalizeAggregratesAndRedistributeOutliers
+let private finalizeAggregatesAndRedistributeOutliers
   (aggregationContext: AggregationContext)
   anonymizationContext
   buckets
@@ -87,7 +87,7 @@ let private finalizeAggregratesAndRedistributeOutliers
   let totals = Array.create aggregationContext.Aggregators.Length 0.0
   let lowCountIndex = AggregationContext.lowCountIndex aggregationContext
 
-  // Finalize aggregrated values, gather dropped outliers data and compute column totals.
+  // Finalize aggregated values, gather dropped outliers data and compute column totals.
   let rows =
     buckets
     |> Seq.map (fun bucket ->
@@ -109,7 +109,7 @@ let private finalizeAggregratesAndRedistributeOutliers
     )
     |> Seq.toArray
 
-  // Force global aggregration and anonymization contexts for aggregrating outliers.
+  // Force global aggregation and anonymization contexts for aggregating outliers.
   let outliersAggregationContext = { aggregationContext with GroupingLabels = [||] }
   let outliersAnonymizationContext = { anonymizationContext with BaseLabels = [] }
 
@@ -134,13 +134,13 @@ let private finalizeAggregratesAndRedistributeOutliers
   rows
 
 let private finalizeBuckets aggregationContext anonymizationContext hooks buckets =
-  // Invoking hooks and redistributing outliers require that a `DiffixLowCount` aggregrator is present,
-  // which only happens during non-global anonymized aggregration.
+  // Invoking hooks and redistributing outliers require that a `DiffixLowCount` aggregator is present,
+  // which only happens during non-global anonymized aggregation.
   match aggregationContext, anonymizationContext with
   | { GroupingLabels = groupingLabels }, Some anonymizationContext when groupingLabels.Length > 0 ->
     List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
-    |> finalizeAggregratesAndRedistributeOutliers aggregationContext anonymizationContext
-  | _ -> // finalize aggregrates without invoking hooks or redistributing outliers
+    |> finalizeAggregatesAndRedistributeOutliers aggregationContext anonymizationContext
+  | _ -> // finalize aggregates without invoking hooks or redistributing outliers
     buckets
     |> Seq.map (fun bucket ->
       Array.append
