@@ -147,8 +147,6 @@ let inline private aidFlattening
     let outlierCount = flatSeed |> mixSeed "outlier" |> randomUniform outlierInterval
     let topCount = flatSeed |> mixSeed "top" |> randomUniform topInterval
 
-    let outliersSum = sortedAidContributions |> Seq.take outlierCount |> Seq.sumBy snd
-
     let topGroupSum =
       sortedAidContributions
       |> Seq.skip outlierCount
@@ -156,10 +154,16 @@ let inline private aidFlattening
       |> Seq.sumBy snd
 
     let topGroupAverage = (float topGroupSum) / (float topCount)
-    let outlierReplacement = topGroupAverage * (float outlierCount)
+
+    let droppedContributions =
+      sortedAidContributions
+      |> Seq.take outlierCount
+      |> Seq.map (fun (aid, contribution) -> aid, (float contribution) - topGroupAverage)
+      |> Seq.filter (fun (_aid, contribution) -> contribution > 0)
+      |> Seq.toArray
 
     let realSum = aidContributions |> Array.sumBy snd
-    let flattening = float outliersSum - outlierReplacement
+    let flattening = droppedContributions |> Seq.sumBy snd
     let flattenedUnaccountedFor = unaccountedFor - flattening |> max 0.
     let flattenedSum = float realSum - flattening
     let flattenedAvg = flattenedSum / float totalCount
@@ -171,20 +175,13 @@ let inline private aidFlattening
       [ anonContext.BucketSeed; aidContributions |> Seq.map fst |> seedFromAidSet ]
       |> generateNoise anonParams.Salt "noise" noiseSD
 
-    let outliers =
-      sortedAidContributions
-      |> Seq.take outlierCount
-      |> Seq.map (fun (aid, contribution) -> aid, (float contribution) - topGroupAverage)
-      |> Seq.filter (fun (_aid, contribution) -> contribution > 0)
-      |> Seq.toArray
-
     Some
       {
         FlattenedSum = flattenedSum + flattenedUnaccountedFor
         Flattening = flattening
         NoiseSD = noiseSD
         Noise = noise
-        Outliers = outliers
+        Outliers = droppedContributions
       }
 
 let private arrayFromDict (d: Dictionary<'a, 'b>) =
