@@ -133,14 +133,16 @@ let private finalizeAggregatesAndRedistributeOutliers
 
   rows
 
-let private finalizeBuckets aggregationContext anonymizationContext hooks buckets =
-  // Invoking hooks and redistributing outliers require that a `DiffixLowCount` aggregator is present,
-  // which only happens during non-global anonymized aggregation.
+let private finalizeBuckets aggregationContext anonymizationContext buckets =
+  // Redistributing outliers require that a `DiffixLowCount` aggregator is present, which only happens during non-global anonymized aggregation.
   match aggregationContext, anonymizationContext with
-  | { GroupingLabels = groupingLabels }, Some anonymizationContext when groupingLabels.Length > 0 ->
-    List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
-    |> finalizeAggregatesAndRedistributeOutliers aggregationContext anonymizationContext
-  | _ -> // finalize aggregates without invoking hooks or redistributing outliers
+  | {
+      GroupingLabels = groupingLabels
+      AnonymizationParams = { RecoverOutliers = true }
+    },
+    Some anonymizationContext when groupingLabels.Length > 0 ->
+    finalizeAggregatesAndRedistributeOutliers aggregationContext anonymizationContext buckets
+  | _ -> // finalize aggregates without redistributing outliers
     buckets
     |> Seq.map (fun bucket ->
       Array.append
@@ -148,6 +150,13 @@ let private finalizeBuckets aggregationContext anonymizationContext hooks bucket
         (bucket.Aggregators
          |> Array.map (fun agg -> agg.Final(aggregationContext, bucket.AnonymizationContext, None)))
     )
+
+let private invokeHooks aggregationContext anonymizationContext hooks buckets =
+  // Invoking hooks requires that a `DiffixLowCount` aggregator is present, which only happens during non-global anonymized aggregation.
+  match aggregationContext, anonymizationContext with
+  | { GroupingLabels = groupingLabels }, Some anonymizationContext when groupingLabels.Length > 0 ->
+    List.fold (fun buckets hook -> hook aggregationContext anonymizationContext buckets) buckets hooks
+  | _ -> buckets
 
 let private executeAggregate queryContext (childPlan, groupingLabels, aggregators, anonymizationContext) : seq<Row> =
   let groupingLabels = Array.ofList groupingLabels
@@ -189,7 +198,8 @@ let private executeAggregate queryContext (childPlan, groupingLabels, aggregator
 
   state
   |> Seq.map (fun pair -> pair.Value)
-  |> finalizeBuckets aggregationContext anonymizationContext queryContext.PostAggregationHooks
+  |> invokeHooks aggregationContext anonymizationContext queryContext.PostAggregationHooks
+  |> finalizeBuckets aggregationContext anonymizationContext
 
 let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
   let isOuterJoin, outerPlan, innerPlan, rowJoiner =

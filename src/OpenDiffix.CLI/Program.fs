@@ -19,6 +19,7 @@ type CliArguments =
   | Access_Level of string
   | Strict of bool
   | Json
+  | Recover_Outliers of bool
 
   // Threshold values
   | [<Unique>] Outlier_Count of int * int
@@ -48,6 +49,9 @@ type CliArguments =
       | Strict _ ->
         "Controls whether the anonymization parameters must be checked strictly, i.e. to ensure safe minimum level of "
         + "anonymization. Defaults to `true`."
+      | Recover_Outliers _ ->
+        "If enabled, aggregated outliers are recovered and redistributed over the reported "
+        + "anonymized values, in order to minimize the total distortion for that column. Defaults to `true`."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Outlier_Count _ ->
         "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -131,6 +135,7 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
     LayerNoiseSD = parsedArgs.TryGetResult Layer_Noise_SD |> toNoise
+    RecoverOutliers = parsedArgs.TryGetResult Recover_Outliers |> Option.defaultValue true
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =

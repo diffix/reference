@@ -282,6 +282,7 @@ type Tests(db: DBFixture) =
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       LayerNoiseSD = 0.
+      RecoverOutliers = true
     }
 
   let queryContext accessLevel =

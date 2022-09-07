@@ -167,6 +167,8 @@ type AnonymizationParams =
     OutlierCount: Interval
     TopCount: Interval
     LayerNoiseSD: float
+
+    RecoverOutliers: bool
   }
   static member Default =
     {
@@ -178,6 +180,7 @@ type AnonymizationParams =
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0
+      RecoverOutliers = true
     }
 
 // ----------------------------------------------------------------

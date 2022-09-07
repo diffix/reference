@@ -40,6 +40,7 @@ let anonParams =
     OutlierCount = { Lower = 1; Upper = 1 }
     TopCount = { Lower = 1; Upper = 1 }
     LayerNoiseSD = 0.
+    RecoverOutliers = true
   }
 
 let aggContext = { AnonymizationParams = anonParams; GroupingLabels = [||]; Aggregators = [||] }
