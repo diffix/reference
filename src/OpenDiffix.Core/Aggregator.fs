@@ -52,8 +52,8 @@ let private increaseContribution valueIncrease aidValue (aidMap: Dictionary<AidH
 
 let private mergeOutliers outliers (contributions: Anonymizer.ContributionsState array) =
   outliers
-  |> Array.iteri (fun i aidOutliers ->
-    let aidContributions = contributions.[i].AidContributions
+  |> Array.iteri (fun aidIndex aidOutliers ->
+    let aidContributions = contributions.[aidIndex].AidContributions
 
     aidOutliers
     |> Array.iter (fun (aid, contribution) ->
