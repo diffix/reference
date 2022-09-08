@@ -22,9 +22,10 @@ let rec private resolveColumn rangeColumns tableName columnName =
   | [] -> failwith $"Column %s{label} not found in query range"
   | _ -> failwith $"Ambiguous reference to column %s{label} in query range"
 
-let private expressionName parsedExpr =
+let rec private expressionName parsedExpr =
   match parsedExpr with
   | ParserTypes.Identifier (_, columnName) -> columnName
+  | ParserTypes.Function ("cast", arg :: _) -> expressionName arg
   | ParserTypes.Function (name, _args) -> name
   | _ -> ""
 

@@ -138,6 +138,23 @@ let ``Selecting columns from a table`` () =
     }
 
 [<Fact>]
+let ``Selecting cast columns from a table`` () =
+  testParsedQuery
+    "SELECT cast(bool_col, 'text') FROM table"
+    { defaultQuery with
+        TargetList =
+          [
+            {
+              Expression =
+                FunctionExpr(ScalarFunction Cast, [ ColumnReference(3, BooleanType); Constant(String "text") ])
+              // Should not be `cast`.
+              Alias = "bool_col"
+              Tag = RegularTargetEntry
+            }
+          ]
+    }
+
+[<Fact>]
 let ``SELECT with alias, function, aggregate, GROUP BY, and WHERE-clause`` () =
   let query =
     @"
