@@ -23,6 +23,7 @@ type Tests(db: DBFixture) =
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       LayerNoiseSD = 0.
+      RecoverOutliers = true
     }
 
   let noisyAnonParams = { AnonymizationParams.Default with TableSettings = tableSettings }
@@ -289,17 +290,13 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers_small GROUP BY city ORDER BY 1"
 
   [<Fact>]
-  let ``Filtering and grouping doesn't change results`` () =
+  let ``Equivalent filtering and grouping doesn't change seed`` () =
     equivalentQueries
-      "SELECT count(*) FROM customers GROUP BY city HAVING city = 'Berlin'"
+      "SELECT count(*) FROM customers WHERE city = 'Berlin' GROUP BY city"
       "SELECT count(*) FROM customers WHERE city = 'Berlin'"
 
     equivalentQueries
-      "SELECT count(*) FROM customers GROUP BY city, round_by(age, 10) HAVING city = 'Berlin' AND round_by(age, 10) = 20"
-      "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20"
-
-    equivalentQueries
-      "SELECT count(*) FROM customers WHERE round_by(age, 10) = 20 GROUP BY city HAVING city = 'Berlin'"
+      "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20 GROUP BY city, round_by(age, 10)"
       "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20"
 
   [<Fact>]

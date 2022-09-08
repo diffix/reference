@@ -40,16 +40,17 @@ let anonParams =
     OutlierCount = { Lower = 1; Upper = 1 }
     TopCount = { Lower = 1; Upper = 1 }
     LayerNoiseSD = 0.
+    RecoverOutliers = true
   }
 
 let aggContext = { AnonymizationParams = anonParams; GroupingLabels = [||]; Aggregators = [||] }
 
 let evaluateAggregator fn args =
-  TestHelpers.evaluateAggregator (aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }) fn args
+  TestHelpers.evaluateAggregator (aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }, None) fn args
 
 let evaluateAggregatorNoisy fn args =
   let aggContextNoisy = { aggContext with AnonymizationParams = { anonParams with LayerNoiseSD = 1. } }
-  TestHelpers.evaluateAggregator (aggContextNoisy, Some { BucketSeed = 0UL; BaseLabels = [] }) fn args
+  TestHelpers.evaluateAggregator (aggContextNoisy, Some { BucketSeed = 0UL; BaseLabels = [] }, None) fn args
 
 let distinctDiffixCount = DiffixCount, { AggregateOptions.Default with Distinct = true }
 let diffixCount = DiffixCount, AggregateOptions.Default

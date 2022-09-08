@@ -112,7 +112,7 @@ let aggContext =
 
 let testAnonAggregatorMerging fn argType =
   let random = makeRandom fn argType
-  let ctx = aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }
+  let ctx = aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }, None
 
   let testPair numAids (length1, length2) =
     let makeArgs = makeAnonArgs argType random numAids
@@ -138,7 +138,7 @@ let testAnonAggregatorMerging fn argType =
 
 let testStandardAggregatorMerging fn argType =
   let random = makeRandom fn argType
-  let ctx = aggContext, None
+  let ctx = aggContext, None, None
 
   let testPair (length1, length2) =
     let makeArgs = makeStandardArgs argType random

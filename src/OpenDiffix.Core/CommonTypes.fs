@@ -168,6 +168,8 @@ type AnonymizationParams =
     OutlierCount: Interval
     TopCount: Interval
     LayerNoiseSD: float
+
+    RecoverOutliers: bool
   }
   static member Default =
     {
@@ -179,6 +181,7 @@ type AnonymizationParams =
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0
+      RecoverOutliers = true
     }
 
 // ----------------------------------------------------------------
@@ -236,7 +239,8 @@ type IAggregator =
   // Merge state with that of a compatible aggregator
   abstract Merge : IAggregator -> unit
   // Extract the final value of the aggregation function from the state
-  abstract Final : AggregationContext * AnonymizationContext option -> Value
+  // Also merges unused data from outliers into the target aggregator, if any
+  abstract Final : AggregationContext * AnonymizationContext option * IAggregator option -> Value
 
 type AggregatorSpec = AggregateFunction * AggregateOptions
 type AggregatorArgs = Expression list
