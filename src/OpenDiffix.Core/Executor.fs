@@ -58,7 +58,7 @@ let private accumulateAbs accumulator value =
   | _ -> accumulator
 
 // Returns a function that proportionally redistributes the aggregated outliers data over the individual values in a column.
-let private makeColumnTweaker total outliersAggregate =
+let private makeOutliersRedistributor total outliersAggregate =
   match total > 0.0, outliersAggregate with
   | true, Integer outliersAggregate ->
     function
@@ -114,20 +114,22 @@ let private finalizeAggregatesAndRedistributeOutliers
   let outliersAnonymizationContext = { anonymizationContext with BaseLabels = [] }
 
   // Create a value tweaker for each column that minimizes the total distortion of that column.
-  let columnTweakers =
+  let outliersRedistributors =
     outliersAggregators
     |> Array.mapi (fun i agg ->
-      makeColumnTweaker totals.[i] (agg.Final(outliersAggregationContext, Some outliersAnonymizationContext, None))
+      makeOutliersRedistributor
+        totals.[i]
+        (agg.Final(outliersAggregationContext, Some outliersAnonymizationContext, None))
     )
 
   // Apply column tweakers to non-suppressed rows.
   rows
   |> Seq.filter (fun row -> not (Value.unwrapBoolean row.[lowCountIndex + aggregationContext.GroupingLabels.Length]))
   |> Seq.iter (fun row ->
-    columnTweakers
-    |> Array.iteri (fun columnIndex tweaker ->
-      let valueIndex = columnIndex + aggregationContext.GroupingLabels.Length
-      row.[valueIndex] <- tweaker row.[valueIndex]
+    outliersRedistributors
+    |> Array.iteri (fun aggregateIndex outliersRedistributor ->
+      let valueIndex = aggregateIndex + aggregationContext.GroupingLabels.Length
+      row.[valueIndex] <- outliersRedistributor row.[valueIndex]
     )
   )
 
