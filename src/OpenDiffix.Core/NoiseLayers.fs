@@ -10,7 +10,7 @@ let private basicSeedMaterial rangeColumns expression =
   | Constant (String value) -> value
   | Constant (Integer value) -> value.ToString()
   | Constant (Real value) -> value.ToString()
-  | Constant (Timestamp value) -> value.ToString()
+  | Constant (Timestamp value) -> (Timestamp value) |> Value.toString
   | Constant (Boolean value) -> value.ToString()
   | _ -> failwith "Unsupported expression used for defining buckets."
 

@@ -223,9 +223,7 @@ let rec evaluateScalarFunction fn args =
   | Cast, [ Integer i; String "text" ] -> i.ToString() |> String
   | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
-  | Cast, [ Timestamp ts; String "text" ] ->
-    ts.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
-    |> String
+  | Cast, [ Timestamp ts; String "text" ] -> (Timestamp ts) |> Value.toString |> String
   | Cast, [ String s; String "timestamp" ] ->
     System.DateTime.Parse(s, System.Globalization.CultureInfo.InvariantCulture)
     |> Timestamp

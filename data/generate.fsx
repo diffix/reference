@@ -19,14 +19,18 @@ type Field =
 let quoteString (string: string) =
   "\"" + string.Replace("\"", "\"\"") + "\""
 
+let singleQuoteString (string: string) = "'" + string.Replace("'", "''") + "'"
+
+let timestampString (value: DateTime) =
+  value.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
+
 let fieldToString field =
   match field with
   | Null -> "NULL"
-  | Text value -> $"'{value}'"
+  | Text value -> singleQuoteString value
   | Integer value -> string value
   | Real value -> string value
-  | Timestamp value ->
-    $"""'{value.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}'"""
+  | Timestamp value -> value |> timestampString |> singleQuoteString
 
 let fieldToCSVString field =
   match field with
@@ -34,8 +38,7 @@ let fieldToCSVString field =
   | Text value -> quoteString value
   | Integer value -> string value
   | Real value -> string value
-  | Timestamp value ->
-    quoteString $"""{value.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}"""
+  | Timestamp value -> value |> timestampString |> quoteString
 
 type Column = { Name: string; Type: Type }
 
