@@ -78,7 +78,12 @@ module QueryParser =
     simpleIdentifier .>> spaces .>>. inParenthesis (commaSeparated expr) .>> spaces
     |>> fun (funName, exprs) -> Function(funName.ToLower(), exprs)
 
-  let typeName = word "text" <|> word "integer" <|> word "real" <|> word "boolean"
+  let typeName =
+    word "text"
+    <|> word "integer"
+    <|> word "real"
+    <|> word "boolean"
+    <|> word "timestamp"
 
   let castExpression =
     word "cast" >>. inParenthesis (expr .>> word "as" .>>. typeName) .>> spaces
