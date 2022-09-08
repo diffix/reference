@@ -55,6 +55,7 @@ let private readValue (reader: SQLiteDataReader) index =
     | fieldType when fieldType = typeof<single> || fieldType = typeof<double> ->
       Real(reader.GetFieldValue<double> index)
     | fieldType when fieldType = typeof<string> -> String(reader.GetString index)
+    | fieldType when fieldType = typeof<System.DateTime> -> Timestamp(reader.GetDateTime index)
     | _unknownType -> Null
 
 let private columnTypeFromString =
@@ -63,6 +64,7 @@ let private columnTypeFromString =
   | "text" -> StringType
   | "boolean" -> BooleanType
   | "real" -> RealType
+  | "datetime" -> TimestampType
   | other -> UnknownType other
 
 type DataProvider(dbPath: string) =

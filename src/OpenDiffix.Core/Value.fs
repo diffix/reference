@@ -12,6 +12,7 @@ let rec toString value =
   | Integer i -> i.ToString()
   | Real r -> r.ToString()
   | String s -> s
+  | Timestamp ts -> ts.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)
   | List values -> "[" + (values |> List.map toStringListItem |> String.joinWithComma) + "]"
 
 and private toStringListItem value =
@@ -27,6 +28,7 @@ let rec typeOf value =
   | Integer _ -> IntegerType
   | Real _ -> RealType
   | String _ -> StringType
+  | Timestamp _ -> TimestampType
   | List values -> values |> List.map typeOf |> ExpressionType.commonType |> ListType
 
 /// Attempts to convert a value to a boolean.

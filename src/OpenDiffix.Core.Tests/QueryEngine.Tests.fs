@@ -299,6 +299,12 @@ type Tests(db: DBFixture) =
       "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20 GROUP BY city, round_by(age, 10)"
       "SELECT count(*) FROM customers WHERE city = 'Berlin' AND round_by(age, 10) = 20"
 
+    let tsCast x = $"cast({x}, 'timestamp')"
+
+    equivalentQueries
+      $"""SELECT count(*) FROM customers WHERE date_trunc('year', {tsCast "last_seen"}) = {tsCast "'2017-01-01'"} GROUP BY date_trunc('year', {tsCast "last_seen"})"""
+      $"""SELECT count(*) FROM customers WHERE date_trunc('year', {tsCast "last_seen"}) = {tsCast "'2017-01-01'"}"""
+
   [<Fact>]
   let ``Anonymizing subquery`` () =
     let queryResult =
