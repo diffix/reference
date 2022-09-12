@@ -64,7 +64,6 @@ let private columnTypeFromString =
   | "text" -> StringType
   | "boolean" -> BooleanType
   | "real" -> RealType
-  | "datetime" -> TimestampType
   | other -> UnknownType other
 
 type DataProvider(dbPath: string) =
