@@ -82,13 +82,15 @@ let private validateGeneralization accessLevel expression =
   if accessLevel <> Direct then
     match expression with
     | FunctionExpr (ScalarFunction DateTrunc, [ _; primaryArg ])
+    | FunctionExpr (ScalarFunction Extract, [ _; primaryArg ])
     | FunctionExpr (ScalarFunction _, primaryArg :: _) ->
       if not (Expression.isColumnReference primaryArg) then
         failwith "Primary argument for a generalization expression has to be a simple column reference."
     | _ -> ()
 
     match expression with
-    | FunctionExpr (ScalarFunction DateTrunc, [ secondaryArg; _ ]) ->
+    | FunctionExpr (ScalarFunction DateTrunc, [ secondaryArg; _ ])
+    | FunctionExpr (ScalarFunction Extract, [ secondaryArg; _ ]) ->
       if secondaryArg |> Expression.isConstant |> not then
         failwith "Secondary arguments for a generalization expression have to be constants."
     | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) ->
@@ -98,7 +100,7 @@ let private validateGeneralization accessLevel expression =
 
   if accessLevel = PublishUntrusted then
     match expression with
-    | FunctionExpr (ScalarFunction fn, _) when List.contains fn [ Floor; Ceil; Round; DateTrunc ] -> ()
+    | FunctionExpr (ScalarFunction fn, _) when List.contains fn [ Floor; Ceil; Round; DateTrunc; Extract ] -> ()
     | FunctionExpr (ScalarFunction fn, [ _; Constant c ]) when
       List.contains fn [ FloorBy; RoundBy ] && Value.isMoneyRounded c
       ->

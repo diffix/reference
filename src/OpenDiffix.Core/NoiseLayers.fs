@@ -22,6 +22,7 @@ let private functionSeedMaterial =
   | RoundBy -> "round"
   | WidthBucket -> "width_bucket"
   | DateTrunc -> "date_trunc"
+  | Extract -> "extract"
   | _ -> failwith "Unsupported function used for defining buckets."
 
 let private collectSeedMaterials rangeColumns expression =
