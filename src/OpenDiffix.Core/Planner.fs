@@ -44,7 +44,16 @@ let rec private collectSetFunctions expression =
 // Node planners
 // ----------------------------------------------------------------
 
+let private collectColumnIndices node =
+  let rec exprIndices expr =
+    match expr with
+    | ColumnReference (index, _) -> [ index ]
+    | expr -> expr |> collect exprIndices
+
+  node |> collect exprIndices
+
 let private planJoin join columnIndices =
+  let columnIndices = columnIndices @ collectColumnIndices [ join.On ] |> List.distinct |> List.sort
   let leftColumnCount = QueryRange.columnsCount join.Left
   let leftIndices, rightIndices = List.partition (fun x -> x < leftColumnCount) columnIndices
   let rightIndices = List.map (fun i -> i - leftColumnCount) rightIndices
@@ -87,14 +96,6 @@ let private planLimit amount plan =
   match amount with
   | None -> plan
   | Some amount -> Plan.Limit(plan, amount)
-
-let private collectColumnIndices node =
-  let rec exprIndices expr =
-    match expr with
-    | ColumnReference (index, _) -> [ index ]
-    | expr -> expr |> collect exprIndices
-
-  node |> collect exprIndices
 
 let private planQuery query =
   let selectedExpressions = query.TargetList |> List.map (fun column -> column.Expression)

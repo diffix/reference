@@ -346,4 +346,10 @@ type Tests(db: DBFixture) =
     let expectedRows = [ [| Integer 506L |] ]
     queryResult.Rows |> should equal expectedRows
 
+  [<Fact>]
+  let ``Join between personal and public tables`` () =
+    let queryResult = runQuery "SELECT count(*) FROM purchases JOIN products ON pid = products.id"
+    let expectedRows = [ [| Integer 443L |] ]
+    queryResult.Rows |> should equal expectedRows
+
   interface IClassFixture<DBFixture>
