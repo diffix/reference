@@ -476,10 +476,40 @@ type Tests(db: DBFixture) =
       "AID columns can't be referenced by pre-anonymization filters."
 
   [<Fact>]
-  let ``Disallow anonymizing queries with JOINs`` () =
+  let ``Allow anonymizing queries with JOINs`` () =
+    analyzeTrustedQuery "SELECT count(*) FROM customers AS c1 JOIN customers AS c2 ON c1.id = c2.id"
+
+  [<Fact>]
+  let ``Reject anonymizing queries with CROSS JOINs`` () =
     assertTrustedQueryFails
-      "SELECT count(*) FROM customers JOIN customers AS t ON true"
-      "JOIN in anonymizing queries is not currently supported."
+      "SELECT count(*) FROM customers AS c1, customers AS c2"
+      "`CROSS JOIN` in anonymizing queries is not supported."
+
+  [<Fact>]
+  let ``Reject anonymizing queries with subqueries`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers AS c JOIN (SELECT id FROM customers) t ON c.id = t.id"
+      "Subqueries in anonymizing queries are not supported."
+
+  [<Fact>]
+  let ``Reject anonymizing queries with invalid JOIN filters`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers AS c1 JOIN customers AS c2 ON c1.id > c2.id"
+      "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers AS c1 JOIN customers AS c2 ON c1.id = 0"
+      "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
+
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers AS c1 JOIN customers AS c2 ON round_by(c1.id, 10) = c2.id"
+      "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
+
+  [<Fact>]
+  let ``Reject anonymizing queries with OR filters`` () =
+    assertTrustedQueryFails
+      "SELECT count(*) FROM customers AS c1 JOIN customers AS c2 ON c1.id = c2.id OR c1.id = c2.id"
+      "Combining `JOIN` filters using `OR` in anonymizing queries is not supported."
 
   [<Fact>]
   let ``Allow anonymizing subquery`` () =

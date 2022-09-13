@@ -48,7 +48,7 @@ let ``Counts all suppressed buckets, but suppresses the star bucket`` () =
     buckets
 
   // now only C is below the default lowThresh, and so is the *-bucket
-  let csvSuppressedStarBucket = csv.Replace("D" + System.Environment.NewLine, "")
+  let csvSuppressedStarBucket = csv.Replace("D\n", "")
 
   HookTestHelpers.run [ StarBucket.hook pullHookResultsCallback ] csvSuppressedStarBucket query
   |> ignore

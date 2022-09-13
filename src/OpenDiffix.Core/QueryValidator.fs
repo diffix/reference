@@ -72,10 +72,25 @@ let private validateSumUsage query =
     | _ -> ()
   )
 
-let private validateSelectTarget (selectQuery: SelectQuery) =
-  match selectQuery.From with
-  | Join _ -> failwith "JOIN in anonymizing queries is not currently supported."
-  | SubQuery _ -> failwith "Subqueries in anonymizing queries are not currently supported."
+let rec private validateJoinFilter filter =
+  match filter with
+  | FunctionExpr (ScalarFunction Or, _) ->
+    failwith "Combining `JOIN` filters using `OR` in anonymizing queries is not supported."
+  | FunctionExpr (ScalarFunction And, [ leftFilter; rightFilter ]) ->
+    validateJoinFilter leftFilter
+    validateJoinFilter rightFilter
+  | FunctionExpr (ScalarFunction Equals, [ ColumnReference _; ColumnReference _ ]) -> ()
+  | _ ->
+    failwith "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
+
+let rec private validateSelectTarget (target: QueryRange) =
+  match target with
+  | Join { On = Constant (Boolean true) } -> failwith "`CROSS JOIN` in anonymizing queries is not supported."
+  | Join { Left = leftTarget; Right = rightTarget; On = matchFilter } ->
+    validateSelectTarget leftTarget
+    validateSelectTarget rightTarget
+    validateJoinFilter matchFilter
+  | SubQuery _ -> failwith "Subqueries in anonymizing queries are not supported."
   | _ -> ()
 
 let private validateGeneralization accessLevel expression =
@@ -132,7 +147,7 @@ let validateAnonymizingQuery accessLevel rangeColumns (selectQuery: SelectQuery)
   validateCountUsage selectQuery
   validateSumUsage selectQuery
   validateCountHistogramUsage accessLevel selectQuery
-  validateSelectTarget selectQuery
+  validateSelectTarget selectQuery.From
   validateWhere rangeColumns selectQuery
 
 let validateGeneralizations accessLevel expressions =
