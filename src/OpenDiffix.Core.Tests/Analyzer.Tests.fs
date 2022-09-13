@@ -633,6 +633,12 @@ type Tests(db: DBFixture) =
     assertNoAnonContext "SELECT cast(price AS integer) FROM products"
 
   [<Fact>]
+  let ``SQL seed for extract and date_part`` () =
+    let expected = [ "extract,dow,customers.last_seen" ]
+    assertSqlSeed "SELECT extract(dow from cast(last_seen as timestamp)) FROM customers" expected
+    assertSqlSeed "SELECT date_part('dow', cast(last_seen as timestamp)) FROM customers" expected
+
+  [<Fact>]
   let ``SQL seed from single filter`` () =
     assertSqlSeedWithFilter
       "SELECT COUNT(*) FROM customers WHERE substring(city, 1, 2) = 'Lo'"

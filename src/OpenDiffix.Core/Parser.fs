@@ -85,9 +85,43 @@ module QueryParser =
     <|> word "boolean"
     <|> word "timestamp"
 
+  let datePartName =
+    word "seconds"
+    <|> word "second"
+    <|> word "epoch"
+    <|> word "minutes"
+    <|> word "minute"
+    <|> word "hours"
+    <|> word "hour"
+    <|> word "days"
+    <|> word "day"
+    <|> word "dow"
+    <|> word "doy"
+    <|> word "isodow"
+    <|> word "weeks"
+    <|> word "week"
+    <|> word "months"
+    <|> word "month"
+    <|> word "quarter"
+    <|> word "years"
+    <|> word "year"
+    <|> word "isoyear"
+    <|> word "decades"
+    <|> word "decade"
+    <|> word "century"
+    <|> word "centuries"
+    <|> word "millenniums"
+    <|> word "millennium"
+    <|> word "millennia"
+
   let castExpression =
     word "cast" >>. inParenthesis (expr .>> word "as" .>>. typeName) .>> spaces
     |>> fun (expr, typeName) -> Function("cast", [ expr; String typeName ])
+
+  let extractExpression =
+    word "extract" >>. inParenthesis (datePartName .>> word "from" .>>. expr)
+    .>> spaces
+    |>> fun (datePartName, expr) -> Function("extract", [ String datePartName; expr ])
 
   let selectedExpression = expr .>>. opt alias |>> As
 
@@ -242,6 +276,7 @@ module QueryParser =
     choice [
       (attempt selectQuery)
       (attempt castExpression)
+      (attempt extractExpression)
       (attempt functionExpression)
       inParenthesis expr
       star

@@ -63,6 +63,7 @@ let typeOfScalarFunction fn args =
       | [ RealType; IntegerType ] -> RealType
       | argsTypes -> List.head argsTypes
   | DateTrunc -> TimestampType
+  | Extract -> RealType
 
 /// Resolves the type of a set function expression.
 let typeOfSetFunction fn _args =
@@ -224,9 +225,7 @@ let rec evaluateScalarFunction fn args =
   | Cast, [ Real r; String "text" ] -> r.ToString(doubleStyle) |> String
   | Cast, [ Boolean b; String "text" ] -> b.ToString().ToLower() |> String
   | Cast, [ Timestamp ts; String "text" ] -> (Timestamp ts) |> Value.toString |> String
-  | Cast, [ String s; String "timestamp" ] ->
-    System.DateTime.Parse(s, System.Globalization.CultureInfo.InvariantCulture)
-    |> Timestamp
+  | Cast, [ String s; String "timestamp" ] -> System.DateTime.Parse(s, CultureInfo.InvariantCulture) |> Timestamp
 
   | NullIf, [ x; y ] when x = y -> Null
   | NullIf, [ x; y ] -> x
@@ -265,6 +264,50 @@ let rec evaluateScalarFunction fn args =
   | DateTrunc, [ String "millenniums"; Timestamp ts ]
   | DateTrunc, [ String "millennia"; Timestamp ts ] ->
     System.DateTime(ts.Year - (ts.Year - 1) % 1000, 1, 1) |> Timestamp
+
+  | Extract, [ String "second"; Timestamp ts ]
+  | Extract, [ String "seconds"; Timestamp ts ] -> ts.Second |> float |> Real
+  | Extract, [ String "epoch"; Timestamp ts ] ->
+    (float (System.DateTimeOffset(ts, System.TimeSpan 0L).ToUnixTimeMilliseconds())
+     / 1000.0)
+    |> Real
+  | Extract, [ String "minute"; Timestamp ts ]
+  | Extract, [ String "minutes"; Timestamp ts ] -> ts.Minute |> float |> Real
+  | Extract, [ String "hour"; Timestamp ts ]
+  | Extract, [ String "hours"; Timestamp ts ] -> ts.Hour |> float |> Real
+  | Extract, [ String "day"; Timestamp ts ]
+  | Extract, [ String "days"; Timestamp ts ] -> ts.Day |> float |> Real
+  | Extract, [ String "dow"; Timestamp ts ] -> ts.DayOfWeek |> float |> Real
+  | Extract, [ String "doy"; Timestamp ts ] -> ts.DayOfYear |> float |> Real
+  | Extract, [ String "isodow"; Timestamp ts ] ->
+    match ts.DayOfWeek with
+    | System.DayOfWeek.Sunday -> 7.0
+    | _ -> float ts.DayOfWeek
+    |> Real
+  | Extract, [ String "week"; Timestamp ts ]
+  | Extract, [ String "weeks"; Timestamp ts ] ->
+    CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(ts, CalendarWeekRule.FirstFourDayWeek, System.DayOfWeek.Monday)
+    |> float
+    |> Real
+  | Extract, [ String "month"; Timestamp ts ]
+  | Extract, [ String "months"; Timestamp ts ] -> ts.Month |> float |> Real
+  | Extract, [ String "quarter"; Timestamp ts ] -> (ts.Month + 2) / 3 |> float |> Real
+  | Extract, [ String "year"; Timestamp ts ]
+  | Extract, [ String "years"; Timestamp ts ] -> ts.Year |> float |> Real
+  | Extract, [ String "isoyear"; Timestamp ts ] ->
+    (match ts.DayOfWeek with
+     | System.DayOfWeek.Sunday -> System.DateTime(ts.Year, ts.Month, ts.Day).AddDays(-6.0)
+     | _ -> System.DateTime(ts.Year, ts.Month, ts.Day).AddDays(-(float ts.DayOfWeek) + 1.0))
+      .Year
+    |> float
+    |> Real
+  | Extract, [ String "decade"; Timestamp ts ]
+  | Extract, [ String "decades"; Timestamp ts ] -> (ts.Year / 10) |> float |> Real
+  | Extract, [ String "century"; Timestamp ts ]
+  | Extract, [ String "centuries"; Timestamp ts ] -> ((ts.Year - 1) / 100 + 1) |> float |> Real
+  | Extract, [ String "millennium"; Timestamp ts ]
+  | Extract, [ String "millenniums"; Timestamp ts ]
+  | Extract, [ String "millennia"; Timestamp ts ] -> ((ts.Year - 1) / 1000 + 1) |> float |> Real
 
   | _ -> failwith $"Invalid usage of scalar function '%A{fn}'."
 

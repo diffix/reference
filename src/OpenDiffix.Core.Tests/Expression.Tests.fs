@@ -576,6 +576,37 @@ module DefaultFunctionsTests =
         [ String "secondz"; Timestamp(System.DateTime(2113, 2, 6)) ]
       ]
 
+  [<Fact>]
+  let Extract () =
+    runsBinary
+      Extract
+      [ //
+        String "second", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41, 123)), Real 41.0
+        String "epoch", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41, 123)), Real 4516005401.123
+        String "minute", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 56.0
+        String "hour", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 13.0
+        String "day", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 8.0
+        String "dow", Timestamp(System.DateTime(2113, 2, 5, 13, 56, 41)), Real 0.0
+        String "doy", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 39.0
+        String "isodow", Timestamp(System.DateTime(2113, 2, 5, 13, 56, 41)), Real 7.0
+        String "week", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 6.0
+        String "month", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 2.0
+        String "quarter", Timestamp(System.DateTime(2113, 5, 8)), Real 2.0
+        String "year", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 2113.0
+        String "isoyear", Timestamp(System.DateTime(2113, 1, 1, 13, 56, 41)), Real 2112.0
+        String "decade", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 211.0
+        String "century", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 22.0
+        String "millennium", Timestamp(System.DateTime(2113, 2, 8, 13, 56, 41)), Real 3.0
+        String "century", Timestamp(System.DateTime(2000, 2, 8, 13, 56, 41)), Real 20.0
+        String "millennium", Timestamp(System.DateTime(2000, 2, 8, 13, 56, 41)), Real 2.0
+      ]
+
+    fails
+      Extract
+      [ //
+        [ String "secondz"; Timestamp(System.DateTime(2113, 2, 6)) ]
+      ]
+
 let makeRows (ctor1, ctor2, ctor3) (rows: ('a * 'b * 'c) list) : Row list =
   rows |> List.map (fun (a, b, c) -> [| ctor1 a; ctor2 b; ctor3 c |])
 

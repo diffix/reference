@@ -75,6 +75,7 @@ type ScalarFunction =
   | Cast
   | NullIf
   | DateTrunc
+  | Extract
 
 type ScalarArgs = Value list
 
@@ -372,6 +373,8 @@ module Function =
     | "cast" -> ScalarFunction Cast
     | "nullif" -> ScalarFunction NullIf
     | "date_trunc" -> ScalarFunction DateTrunc
+    | "extract"
+    | "date_part" -> ScalarFunction Extract
     | other -> failwith $"Unknown function `{other}`"
 
 module Table =
