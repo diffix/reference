@@ -83,8 +83,8 @@ let rec private validateJoinFilter filter =
   | _ ->
     failwith "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
 
-let rec private validateSelectTarget (selectQuery: QueryRange) =
-  match selectQuery with
+let rec private validateSelectTarget (target: QueryRange) =
+  match target with
   | Join { On = Constant (Boolean true) } -> failwith "`CROSS JOIN` in anonymizing queries is not supported."
   | Join { Left = leftTarget; Right = rightTarget; On = matchFilter } ->
     validateSelectTarget leftTarget
