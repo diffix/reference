@@ -77,7 +77,9 @@ let ``plan order by`` () =
 [<Fact>]
 let ``plan aggregation`` () =
   let groupBy = [ column 1 ]
-  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
+
+  let selectedColumns =
+    [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
 
   let select = { emptySelect with TargetList = selectedColumns; GroupBy = groupBy }
 
@@ -202,6 +204,7 @@ let ``junk filter`` () =
 
   let select = { emptySelect with TargetList = [ junkCol; selectColumn 1 ] }
 
-  let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
+  let expected =
+    Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
 
   select |> Planner.plan |> should equal expected

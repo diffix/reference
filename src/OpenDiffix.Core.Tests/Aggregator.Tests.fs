@@ -133,7 +133,7 @@ let testAnonAggregatorMerging fn argType =
   // Empty args can't indicate number of AID instances
   testPair 1 (0, 0)
 
-  for numAids in 1 .. 5 do
+  for numAids in 1..5 do
     argLengthPairs |> List.iter (testPair numAids)
 
 let testStandardAggregatorMerging fn argType =

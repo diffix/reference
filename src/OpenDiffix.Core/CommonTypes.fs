@@ -129,8 +129,8 @@ type Schema = Table list
 
 type IDataProvider =
   inherit IDisposable
-  abstract OpenTable : table: Table * columnIndices: int list -> Row seq
-  abstract GetSchema : unit -> Schema
+  abstract OpenTable: table: Table * columnIndices: int list -> Row seq
+  abstract GetSchema: unit -> Schema
 
 // ----------------------------------------------------------------
 // Anonymizer types
@@ -239,12 +239,12 @@ type AggregationContext =
 type IAggregator =
   // Process an instance of the aggregation function's arguments and transition
   // the aggregator state
-  abstract Transition : Value list -> unit
+  abstract Transition: Value list -> unit
   // Merge state with that of a compatible aggregator
-  abstract Merge : IAggregator -> unit
+  abstract Merge: IAggregator -> unit
   // Extract the final value of the aggregation function from the state
   // Also merges unused data from outliers into the target aggregator, if any
-  abstract Final : AggregationContext * AnonymizationContext option * IAggregator option -> Value
+  abstract Final: AggregationContext * AnonymizationContext option * IAggregator option -> Value
 
 type AggregatorSpec = AggregateFunction * AggregateOptions
 type AggregatorArgs = Expression list
@@ -288,7 +288,7 @@ module ExpressionType =
       | _ -> MIXED_TYPE
 
 module OrderBy =
-  let toString (OrderBy (expr, direction, nullsBehavior)) =
+  let toString (OrderBy(expr, direction, nullsBehavior)) =
     let directionString =
       match direction with
       | Ascending -> "ASC"
@@ -315,7 +315,7 @@ module Expression =
 
   let toString expr =
     match expr with
-    | FunctionExpr (AggregateFunction (fn, opts), args) ->
+    | FunctionExpr(AggregateFunction(fn, opts), args) ->
       let argsStr = if List.isEmpty args then "*" else args |> String.join ", "
       let distinct = if opts.Distinct then "DISTINCT " else ""
 
@@ -326,9 +326,9 @@ module Expression =
           $" WITHIN GROUP (ORDER BY {String.joinWithComma opts.OrderBy})"
 
       $"{fn}({distinct}{argsStr}){orderBy}"
-    | FunctionExpr (ScalarFunction fn, args) -> $"{fn}({String.joinWithComma args})"
-    | FunctionExpr (SetFunction fn, args) -> $"{fn}({String.joinWithComma args})"
-    | ColumnReference (index, _) ->
+    | FunctionExpr(ScalarFunction fn, args) -> $"{fn}({String.joinWithComma args})"
+    | FunctionExpr(SetFunction fn, args) -> $"{fn}({String.joinWithComma args})"
+    | ColumnReference(index, _) ->
       // Without some context we can't know column names.
       $"${index}"
     | Constant value -> valueToString value
@@ -501,16 +501,16 @@ module QueryContext =
 module Plan =
   let rec columnsCount (plan: Plan) =
     match plan with
-    | Plan.Scan (table, _) -> table.Columns.Length
-    | Plan.Project (_, expressions) -> expressions.Length
-    | Plan.ProjectSet (plan, _, _) -> (columnsCount plan) + 1
-    | Plan.Filter (plan, _) -> columnsCount plan
-    | Plan.Sort (plan, _) -> columnsCount plan
-    | Plan.Aggregate (_, groupingLabels, aggregators, _) -> groupingLabels.Length + aggregators.Length
+    | Plan.Scan(table, _) -> table.Columns.Length
+    | Plan.Project(_, expressions) -> expressions.Length
+    | Plan.ProjectSet(plan, _, _) -> (columnsCount plan) + 1
+    | Plan.Filter(plan, _) -> columnsCount plan
+    | Plan.Sort(plan, _) -> columnsCount plan
+    | Plan.Aggregate(_, groupingLabels, aggregators, _) -> groupingLabels.Length + aggregators.Length
     | Plan.Unique plan -> columnsCount plan
-    | Plan.Join (left, right, _, _) -> columnsCount left + columnsCount right
-    | Plan.Append (first, _) -> columnsCount first
-    | Plan.Limit (plan, _) -> columnsCount plan
+    | Plan.Join(left, right, _, _) -> columnsCount left + columnsCount right
+    | Plan.Append(first, _) -> columnsCount first
+    | Plan.Limit(plan, _) -> columnsCount plan
 
   let private NEWLINE = Environment.NewLine
 
@@ -529,23 +529,23 @@ module Plan =
     (nodeLine depth)
     + (
       match plan with
-      | Plan.Scan (table, _) -> $"Seq Scan on {table.Name}"
-      | Plan.Project (childPlan, expressions) -> $"Project {String.joinWithComma expressions}" + childToString childPlan
-      | Plan.ProjectSet (childPlan, fn, args) ->
+      | Plan.Scan(table, _) -> $"Seq Scan on {table.Name}"
+      | Plan.Project(childPlan, expressions) -> $"Project {String.joinWithComma expressions}" + childToString childPlan
+      | Plan.ProjectSet(childPlan, fn, args) ->
         $"ProjectSet {fn}({String.joinWithComma args})" + childToString childPlan
-      | Plan.Filter (childPlan, condition) -> $"Filter {condition})" + childToString childPlan
-      | Plan.Sort (childPlan, orderings) -> $"Sort {String.joinWithComma orderings}" + childToString childPlan
-      | Plan.Aggregate (childPlan, groupingLabels, aggregators, anonymizationContext) ->
+      | Plan.Filter(childPlan, condition) -> $"Filter {condition})" + childToString childPlan
+      | Plan.Sort(childPlan, orderings) -> $"Sort {String.joinWithComma orderings}" + childToString childPlan
+      | Plan.Aggregate(childPlan, groupingLabels, aggregators, anonymizationContext) ->
         "Aggregate"
         + $"{propLine depth}Group Keys: {String.joinWithComma groupingLabels}"
         + $"{propLine depth}Aggregates: {String.joinWithComma aggregators}"
         + $"{propLine depth}AnonymizationContext: {anonymizationContext}"
         + childToString childPlan
       | Plan.Unique childPlan -> "Unique" + childToString childPlan
-      | Plan.Join (leftPlan, rightPlan, joinType, condition) ->
+      | Plan.Join(leftPlan, rightPlan, joinType, condition) ->
         $"{joinType} on {condition}" + childToString leftPlan + childToString rightPlan
-      | Plan.Append (leftPlan, rightPlan) -> "Append" + childToString leftPlan + childToString rightPlan
-      | Plan.Limit (childPlan, amount) -> $"Limit {amount}" + childToString childPlan
+      | Plan.Append(leftPlan, rightPlan) -> "Append" + childToString leftPlan + childToString rightPlan
+      | Plan.Limit(childPlan, amount) -> $"Limit {amount}" + childToString childPlan
     )
 
   let explain (plan: Plan) = toString 0 plan

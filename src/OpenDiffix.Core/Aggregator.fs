@@ -269,7 +269,7 @@ type private DiffixCountDistinctNoise(aidsCount) =
       | Some { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixLowCount(aidsCount) =
-  let mutable state: HashSet<AidHash> [] = emptySets aidsCount
+  let mutable state: HashSet<AidHash>[] = emptySets aidsCount
 
   member this.State = state
 
@@ -563,7 +563,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     aggArgs
     |> List.tryItem index
     |> function
-      | Some (Constant (Integer x)) when x >= 0L && x < aidsCount -> int32 x
+      | Some(Constant(Integer x)) when x >= 0L && x < aidsCount -> int32 x
       | _ -> failwith "Expected a valid AID index"
 
   let unpackFloorWidthArgAt index =
@@ -571,7 +571,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     |> List.tryItem index
     |> function
       | None -> None
-      | Some (Constant (Integer x)) when x >= 1L -> Some x
+      | Some(Constant(Integer x)) when x >= 1L -> Some x
       | _ -> failwith $"Expected positive integer argument in index {index} of aggregate {fst aggSpec}."
 
   match aggSpec with

@@ -79,7 +79,7 @@ let failWithUsageInfo errorMsg =
 
 let toInterval =
   function
-  | Some (lower, upper) -> { Lower = lower; Upper = upper }
+  | Some(lower, upper) -> { Lower = lower; Upper = upper }
   | _ -> Interval.Default
 
 let toNoise =
@@ -101,7 +101,7 @@ let private toTableSettings (aidColumns: string list option) =
 
 let toSalt =
   function
-  | Some (salt: string) -> Text.Encoding.UTF8.GetBytes(salt)
+  | Some(salt: string) -> Text.Encoding.UTF8.GetBytes(salt)
   | _ -> [||]
 
 let toAccessLevel =
@@ -198,8 +198,8 @@ let private runSingleQueryRequest queriesPath queryRequest =
     runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
     |> (fun result -> (result, queryRequest))
     |> Ok
-  with
-  | (exn: Exception) -> Error exn.Message
+  with (exn: Exception) ->
+    Error exn.Message
 
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
@@ -241,7 +241,6 @@ let main argv =
   try
     argv |> mainCore |> printfn "%s"
     0
-  with
-  | e ->
+  with e ->
     eprintfn $"ERROR: %s{e.Message}"
     1

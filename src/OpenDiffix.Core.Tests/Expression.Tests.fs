@@ -685,10 +685,11 @@ let sortRows () =
     [| Null; Integer 2L |]
     [| Null; Null |]
   ]
-  |> Expression.sortRows [ //
-       OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
-       OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
-     ]
+  |> Expression.sortRows
+       [ //
+         OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
+         OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
+       ]
   |> List.ofSeq
   |> should
        equal

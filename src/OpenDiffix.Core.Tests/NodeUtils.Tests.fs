@@ -50,7 +50,7 @@ let ``Map expressions`` () =
     selectQuery
     |> NodeUtils.map (
       function
-      | Constant (Boolean true) -> Constant(Boolean false)
+      | Constant(Boolean true) -> Constant(Boolean false)
       | other -> other
     )
 

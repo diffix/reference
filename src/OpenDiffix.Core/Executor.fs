@@ -9,7 +9,7 @@ module Utils =
 
   let unpackAggregator =
     function
-    | FunctionExpr (AggregateFunction (fn, opts), args) -> ((fn, opts), args)
+    | FunctionExpr(AggregateFunction(fn, opts), args) -> ((fn, opts), args)
     | _ -> failwith "Expression is not an aggregator"
 
   let unpackAggregators aggregators =
@@ -232,13 +232,13 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
 
 let execute (queryContext: QueryContext) plan : seq<Row> =
   match plan with
-  | Plan.Scan (table, columnIndices) -> executeScan queryContext table columnIndices
-  | Plan.Project (plan, expressions) -> executeProject queryContext (plan, expressions)
-  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet queryContext (plan, fn, args)
-  | Plan.Filter (plan, condition) -> executeFilter queryContext (plan, condition)
-  | Plan.Sort (plan, orderings) -> executeSort queryContext (plan, orderings)
-  | Plan.Aggregate (plan, labels, aggregators, anonymizationContext) ->
+  | Plan.Scan(table, columnIndices) -> executeScan queryContext table columnIndices
+  | Plan.Project(plan, expressions) -> executeProject queryContext (plan, expressions)
+  | Plan.ProjectSet(plan, fn, args) -> executeProjectSet queryContext (plan, fn, args)
+  | Plan.Filter(plan, condition) -> executeFilter queryContext (plan, condition)
+  | Plan.Sort(plan, orderings) -> executeSort queryContext (plan, orderings)
+  | Plan.Aggregate(plan, labels, aggregators, anonymizationContext) ->
     executeAggregate queryContext (plan, labels, aggregators, anonymizationContext)
-  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
-  | Plan.Limit (plan, amount) -> executeLimit queryContext (plan, amount)
+  | Plan.Join(leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
+  | Plan.Limit(plan, amount) -> executeLimit queryContext (plan, amount)
   | _ -> failwith "Plan execution not implemented"

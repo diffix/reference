@@ -17,11 +17,12 @@ let rows =
   [ 1, 5; 2, 4; 3, 2; 4, 1; 5, 5; 6, 4; 7, 3; 8, 6 ]
   |> List.collect (fun (id, count) -> List.replicate count id)
   |> List.map (fun id -> [| id |> int64 |> Integer; String "value"; companies id; reals id |])
-  |> List.append [
-       [| Null; String "value"; String "Alpha"; Real -100.0 |]
-       [| Integer 8L; Null; String "Alpha"; Null |]
-       [| Integer 9L; String "value"; Null; Real 10.0 |]
-     ]
+  |> List.append
+       [
+         [| Null; String "value"; String "Alpha"; Real -100.0 |]
+         [| Integer 8L; Null; String "Alpha"; Null |]
+         [| Integer 9L; String "value"; Null; Real 10.0 |]
+       ]
 
 let aidColumn = ColumnReference(0, IntegerType)
 let aidColumnList = ListExpr [ aidColumn ]
@@ -148,13 +149,14 @@ let ``direct count_histogram`` () =
   |> evaluateAggregator countHistogram [ aidColumn ]
   |> should
        equal
-       (List [
-         List [ Integer 1L; Integer 4L ]
-         List [ Integer 2L; Integer 3L ]
-         List [ Integer 6L; Integer 1L ]
-         List [ Integer 7L; Integer 1L ]
-         List [ Integer 13L; Integer 1L ]
-        ])
+       (List
+         [
+           List [ Integer 1L; Integer 4L ]
+           List [ Integer 2L; Integer 3L ]
+           List [ Integer 6L; Integer 1L ]
+           List [ Integer 7L; Integer 1L ]
+           List [ Integer 13L; Integer 1L ]
+         ])
 
 [<Fact>]
 let ``direct count_histogram with generalization`` () =
@@ -162,11 +164,12 @@ let ``direct count_histogram with generalization`` () =
   |> evaluateAggregator countHistogram [ aidColumn; Constant(Integer 5L) ]
   |> should
        equal
-       (List [ //
-         List [ Integer 0L; Integer 7L ]
-         List [ Integer 5L; Integer 2L ]
-         List [ Integer 10L; Integer 1L ]
-        ])
+       (List
+         [ //
+           List [ Integer 0L; Integer 7L ]
+           List [ Integer 5L; Integer 2L ]
+           List [ Integer 10L; Integer 1L ]
+         ])
 
 [<Fact>]
 let ``anon count_histogram`` () =
@@ -174,11 +177,12 @@ let ``anon count_histogram`` () =
   |> evaluateAggregator diffixCountHistogram [ aidColumnList; Constant(Integer 0L) ]
   |> should
        equal
-       (List [ //
-         List [ Null; Integer 3L ]
-         List [ Integer 1L; Integer 4L ]
-         List [ Integer 2L; Integer 3L ]
-        ])
+       (List
+         [ //
+           List [ Null; Integer 3L ]
+           List [ Integer 1L; Integer 4L ]
+           List [ Integer 2L; Integer 3L ]
+         ])
 
 [<Fact>]
 let ``anon count_histogram with generalization`` () =
@@ -186,10 +190,11 @@ let ``anon count_histogram with generalization`` () =
   |> evaluateAggregator diffixCountHistogram [ aidColumnList; Constant(Integer 0L); Constant(Integer 5L) ]
   |> should
        equal
-       (List [ //
-         List [ Integer 0L; Integer 7L ]
-         List [ Integer 5L; Integer 2L ]
-        ])
+       (List
+         [ //
+           List [ Integer 0L; Integer 7L ]
+           List [ Integer 5L; Integer 2L ]
+         ])
 
 [<Fact>]
 let ``anon count returns 0 if insufficient users`` () =
@@ -469,7 +474,7 @@ let ``compacting top/outlier interval respects rules`` () =
           for xs in cartesian Ls -> x :: xs
       }
 
-  cartesian [ seq { 1 .. 5 }; seq { 1 .. 5 }; seq { 1 .. 5 }; seq { 1 .. 5 } ]
+  cartesian [ seq { 1..5 }; seq { 1..5 }; seq { 1..5 }; seq { 1..5 } ]
   |> Seq.map (fun l -> ({ Lower = l.[0]; Upper = l.[1] }, { Lower = l.[2]; Upper = l.[3] }))
   // Pick only valid intervals which have a flattening for `totalCount`
   |> Seq.filter (fun (outlier, top) ->

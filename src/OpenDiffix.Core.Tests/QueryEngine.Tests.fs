@@ -7,11 +7,12 @@ open QueryEngine
 
 type Tests(db: DBFixture) =
   let tableSettings =
-    Map [ //
-      "customers", { AidColumns = [ "id" ] }
-      "purchases", { AidColumns = [ "cid" ] }
-      "customers_small", { AidColumns = [ "id" ] }
-    ]
+    Map
+      [ //
+        "customers", { AidColumns = [ "id" ] }
+        "purchases", { AidColumns = [ "cid" ] }
+        "customers_small", { AidColumns = [ "id" ] }
+      ]
 
   let noiselessAnonParams =
     {
@@ -98,7 +99,8 @@ type Tests(db: DBFixture) =
   let ``query 5 - bucket expansion`` () =
     let queryResult = runQuery "SELECT city FROM customers_small"
 
-    let expectedRows = List.collect (fun name -> [ for _i in 1 .. 10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
+    let expectedRows =
+      List.collect (fun name -> [ for _i in 1..10 -> [| String name |] ]) [ "Berlin"; "Rome" ]
 
     let expected = { Columns = [ { Name = "city"; Type = StringType } ]; Rows = expectedRows }
 
@@ -140,7 +142,9 @@ type Tests(db: DBFixture) =
         Rows = [ [| String "1Water" |] ]
       }
 
-    let queryResult = runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1 GROUP BY id, name"
+    let queryResult =
+      runQuery "SELECT CAST(id AS text) || name AS n FROM products WHERE id = 1 GROUP BY id, name"
+
     queryResult |> should equal expected
 
   [<Fact>]
@@ -180,14 +184,18 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``query 14 - avg parity`` () =
-    let expected = runQuery "SELECT sum(age) / cast(count(age), 'real') as avg FROM customers_small GROUP BY city"
+    let expected =
+      runQuery "SELECT sum(age) / cast(count(age), 'real') as avg FROM customers_small GROUP BY city"
+
     let queryResult = runQuery "SELECT avg(age) FROM customers_small GROUP BY city"
 
     queryResult |> should equal expected
 
   [<Fact>]
   let ``query 15 - avg_noise parity`` () =
-    let expected = runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
+    let expected =
+      runQuery "SELECT sum_noise(age) / count(age) as avg_noise FROM customers_small GROUP BY city"
+
     let queryResult = runQuery "SELECT avg_noise(age) FROM customers_small GROUP BY city"
 
     queryResult |> should equal expected
@@ -215,37 +223,41 @@ type Tests(db: DBFixture) =
             [|
               Real 0.0
               Integer 337L
-              List [
-                List [ Value.Null; Integer 3L ]
-                List [ Integer 1L; Integer 61L ]
-                List [ Integer 2L; Integer 52L ]
-                List [ Integer 3L; Integer 36L ]
-                List [ Integer 4L; Integer 11L ]
-              ]
+              List
+                [
+                  List [ Value.Null; Integer 3L ]
+                  List [ Integer 1L; Integer 61L ]
+                  List [ Integer 2L; Integer 52L ]
+                  List [ Integer 3L; Integer 36L ]
+                  List [ Integer 4L; Integer 11L ]
+                ]
             |]
             [|
               Real 1.5
               Integer 132L
-              List [
-                List [ Integer 1L; Integer 76L ]
-                List [ Integer 2L; Integer 25L ]
-                List [ Integer 3L; Integer 2L ]
-              ]
+              List
+                [
+                  List [ Integer 1L; Integer 76L ]
+                  List [ Integer 2L; Integer 25L ]
+                  List [ Integer 3L; Integer 2L ]
+                ]
             |]
             [|
               Real 3.0
               Integer 34L
-              List [ //
-                List [ Integer 1L; Integer 26L ]
-                List [ Integer 2L; Integer 4L ]
-              ]
+              List
+                [ //
+                  List [ Integer 1L; Integer 26L ]
+                  List [ Integer 2L; Integer 4L ]
+                ]
             |]
             [|
               Real 4.5
               Integer 2L
-              List [ //
-                List [ Integer 1L; Integer 2L ]
-              ]
+              List
+                [ //
+                  List [ Integer 1L; Integer 2L ]
+                ]
             |]
           ]
       }
