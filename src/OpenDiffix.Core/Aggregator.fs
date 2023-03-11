@@ -292,7 +292,7 @@ type private DiffixLowCount(aidsCount) =
 
     member this.Final(_aggContext, anonContext, _outliersAggregator) =
       let anonParams = (unwrapAnonContext anonContext).AnonymizationParams
-      Boolean(Anonymizer.isLowCount anonParams state)
+      Boolean(Anonymizer.isLowCount anonParams.Salt anonParams.Suppression state)
 
 type private DiffixSum(summandType, aidsCount) =
   let state: Anonymizer.SumState =
@@ -511,7 +511,7 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
           let binLabel = pair.Key
           let bin = pair.Value
 
-          if Anonymizer.isLowCount anonParams bin.LowCount.State then
+          if Anonymizer.isLowCount anonParams.Salt anonParams.Suppression bin.LowCount.State then
             // Merge low count bin to suppress bin.
             (suppressBin.LowCount :> IAggregator).Merge(bin.LowCount)
             None
@@ -522,7 +522,7 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
         |> Seq.map (fun (binLabel, bin) -> Value.List [ Integer binLabel; anonBinCount bin ])
         |> Seq.toList
 
-      if Anonymizer.isLowCount anonParams suppressBin.LowCount.State then
+      if Anonymizer.isLowCount anonParams.Salt anonParams.Suppression suppressBin.LowCount.State then
         Value.List highCountBins
       else
         Value.List((Value.List [ Null; anonBinCount suppressBin ]) :: highCountBins)

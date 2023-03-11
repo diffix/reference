@@ -123,7 +123,9 @@ type OrderByNullsBehavior =
 
 type Column = { Name: string; Type: ExpressionType }
 
-type Table = { Name: string; Columns: Column list }
+type Columns = Column list
+
+type Table = { Name: string; Columns: Columns }
 
 type Schema = Table list
 
@@ -147,12 +149,9 @@ type Interval =
 
 type TableSettings = { AidColumns: string list }
 
+type LowCountParams = { LowThreshold: int; LayerSD: float; LowMeanGap: float }
+
 type SuppressionParams =
-  {
-    LowThreshold: int
-    LayerSD: float
-    LowMeanGap: float
-  }
   static member Default = { LowThreshold = 2; LayerSD = 1.; LowMeanGap = 2. }
 
 type AccessLevel =
@@ -160,11 +159,19 @@ type AccessLevel =
   | PublishUntrusted
   | Direct
 
+type AdaptiveBucketsParams =
+  {
+    SingularityLowThreshold: int
+    RangeLowThreshold: int
+  }
+  static member Default = { SingularityLowThreshold = 4; RangeLowThreshold = 8 }
+
 type AnonymizationParams =
   {
     TableSettings: Map<string, TableSettings>
-    Salt: byte []
-    Suppression: SuppressionParams
+    Salt: byte[]
+    Suppression: LowCountParams
+    AdaptiveBuckets: AdaptiveBucketsParams
     AccessLevel: AccessLevel
     Strict: bool
 
@@ -174,18 +181,21 @@ type AnonymizationParams =
     LayerNoiseSD: float
 
     RecoverOutliers: bool
+    UseAdaptiveBuckets: bool
   }
   static member Default =
     {
       TableSettings = Map.empty
       Salt = [||]
       Suppression = SuppressionParams.Default
+      AdaptiveBuckets = AdaptiveBucketsParams.Default
       AccessLevel = PublishTrusted
       Strict = true
       OutlierCount = Interval.Default
       TopCount = Interval.Default
       LayerNoiseSD = 1.0
       RecoverOutliers = true
+      UseAdaptiveBuckets = false
     }
 
 // ----------------------------------------------------------------

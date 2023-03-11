@@ -337,10 +337,12 @@ type Tests(db: DBFixture) =
       AccessLevel = PublishTrusted
       Strict = false
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
+      AdaptiveBuckets = AdaptiveBucketsParams.Default
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       LayerNoiseSD = 0.
       RecoverOutliers = true
+      UseAdaptiveBuckets = false
     }
 
   let queryContext accessLevel =

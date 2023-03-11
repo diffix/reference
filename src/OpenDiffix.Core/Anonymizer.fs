@@ -291,20 +291,20 @@ let private moneyRoundNoise noiseSD =
 // ----------------------------------------------------------------
 
 /// Returns whether any of the AID value sets has a low count.
-let isLowCount (anonParams: AnonymizationParams) (aidSets: HashSet<AidHash> seq) =
+let isLowCount salt (lowCountParams: LowCountParams) (aidSets: HashSet<AidHash> seq) =
   aidSets
   |> Seq.map (fun aidSet ->
-    if aidSet.Count < anonParams.Suppression.LowThreshold then
+    if aidSet.Count < lowCountParams.LowThreshold then
       true
     else
       let thresholdNoise =
         [ seedFromAidSet aidSet ]
-        |> generateNoise anonParams.Salt "suppress" anonParams.Suppression.LayerSD
+        |> generateNoise salt "suppress" lowCountParams.LayerSD
 
       // `LowMeanGap` is the number of (total!) standard deviations between `LowThreshold` and desired mean
       let thresholdMean =
-        anonParams.Suppression.LowMeanGap * anonParams.Suppression.LayerSD * sqrt (2.0)
-        + float anonParams.Suppression.LowThreshold
+        lowCountParams.LowMeanGap * lowCountParams.LayerSD * sqrt (2.0)
+        + float lowCountParams.LowThreshold
 
       let threshold = thresholdNoise + thresholdMean
 
@@ -323,7 +323,7 @@ let countDistinct
   let lowCountValues, highCountValues =
     aidsPerValue
     |> Seq.toArray
-    |> Array.partition (fun pair -> isLowCount anonParams pair.Value)
+    |> Array.partition (fun pair -> isLowCount anonParams.Salt anonParams.Suppression pair.Value)
 
   let sortedLowCountValues = sortByValue lowCountValues
 

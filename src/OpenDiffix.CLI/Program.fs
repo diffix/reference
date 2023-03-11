@@ -132,10 +132,12 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
     AccessLevel = parsedArgs.TryGetResult Access_Level |> toAccessLevel
     Strict = parsedArgs.TryGetResult Strict |> Option.defaultValue true
     Suppression = suppression
+    AdaptiveBuckets = AdaptiveBucketsParams.Default
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
     LayerNoiseSD = parsedArgs.TryGetResult Layer_Noise_SD |> toNoise
     RecoverOutliers = parsedArgs.TryGetResult Recover_Outliers |> Option.defaultValue true
+    UseAdaptiveBuckets = false
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =

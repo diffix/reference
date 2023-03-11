@@ -94,3 +94,6 @@ let isMoneyRounded arg =
   | Real c -> abs (moneyRound (c) - c) < MONEY_ROUND_DELTA
   | Integer c -> abs (moneyRound (float c) - float c) < MONEY_ROUND_DELTA
   | _ -> false
+
+let addToSeed seed (values: Value seq) =
+  values |> Seq.map toString |> Hash.strings seed

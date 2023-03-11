@@ -9,10 +9,12 @@ let private noiselessAnonParams: AnonymizationParams =
     AccessLevel = Direct
     Strict = false
     Suppression = { LowThreshold = 3; LowMeanGap = 0.; LayerSD = 0. }
+    AdaptiveBuckets = AdaptiveBucketsParams.Default
     OutlierCount = { Lower = 1; Upper = 1 }
     TopCount = { Lower = 1; Upper = 1 }
     LayerNoiseSD = 0.
     RecoverOutliers = true
+    UseAdaptiveBuckets = false
   }
 
 let private csvReader (csv: string) =
