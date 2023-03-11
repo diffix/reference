@@ -20,6 +20,13 @@ let testTable: Table =
 let expression = Boolean true |> Constant
 let negativeExpression = Boolean false |> Constant
 
+let anonContext =
+  {
+    BucketSeed = 0UL
+    BaseLabels = []
+    AnonymizationParams = AnonymizationParams.Default
+  }
+
 let selectQuery =
   {
     TargetList = [ { Expression = expression; Alias = "col"; Tag = RegularTargetEntry } ]
@@ -29,7 +36,7 @@ let selectQuery =
     Having = expression
     OrderBy = [ OrderBy(expression, Ascending, NullsFirst) ]
     Limit = None
-    AnonymizationContext = Some { BucketSeed = 0UL; BaseLabels = [] }
+    AnonymizationContext = Some anonContext
   }
 
 let selectQueryNegative =
@@ -41,7 +48,7 @@ let selectQueryNegative =
     Having = negativeExpression
     OrderBy = [ OrderBy(negativeExpression, Ascending, NullsFirst) ]
     Limit = None
-    AnonymizationContext = Some { BucketSeed = 0UL; BaseLabels = [] }
+    AnonymizationContext = Some anonContext
   }
 
 [<Fact>]

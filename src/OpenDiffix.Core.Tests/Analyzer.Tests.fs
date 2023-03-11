@@ -376,7 +376,14 @@ type Tests(db: DBFixture) =
     let expectedSeed = Hash.strings 0UL seedMaterials
 
     (analyzeTrustedQuery query).AnonymizationContext
-    |> should equal (Some { BucketSeed = expectedSeed; BaseLabels = baseLabels })
+    |> should
+         equal
+         (Some
+           {
+             BucketSeed = expectedSeed
+             BaseLabels = baseLabels
+             AnonymizationParams = anonParams
+           })
 
   let assertSqlSeed query (seedMaterials: string seq) =
     assertSqlSeedWithFilter query seedMaterials []

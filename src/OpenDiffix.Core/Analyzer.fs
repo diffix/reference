@@ -453,7 +453,15 @@ let private compileQuery anonParams (query: SelectQuery) =
 
     let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketExpressions
     let baseLabels = gatherBucketLabelsFromFilter query.Where
-    let anonContext = Some { BucketSeed = sqlSeed; BaseLabels = baseLabels }
+
+    let anonContext =
+      Some
+        {
+          BucketSeed = sqlSeed
+          BaseLabels = baseLabels
+          AnonymizationParams = anonParams
+        }
+
     { query with AnonymizationContext = anonContext }
   else
     query

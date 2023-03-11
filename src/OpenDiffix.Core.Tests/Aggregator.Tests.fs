@@ -103,16 +103,19 @@ let argLengthPairs =
     1, 0
   ]
 
-let aggContext =
+let aggContext = { GroupingLabels = [||]; Aggregators = [||] }
+
+let anonContext =
   {
+    BucketSeed = 0UL
+    BaseLabels = []
     AnonymizationParams = AnonymizationParams.Default
-    GroupingLabels = [||]
-    Aggregators = [||]
   }
+
 
 let testAnonAggregatorMerging fn argType =
   let random = makeRandom fn argType
-  let ctx = aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }, None
+  let ctx = aggContext, Some anonContext, None
 
   let testPair numAids (length1, length2) =
     let makeArgs = makeAnonArgs argType random numAids

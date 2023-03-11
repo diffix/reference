@@ -123,12 +123,12 @@ type private AidCount =
   }
 
 let inline private aidFlattening
-  (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
   (unaccountedFor: float)
   (aidContributions: (AidHash * ^Contribution) array)
   : AidCount option =
   let totalCount = aidContributions.Length
+  let anonParams = anonContext.AnonymizationParams
 
   match compactFlatteningIntervals anonParams.OutlierCount anonParams.TopCount totalCount with
   | None -> None // not enough AIDVs for a sensible flattening
@@ -187,12 +187,12 @@ let inline private aidFlattening
 let private arrayFromDict (d: Dictionary<'a, 'b>) =
   d |> Seq.map (fun pair -> pair.Key, pair.Value) |> Seq.toArray
 
-let private mapAidFlattening (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) perAidContributions =
+let private mapAidFlattening (anonContext: AnonymizationContext) perAidContributions =
   perAidContributions
   |> Array.map (fun aidState ->
     aidState.AidContributions
     |> arrayFromDict
-    |> aidFlattening anonParams anonContext aidState.UnaccountedFor
+    |> aidFlattening anonContext aidState.UnaccountedFor
   )
 
 let private sortByValue (aidsPerValue: KeyValuePair<Value, HashSet<AidHash> array> seq) =
@@ -248,7 +248,6 @@ let private distributeValues (valuesByAID: seq<AidHash * array<Value>>) : seq<Ai
   result :> seq<AidHash * Value>
 
 let private countDistinctFlatteningByAid
-  (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
   (perAidContributions: Dictionary<AidHash, HashSet<Value>>)
   =
@@ -260,7 +259,7 @@ let private countDistinctFlatteningByAid
   |> Seq.countBy fst
   |> Seq.map (fun (aid, count) -> aid, int64 count)
   |> Seq.toArray
-  |> aidFlattening anonParams anonContext 0.0
+  |> aidFlattening anonContext 0.0
 
 // Assumes that `byAidSum` is non-empty, meaning that there is at least one AID instance involved
 let private anonymizedSum (byAidSum: AidCount seq) =
@@ -314,11 +313,11 @@ let isLowCount (anonParams: AnonymizationParams) (aidSets: HashSet<AidHash> seq)
   |> Seq.reduce (||)
 
 let countDistinct
-  (anonParams: AnonymizationParams)
   (anonContext: AnonymizationContext)
   aidsCount
   (aidsPerValue: Dictionary<Value, HashSet<AidHash> array>)
   =
+  let anonParams = anonContext.AnonymizationParams
   // These values are safe, and can be counted as they are
   // without any additional noise.
   let lowCountValues, highCountValues =
@@ -332,7 +331,7 @@ let countDistinct
     [ 0 .. aidsCount - 1 ]
     |> List.map (
       transposeToPerAid sortedLowCountValues
-      >> countDistinctFlatteningByAid anonParams anonContext
+      >> countDistinctFlatteningByAid anonContext
     )
 
   let safeCount = int64 highCountValues.Length
@@ -363,12 +362,8 @@ let private gatherOutliers (byAid: option<AidCount> array) =
     | Some state -> state.Outliers
   )
 
-let count
-  (anonParams: AnonymizationParams)
-  (anonContext: AnonymizationContext)
-  (contributions: ContributionsState array)
-  =
-  let byAid = mapAidFlattening anonParams anonContext contributions
+let count (anonContext: AnonymizationContext) (contributions: ContributionsState array) =
+  let byAid = mapAidFlattening anonContext contributions
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // we have to abort anonymization.
@@ -384,8 +379,9 @@ let count
         Outliers = byAid |> gatherOutliers
       }
 
-let histogramBinCount (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (aidSet: HashSet<AidHash>) =
+let histogramBinCount (anonContext: AnonymizationContext) (aidSet: HashSet<AidHash>) =
   let numAids = aidSet.Count
+  let anonParams = anonContext.AnonymizationParams
 
   let noise =
     [ anonContext.BucketSeed; seedFromAidSet aidSet ]
@@ -397,9 +393,9 @@ let histogramBinCount (anonParams: AnonymizationParams) (anonContext: Anonymizat
   |> max anonParams.Suppression.LowThreshold
   |> Integer
 
-let sum (anonParams: AnonymizationParams) (anonContext: AnonymizationContext) (contributions: SumState) =
-  let byAidPositive = mapAidFlattening anonParams anonContext contributions.Positive
-  let byAidNegative = mapAidFlattening anonParams anonContext contributions.Negative
+let sum (anonContext: AnonymizationContext) (contributions: SumState) =
+  let byAidPositive = mapAidFlattening anonContext contributions.Positive
+  let byAidNegative = mapAidFlattening anonContext contributions.Negative
 
   // If any of the AIDs had insufficient data to produce a sensible flattening
   // for both positive and negative values, we have to abort anonymization.

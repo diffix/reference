@@ -138,11 +138,10 @@ let private finalizeAggregatesAndRedistributeOutliers
 let private finalizeBuckets aggregationContext anonymizationContext buckets =
   // Redistributing outliers require that a `DiffixLowCount` aggregator is present, which only happens during non-global anonymized aggregation.
   match aggregationContext, anonymizationContext with
-  | {
-      GroupingLabels = groupingLabels
-      AnonymizationParams = { RecoverOutliers = true }
-    },
-    Some anonymizationContext when groupingLabels.Length > 0 ->
+  | { GroupingLabels = groupingLabels }, Some anonymizationContext when
+    groupingLabels.Length > 0
+    && anonymizationContext.AnonymizationParams.RecoverOutliers = true
+    ->
     finalizeAggregatesAndRedistributeOutliers aggregationContext anonymizationContext buckets
   | _ -> // finalize aggregates without redistributing outliers
     buckets
@@ -191,12 +190,7 @@ let private executeAggregate queryContext (childPlan, groupingLabels, aggregator
     bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
-  let aggregationContext =
-    {
-      AnonymizationParams = queryContext.AnonymizationParams
-      GroupingLabels = groupingLabels
-      Aggregators = aggregators
-    }
+  let aggregationContext = { GroupingLabels = groupingLabels; Aggregators = aggregators }
 
   state
   |> Seq.map (fun pair -> pair.Value)
