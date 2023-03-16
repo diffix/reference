@@ -225,9 +225,7 @@ type Plan =
   | Filter of Plan * condition: Expression
   | Sort of Plan * OrderBy list
   | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list * AnonymizationContext option
-  | Unique of Plan
   | Join of left: Plan * right: Plan * JoinType * on: Expression
-  | Append of first: Plan * second: Plan
   | Limit of Plan * amount: uint
   override this.ToString() = Plan.explain this
 
@@ -521,9 +519,7 @@ module Plan =
     | Plan.Filter(plan, _) -> columnsCount plan
     | Plan.Sort(plan, _) -> columnsCount plan
     | Plan.Aggregate(_, groupingLabels, aggregators, _) -> groupingLabels.Length + aggregators.Length
-    | Plan.Unique plan -> columnsCount plan
     | Plan.Join(left, right, _, _) -> columnsCount left + columnsCount right
-    | Plan.Append(first, _) -> columnsCount first
     | Plan.Limit(plan, _) -> columnsCount plan
 
   let private NEWLINE = Environment.NewLine
@@ -555,10 +551,8 @@ module Plan =
         + $"{propLine depth}Aggregates: {String.joinWithComma aggregators}"
         + $"{propLine depth}AnonymizationContext: {anonymizationContext}"
         + childToString childPlan
-      | Plan.Unique childPlan -> "Unique" + childToString childPlan
       | Plan.Join(leftPlan, rightPlan, joinType, condition) ->
         $"{joinType} on {condition}" + childToString leftPlan + childToString rightPlan
-      | Plan.Append(leftPlan, rightPlan) -> "Append" + childToString leftPlan + childToString rightPlan
       | Plan.Limit(childPlan, amount) -> $"Limit {amount}" + childToString childPlan
     )
 

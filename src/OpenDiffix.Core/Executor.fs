@@ -235,4 +235,3 @@ let execute (queryContext: QueryContext) plan : seq<Row> =
     executeAggregate queryContext (plan, labels, aggregators, anonymizationContext)
   | Plan.Join(leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
   | Plan.Limit(plan, amount) -> executeLimit queryContext (plan, amount)
-  | _ -> failwith "Plan execution not implemented"
