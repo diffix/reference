@@ -50,10 +50,10 @@ let typeOfScalarFunction fn args =
     args
     |> List.item 1
     |> function
-      | Constant (String "integer") -> IntegerType
-      | Constant (String "real") -> RealType
-      | Constant (String "boolean") -> BooleanType
-      | Constant (String "timestamp") -> TimestampType
+      | Constant(String "integer") -> IntegerType
+      | Constant(String "real") -> RealType
+      | Constant(String "boolean") -> BooleanType
+      | Constant(String "timestamp") -> TimestampType
       | _ -> failwith "Unsupported cast destination type name."
   | NullIf ->
     args
@@ -92,10 +92,10 @@ let typeOfAggregate fn args =
 /// Resolves the type of an expression.
 let rec typeOf expression =
   match expression with
-  | FunctionExpr (ScalarFunction fn, args) -> typeOfScalarFunction fn args
-  | FunctionExpr (SetFunction fn, args) -> typeOfSetFunction fn args
-  | FunctionExpr (AggregateFunction (fn, _options), args) -> typeOfAggregate fn args
-  | ColumnReference (_, exprType) -> exprType
+  | FunctionExpr(ScalarFunction fn, args) -> typeOfScalarFunction fn args
+  | FunctionExpr(SetFunction fn, args) -> typeOfSetFunction fn args
+  | FunctionExpr(AggregateFunction(fn, _options), args) -> typeOfAggregate fn args
+  | ColumnReference(_, exprType) -> exprType
   | Constant c -> Value.typeOf c
   | ListExpr expressions -> ListType(typeOfList expressions)
 
@@ -320,18 +320,18 @@ let evaluateSetFunction fn args =
 /// Evaluates the expression for a given row.
 let rec evaluate (row: Row) (expr: Expression) =
   match expr with
-  | FunctionExpr (ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate row))
-  | FunctionExpr (AggregateFunction (fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
-  | FunctionExpr (SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
+  | FunctionExpr(ScalarFunction fn, args) -> evaluateScalarFunction fn (args |> List.map (evaluate row))
+  | FunctionExpr(AggregateFunction(fn, _options), _) -> failwith $"Invalid usage of aggregate function '%A{fn}'."
+  | FunctionExpr(SetFunction fn, _) -> failwith $"Invalid usage of set function '%A{fn}'."
   | ListExpr expressions -> expressions |> List.map (evaluate row) |> Value.List
-  | ColumnReference (index, _) -> row.[index]
+  | ColumnReference(index, _) -> row.[index]
   | Constant value -> value
 
 /// Sorts a row sequence based on the given orderings.
 let sortRows orderings (rows: Row seq) =
   let exprsComparers =
     orderings
-    |> List.map (fun (OrderBy (expr, direction, nulls)) -> expr, Value.comparer direction nulls)
+    |> List.map (fun (OrderBy(expr, direction, nulls)) -> expr, Value.comparer direction nulls)
 
   let rec compare exprsComparers rowA rowB =
     match exprsComparers with
@@ -375,8 +375,8 @@ let makeEquals left right =
 
 let rec isScalar expr =
   match expr with
-  | FunctionExpr (AggregateFunction _, _) -> false
-  | FunctionExpr (_, args) -> List.forall isScalar args
+  | FunctionExpr(AggregateFunction _, _) -> false
+  | FunctionExpr(_, args) -> List.forall isScalar args
   | _ -> true
 
 let unwrapListExpr expr =

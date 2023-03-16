@@ -48,6 +48,6 @@ module TargetEntry =
 module QueryRange =
   let rec columnsCount (queryRange: QueryRange) =
     match queryRange with
-    | SubQuery (query, _) -> query.TargetList.Length
+    | SubQuery(query, _) -> query.TargetList.Length
     | Join join -> (columnsCount join.Left) + (columnsCount join.Right)
-    | RangeTable (table, _) -> table.Columns.Length
+    | RangeTable(table, _) -> table.Columns.Length

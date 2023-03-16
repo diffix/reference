@@ -100,7 +100,9 @@ type private SpinLock() =
   member this.Enter() =
     let mutable entered = false
     lock.Enter(&entered)
-    if not entered then failwith "Failed to enter lock."
+
+    if not entered then
+      failwith "Failed to enter lock."
 
   member this.Exit() = lock.Exit()
 
@@ -157,7 +159,9 @@ let private prepareBuckets (aggregationContext: AggregationContext) (buckets: Bu
         siblingsPerColumn.[colIndex] <- siblings
         // We don't actually need more than 3 values.
         // 1 = no siblings; 2 = single sibling; 3 = multiple siblings
-        if siblings.Count < 3 then siblings.Add(bucketTuple)
+        if siblings.Count < 3 then
+          siblings.Add(bucketTuple)
+
         lock.Exit()
 
       if lowCount then Some(bucket, siblingsPerColumn) else None
@@ -201,8 +205,11 @@ let private led (aggregationContext: AggregationContext) (buckets: Bucket array)
         // Count=3 means there are multiple siblings and has no special meaning.
         ()
 
-    if hasUnknownColumn then diagnostics.IncrementBucketsUnknownColumn()
-    if mergeTargets.Count > 0 then diagnostics.IncrementBucketsIsolatingColumn()
+    if hasUnknownColumn then
+      diagnostics.IncrementBucketsUnknownColumn()
+
+    if mergeTargets.Count > 0 then
+      diagnostics.IncrementBucketsIsolatingColumn()
 
     if hasUnknownColumn && mergeTargets.Count > 0 then
       Some(victimBucket, mergeTargets)

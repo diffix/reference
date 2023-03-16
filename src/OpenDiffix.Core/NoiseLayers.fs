@@ -4,14 +4,14 @@ open AnalyzerTypes
 
 let private basicSeedMaterial rangeColumns expression =
   match expression with
-  | ColumnReference (index, _type) ->
+  | ColumnReference(index, _type) ->
     let rangeColumn = List.item index rangeColumns
     $"%s{rangeColumn.RangeName}.%s{rangeColumn.ColumnName}"
-  | Constant (String value) -> value
-  | Constant (Integer value) -> value.ToString()
-  | Constant (Real value) -> value.ToString()
-  | Constant (Timestamp value) -> (Timestamp value) |> Value.toString
-  | Constant (Boolean value) -> value.ToString()
+  | Constant(String value) -> value
+  | Constant(Integer value) -> value.ToString()
+  | Constant(Real value) -> value.ToString()
+  | Constant(Timestamp value) -> (Timestamp value) |> Value.toString
+  | Constant(Boolean value) -> value.ToString()
   | _ -> failwith "Unsupported expression used for defining buckets."
 
 let private functionSeedMaterial =
@@ -27,7 +27,7 @@ let private functionSeedMaterial =
 
 let private collectSeedMaterials rangeColumns expression =
   match expression with
-  | FunctionExpr (ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
+  | FunctionExpr(ScalarFunction fn, args) -> functionSeedMaterial fn :: List.map (basicSeedMaterial rangeColumns) args
   | Constant _ -> failwith "Constant expressions can not be used for defining buckets."
   | _ -> [ basicSeedMaterial rangeColumns expression ]
   |> String.join ","

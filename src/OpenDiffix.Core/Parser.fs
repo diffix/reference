@@ -147,7 +147,8 @@ module QueryParser =
         | Some direction, Some nullsBehavior -> direction, nullsBehavior
         | _ -> failwith "Invalid `ORDER BY` clause"
 
-      OrderSpec(expr, direction, nullsBehavior))
+      OrderSpec(expr, direction, nullsBehavior)
+    )
 
   let orderBy = words [ "ORDER"; "BY" ] .>> spaces >>. commaSeparated orderSpec
 
@@ -158,13 +159,14 @@ module QueryParser =
   let table = identifier .>>. opt alias |>> Expression.Table
 
   let joinType =
-    choice [
-      word "JOIN" >>. preturn InnerJoin
-      words [ "INNER"; "JOIN" ] >>. preturn InnerJoin
-      words [ "LEFT"; "JOIN" ] >>. preturn LeftJoin
-      words [ "RIGHT"; "JOIN" ] >>. preturn RightJoin
-      words [ "FULL"; "JOIN" ] >>. preturn FullJoin
-    ]
+    choice
+      [
+        word "JOIN" >>. preturn InnerJoin
+        words [ "INNER"; "JOIN" ] >>. preturn InnerJoin
+        words [ "LEFT"; "JOIN" ] >>. preturn LeftJoin
+        words [ "RIGHT"; "JOIN" ] >>. preturn RightJoin
+        words [ "FULL"; "JOIN" ] >>. preturn FullJoin
+      ]
 
   let selectQuery, selectQueryRef = createParserForwardedToRef<Expression, unit> ()
 
@@ -273,18 +275,19 @@ module QueryParser =
   addPostfixOperator "is not null" spaces 8 false (Expression.IsNull >> Expression.Not)
 
   opp.TermParser <-
-    choice [
-      (attempt selectQuery)
-      (attempt castExpression)
-      (attempt extractExpression)
-      (attempt functionExpression)
-      inParenthesis expr
-      star
-      number
-      boolean
-      stringLiteral
-      qualifiedIdentifier
-    ]
+    choice
+      [
+        (attempt selectQuery)
+        (attempt castExpression)
+        (attempt extractExpression)
+        (attempt functionExpression)
+        inParenthesis expr
+        star
+        number
+        boolean
+        stringLiteral
+        qualifiedIdentifier
+      ]
 
   let fullParser = spaces >>. selectQuery .>> (opt (pchar ';')) .>> spaces .>> eof
 
@@ -294,8 +297,8 @@ module QueryParser =
 
 let parse sql : SelectQuery =
   match FParsec.CharParsers.run QueryParser.fullParser sql with
-  | FParsec.CharParsers.Success (result, _, _) ->
+  | FParsec.CharParsers.Success(result, _, _) ->
     match result with
     | SelectQuery selectQuery -> selectQuery
     | _ -> failwith "Parse error: Expecting SELECT query"
-  | FParsec.CharParsers.Failure (errorMessage, _, _) -> failwith ("Parse error: " + errorMessage)
+  | FParsec.CharParsers.Failure(errorMessage, _, _) -> failwith ("Parse error: " + errorMessage)
