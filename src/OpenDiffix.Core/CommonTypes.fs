@@ -227,6 +227,7 @@ type Plan =
   | Aggregate of Plan * groupingLabels: Expression list * aggregators: Expression list * AnonymizationContext option
   | Join of left: Plan * right: Plan * JoinType * on: Expression
   | Limit of Plan * amount: uint
+  | AdaptiveBuckets of Plan * expressions: Expression list * AnonymizationContext
   override this.ToString() = Plan.explain this
 
 // ----------------------------------------------------------------
@@ -521,6 +522,7 @@ module Plan =
     | Plan.Aggregate(_, groupingLabels, aggregators, _) -> groupingLabels.Length + aggregators.Length
     | Plan.Join(left, right, _, _) -> columnsCount left + columnsCount right
     | Plan.Limit(plan, _) -> columnsCount plan
+    | Plan.AdaptiveBuckets(_, expressions, _) -> expressions.Length
 
   let private NEWLINE = Environment.NewLine
 
@@ -554,6 +556,11 @@ module Plan =
       | Plan.Join(leftPlan, rightPlan, joinType, condition) ->
         $"{joinType} on {condition}" + childToString leftPlan + childToString rightPlan
       | Plan.Limit(childPlan, amount) -> $"Limit {amount}" + childToString childPlan
+      | Plan.AdaptiveBuckets(childPlan, expressions, anonymizationContext) ->
+        "AdaptiveBuckets"
+        + $"{propLine depth}Expressions: {String.joinWithComma expressions}"
+        + $"{propLine depth}AnonymizationContext: {anonymizationContext}"
+        + childToString childPlan
     )
 
   let explain (plan: Plan) = toString 0 plan

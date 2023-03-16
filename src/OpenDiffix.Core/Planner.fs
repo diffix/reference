@@ -11,19 +11,16 @@ open NodeUtils
 /// If an expression is already computed in a child plan, the outer
 /// expression is mapped to a reference to its index in the inner plan.
 let rec private projectExpression innerExpressions outerExpression =
-  if List.isEmpty innerExpressions then
-    outerExpression
-  else
-    match innerExpressions |> List.tryFindIndex ((=) outerExpression) with
-    | None ->
-      match outerExpression with
-      | FunctionExpr(fn, args) ->
-        let args = args |> List.map (projectExpression innerExpressions)
-        FunctionExpr(fn, args)
-      | Constant _ -> outerExpression
-      | ColumnReference _ -> failwith "Expression projection failed"
-      | ListExpr values -> values |> List.map (projectExpression innerExpressions) |> ListExpr
-    | Some i -> ColumnReference(i, Expression.typeOf outerExpression)
+  match innerExpressions |> List.tryFindIndex ((=) outerExpression) with
+  | None ->
+    match outerExpression with
+    | FunctionExpr(fn, args) ->
+      let args = args |> List.map (projectExpression innerExpressions)
+      FunctionExpr(fn, args)
+    | Constant _ -> outerExpression
+    | ColumnReference _ -> failwith "Expression projection failed"
+    | ListExpr values -> values |> List.map (projectExpression innerExpressions) |> ListExpr
+  | Some i -> ColumnReference(i, Expression.typeOf outerExpression)
 
 /// Swaps set function expressions with a reference to their evaluated value in the child plan.
 let private projectSetFunctions evaluatedSetFunction expression =
@@ -80,11 +77,11 @@ let private planSort sortExpressions plan =
   | [] -> plan
   | _ -> Plan.Sort(plan, sortExpressions)
 
-let private planAggregate (groupingLabels: Expression list) (aggregators: Expression list) anonymizationContext plan =
-  if groupingLabels.IsEmpty && aggregators.IsEmpty then
-    plan
-  else
-    Plan.Aggregate(plan, groupingLabels, aggregators, anonymizationContext)
+let private planAggregate groupingLabels aggregators anonymizationContext plan =
+  Plan.Aggregate(plan, groupingLabels, aggregators, anonymizationContext)
+
+let private planAdaptiveBuckets selectedExpressions anonymizationContext plan =
+  Plan.AdaptiveBuckets(plan, selectedExpressions, anonymizationContext)
 
 let private planFrom queryRange columnIndices =
   match queryRange with
@@ -129,10 +126,20 @@ let plan query =
   let expressions = query.Having :: selectedExpressions @ orderByExpressions
   let aggregators = expressions |> collectAggregates |> List.distinct
   let groupingLabels = query.GroupBy |> List.distinct
-  let aggregatedColumns = groupingLabels @ aggregators
-  let selectedExpressions = selectedExpressions |> List.map (projectExpression aggregatedColumns)
-  let orderByExpressions = query.OrderBy |> map (projectExpression aggregatedColumns)
-  let havingExpression = projectExpression aggregatedColumns query.Having
+
+  let expressionProjector, rowsAggregatorPlanner =
+    if groupingLabels.IsEmpty && aggregators.IsEmpty then
+      match query.AnonymizationContext with
+      | Some anonymizationContext when anonymizationContext.AnonymizationParams.UseAdaptiveBuckets ->
+        projectExpression selectedExpressions, planAdaptiveBuckets selectedExpressions anonymizationContext
+      | _ -> id, id
+    else
+      projectExpression (groupingLabels @ aggregators),
+      planAggregate groupingLabels aggregators query.AnonymizationContext
+
+  let selectedExpressions = selectedExpressions |> List.map expressionProjector
+  let orderByExpressions = query.OrderBy |> map expressionProjector
+  let havingExpression = expressionProjector query.Having
 
   let columnIndices =
     query.Where :: expressions @ groupingLabels
@@ -142,7 +149,7 @@ let plan query =
 
   planFrom query.From columnIndices
   |> planFilter query.Where
-  |> planAggregate groupingLabels aggregators query.AnonymizationContext
+  |> rowsAggregatorPlanner
   |> planFilter havingExpression
   |> planSort orderByExpressions
   |> planProject selectedExpressions

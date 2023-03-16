@@ -2,6 +2,8 @@ module rec OpenDiffix.Core.Executor
 
 open System
 
+open OpenDiffix.Core.AdaptiveBuckets
+
 module Utils =
   let filter condition rows =
     rows
@@ -220,6 +222,26 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
       joinedRows
   )
 
+let private executeAdaptiveBuckets
+  queryContext
+  (childPlan, (expressions: Expression list), (anonymizationContext: AnonymizationContext))
+  : seq<Row> =
+  let expressions = Array.ofList expressions
+
+  let rows =
+    childPlan
+    |> execute queryContext
+    |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate row))
+    |> Seq.toArray
+
+  let columnTypes = expressions |> Array.tail |> Array.map Expression.typeOf
+  let microdataColumns = Microdata.extractValueMaps columnTypes rows
+  let forest, nullMappings = rows |> Forest.buildForest anonymizationContext columnTypes.Length
+
+  forest
+  |> Bucket.harvestBuckets
+  |> Microdata.generateMicrodata microdataColumns nullMappings
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
@@ -233,5 +255,7 @@ let execute (queryContext: QueryContext) plan : seq<Row> =
   | Plan.Sort(plan, orderings) -> executeSort queryContext (plan, orderings)
   | Plan.Aggregate(plan, labels, aggregators, anonymizationContext) ->
     executeAggregate queryContext (plan, labels, aggregators, anonymizationContext)
+  | Plan.AdaptiveBuckets(plan, expressions, anonymizationContext) ->
+    executeAdaptiveBuckets queryContext (plan, expressions, anonymizationContext)
   | Plan.Join(leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
   | Plan.Limit(plan, amount) -> executeLimit queryContext (plan, amount)

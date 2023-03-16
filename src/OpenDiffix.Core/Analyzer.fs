@@ -383,7 +383,7 @@ let private bucketExpand aidColumnsExpression =
   let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
   Expression.makeSetFunction GenerateSeries [ bucketCount ]
 
-let private compileAnonymizingQuery aidColumnsExpression selectQuery =
+let private compileAnonymizingQuery useAdaptiveBuckets aidColumnsExpression selectQuery =
   let selectQuery = compileAnonymizingAggregators aidColumnsExpression selectQuery
 
   let selectedExpressions =
@@ -395,17 +395,25 @@ let private compileAnonymizingQuery aidColumnsExpression selectQuery =
 
   let selectQuery =
     if noGrouping && noAggregation then
-      // Non-aggregating query; group implicitly and expand.
-      { selectQuery with
-          TargetList =
-            {
-              Expression = bucketExpand aidColumnsExpression
-              Alias = ""
-              Tag = JunkTargetEntry
-            }
-            :: selectQuery.TargetList
-          GroupBy = selectedExpressions
-      }
+      if useAdaptiveBuckets then
+        // Non-aggregating query; synthesize rows using 'Adaptive Buckets' pipeline.
+        { selectQuery with
+            TargetList =
+              { Expression = aidColumnsExpression; Alias = ""; Tag = JunkTargetEntry }
+              :: selectQuery.TargetList
+        }
+      else
+        // Non-aggregating query; group implicitly and expand.
+        { selectQuery with
+            TargetList =
+              {
+                Expression = bucketExpand aidColumnsExpression
+                Alias = ""
+                Tag = JunkTargetEntry
+              }
+              :: selectQuery.TargetList
+            GroupBy = selectedExpressions
+        }
     else
       selectQuery
 
@@ -436,15 +444,14 @@ let private compileQuery anonParams (query: SelectQuery) =
   let query =
     if isAnonymizing then
       QueryValidator.validateAnonymizingQuery anonParams.AccessLevel rangeColumns query
-      compileAnonymizingQuery aidColumnsExpression query
+      compileAnonymizingQuery anonParams.UseAdaptiveBuckets aidColumnsExpression query
     else
       QueryValidator.validateDirectQuery query
       query
 
-  // Noise seeding is needed only for anonymizing aggregators. This includes the aggregators injected
-  // in `compileAnonymizingQuery` and explicit use of noisy aggregators like `diffix_low_count`.
-  // If there aren't any, we also don't need to do the validations which are done deep in `computeSQLSeed`.
-  if hasAnonymizingAggregators query then
+  // Noise seeding is needed for the anonymizing aggregators injected in `compileAnonymizingQuery` and any explicit
+  // use of noisy aggregators like `diffix_low_count`. It is also needed when using the Adaptive Buckets pipeline.
+  if isAnonymizing || hasAnonymizingAggregators query then
     let normalizedBucketExpressions =
       (query.GroupBy @ gatherBucketExpressionsFromFilter query.Where)
       |> Seq.map normalizeBucketExpression

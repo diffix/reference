@@ -86,6 +86,12 @@ let ``Accepts supported CLI parameters`` () =
     "customers.id"
     "-q"
     "SELECT count(*) FROM customers"
+    "--use-adaptive-buckets"
+    "false"
+    "--range-low-threshold"
+    "10"
+    "--singularity-low-threshold"
+    "5"
   |]
   |> mainCore
   |> should not' (be Empty)

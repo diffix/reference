@@ -367,9 +367,29 @@ type Tests(db: DBFixture) =
     queryResult.Rows |> should equal expectedRows
 
   [<Fact>]
-  let ``Select over anonymizing non-aggregating select query`` () =
+  let ``Anonymizing non-aggregating select sub-query`` () =
     let queryResult = runQuery "SELECT city, count(*) FROM (SELECT city FROM customers_small) t GROUP BY 1"
     let expectedRows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+    queryResult.Rows |> should equal expectedRows
+
+  [<Fact>]
+  let ``'Adaptive Buckets' sub-query`` () =
+    let anonParams = { noiselessAnonParams with UseAdaptiveBuckets = true }
+
+    let queryResult =
+      runQueryWithCustomAnonParams
+        anonParams
+        "SELECT city, sum(age) FROM (SELECT city, age FROM customers) t GROUP BY 1"
+
+    let expectedRows =
+      [
+        [| String "London"; Integer 1175L |]
+        [| String "Berlin"; Integer 3443L |]
+        [| String "Rome"; Integer 2590L |]
+        [| String "Paris"; Integer 1261L |]
+        [| String "Madrid"; Integer 1081L |]
+      ]
+
     queryResult.Rows |> should equal expectedRows
 
   interface IClassFixture<DBFixture>
