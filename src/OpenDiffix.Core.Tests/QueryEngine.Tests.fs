@@ -366,4 +366,10 @@ type Tests(db: DBFixture) =
     let expectedRows = [ [| Integer 443L |] ]
     queryResult.Rows |> should equal expectedRows
 
+  [<Fact>]
+  let ``Select over anonymizing non-aggregating select query`` () =
+    let queryResult = runQuery "SELECT city, count(*) FROM (SELECT city FROM customers_small) t GROUP BY 1"
+    let expectedRows = [ [| String "Berlin"; Integer 10L |]; [| String "Rome"; Integer 10L |] ]
+    queryResult.Rows |> should equal expectedRows
+
   interface IClassFixture<DBFixture>
