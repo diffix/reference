@@ -20,8 +20,7 @@ let assertHookFails csv query (errorFragment: string) =
   try
     HookTestHelpers.run [ Led.hook ] csv query |> ignore
     failwith "Expecting query to fail"
-  with
-  | ex ->
+  with ex ->
     let str = ex.Message.ToLower()
 
     if str.Contains(errorFragment.ToLower()) then
@@ -157,7 +156,7 @@ let ``Works when low count filter is in HAVING`` () =
     HAVING NOT diffix_low_count(RowIndex)
     """
     [
-      [| String "cs"; String "m"; String "prof"; Integer 4L |],  //
+      [| String "cs"; String "m"; String "prof"; Integer 4L |], //
       [| String "cs"; String "m"; String "prof"; Integer 5L |]
     ]
 

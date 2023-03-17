@@ -25,7 +25,12 @@ type Tests(db: DBFixture) =
   let countDistinct expression =
     FunctionExpr(AggregateFunction(Count, { Distinct = true; OrderBy = [] }), [ expression ])
 
-  let anonContext = { BucketSeed = 0UL; BaseLabels = [] }
+  let anonContext =
+    {
+      BucketSeed = 0UL
+      BaseLabels = []
+      AnonymizationParams = AnonymizationParams.Default
+    }
 
   let queryContext = QueryContext.makeWithDataProvider db.DataProvider
 
@@ -35,7 +40,10 @@ type Tests(db: DBFixture) =
   [<Fact>]
   let ``execute scan`` () =
     let plan = Plan.Scan(products, [ 0; 1; 2 ])
-    let expected = [ [| Integer 1L; String "Water"; Real 1.3 |]; [| Integer 2L; String "Pasta"; Real 7.5 |] ]
+
+    let expected =
+      [ [| Integer 1L; String "Water"; Real 1.3 |]; [| Integer 2L; String "Pasta"; Real 7.5 |] ]
+
     plan |> execute |> List.take 2 |> should equal expected
 
   [<Fact>]
@@ -109,7 +117,9 @@ type Tests(db: DBFixture) =
     let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), InnerJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
-    let expected = [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
+    let expected =
+      [ [| Integer 1000L; Integer 1001L |]; [| Integer 9L; Integer 10L |]; [| Integer 8L; Integer 9L |] ]
+
     plan |> execute |> List.rev |> List.take 3 |> should equal expected
 
   [<Fact>]
@@ -120,7 +130,9 @@ type Tests(db: DBFixture) =
     let joinPlan = Plan.Join(Plan.Scan(products, [ 0 ]), Plan.Scan(products, [ 0 ]), LeftJoin, condition)
     let plan = Plan.Project(joinPlan, [ idColumn1; idColumn2 ])
 
-    let expected = [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
+    let expected =
+      [ [| Integer 1001L; Null |]; [| Integer 1000L; Integer 1001L |]; [| Integer 10L; Null |] ]
+
     plan |> execute |> List.rev |> List.take 3 |> should equal expected
 
   [<Fact>]

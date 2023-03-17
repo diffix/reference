@@ -26,7 +26,13 @@ let emptySelect =
     Having = constTrue
     OrderBy = []
     Limit = None
-    AnonymizationContext = Some { BucketSeed = 0UL; BaseLabels = [] }
+    AnonymizationContext =
+      Some
+        {
+          BucketSeed = 0UL
+          BaseLabels = []
+          AnonymizationParams = AnonymizationParams.Default
+        }
   }
 
 let column index =
@@ -77,7 +83,9 @@ let ``plan order by`` () =
 [<Fact>]
 let ``plan aggregation`` () =
   let groupBy = [ column 1 ]
-  let selectedColumns = [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
+
+  let selectedColumns =
+    [ selectColumn 1; { Expression = countStar; Alias = ""; Tag = RegularTargetEntry } ]
 
   let select = { emptySelect with TargetList = selectedColumns; GroupBy = groupBy }
 
@@ -202,6 +210,30 @@ let ``junk filter`` () =
 
   let select = { emptySelect with TargetList = [ junkCol; selectColumn 1 ] }
 
-  let expected = Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
+  let expected =
+    Plan.Project(Plan.Project(Plan.Scan(table, [ 0; 1 ]), [ column 0; column 1 ]), [ column 1 ])
+
+  select |> Planner.plan |> should equal expected
+
+[<Fact>]
+let ``plan adaptive buckets`` () =
+  let anonContext =
+    {
+      BucketSeed = 0UL
+      BaseLabels = []
+      AnonymizationParams = { AnonymizationParams.Default with UseAdaptiveBuckets = true }
+    }
+
+  let select =
+    { emptySelect with
+        TargetList = [ selectColumn 1 ]
+        AnonymizationContext = Some anonContext
+    }
+
+  let expected =
+    Plan.Project(
+      Plan.AdaptiveBuckets(Plan.Scan(table, [ 1 ]), [ column 1 ], anonContext),
+      [ ColumnReference(0, StringType) ]
+    )
 
   select |> Planner.plan |> should equal expected

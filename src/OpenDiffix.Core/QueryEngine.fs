@@ -13,7 +13,7 @@ let rec private extractColumns query =
 // Public API
 // ----------------------------------------------------------------
 
-type QueryResult = { Columns: Column list; Rows: Row list }
+type QueryResult = { Columns: Columns; Rows: Row list }
 
 // The main entrypoint to the `OpenDiffix.Core` library.
 //

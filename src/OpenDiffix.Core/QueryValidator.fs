@@ -10,7 +10,7 @@ let private validateSingleLowCount query =
     |> collectAggregates
     |> List.filter (
       function
-      | FunctionExpr (AggregateFunction (DiffixLowCount, _), _) -> true
+      | FunctionExpr(AggregateFunction(DiffixLowCount, _), _) -> true
       | _ -> false
     )
     |> List.distinct
@@ -51,7 +51,7 @@ let private validateCountHistogramUsage accessLevel query =
     function
     | CountHistogram, { Distinct = true }, _ ->
       failwith "count_histogram(distinct) is not supported in anonymizing queries."
-    | CountHistogram, _, [ _aidExpr; Constant (Integer binSize) ] when binSize >= 1L ->
+    | CountHistogram, _, [ _aidExpr; Constant(Integer binSize) ] when binSize >= 1L ->
       if accessLevel = PublishUntrusted && not (Value.isMoneyRounded (Integer binSize)) then
         failwith "count_histogram bin size must be a money-aligned value (1, 2, 5, 10, ...)."
     | CountHistogram, _, [ _aidExpr; _invalidBinSize ] ->
@@ -74,18 +74,18 @@ let private validateSumUsage query =
 
 let rec private validateJoinFilter filter =
   match filter with
-  | FunctionExpr (ScalarFunction Or, _) ->
+  | FunctionExpr(ScalarFunction Or, _) ->
     failwith "Combining `JOIN` filters using `OR` in anonymizing queries is not supported."
-  | FunctionExpr (ScalarFunction And, [ leftFilter; rightFilter ]) ->
+  | FunctionExpr(ScalarFunction And, [ leftFilter; rightFilter ]) ->
     validateJoinFilter leftFilter
     validateJoinFilter rightFilter
-  | FunctionExpr (ScalarFunction Equals, [ ColumnReference _; ColumnReference _ ]) -> ()
+  | FunctionExpr(ScalarFunction Equals, [ ColumnReference _; ColumnReference _ ]) -> ()
   | _ ->
     failwith "Only equalities between simple column references are supported as `JOIN` filters in anonymizing queries."
 
 let rec private validateSelectTarget (target: QueryRange) =
   match target with
-  | Join { On = Constant (Boolean true) } -> failwith "`CROSS JOIN` in anonymizing queries is not supported."
+  | Join { On = Constant(Boolean true) } -> failwith "`CROSS JOIN` in anonymizing queries is not supported."
   | Join { Left = leftTarget; Right = rightTarget; On = matchFilter } ->
     validateSelectTarget leftTarget
     validateSelectTarget rightTarget
@@ -96,38 +96,38 @@ let rec private validateSelectTarget (target: QueryRange) =
 let private validateGeneralization accessLevel expression =
   if accessLevel <> Direct then
     match expression with
-    | FunctionExpr (ScalarFunction DateTrunc, [ _; primaryArg ])
-    | FunctionExpr (ScalarFunction Extract, [ _; primaryArg ])
-    | FunctionExpr (ScalarFunction _, primaryArg :: _) ->
+    | FunctionExpr(ScalarFunction DateTrunc, [ _; primaryArg ])
+    | FunctionExpr(ScalarFunction Extract, [ _; primaryArg ])
+    | FunctionExpr(ScalarFunction _, primaryArg :: _) ->
       if not (Expression.isColumnReference primaryArg) then
         failwith "Primary argument for a generalization expression has to be a simple column reference."
     | _ -> ()
 
     match expression with
-    | FunctionExpr (ScalarFunction DateTrunc, [ secondaryArg; _ ])
-    | FunctionExpr (ScalarFunction Extract, [ secondaryArg; _ ]) ->
+    | FunctionExpr(ScalarFunction DateTrunc, [ secondaryArg; _ ])
+    | FunctionExpr(ScalarFunction Extract, [ secondaryArg; _ ]) ->
       if secondaryArg |> Expression.isConstant |> not then
         failwith "Secondary arguments for a generalization expression have to be constants."
-    | FunctionExpr (ScalarFunction _, _ :: secondaryArgs) ->
+    | FunctionExpr(ScalarFunction _, _ :: secondaryArgs) ->
       if (List.exists (Expression.isConstant >> not) secondaryArgs) then
         failwith "Secondary arguments for a generalization expression have to be constants."
     | _ -> ()
 
   if accessLevel = PublishUntrusted then
     match expression with
-    | FunctionExpr (ScalarFunction fn, _) when List.contains fn [ Floor; Ceil; Round; DateTrunc; Extract ] -> ()
-    | FunctionExpr (ScalarFunction fn, [ _; Constant c ]) when
+    | FunctionExpr(ScalarFunction fn, _) when List.contains fn [ Floor; Ceil; Round; DateTrunc; Extract ] -> ()
+    | FunctionExpr(ScalarFunction fn, [ _; Constant c ]) when
       List.contains fn [ FloorBy; RoundBy ] && Value.isMoneyRounded c
       ->
       ()
-    | FunctionExpr (ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
+    | FunctionExpr(ScalarFunction Substring, [ _; fromArg; _ ]) when fromArg = (1L |> Integer |> Constant) -> ()
     | ColumnReference _ -> ()
     | _ -> failwith "Generalization used in the query is not allowed in untrusted access level."
 
 let private validateWhere rangeColumns selectQuery =
   let rec filterVisitor =
     function
-    | ColumnReference (index, _) ->
+    | ColumnReference(index, _) ->
       let rangeColumn = List.item index rangeColumns
 
       if rangeColumn.IsAid then

@@ -24,9 +24,9 @@ let rec private resolveColumn rangeColumns tableName columnName =
 
 let rec private expressionName parsedExpr =
   match parsedExpr with
-  | ParserTypes.Identifier (_, columnName) -> columnName
-  | ParserTypes.Function ("cast", arg :: _) -> expressionName arg
-  | ParserTypes.Function (name, _args) -> name
+  | ParserTypes.Identifier(_, columnName) -> columnName
+  | ParserTypes.Function("cast", arg :: _) -> expressionName arg
+  | ParserTypes.Function(name, _args) -> name
   | _ -> ""
 
 let private constTrue = Constant(Boolean true)
@@ -48,27 +48,29 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
     let count = mapFunctionExpression rangeColumns (AggregateFunction(countFunction, options)) parsedArgs
     // `nullif` is necessary to handle cases where large negative noise brings `count`
     // down to 0 during global aggregation.
-    let countDenominator = FunctionExpr(ScalarFunction ScalarFunction.NullIf, [ count; Constant(Integer 0L) ])
+    let countDenominator =
+      FunctionExpr(ScalarFunction ScalarFunction.NullIf, [ count; Constant(Integer 0L) ])
+
     let castSum = FunctionExpr(ScalarFunction ScalarFunction.Cast, [ sum; Constant(String "real") ])
     ScalarFunction ScalarFunction.Divide, [ castSum; countDenominator ]
 
   (match fn, parsedArgs with
-   | AggregateFunction (Count, options), [ ParserTypes.Star ] -> //
+   | AggregateFunction(Count, options), [ ParserTypes.Star ] -> //
      AggregateFunction(Count, options), []
 
-   | AggregateFunction (CountNoise, options), [ ParserTypes.Star ] -> //
+   | AggregateFunction(CountNoise, options), [ ParserTypes.Star ] -> //
      AggregateFunction(CountNoise, options), []
 
-   | AggregateFunction (Avg, options), parsedArgs -> //
+   | AggregateFunction(Avg, options), parsedArgs -> //
      mapAvg options parsedArgs Sum Count
 
-   | AggregateFunction (AvgNoise, options), parsedArgs -> //
+   | AggregateFunction(AvgNoise, options), parsedArgs -> //
      mapAvg options parsedArgs SumNoise Count
 
-   | AggregateFunction (DiffixLowCount, options), parsedAids ->
+   | AggregateFunction(DiffixLowCount, options), parsedAids ->
      AggregateFunction(DiffixLowCount, options), [ mapAids parsedAids ]
 
-   | AggregateFunction (DiffixCount, options), parsedArg :: parsedAids ->
+   | AggregateFunction(DiffixCount, options), parsedArg :: parsedAids ->
      let options, args =
        match parsedArg with
        | ParserTypes.Star -> options, []
@@ -77,7 +79,7 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
      AggregateFunction(DiffixCount, options), mapAids parsedAids :: args
 
-   | AggregateFunction (DiffixCountNoise, options), parsedArg :: parsedAids ->
+   | AggregateFunction(DiffixCountNoise, options), parsedArg :: parsedAids ->
      let options, args =
        match parsedArg with
        | ParserTypes.Star -> options, []
@@ -86,7 +88,7 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
      AggregateFunction(DiffixCountNoise, options), mapAids parsedAids :: args
 
-   | AggregateFunction (DiffixSum, options), parsedArg :: parsedAids ->
+   | AggregateFunction(DiffixSum, options), parsedArg :: parsedAids ->
      let options, args =
        match parsedArg with
        | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
@@ -94,7 +96,7 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
      AggregateFunction(DiffixSum, options), mapAids parsedAids :: args
 
-   | AggregateFunction (DiffixSumNoise, options), parsedArg :: parsedAids ->
+   | AggregateFunction(DiffixSumNoise, options), parsedArg :: parsedAids ->
      let options, args =
        match parsedArg with
        | ParserTypes.Distinct parsedExpr -> { options with Distinct = true }, [ mapExpression rangeColumns parsedExpr ]
@@ -102,13 +104,13 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
      AggregateFunction(DiffixSumNoise, options), mapAids parsedAids :: args
 
-   | AggregateFunction (DiffixAvg, options), parsedArgs -> //
+   | AggregateFunction(DiffixAvg, options), parsedArgs -> //
      mapAvg options parsedArgs DiffixSum DiffixCount
 
-   | AggregateFunction (DiffixAvgNoise, options), parsedArgs -> //
+   | AggregateFunction(DiffixAvgNoise, options), parsedArgs -> //
      mapAvg options parsedArgs DiffixSumNoise DiffixCount
 
-   | AggregateFunction (DiffixCountHistogram, options), parsedAidIndex :: parsedBinSize :: parsedAids ->
+   | AggregateFunction(DiffixCountHistogram, options), parsedAidIndex :: parsedBinSize :: parsedAids ->
      AggregateFunction(DiffixCountHistogram, options),
      [
        mapAids parsedAids
@@ -116,7 +118,7 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
        mapExpression rangeColumns parsedBinSize
      ]
 
-   | AggregateFunction (aggregate, options), [ ParserTypes.Distinct expr ] ->
+   | AggregateFunction(aggregate, options), [ ParserTypes.Distinct expr ] ->
      let arg = mapExpression rangeColumns expr
      AggregateFunction(aggregate, { options with Distinct = true }), [ arg ]
 
@@ -127,21 +129,21 @@ let private mapFunctionExpression rangeColumns fn parsedArgs =
 
 let private mapExpression rangeColumns parsedExpr =
   match parsedExpr with
-  | ParserTypes.Identifier (tableName, columnName) -> mapColumnReference rangeColumns tableName columnName
+  | ParserTypes.Identifier(tableName, columnName) -> mapColumnReference rangeColumns tableName columnName
   | ParserTypes.Expression.Integer value -> Value.Integer(int64 value) |> Constant
   | ParserTypes.Expression.Float value -> Value.Real value |> Constant
   | ParserTypes.Expression.String value -> Value.String value |> Constant
   | ParserTypes.Expression.Boolean value -> Value.Boolean value |> Constant
   | ParserTypes.Not expr -> mapFunctionExpression rangeColumns (ScalarFunction Not) [ expr ]
-  | ParserTypes.Lt (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Lt) [ left; right ]
-  | ParserTypes.LtE (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction LtE) [ left; right ]
-  | ParserTypes.Gt (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Gt) [ left; right ]
-  | ParserTypes.GtE (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction GtE) [ left; right ]
-  | ParserTypes.And (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction And) [ left; right ]
-  | ParserTypes.Or (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Or) [ left; right ]
-  | ParserTypes.Equals (left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Equals) [ left; right ]
+  | ParserTypes.Lt(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Lt) [ left; right ]
+  | ParserTypes.LtE(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction LtE) [ left; right ]
+  | ParserTypes.Gt(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Gt) [ left; right ]
+  | ParserTypes.GtE(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction GtE) [ left; right ]
+  | ParserTypes.And(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction And) [ left; right ]
+  | ParserTypes.Or(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Or) [ left; right ]
+  | ParserTypes.Equals(left, right) -> mapFunctionExpression rangeColumns (ScalarFunction Equals) [ left; right ]
   | ParserTypes.IsNull expr -> mapFunctionExpression rangeColumns (ScalarFunction IsNull) [ expr ]
-  | ParserTypes.Function (name, args) ->
+  | ParserTypes.Function(name, args) ->
     let fn = Function.fromString name
     mapFunctionExpression rangeColumns fn args
   | other -> failwith $"The expression is not permitted in this context: %A{other}"
@@ -153,7 +155,7 @@ let private mapFilterExpression rangeColumns optionalExpr =
 
 let private mapTargetEntry rangeColumns parsedExpr =
   match parsedExpr with
-  | ParserTypes.As (parsedExpression, parsedAlias) ->
+  | ParserTypes.As(parsedExpression, parsedAlias) ->
     let alias = parsedAlias |> Option.defaultValue (expressionName parsedExpression)
     let expression = parsedExpression |> mapExpression rangeColumns
     [ { Expression = expression; Alias = alias; Tag = RegularTargetEntry } ]
@@ -177,7 +179,7 @@ let private mapTargetEntry rangeColumns parsedExpr =
 
 let private mapGroupByIndex (expressions: Expression list) groupByExpression =
   match groupByExpression with
-  | Constant (Integer index) ->
+  | Constant(Integer index) ->
     if index < 1L || index > int64 expressions.Length then
       failwith $"Invalid `GROUP BY` index: {index}"
     else
@@ -194,7 +196,7 @@ let private mapGroupByIndices (targetList: TargetEntry list) groupByExpressions 
 
 let private mapOrderByIndex (expressions: Expression list) orderByExpression =
   match orderByExpression with
-  | Constant (Integer index), direction, nullsBehavior ->
+  | Constant(Integer index), direction, nullsBehavior ->
     if index < 1L || index > int64 expressions.Length then
       failwith $"Invalid `ORDER BY` index: {index}"
     else
@@ -219,7 +221,7 @@ let private interpretNullsBehavior nullsBehavior =
 
 let private interpretOrderByExpression rangeColumns expression =
   match expression with
-  | ParserTypes.OrderSpec (expression, direction, nullsBehavior) ->
+  | ParserTypes.OrderSpec(expression, direction, nullsBehavior) ->
     (mapExpression rangeColumns expression), (interpretDirection direction), (interpretNullsBehavior nullsBehavior)
   | _ -> failwith "Invalid `ORDER BY` clause"
 
@@ -230,7 +232,7 @@ let private interpretOrderByExpression rangeColumns expression =
 /// Returns the `RangeColumn`s in scope of a query.
 let rec private collectRangeColumns anonParams range =
   match range with
-  | SubQuery (query, queryAlias) ->
+  | SubQuery(query, queryAlias) ->
     query.TargetList
     |> List.map (fun targetEntry ->
       {
@@ -242,7 +244,7 @@ let rec private collectRangeColumns anonParams range =
     )
   | Join { Left = left; Right = right } -> //
     collectRangeColumns anonParams left @ collectRangeColumns anonParams right
-  | RangeTable (table, alias) ->
+  | RangeTable(table, alias) ->
     table.Columns
     |> List.map (fun col ->
       {
@@ -255,11 +257,11 @@ let rec private collectRangeColumns anonParams range =
 
 let rec private mapQueryRange schema anonParams parsedRange =
   match parsedRange with
-  | ParserTypes.Table (name, alias) ->
+  | ParserTypes.Table(name, alias) ->
     let alias = alias |> Option.defaultValue name
     let table = name |> Schema.findTable schema
     RangeTable(table, alias)
-  | ParserTypes.Join (joinType, left, right, on) ->
+  | ParserTypes.Join(joinType, left, right, on) ->
     let left = mapQueryRange schema anonParams left
     let right = mapQueryRange schema anonParams right
 
@@ -267,7 +269,7 @@ let rec private mapQueryRange schema anonParams parsedRange =
     let condition = mapFilterExpression rangeColumns (Some on)
 
     Join { Type = joinType; Left = left; Right = right; On = condition }
-  | ParserTypes.SubQuery (subQuery, alias) -> SubQuery(mapQuery schema anonParams true subQuery, alias)
+  | ParserTypes.SubQuery(subQuery, alias) -> SubQuery(mapQuery schema anonParams true subQuery, alias)
   | _ -> failwith "Invalid `FROM` clause"
 
 // ----------------------------------------------------------------
@@ -277,8 +279,8 @@ let rec private mapQueryRange schema anonParams parsedRange =
 /// Returns the list of all aliases in range.
 let private rangeEntries range =
   match range with
-  | SubQuery (_query, alias) -> [ alias ]
-  | RangeTable (_table, alias) -> [ alias ]
+  | SubQuery(_query, alias) -> [ alias ]
+  | RangeTable(_table, alias) -> [ alias ]
   | Join { Left = left; Right = right } -> rangeEntries left @ rangeEntries right
 
 /// Verifies that there are no duplicate names in range.
@@ -325,7 +327,7 @@ let private hasAnonymizingAggregators query =
   |> collectAggregates
   |> Seq.exists (
     function
-    | FunctionExpr (AggregateFunction (fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
+    | FunctionExpr(AggregateFunction(fn, opts), _) -> Aggregator.isAnonymizing (fn, opts)
     | _ -> false
   )
 
@@ -354,7 +356,7 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
 
   let rec exprMapper expr =
     match expr with
-    | FunctionExpr (AggregateFunction (CountHistogram, opts), args) ->
+    | FunctionExpr(AggregateFunction(CountHistogram, opts), args) ->
       let countedAidExpr = List.head args
 
       let countedAidIndex =
@@ -369,7 +371,7 @@ let private compileAnonymizingAggregators aidColumnsExpression query =
         AggregateFunction(anonymizing DiffixCountHistogram, opts),
         aidColumnsExpression :: countedAidIndex :: (List.tail args)
       )
-    | FunctionExpr (AggregateFunction (agg, opts), args) when
+    | FunctionExpr(AggregateFunction(agg, opts), args) when
       List.contains agg [ Count; CountNoise; Sum; SumNoise; Avg; AvgNoise ]
       ->
       FunctionExpr(AggregateFunction(anonymizing agg, opts), aidColumnsExpression :: args)
@@ -381,7 +383,7 @@ let private bucketExpand aidColumnsExpression =
   let bucketCount = Expression.makeAggregate DiffixCount [ aidColumnsExpression ]
   Expression.makeSetFunction GenerateSeries [ bucketCount ]
 
-let private compileAnonymizingQuery aidColumnsExpression selectQuery =
+let private compileAnonymizingQuery useAdaptiveBuckets aidColumnsExpression selectQuery =
   let selectQuery = compileAnonymizingAggregators aidColumnsExpression selectQuery
 
   let selectedExpressions =
@@ -393,17 +395,25 @@ let private compileAnonymizingQuery aidColumnsExpression selectQuery =
 
   let selectQuery =
     if noGrouping && noAggregation then
-      // Non-aggregating query; group implicitly and expand.
-      { selectQuery with
-          TargetList =
-            {
-              Expression = bucketExpand aidColumnsExpression
-              Alias = ""
-              Tag = JunkTargetEntry
-            }
-            :: selectQuery.TargetList
-          GroupBy = selectedExpressions
-      }
+      if useAdaptiveBuckets then
+        // Non-aggregating query; synthesize rows using 'Adaptive Buckets' pipeline.
+        { selectQuery with
+            TargetList =
+              { Expression = aidColumnsExpression; Alias = ""; Tag = JunkTargetEntry }
+              :: selectQuery.TargetList
+        }
+      else
+        // Non-aggregating query; group implicitly and expand.
+        { selectQuery with
+            TargetList =
+              {
+                Expression = bucketExpand aidColumnsExpression
+                Alias = ""
+                Tag = JunkTargetEntry
+              }
+              :: selectQuery.TargetList
+            GroupBy = selectedExpressions
+        }
     else
       selectQuery
 
@@ -434,15 +444,14 @@ let private compileQuery anonParams (query: SelectQuery) =
   let query =
     if isAnonymizing then
       QueryValidator.validateAnonymizingQuery anonParams.AccessLevel rangeColumns query
-      compileAnonymizingQuery aidColumnsExpression query
+      compileAnonymizingQuery anonParams.UseAdaptiveBuckets aidColumnsExpression query
     else
       QueryValidator.validateDirectQuery query
       query
 
-  // Noise seeding is needed only for anonymizing aggregators. This includes the aggregators injected
-  // in `compileAnonymizingQuery` and explicit use of noisy aggregators like `diffix_low_count`.
-  // If there aren't any, we also don't need to do the validations which are done deep in `computeSQLSeed`.
-  if hasAnonymizingAggregators query then
+  // Noise seeding is needed for the anonymizing aggregators injected in `compileAnonymizingQuery` and any explicit
+  // use of noisy aggregators like `diffix_low_count`. It is also needed when using the Adaptive Buckets pipeline.
+  if isAnonymizing || hasAnonymizingAggregators query then
     let normalizedBucketExpressions =
       (query.GroupBy @ gatherBucketExpressionsFromFilter query.Where)
       |> Seq.map normalizeBucketExpression
@@ -451,35 +460,43 @@ let private compileQuery anonParams (query: SelectQuery) =
 
     let sqlSeed = NoiseLayers.computeSQLSeed rangeColumns normalizedBucketExpressions
     let baseLabels = gatherBucketLabelsFromFilter query.Where
-    let anonContext = Some { BucketSeed = sqlSeed; BaseLabels = baseLabels }
+
+    let anonContext =
+      Some
+        {
+          BucketSeed = sqlSeed
+          BaseLabels = baseLabels
+          AnonymizationParams = anonParams
+        }
+
     { query with AnonymizationContext = anonContext }
   else
     query
 
 let rec private gatherBucketExpressionsFromFilter filter =
   match filter with
-  | Constant (Boolean true) -> []
-  | FunctionExpr (ScalarFunction And, args) -> args |> List.collect gatherBucketExpressionsFromFilter
-  | FunctionExpr (ScalarFunction Eq, [ bucketExpression; Constant _ ]) -> [ bucketExpression ]
+  | Constant(Boolean true) -> []
+  | FunctionExpr(ScalarFunction And, args) -> args |> List.collect gatherBucketExpressionsFromFilter
+  | FunctionExpr(ScalarFunction Eq, [ bucketExpression; Constant _ ]) -> [ bucketExpression ]
   | _ ->
     failwith "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
 
 let rec private gatherBucketLabelsFromFilter filter =
   match filter with
-  | Constant (Boolean true) -> []
-  | FunctionExpr (ScalarFunction And, args) -> args |> List.collect gatherBucketLabelsFromFilter
-  | FunctionExpr (ScalarFunction Eq, [ _; Constant bucketLabel ]) -> [ bucketLabel ]
+  | Constant(Boolean true) -> []
+  | FunctionExpr(ScalarFunction And, args) -> args |> List.collect gatherBucketLabelsFromFilter
+  | FunctionExpr(ScalarFunction Eq, [ _; Constant bucketLabel ]) -> [ bucketLabel ]
   | _ ->
     failwith "Only equalities between a generalization and a constant are allowed as filters in anonymizing queries."
 
 let rec private normalizeBucketExpression expression =
   match expression with
-  | FunctionExpr (ScalarFunction Cast, [ expression; Constant (String "integer") ]) when
+  | FunctionExpr(ScalarFunction Cast, [ expression; Constant(String "integer") ]) when
     Expression.typeOf expression = RealType
     ->
     FunctionExpr(ScalarFunction RoundBy, [ normalizeBucketExpression expression; 1.0 |> Real |> Constant ])
-  | FunctionExpr (ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketExpression expression
-  | FunctionExpr (ScalarFunction fn, args) ->
+  | FunctionExpr(ScalarFunction Cast, [ expression; _type ]) -> normalizeBucketExpression expression
+  | FunctionExpr(ScalarFunction fn, args) ->
     let fn, extraArgs =
       match fn with
       | Ceil -> CeilBy, [ 1.0 |> Real |> Constant ]

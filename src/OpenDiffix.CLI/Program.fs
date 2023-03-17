@@ -20,6 +20,7 @@ type CliArguments =
   | Strict of bool
   | Json
   | Recover_Outliers of bool
+  | Use_Adaptive_Buckets of bool
 
   // Threshold values
   | [<Unique>] Outlier_Count of int * int
@@ -27,6 +28,8 @@ type CliArguments =
   | [<Unique>] Low_Threshold of int
   | [<Unique>] Low_Layer_SD of float
   | [<Unique>] Low_Mean_Gap of float
+  | [<Unique>] Range_Low_Threshold of int
+  | [<Unique>] Singularity_Low_Threshold of int
 
   // General anonymization parameters
   | [<Unique>] Layer_Noise_SD of float
@@ -52,6 +55,9 @@ type CliArguments =
       | Recover_Outliers _ ->
         "If enabled, aggregated outliers are recovered and redistributed over the reported "
         + "anonymized values, in order to minimize the total distortion for that column. Defaults to `true`."
+      | Use_Adaptive_Buckets _ ->
+        "If enabled, instead of implicitly grouping and expanding selected expressions, the 'Adaptive Buckets' pipeline "
+        + "will be used for synthesizing data in anonymizing queries without aggregation. Defaults to `false`."
       | Json -> "Outputs the query result as JSON. By default, output is in CSV format."
       | Outlier_Count _ ->
         "Interval used in the count aggregate to determine how many of the entities with the most extreme values "
@@ -69,6 +75,12 @@ type CliArguments =
         + "Total standard deviation is the combined standard deviation of two noise layers with `--low-layer-sd` standard deviation each."
       | Layer_Noise_SD _ ->
         "Specifies the standard deviation for each noise layer used when calculating aggregation noise."
+      | Range_Low_Threshold _ ->
+        "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the range threshold "
+        + "when using the 'Adaptive Buckets' pipeline."
+      | Singularity_Low_Threshold _ ->
+        "Sets the lower bound for the number of distinct AID values that must be present in a bucket for it to pass the singularity threshold "
+        + "when using the 'Adaptive Buckets' pipeline."
 
 let executableName = "OpenDiffix.CLI"
 
@@ -79,7 +91,7 @@ let failWithUsageInfo errorMsg =
 
 let toInterval =
   function
-  | Some (lower, upper) -> { Lower = lower; Upper = upper }
+  | Some(lower, upper) -> { Lower = lower; Upper = upper }
   | _ -> Interval.Default
 
 let toNoise =
@@ -101,7 +113,7 @@ let private toTableSettings (aidColumns: string list option) =
 
 let toSalt =
   function
-  | Some (salt: string) -> Text.Encoding.UTF8.GetBytes(salt)
+  | Some(salt: string) -> Text.Encoding.UTF8.GetBytes(salt)
   | _ -> [||]
 
 let toAccessLevel =
@@ -126,16 +138,28 @@ let constructAnonParameters (parsedArgs: ParseResults<CliArguments>) : Anonymiza
         |> Option.defaultValue SuppressionParams.Default.LowMeanGap
     }
 
+  let adaptiveBuckets =
+    {
+      RangeLowThreshold =
+        parsedArgs.TryGetResult Range_Low_Threshold
+        |> Option.defaultValue AdaptiveBucketsParams.Default.RangeLowThreshold
+      SingularityLowThreshold =
+        parsedArgs.TryGetResult Singularity_Low_Threshold
+        |> Option.defaultValue AdaptiveBucketsParams.Default.SingularityLowThreshold
+    }
+
   {
     TableSettings = parsedArgs.TryGetResult Aid_Columns |> toTableSettings
     Salt = parsedArgs.TryGetResult Salt |> toSalt
     AccessLevel = parsedArgs.TryGetResult Access_Level |> toAccessLevel
     Strict = parsedArgs.TryGetResult Strict |> Option.defaultValue true
     Suppression = suppression
+    AdaptiveBuckets = adaptiveBuckets
     OutlierCount = parsedArgs.TryGetResult Outlier_Count |> toInterval
     TopCount = parsedArgs.TryGetResult Top_Count |> toInterval
     LayerNoiseSD = parsedArgs.TryGetResult Layer_Noise_SD |> toNoise
     RecoverOutliers = parsedArgs.TryGetResult Recover_Outliers |> Option.defaultValue true
+    UseAdaptiveBuckets = parsedArgs.TryGetResult Use_Adaptive_Buckets |> Option.defaultValue false
   }
 
 let getQuery (parsedArgs: ParseResults<CliArguments>) =
@@ -198,8 +222,8 @@ let private runSingleQueryRequest queriesPath queryRequest =
     runQuery queryRequest.Query fullDbPath queryRequest.AnonymizationParameters
     |> (fun result -> (result, queryRequest))
     |> Ok
-  with
-  | (exn: Exception) -> Error exn.Message
+  with (exn: Exception) ->
+    Error exn.Message
 
 let batchExecuteQueries (queriesPath: string) =
   if not <| File.Exists queriesPath then
@@ -241,7 +265,6 @@ let main argv =
   try
     argv |> mainCore |> printfn "%s"
     0
-  with
-  | e ->
+  with e ->
     eprintfn $"ERROR: %s{e.Message}"
     1

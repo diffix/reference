@@ -185,9 +185,9 @@ type private DiffixCount(aidsCount) =
         if Array.isEmpty aggContext.GroupingLabels && List.isEmpty anonContext.BaseLabels then
           0L
         else
-          int64 aggContext.AnonymizationParams.Suppression.LowThreshold
+          int64 anonContext.AnonymizationParams.Suppression.LowThreshold
 
-      match Anonymizer.count aggContext.AnonymizationParams anonContext state with
+      match Anonymizer.count anonContext state with
       | None ->
         Option.iter (getState >> mergeOutliers (contributionsToArray state)) outliersAggregator
         Integer minCount
@@ -201,7 +201,7 @@ type private DiffixCountNoise(aidsCount) =
 
   interface IAggregator with
     override this.Final(aggContext, anonContext, _outliersAggregator) =
-      match Anonymizer.count aggContext.AnonymizationParams (unwrapAnonContext anonContext) this.State with
+      match Anonymizer.count (unwrapAnonContext anonContext) this.State with
       | None -> Null
       | Some result -> Real result.NoiseSD
 
@@ -251,9 +251,9 @@ type private DiffixCountDistinct(aidsCount) =
         if Array.isEmpty aggContext.GroupingLabels && List.isEmpty anonContext.BaseLabels then
           0L
         else
-          int64 aggContext.AnonymizationParams.Suppression.LowThreshold
+          int64 anonContext.AnonymizationParams.Suppression.LowThreshold
 
-      match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext aidsCount aidsPerValue with
+      match Anonymizer.countDistinct anonContext aidsCount aidsPerValue with
       | None -> Integer minCount
       | Some { AnonymizedCount = value } -> value |> max minCount |> Integer
 
@@ -262,14 +262,12 @@ type private DiffixCountDistinctNoise(aidsCount) =
 
   interface IAggregator with
     override this.Final(aggContext, anonContext, _outliersAggregator) =
-      let anonContext = unwrapAnonContext anonContext
-
-      match Anonymizer.countDistinct aggContext.AnonymizationParams anonContext this.AidsCount this.State with
+      match Anonymizer.countDistinct (unwrapAnonContext anonContext) this.AidsCount this.State with
       | None -> Null
       | Some { NoiseSD = noiseSD } -> Real noiseSD
 
 type private DiffixLowCount(aidsCount) =
-  let mutable state: HashSet<AidHash> [] = emptySets aidsCount
+  let mutable state: HashSet<AidHash>[] = emptySets aidsCount
 
   member this.State = state
 
@@ -292,9 +290,9 @@ type private DiffixLowCount(aidsCount) =
       let otherState = (castAggregator<DiffixLowCount> aggregator).State
       otherState |> mergeHashSetsInto state
 
-    member this.Final(aggContext, anonContext, _outliersAggregator) =
-      let anonContext = unwrapAnonContext anonContext
-      Boolean(Anonymizer.isLowCount aggContext.AnonymizationParams state)
+    member this.Final(_aggContext, anonContext, _outliersAggregator) =
+      let anonParams = (unwrapAnonContext anonContext).AnonymizationParams
+      Boolean(Anonymizer.isLowCount anonParams.Salt anonParams.Suppression state)
 
 type private DiffixSum(summandType, aidsCount) =
   let state: Anonymizer.SumState =
@@ -392,7 +390,7 @@ type private DiffixSum(summandType, aidsCount) =
         else
           Math.roundAwayFromZero >> int64 >> Integer
 
-      match Anonymizer.sum aggContext.AnonymizationParams anonContext state with
+      match Anonymizer.sum anonContext state with
       | None ->
         Option.iter (getPositiveState >> mergeOutliers (contributionsToArray state.Positive)) outliersAggregator
         Option.iter (getNegativeState >> mergeOutliers (contributionsToArray state.Negative)) outliersAggregator
@@ -408,7 +406,7 @@ type private DiffixSumNoise(summandType, aidsCount) =
 
   interface IAggregator with
     override this.Final(aggContext, anonContext, _outliersAggregator) =
-      match Anonymizer.sum aggContext.AnonymizationParams (unwrapAnonContext anonContext) this.State with
+      match Anonymizer.sum (unwrapAnonContext anonContext) this.State with
       | None -> Null
       | Some result -> Real result.NoiseSD
 
@@ -485,10 +483,11 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
 
     member this.Final(aggContext, anonContext, _outliersAggregator) =
       let anonContext = unwrapAnonContext anonContext
+      let anonParams = anonContext.AnonymizationParams
       let bins = Dictionary<int64, CountHistogramBin>()
 
       let anonBinCount (bin: CountHistogramBin) =
-        Anonymizer.histogramBinCount aggContext.AnonymizationParams anonContext bin.LowCount.State.[countedAidIndex]
+        Anonymizer.histogramBinCount anonContext bin.LowCount.State.[countedAidIndex]
 
       for pair in state do
         let aidEntry = pair.Value
@@ -512,7 +511,7 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
           let binLabel = pair.Key
           let bin = pair.Value
 
-          if Anonymizer.isLowCount aggContext.AnonymizationParams bin.LowCount.State then
+          if Anonymizer.isLowCount anonParams.Salt anonParams.Suppression bin.LowCount.State then
             // Merge low count bin to suppress bin.
             (suppressBin.LowCount :> IAggregator).Merge(bin.LowCount)
             None
@@ -523,7 +522,7 @@ type private DiffixCountHistogram(aidsCount, countedAidIndex, binSize: int64 opt
         |> Seq.map (fun (binLabel, bin) -> Value.List [ Integer binLabel; anonBinCount bin ])
         |> Seq.toList
 
-      if Anonymizer.isLowCount aggContext.AnonymizationParams suppressBin.LowCount.State then
+      if Anonymizer.isLowCount anonParams.Salt anonParams.Suppression suppressBin.LowCount.State then
         Value.List highCountBins
       else
         Value.List((Value.List [ Null; anonBinCount suppressBin ]) :: highCountBins)
@@ -563,7 +562,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     aggArgs
     |> List.tryItem index
     |> function
-      | Some (Constant (Integer x)) when x >= 0L && x < aidsCount -> int32 x
+      | Some(Constant(Integer x)) when x >= 0L && x < aidsCount -> int32 x
       | _ -> failwith "Expected a valid AID index"
 
   let unpackFloorWidthArgAt index =
@@ -571,7 +570,7 @@ let create (aggSpec: AggregatorSpec, aggArgs: AggregatorArgs) : T =
     |> List.tryItem index
     |> function
       | None -> None
-      | Some (Constant (Integer x)) when x >= 1L -> Some x
+      | Some(Constant(Integer x)) when x >= 1L -> Some x
       | _ -> failwith $"Expected positive integer argument in index {index} of aggregate {fst aggSpec}."
 
   match aggSpec with

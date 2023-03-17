@@ -9,6 +9,10 @@
     <Compile Include="Value.Tests.fs" />
     <Compile Include="Expression.Tests.fs" />
     <Compile Include="Anonymizer.Tests.fs" />
+    <Compile Include="AdaptiveBuckets\TestHelpers.fs" />
+    <Compile Include="AdaptiveBuckets\Common.Tests.fs" />
+    <Compile Include="AdaptiveBuckets\Range.Tests.fs" />
+    <Compile Include="AdaptiveBuckets\Forest.Tests.fs" />
     <Compile Include="Aggregator.Tests.fs" />
     <Compile Include="NodeUtils.Tests.fs" />
     <Compile Include="Analyzer.Tests.fs" />

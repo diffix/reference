@@ -631,15 +631,17 @@ let colRef2 = ColumnReference(2, RealType)
 
 let evaluate expr = Expression.evaluate testRow expr
 
-let aggContext =
+let aggContext = { GroupingLabels = [||]; Aggregators = [||] }
+
+let anonContext =
   {
+    BucketSeed = 0UL
+    BaseLabels = []
     AnonymizationParams = AnonymizationParams.Default
-    GroupingLabels = [||]
-    Aggregators = [||]
   }
 
 let evaluateAggregator aggSpec args =
-  evaluateAggregator (aggContext, Some { BucketSeed = 0UL; BaseLabels = [] }, None) aggSpec args testRows
+  evaluateAggregator (aggContext, Some anonContext, None) aggSpec args testRows
 
 [<Fact>]
 let ``evaluate scalar expressions`` () =
@@ -685,10 +687,11 @@ let sortRows () =
     [| Null; Integer 2L |]
     [| Null; Null |]
   ]
-  |> Expression.sortRows [ //
-       OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
-       OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
-     ]
+  |> Expression.sortRows
+       [ //
+         OrderBy(ColumnReference(0, StringType), Ascending, NullsLast)
+         OrderBy(ColumnReference(1, IntegerType), Descending, NullsFirst)
+       ]
   |> List.ofSeq
   |> should
        equal

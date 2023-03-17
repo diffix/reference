@@ -2,6 +2,8 @@ module rec OpenDiffix.Core.Executor
 
 open System
 
+open OpenDiffix.Core.AdaptiveBuckets
+
 module Utils =
   let filter condition rows =
     rows
@@ -9,7 +11,7 @@ module Utils =
 
   let unpackAggregator =
     function
-    | FunctionExpr (AggregateFunction (fn, opts), args) -> ((fn, opts), args)
+    | FunctionExpr(AggregateFunction(fn, opts), args) -> ((fn, opts), args)
     | _ -> failwith "Expression is not an aggregator"
 
   let unpackAggregators aggregators =
@@ -138,11 +140,10 @@ let private finalizeAggregatesAndRedistributeOutliers
 let private finalizeBuckets aggregationContext anonymizationContext buckets =
   // Redistributing outliers require that a `DiffixLowCount` aggregator is present, which only happens during non-global anonymized aggregation.
   match aggregationContext, anonymizationContext with
-  | {
-      GroupingLabels = groupingLabels
-      AnonymizationParams = { RecoverOutliers = true }
-    },
-    Some anonymizationContext when groupingLabels.Length > 0 ->
+  | { GroupingLabels = groupingLabels }, Some anonymizationContext when
+    groupingLabels.Length > 0
+    && anonymizationContext.AnonymizationParams.RecoverOutliers = true
+    ->
     finalizeAggregatesAndRedistributeOutliers aggregationContext anonymizationContext buckets
   | _ -> // finalize aggregates without redistributing outliers
     buckets
@@ -191,12 +192,7 @@ let private executeAggregate queryContext (childPlan, groupingLabels, aggregator
     bucket.Aggregators
     |> Array.iteri (fun i aggregator -> aggArgs.[i] |> List.map argEvaluator |> aggregator.Transition)
 
-  let aggregationContext =
-    {
-      AnonymizationParams = queryContext.AnonymizationParams
-      GroupingLabels = groupingLabels
-      Aggregators = aggregators
-    }
+  let aggregationContext = { GroupingLabels = groupingLabels; Aggregators = aggregators }
 
   state
   |> Seq.map (fun pair -> pair.Value)
@@ -226,19 +222,40 @@ let private executeJoin executionContext (leftPlan, rightPlan, joinType, on) =
       joinedRows
   )
 
+let private executeAdaptiveBuckets
+  queryContext
+  (childPlan, (expressions: Expression list), (anonymizationContext: AnonymizationContext))
+  : seq<Row> =
+  let expressions = Array.ofList expressions
+
+  let rows =
+    childPlan
+    |> execute queryContext
+    |> Seq.map (fun row -> expressions |> Array.map (Expression.evaluate row))
+    |> Seq.toArray
+
+  let columnTypes = expressions |> Array.tail |> Array.map Expression.typeOf
+  let microdataColumns = Microdata.extractValueMaps columnTypes rows
+  let forest, nullMappings = rows |> Forest.buildForest anonymizationContext columnTypes.Length
+
+  forest
+  |> Bucket.harvestBuckets
+  |> Microdata.generateMicrodata microdataColumns nullMappings
+
 // ----------------------------------------------------------------
 // Public API
 // ----------------------------------------------------------------
 
 let execute (queryContext: QueryContext) plan : seq<Row> =
   match plan with
-  | Plan.Scan (table, columnIndices) -> executeScan queryContext table columnIndices
-  | Plan.Project (plan, expressions) -> executeProject queryContext (plan, expressions)
-  | Plan.ProjectSet (plan, fn, args) -> executeProjectSet queryContext (plan, fn, args)
-  | Plan.Filter (plan, condition) -> executeFilter queryContext (plan, condition)
-  | Plan.Sort (plan, orderings) -> executeSort queryContext (plan, orderings)
-  | Plan.Aggregate (plan, labels, aggregators, anonymizationContext) ->
+  | Plan.Scan(table, columnIndices) -> executeScan queryContext table columnIndices
+  | Plan.Project(plan, expressions) -> executeProject queryContext (plan, expressions)
+  | Plan.ProjectSet(plan, fn, args) -> executeProjectSet queryContext (plan, fn, args)
+  | Plan.Filter(plan, condition) -> executeFilter queryContext (plan, condition)
+  | Plan.Sort(plan, orderings) -> executeSort queryContext (plan, orderings)
+  | Plan.Aggregate(plan, labels, aggregators, anonymizationContext) ->
     executeAggregate queryContext (plan, labels, aggregators, anonymizationContext)
-  | Plan.Join (leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
-  | Plan.Limit (plan, amount) -> executeLimit queryContext (plan, amount)
-  | _ -> failwith "Plan execution not implemented"
+  | Plan.AdaptiveBuckets(plan, expressions, anonymizationContext) ->
+    executeAdaptiveBuckets queryContext (plan, expressions, anonymizationContext)
+  | Plan.Join(leftPlan, rightPlan, joinType, on) -> executeJoin queryContext (leftPlan, rightPlan, joinType, on)
+  | Plan.Limit(plan, amount) -> executeLimit queryContext (plan, amount)

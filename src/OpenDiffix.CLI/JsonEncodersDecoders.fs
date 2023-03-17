@@ -64,7 +64,7 @@ module private rec Encoders =
 
   let private encodeResponse (response: QueryResponseRequest) =
     match response with
-    | Ok (queryResult, queryRequest) ->
+    | Ok(queryResult, queryRequest) ->
       let response =
         {|
           Success = true
@@ -110,9 +110,9 @@ let encodeQueryResult (queryResult: QueryEngine.QueryResult) = (queryResult |> a
 
 let encodeBatchRunResult (time: System.DateTime) version (queryResults: QueryResponseRequest list) =
   ({|
-     Version = version
-     Time = time.ToLongDateString()
-     QueryResults = queryResults
+    Version = version
+    Time = time.ToLongDateString()
+    QueryResults = queryResults
    |}
    |> autoEncode)
     .ToString()

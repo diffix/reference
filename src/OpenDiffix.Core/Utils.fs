@@ -63,7 +63,7 @@ module Dictionary =
 type Hash = uint64
 
 module Hash =
-  let bytes (data: byte []) : Hash =
+  let bytes (data: byte[]) : Hash =
     // Implementation of FNV-1a hash algorithm: http://www.isthe.com/chongo/tech/comp/fnv/index.html
     let fnvPrime = 1099511628211UL
     let offsetBasis = 14695981039346656037UL
@@ -86,3 +86,17 @@ module Hash =
 module Math =
   let roundAwayFromZero (x: float) : float =
     System.Math.Round(x, MidpointRounding.AwayFromZero)
+
+let TIMESTAMP_REFERENCE = DateTime(1800, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+
+// Encodes `s` as a double-precision floating point number, obtained by hashing.
+// Uses only a subset of representable floating point to avoid large/small numbers.
+// For columns with many unique values collisions are possible, but collisions numerous enough
+// to cross a reasonable LCF threshold rather unlikely.
+let hashStringToFloat (s: String) =
+  let hash = Hash.string s
+  // Fix 8 highest order bits to 01000000 to have a moderate-sized positive number.
+  let bitMask = 0b11111111UL <<< 56
+  let newValue = 0b01000000UL <<< 56
+  let hashSlice = ((hash &&& ~~~bitMask) ||| newValue)
+  hashSlice |> BitConverter.GetBytes |> BitConverter.ToDouble

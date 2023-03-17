@@ -10,7 +10,7 @@ type NodeFunctions =
   // Expression
   static member Map(expression: Expression, f: Expression -> Expression) =
     match expression with
-    | FunctionExpr (fn, args) -> FunctionExpr(fn, List.map f args)
+    | FunctionExpr(fn, args) -> FunctionExpr(fn, List.map f args)
     | ListExpr exprs -> ListExpr(List.map f exprs)
     | expr -> expr
 
@@ -21,7 +21,7 @@ type NodeFunctions =
   static member Map(query: SelectQuery, f: Query -> Query) =
     let rec mapSubQueries range =
       match range with
-      | SubQuery (subQuery, alias) -> SubQuery(f subQuery, alias)
+      | SubQuery(subQuery, alias) -> SubQuery(f subQuery, alias)
       | Join join -> Join(NodeFunctions.Map(join, mapSubQueries))
       | rangeTable -> rangeTable
 
@@ -67,13 +67,13 @@ type NodeFunctions =
 
   static member Unwrap(orderByExpression: OrderBy) =
     match orderByExpression with
-    | OrderBy (expr, direction, nulls) -> (expr, direction, nulls)
+    | OrderBy(expr, direction, nulls) -> (expr, direction, nulls)
 
 let inline private callMap (_: ^M, node: ^T, func: ^F) =
-  ((^M or ^T): (static member Map : ^T * ^F -> ^T) (node, func))
+  ((^M or ^T): (static member Map: ^T * ^F -> ^T) (node, func))
 
 let inline private callUnwrap (_: ^M, node: ^T) =
-  ((^M or ^T): (static member Unwrap : ^T -> ^U) node)
+  ((^M or ^T): (static member Unwrap: ^T -> ^U) node)
 
 // ----------------------------------------------------------------
 // Public API
@@ -109,7 +109,7 @@ let inline unwrap node =
 let inline collectAggregates node =
   let rec exprAggregators expr =
     match expr with
-    | FunctionExpr (AggregateFunction _, _) as aggregator -> [ aggregator ]
+    | FunctionExpr(AggregateFunction _, _) as aggregator -> [ aggregator ]
     | expr -> expr |> collect exprAggregators
 
   node |> collect exprAggregators
@@ -118,7 +118,7 @@ let inline collectAggregates node =
 let inline visitAggregates f node =
   let rec exprVisitor f expr =
     match expr with
-    | FunctionExpr (AggregateFunction (fn, opts), args) -> f (fn, opts, args)
+    | FunctionExpr(AggregateFunction(fn, opts), args) -> f (fn, opts, args)
     | other -> other |> visit (exprVisitor f)
 
   node |> visit (exprVisitor f)

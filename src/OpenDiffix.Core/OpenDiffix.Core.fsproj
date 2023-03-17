@@ -10,6 +10,11 @@
     <Compile Include="Bucket.fs" />
     <Compile Include="Expression.fs" />
     <Compile Include="Anonymizer.fs" />
+    <Compile Include="AdaptiveBuckets\Range.fs" />
+    <Compile Include="AdaptiveBuckets\Combination.fs" />
+    <Compile Include="AdaptiveBuckets\Forest.fs" />
+    <Compile Include="AdaptiveBuckets\Bucket.fs" />
+    <Compile Include="AdaptiveBuckets\Microdata.fs" />
     <Compile Include="Aggregator.fs" />
     <Compile Include="ParserTypes.fs" />
     <Compile Include="Parser.fs" />

@@ -327,19 +327,22 @@ type Tests(db: DBFixture) =
   let anonParams =
     {
       TableSettings =
-        Map [
-          "customers", { AidColumns = [ "id"; "company_name" ] }
-          "customers_small", { AidColumns = [ "id"; "company_name" ] }
-          "purchases", { AidColumns = [ "cid" ] }
-        ]
+        Map
+          [
+            "customers", { AidColumns = [ "id"; "company_name" ] }
+            "customers_small", { AidColumns = [ "id"; "company_name" ] }
+            "purchases", { AidColumns = [ "cid" ] }
+          ]
       Salt = [||]
       AccessLevel = PublishTrusted
       Strict = false
       Suppression = { LowThreshold = 2; LowMeanGap = 0.0; LayerSD = 0. }
+      AdaptiveBuckets = AdaptiveBucketsParams.Default
       OutlierCount = { Lower = 1; Upper = 1 }
       TopCount = { Lower = 1; Upper = 1 }
       LayerNoiseSD = 0.
       RecoverOutliers = true
+      UseAdaptiveBuckets = false
     }
 
   let queryContext accessLevel =
@@ -364,8 +367,8 @@ type Tests(db: DBFixture) =
     try
       query |> (analyzeQuery accessLevel) |> ignore
       failwith "Expected query to fail"
-    with
-    | ex -> ex.Message |> should equal error
+    with ex ->
+      ex.Message |> should equal error
 
   let assertTrustedQueryFails = assertQueryFails PublishTrusted
   let assertDirectQueryFails = assertQueryFails Direct
@@ -375,7 +378,14 @@ type Tests(db: DBFixture) =
     let expectedSeed = Hash.strings 0UL seedMaterials
 
     (analyzeTrustedQuery query).AnonymizationContext
-    |> should equal (Some { BucketSeed = expectedSeed; BaseLabels = baseLabels })
+    |> should
+         equal
+         (Some
+           {
+             BucketSeed = expectedSeed
+             BaseLabels = baseLabels
+             AnonymizationParams = anonParams
+           })
 
   let assertSqlSeed query (seedMaterials: string seq) =
     assertSqlSeedWithFilter query seedMaterials []
@@ -389,7 +399,8 @@ type Tests(db: DBFixture) =
 
   [<Fact>]
   let ``Analyze count transforms`` () =
-    let result = analyzeTrustedQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
+    let result =
+      analyzeTrustedQuery "SELECT count(*), count(distinct id) FROM customers_small HAVING count(*) > 1"
 
     let countStar = FunctionExpr(AggregateFunction(DiffixCount, AggregateOptions.Default), [ aidColumns ])
 
